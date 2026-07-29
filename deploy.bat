@@ -1,9 +1,10 @@
 @echo off
 setlocal enabledelayedexpansion
 cd /d "%~dp0"
+set "GIT_TERMINAL_PROMPT=0"
 
 echo.
-echo === Smart Dashboard HTTPS Deploy ===
+echo === Smart Dashboard Deploy ===
 echo.
 
 set "GIT_BIN_DIR="
@@ -21,78 +22,70 @@ if exist "%USERPROFILE%\.workbuddy\vendor\PortableGit\mingw64\bin\git.exe" (
 
 if not defined GIT_BIN_DIR (
   git --version >nul 2>&1
-  if !ERRORLEVEL! == 0 goto :GIT_READY
-  echo.
-  echo git.exe not found. Please install Git for Windows first:
-  echo   https://git-scm.com/download/win
-  echo During install, select: "Git from the command line and also from 3rd-party software"
+  if !ERRORLEVEL! == 0 goto GIT_READY
+  echo git.exe not found. Install Git for Windows: https://git-scm.com/download/win
   pause
   exit /b 1
 )
-
 set "PATH=%GIT_BIN_DIR%;%PATH%"
 
 :GIT_READY
-git --version >nul 2>&1
-if !ERRORLEVEL! neq 0 (
-  echo.
-  echo git.exe path is invalid.
-  pause
-  exit /b 1
-)
-
 if not exist ".git" (
   echo Initializing git repository...
   git init
-  git remote add origin https://github.com/YHDXM/ZXS.git
+  git remote add origin https://github.com/yhdxm/zxs.git
 )
-
 git remote get-url origin >nul 2>&1
 if !ERRORLEVEL! neq 0 (
-  git remote add origin https://github.com/YHDXM/ZXS.git
+  git remote add origin https://github.com/yhdxm/zxs.git
 )
 
-:: Local commit identity (does not touch global git config)
 git config user.email "deploy@zxs.local"
 git config user.name "ZXS Deploy"
-
-:: Local HTTP tuning for large pushes
 git config http.version HTTP/1.1
 git config http.postBuffer 524288000
 git config https.postBuffer 524288000
-git config http.sslVerify true
+git config --local credential.helper ""
 
 git add -A
 git diff --cached --quiet
 if !ERRORLEVEL! neq 0 (
-  git commit -m "deploy: update site (%date% %time%)"
+  git commit -m "deploy: update (%date% %time%)"
 ) else (
-  echo No changes to commit. Pushing existing state...
+  echo No local changes to commit.
 )
 
 git branch -M main
 
 echo.
-echo Pushing to GitHub (will retry up to 3 times)...
-set ATTEMPT=0
-:RETRY
-set /a ATTEMPT+=1
-git push -f origin main
-if !ERRORLEVEL! == 0 goto SUCCESS
+echo Paste your GitHub token below (classic token, needs "repo" scope).
+echo NOTE: the token shows in plain text - do not screenshot this line.
 echo.
-echo Attempt %ATTEMPT% failed.
-if %ATTEMPT% lss 3 (
-  echo Retrying in 5 seconds...
-  timeout /t 5 /nobreak >nul
-  goto RETRY
+set /p "GH_TOKEN=GitHub token: "
+set "GH_TOKEN=%GH_TOKEN: =%"
+
+if not defined GH_TOKEN (
+  echo No token entered. Aborting.
+  pause
+  exit /b 1
+)
+
+echo.
+echo Pushing to GitHub...
+git push -f https://%GH_TOKEN%@github.com/YHDXM/ZXS.git main > "%TEMP%\zxs_deploy_push.log" 2>&1
+set "PUSH_ERR=%ERRORLEVEL%"
+set "GH_TOKEN="
+
+if "%PUSH_ERR%" == "0" (
+  echo.
+  echo Push finished. Check GitHub Actions for build status:
+  echo   https://github.com/YHDXM/ZXS/actions
+) else (
+  echo.
+  echo Push failed. Open this file for details:
+  echo   %TEMP%\zxs_deploy_push.log
+  echo Common causes: token lacks "repo" scope, or wrong GitHub account.
 )
 echo.
-echo HTTPS push failed after 3 attempts.
-echo Try deploy-ssh.bat if an SSH key is configured, or install Git for Windows.
-pause
-exit /b 1
-
-:SUCCESS
-echo.
-echo Push finished. Check GitHub Actions tab for build status.
+echo (If the window ever closes too fast, the push log is saved at %TEMP%\zxs_deploy_push.log)
 pause

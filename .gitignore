@@ -42,3 +42,6 @@ __screenshots__/
 
 # Vite
 *.timestamp-*-*.mjs
+
+# Internal workbuddy memory (not for deployment)
+.workbuddy/
