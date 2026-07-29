@@ -47,6 +47,25 @@ git config http.postBuffer 524288000
 git config https.postBuffer 524288000
 git config --local credential.helper ""
 
+set "PROXY_PORT="
+for %%p in (7890 10809 1080 8118 7070) do (
+  powershell -NoProfile -Command "try { $c=New-Object System.Net.Sockets.TcpClient('127.0.0.1',%%p); $c.Close(); exit 0 } catch { exit 1 }" >nul 2>&1
+  if !ERRORLEVEL! == 0 (
+    set "PROXY_PORT=%%p"
+    goto PROXY_FOUND
+  )
+)
+
+:PROXY_FOUND
+if defined PROXY_PORT (
+  echo Detected local proxy: 127.0.0.1:!PROXY_PORT!
+  git config --local http.proxy http://127.0.0.1:!PROXY_PORT!
+  git config --local https.proxy http://127.0.0.1:!PROXY_PORT!
+) else (
+  echo WARNING: No local proxy detected on common ports.
+  echo If GitHub push fails with "Connection reset", start your VPN/proxy first.
+)
+
 git add -A
 git diff --cached --quiet
 if !ERRORLEVEL! neq 0 (
