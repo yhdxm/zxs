@@ -72,8 +72,12 @@ if not defined GH_TOKEN (
 
 echo.
 echo Pushing to GitHub...
-git push -f https://%GH_TOKEN%@github.com/YHDXM/ZXS.git main > "%TEMP%\zxs_deploy_push.log" 2>&1
+set "REMOTE_URL=https://%GH_TOKEN%@github.com/YHDXM/ZXS.git"
+git remote set-url origin "%REMOTE_URL%"
+set "REMOTE_URL="
+git push -f origin main > "%TEMP%\zxs_deploy_push.log" 2>&1
 set "PUSH_ERR=%ERRORLEVEL%"
+git remote set-url origin https://github.com/YHDXM/ZXS.git
 set "GH_TOKEN="
 
 if "%PUSH_ERR%" == "0" (
