@@ -1,0 +1,128 @@
+/* ============================================================
+   ZXS 设计系统 · 双主题令牌（浅色 = 当前风格 / 深色 = 新增）
+   切换方式：在 <html> 上切换 class "dark"（或 data-theme 属性）
+   ============================================================ */
+
+/* ---------- 浅色（默认，当前项目风格） ---------- */
+:root,
+:root[data-theme='light'] {
+  --bg-app: #f8fafc;
+  --bg-app-grad: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 50%, #e2e8f0 100%);
+  --bg-main-grad: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+  --surface: #ffffff;
+  --surface-soft: rgba(255, 255, 255, 0.7);
+  --surface-mute: rgba(255, 255, 255, 0.6);
+  --sidebar-bg: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 50%, #e2e8f0 100%);
+
+  --text-strong: #0f172a;
+  --text: #475569;
+  --text-muted: #64748b;
+  --text-faint: #94a3b8;
+  --text-invert: #ffffff;
+
+  --border: rgba(99, 102, 241, 0.12);
+  --border-strong: rgba(99, 102, 241, 0.18);
+
+  --primary: #6366f1;
+  --primary-2: #38bdf8;
+  --primary-3: #8b5cf6;
+  --primary-contrast: #ffffff;
+
+  --accent-glow: rgba(99, 102, 241, 0.35);
+  --accent-glow-2: rgba(56, 189, 248, 0.5);
+  --shadow-sidebar: 10px 0 40px rgba(2, 6, 23, 0.08);
+  --shadow-card: 0 0 18px rgba(99, 102, 241, 0.16);
+
+  --topbar-bg: rgba(255, 255, 255, 0.82);
+  --nav-hover: rgba(99, 102, 241, 0.08);
+  --nav-active-bg: linear-gradient(120deg, rgba(99, 102, 241, 0.14), rgba(139, 92, 246, 0.10));
+  --nav-active-text: #4338ca;
+  --nav-active-glow: rgba(99, 102, 241, 0.16);
+
+  --toggle-bg: rgba(255, 255, 255, 0.6);
+  --toggle-track: rgba(99, 102, 241, 0.18);
+}
+
+/* ---------- 深色（新增） ---------- */
+.dark,
+:root[data-theme='dark'] {
+  --bg-app: #0b1120;
+  --bg-app-grad: linear-gradient(180deg, #0f172a 0%, #111827 50%, #0b1120 100%);
+  --bg-main-grad: linear-gradient(180deg, #0b1120 0%, #0f172a 100%);
+  --surface: #111827;
+  --surface-soft: rgba(30, 41, 59, 0.7);
+  --surface-mute: rgba(30, 41, 59, 0.6);
+  --sidebar-bg: linear-gradient(180deg, #0f172a 0%, #111827 50%, #0b1120 100%);
+
+  --text-strong: #f1f5f9;
+  --text: #cbd5e1;
+  --text-muted: #94a3b8;
+  --text-faint: #64748b;
+  --text-invert: #0b1120;
+
+  --border: rgba(129, 140, 248, 0.16);
+  --border-strong: rgba(129, 140, 248, 0.22);
+
+  --primary: #818cf8;
+  --primary-2: #38bdf8;
+  --primary-3: #a78bfa;
+  --primary-contrast: #0b1120;
+
+  --accent-glow: rgba(129, 140, 248, 0.45);
+  --accent-glow-2: rgba(56, 189, 248, 0.55);
+  --shadow-sidebar: 10px 0 40px rgba(0, 0, 0, 0.5);
+  --shadow-card: 0 0 18px rgba(99, 102, 241, 0.28);
+
+  --topbar-bg: rgba(15, 23, 42, 0.82);
+  --nav-hover: rgba(129, 140, 248, 0.12);
+  --nav-active-bg: linear-gradient(120deg, rgba(129, 140, 248, 0.20), rgba(167, 139, 250, 0.14));
+  --nav-active-text: #c7d2fe;
+  --nav-active-glow: rgba(129, 140, 248, 0.22);
+
+  --toggle-bg: rgba(30, 41, 59, 0.7);
+  --toggle-track: rgba(129, 140, 248, 0.30);
+}
+
+/* ---------- 全局过渡（切换主题时的平滑感） ---------- */
+html {
+  background: var(--bg-app);
+  transition: background-color 0.3s ease;
+}
+body {
+  background: var(--bg-app);
+  color: var(--text);
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+* {
+  transition:
+    background-color 0.3s ease,
+    border-color 0.3s ease,
+    color 0.3s ease,
+    box-shadow 0.3s ease;
+}
+
+/* ---------- Element Plus 暗色主题变量微调（与令牌对齐） ---------- */
+.dark {
+  --el-color-primary: #818cf8;
+  --el-color-primary-light-3: #6366f1;
+  --el-bg-color: #111827;
+  --el-bg-color-overlay: #1f2937;
+  --el-fill-color-blank: #0f172a;
+  --el-text-color-primary: #e2e8f0;
+  --el-text-color-regular: #cbd5e1;
+  --el-border-color: rgba(129, 140, 248, 0.22);
+  --el-border-color-light: rgba(129, 140, 248, 0.16);
+  --el-mask-color: rgba(2, 6, 23, 0.7);
+}
+
+/* ---------- Vant 暗色变量（移动端） ---------- */
+.dark {
+  --van-background: #0b1120;
+  --van-background-2: #111827;
+  --van-background-3: #1f2937;
+  --van-text-color: #cbd5e1;
+  --van-text-color-2: #94a3b8;
+  --van-text-color-3: #64748b;
+  --van-border-color: rgba(129, 140, 248, 0.22);
+  --van-primary-color: #818cf8;
+}

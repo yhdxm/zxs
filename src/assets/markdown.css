@@ -1,0 +1,70 @@
+/* ============================================================
+   Markdown 渲染全局样式（renderMarkdown 输出 md-* 类）
+   作用于 v-html 内容（非 scoped），需全局引入。
+   ============================================================ */
+.md-h1, .md-h2, .md-h3, .md-h4, .md-h5, .md-h6 {
+  color: var(--text-strong);
+  font-weight: 700;
+  line-height: 1.4;
+  margin: 14px 0 8px;
+}
+.md-h1 { font-size: 20px; border-bottom: 2px solid var(--border); padding-bottom: 6px; }
+.md-h2 { font-size: 18px; border-bottom: 1px solid var(--border); padding-bottom: 5px; }
+.md-h3 { font-size: 16px; }
+.md-h4, .md-h5, .md-h6 { font-size: 14px; }
+.md-p { margin: 8px 0; line-height: 1.8; }
+.md-ul, .md-ol { margin: 8px 0; padding-left: 22px; }
+.md-li { margin: 4px 0; line-height: 1.7; }
+.md-a { color: var(--primary); text-decoration: underline; word-break: break-all; }
+.md-strong { font-weight: 700; color: var(--text-strong); }
+.md-em { font-style: italic; }
+.md-code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.88em;
+  background: var(--surface-soft);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 1px 6px;
+  color: var(--primary-3);
+}
+.md-pre {
+  background: var(--surface-soft);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin: 10px 0;
+  overflow-x: auto;
+}
+.md-pre .md-code {
+  background: transparent;
+  border: none;
+  padding: 0;
+  color: var(--text);
+  white-space: pre;
+  display: block;
+  word-break: normal;
+}
+.md-quote {
+  border-left: 3px solid var(--border-strong);
+  padding-left: 12px;
+  margin: 8px 0;
+  color: var(--text-muted);
+}
+.md-hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 14px 0;
+}
+.md-img { max-width: 100%; border-radius: 10px; margin: 8px 0; }
+.md-table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 10px 0;
+  font-size: 13px;
+}
+.md-table th, .md-table td {
+  border: 1px solid var(--border);
+  padding: 6px 10px;
+  text-align: left;
+}
+.md-table th { background: var(--surface-soft); color: var(--text-strong); }
