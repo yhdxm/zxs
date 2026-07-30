@@ -6,7 +6,12 @@
         <span class="mm-title-icon" :class="type">{{ typeIcon }}</span>
         <div>
           <h2>{{ typeLabel }}数据条</h2>
-          <p class="mm-title-tip">共 {{ filteredList.length }} 条数据</p>
+          <!--
+            口径（Fix #4 / #5）：列表左上角总数 = 实际数据条数 − 今日新增条目数。
+            「今日新增」以 createdAt 的本地日期 === 今日 判定（含通过「+ 新增」录入的草稿/今日数据），
+            避免新增录入虚增存量统计；详情在下方 tip 中展示。
+          -->
+          <p class="mm-title-tip">共 {{ backlogCount }} 条数据（含今日新增 {{ newCountInList }} 条 / 总计 {{ filteredList.length }} 条）</p>
         </div>
       </div>
 
@@ -92,6 +97,14 @@
           </el-button>
           <el-button size="small" text @click.stop="openEditById(item.id)">
             <el-icon><Edit /></el-icon><span>修改</span>
+          </el-button>
+          <!-- 点位：巡检状态操作置于「修改」之后（Fix #4：顺序 新增 / 修改 / 巡检状态 / 删除） -->
+          <el-button v-if="type === 'points'" size="small" text @click.stop="cyclePointStatus(item.id)">
+            <el-icon><Switch /></el-icon><span>巡检状态</span>
+          </el-button>
+          <!-- 内容：分类快速操作置于「修改」之后（Fix #5：顺序 新增 / 修改 / 分类 / 删除） -->
+          <el-button v-if="type === 'contents'" size="small" text @click.stop="editCategory(item.id)">
+            <el-icon><Collection /></el-icon><span>分类</span>
           </el-button>
           <el-button v-if="type === 'todos'" size="small" text @click.stop="cycleTodoStatus(item.id)">
             <el-icon><Switch /></el-icon><span>状态</span>
@@ -205,7 +218,7 @@ import { computed, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   List, Location, Document, Plus, Edit, Delete,
-  Download, Upload, More, Search, Switch
+  Download, Upload, More, Search, Switch, Collection
 } from '@element-plus/icons-vue'
 import {
   type AppDashboardData,
@@ -364,6 +377,27 @@ interface SideVM {
   badge?: string
   badgeType?: 'primary' | 'success' | 'info' | 'warning' | 'danger'
 }
+
+/** 判定条目是否为「今日新增」（createdAt 本地日期 === 今日） */
+function isCreatedToday(item: { createdAt: string }): boolean {
+  const d = new Date(item.createdAt)
+  if (Number.isNaN(d.getTime())) return false
+  const now = new Date()
+  return (
+    d.getFullYear() === now.getFullYear() &&
+    d.getMonth() === now.getMonth() &&
+    d.getDate() === now.getDate()
+  )
+}
+
+/**
+ * 今日新增条目数（在 filteredList 范围内统计），用于「条数减去新增」口径。
+ */
+const newCountInList = computed(() => filteredList.value.filter((it) => isCreatedToday(it as { createdAt: string })).length)
+/**
+ * 存量条数 = 实际数据条数 − 今日新增（Fix #4 / #5：不要把新增草稿/今日录入计入存量）。
+ */
+const backlogCount = computed(() => Math.max(0, filteredList.value.length - newCountInList.value))
 const sideItems = computed<SideVM[]>(() => {
   return filteredList.value.map((item) => {
     if (props.type === 'todos') {
@@ -493,6 +527,35 @@ const cycleTodoStatus = async (id: string) => {
   target.status = next[target.status] || 'todo'
   await props.onSave()
   ElMessage.success(`状态已更新为：${todoStatusLabel(target.status)}`)
+}
+
+/** 点位巡检状态快速切换（Fix #4）：待巡查 → 异常 → 已巡查 → 待巡查 */
+const cyclePointStatus = async (id: string) => {
+  const target = props.dashboard.points.find((i) => i.id === id)
+  if (!target) return
+  const next: Record<PointStatus, PointStatus> = { pending: 'issue', issue: 'done', done: 'pending' }
+  target.status = next[target.status] || 'pending'
+  await props.onSave()
+  ElMessage.success(`巡检状态已更新为：${statusLabel(target.status)}`)
+}
+
+/** 内容分类快速设置（Fix #5）：弹窗输入分类后保存 */
+const editCategory = async (id: string) => {
+  const target = props.dashboard.contents.find((i) => i.id === id)
+  if (!target) return
+  try {
+    const { value } = await ElMessageBox.prompt('设置该内容的分类（如 日报 / 周报 / 笔记）', '分类', {
+      inputValue: target.category || '',
+      confirmButtonText: '保存',
+      cancelButtonText: '取消',
+      inputValidator: (v) => (v && v.trim() ? true : '分类不能为空')
+    })
+    target.category = value.trim()
+    await props.onSave()
+    ElMessage.success('分类已更新')
+  } catch {
+    /* 取消 */
+  }
 }
 
 const duplicateItem = (id: string) => {

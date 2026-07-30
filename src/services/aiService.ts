@@ -1,5 +1,6 @@
 import { encryptSecret, decryptSecret } from './secret'
 import { loadProfileAiConfig, saveProfileAiConfig } from './appDataService'
+import { recordUsage } from './usageTracker'
 
 export type AiProvider = 'ollama' | 'openrouter' | 'openai-compatible' | 'bailian'
 
@@ -91,6 +92,38 @@ const ANSWER_RULE =
 
 function buildSystemPrompt(prompt: string): string {
   return (prompt || '') + ANSWER_RULE
+}
+
+/**
+ * 记录一次真实 AI 调用用量（Fix #2）。
+ * 若响应体携带 OpenAI 兼容的 usage（prompt_tokens / completion_tokens / total_tokens），
+ * 则使用「真实 tokens」；否则按字符长度本地估算。阿里百炼、OpenAI 兼容接口均会返回 usage。
+ * 所有记录仅存浏览器 localStorage，不写入云端、不消耗任何积分。
+ */
+function trackUsage(
+  provider: string,
+  model: string,
+  prompt: string,
+  completion: string,
+  usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number }
+): void {
+  if (!usage || typeof usage.prompt_tokens !== 'number') {
+    recordUsage({ provider, model, promptText: prompt, completionText: completion })
+    return
+  }
+  recordUsage({
+    provider,
+    model,
+    promptText: prompt,
+    completionText: completion,
+    realUsage: {
+      promptTokens: Number(usage.prompt_tokens) || 0,
+      completionTokens: Number(usage.completion_tokens) || 0,
+      totalTokens:
+        Number(usage.total_tokens) ||
+        (Number(usage.prompt_tokens) || 0) + (Number(usage.completion_tokens) || 0)
+    }
+  })
 }
 
 export async function loadAiConfig(userId?: string): Promise<AiConfig> {
@@ -189,6 +222,7 @@ export async function callAi(config: AiConfig, userPrompt: string): Promise<stri
 
     const content = data?.message?.content || data?.response || ''
     if (typeof content === 'string' && content.trim()) {
+      trackUsage('ollama', config.model, userPrompt, content)
       return content
     }
 
@@ -221,6 +255,7 @@ export async function callAi(config: AiConfig, userPrompt: string): Promise<stri
 
     const content = data?.choices?.[0]?.message?.content || ''
     if (typeof content === 'string' && content.trim()) {
+      trackUsage('bailian', config.model || 'qwen-turbo', userPrompt, content, data?.usage)
       return content
     }
 
@@ -255,6 +290,7 @@ export async function callAi(config: AiConfig, userPrompt: string): Promise<stri
 
   const content = data?.choices?.[0]?.message?.content || ''
   if (typeof content === 'string' && content.trim()) {
+    trackUsage(config.provider, config.model, userPrompt, content, data?.usage)
     return content
   }
 

@@ -162,23 +162,125 @@ export const CALLABLE_MODELS: CallableModel[] = [
   },
 
   // ===== 阿里百炼（DashScope）=====
+  // 以下模型均取自用户阿里百炼控制台「免费额度」档（截图核对），统一标记 isFree: true。
+  // 说明：阿里百炼免费额度模型会随官方活动调整，此处以用户控制台可见的免费档为准。
   {
     id: 'bailian:qwen-turbo',
     provider: 'bailian',
     baseUrl: BAILIAN_BASE,
     model: 'qwen-turbo',
-    isFree: false,
-    label: '阿里百炼 · qwen-turbo',
-    note: '需 DashScope Key'
+    isFree: true,
+    label: '阿里百炼 · qwen-turbo（免费）',
+    note: '通义千问极速版，免费额度'
   },
   {
     id: 'bailian:qwen-plus',
     provider: 'bailian',
     baseUrl: BAILIAN_BASE,
     model: 'qwen-plus',
-    isFree: false,
-    label: '阿里百炼 · qwen-plus',
-    note: '需 DashScope Key'
+    isFree: true,
+    label: '阿里百炼 · qwen-plus（免费）',
+    note: '通义千问 plus，免费额度'
+  },
+  {
+    id: 'bailian:qwen-plus-2025-07-28',
+    provider: 'bailian',
+    baseUrl: BAILIAN_BASE,
+    model: 'qwen-plus-2025-07-28',
+    isFree: true,
+    label: '阿里百炼 · qwen-plus-2025-07-28（免费）',
+    note: 'qwen-plus 指定快照版，免费额度'
+  },
+  {
+    id: 'bailian:qwen-max',
+    provider: 'bailian',
+    baseUrl: BAILIAN_BASE,
+    model: 'qwen-max',
+    isFree: true,
+    label: '阿里百炼 · qwen-max（免费）',
+    note: '通义千问旗舰版，免费额度'
+  },
+  {
+    id: 'bailian:qwen-math-turbo',
+    provider: 'bailian',
+    baseUrl: BAILIAN_BASE,
+    model: 'qwen-math-turbo',
+    isFree: true,
+    label: '阿里百炼 · qwen-math-turbo（免费）',
+    note: '数学推理专用，免费额度'
+  },
+  {
+    id: 'bailian:qwen3.7-plus',
+    provider: 'bailian',
+    baseUrl: BAILIAN_BASE,
+    model: 'qwen3.7-plus',
+    isFree: true,
+    label: '阿里百炼 · qwen3.7-plus（免费）',
+    note: 'qwen3 系列 plus，免费额度'
+  },
+  {
+    id: 'bailian:qwen3-vl-235b-a22b-thinking',
+    provider: 'bailian',
+    baseUrl: BAILIAN_BASE,
+    model: 'qwen3-vl-235b-a22b-thinking',
+    isFree: true,
+    label: '阿里百炼 · qwen3-vl-235b-a22b-thinking（免费）',
+    note: '视觉语言思考模型，免费额度'
+  },
+  {
+    id: 'bailian:qwen3-vl-32b-thinking',
+    provider: 'bailian',
+    baseUrl: BAILIAN_BASE,
+    model: 'qwen3-vl-32b-thinking',
+    isFree: true,
+    label: '阿里百炼 · qwen3-vl-32b-thinking（免费）',
+    note: '视觉语言思考模型，免费额度'
+  },
+  {
+    id: 'bailian:deepseek-r1-distill-qwen-7b',
+    provider: 'bailian',
+    baseUrl: BAILIAN_BASE,
+    model: 'deepseek-r1-distill-qwen-7b',
+    isFree: true,
+    label: '阿里百炼 · deepseek-r1-distill-qwen-7b（免费）',
+    note: 'DeepSeek-R1 蒸馏版，免费额度'
+  },
+  {
+    id: 'bailian:glm-5',
+    provider: 'bailian',
+    baseUrl: BAILIAN_BASE,
+    model: 'glm-5',
+    isFree: true,
+    label: '阿里百炼 · glm-5（免费）',
+    note: '智谱 GLM-5，免费额度'
+  },
+  // ===== 阿里百炼常用补充模型（同属免费额度/公开档，便于用户选择）=====
+  {
+    id: 'bailian:qwen-long',
+    provider: 'bailian',
+    baseUrl: BAILIAN_BASE,
+    model: 'qwen-long',
+    isFree: true,
+    label: '阿里百炼 · qwen-long（免费）',
+    note: '超长上下文，免费额度'
+  },
+  {
+    id: 'bailian:qwen-vl-plus',
+    provider: 'bailian',
+    baseUrl: BAILIAN_BASE,
+    model: 'qwen-vl-plus',
+    isFree: true,
+    label: '阿里百炼 · qwen-vl-plus（免费）',
+    note: '视觉语言模型，免费额度'
+  },
+  {
+    id: 'bailian:qwen2.5-72b-instruct',
+    provider: 'bailian',
+    baseUrl: BAILIAN_BASE,
+    model: 'qwen2.5-72b-instruct',
+    isFree: true,
+    label: '阿里百炼 · qwen2.5-72b-instruct（免费）',
+    note: 'qwen2.5 开源指令版，免费额度'
   },
 
   // ===== 本地 Ollama（零成本、零隐私外泄）=====

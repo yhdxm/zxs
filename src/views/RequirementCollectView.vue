@@ -49,6 +49,26 @@
       <span v-if="associatedCount" class="ei-stat-rel">已关联模块 {{ associatedCount }} 条</span>
     </div>
 
+    <!-- 缓存管理（Fix #3）：保留天数 + 清空全部 -->
+    <div class="ei-cache">
+      <div class="ei-cache-row">
+        <span class="ei-cache-label">缓存保留天数</span>
+        <el-input-number
+          v-model="retentionDays"
+          :min="1"
+          :max="365"
+          size="small"
+          controls-position="right"
+          @change="onRetentionChange"
+        />
+        <span class="ei-cache-unit">天</span>
+        <span class="ei-cache-tip">超过保留期的灵感在刷新时自动清理（默认 30 天）</span>
+        <el-button class="ei-clear-all" type="danger" plain size="small" :loading="clearing" @click="clearAllCache">
+          <el-icon><Delete /></el-icon> 清空全部缓存
+        </el-button>
+      </div>
+    </div>
+
     <div v-if="loading && !ideas.length" class="ei-loading">
       <el-icon class="is-loading"><Loading /></el-icon> 正在加载已缓存的灵感…
     </div>
@@ -64,6 +84,7 @@
         :idea="idea"
         @toggle-bookmark="onToggleBookmark"
         @set-related="onSetRelated"
+        @delete="onDeleteIdea"
       />
     </div>
   </div>
@@ -71,14 +92,19 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { ElMessage } from 'element-plus'
-import { Refresh, Search, Star, Loading } from '@element-plus/icons-vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { Refresh, Search, Star, Loading, Delete } from '@element-plus/icons-vue'
 import {
   fetchExternalIdeas,
   loadExternalIdeas,
   saveExternalIdeas,
   toggleBookmark,
   setRelatedModule,
+  deleteExternalIdea,
+  clearExternalIdeas,
+  getRetentionDays,
+  setRetentionDays,
+  cleanupExpiredExternalIdeas,
   type ExternalIdea,
   type RelatedModule
 } from '../services/externalIdeas'
@@ -87,12 +113,14 @@ import { refreshSavedUser } from '../services/appDataService'
 const ideas = ref<ExternalIdea[]>([])
 const loading = ref(false)
 const fetching = ref(false)
+const clearing = ref(false)
 
 const searchText = ref('')
 const sourceFilter = ref('')
 const tagFilter = ref('')
 const onlyBookmarked = ref(false)
 
+const retentionDays = ref(30)
 const userId = ref('')
 
 const sources = computed(() => Array.from(new Set(ideas.value.map((i) => i.source))).sort())
@@ -129,6 +157,9 @@ async function load() {
   loading.value = true
   try {
     await loadUser()
+    retentionDays.value = getRetentionDays()
+    // Fix #3：进入页面即按保留天数清理过期灵感（Supabase 表未建也不白屏）
+    await runCleanup()
     ideas.value = await loadExternalIdeas(userId.value)
   } finally {
     loading.value = false
@@ -178,6 +209,55 @@ function onSetRelated(idea: ExternalIdea, mod: RelatedModule) {
   }
 }
 
+/** 删除单条灵感（Fix #3） */
+async function onDeleteIdea(idea: ExternalIdea) {
+  try {
+    await ElMessageBox.confirm('确认删除这条灵感？删除后不可恢复。', '删除确认', { type: 'warning' })
+  } catch {
+    return
+  }
+  ideas.value = ideas.value.filter((i) => i.id !== idea.id)
+  await deleteExternalIdea(userId.value, idea.id)
+  ElMessage.success('已删除')
+}
+
+/** 保留天数变更（持久化 + 立即清理过期） */
+let retentionTimer: ReturnType<typeof setTimeout> | undefined
+function onRetentionChange(val: number) {
+  retentionDays.value = val
+  if (retentionTimer) clearTimeout(retentionTimer)
+  retentionTimer = setTimeout(async () => {
+    setRetentionDays(val)
+    await runCleanup()
+  }, 300)
+}
+
+/** 按保留天数清理过期灵感 */
+async function runCleanup() {
+  const removed = await cleanupExpiredExternalIdeas(userId.value, retentionDays.value)
+  if (removed > 0) {
+    ideas.value = await loadExternalIdeas(userId.value)
+    ElMessage.info(`已自动清理 ${removed} 条过期灵感（保留 ${retentionDays.value} 天）`)
+  }
+}
+
+/** 清空全部缓存（Fix #3） */
+async function clearAllCache() {
+  try {
+    await ElMessageBox.confirm('确认清空全部本地灵感缓存？此操作不可恢复。', '清空确认', { type: 'warning' })
+  } catch {
+    return
+  }
+  clearing.value = true
+  try {
+    await clearExternalIdeas(userId.value)
+    ideas.value = []
+    ElMessage.success('已清空全部灵感缓存')
+  } finally {
+    clearing.value = false
+  }
+}
+
 onMounted(load)
 </script>
 
@@ -220,6 +300,20 @@ onMounted(load)
 .ei-stat-star { color: #f59e0b; }
 .ei-stat-rel { color: var(--primary); }
 
+.ei-cache {
+  background: var(--surface, #fff);
+  border: 1px solid var(--border, #eef0f4);
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin-bottom: 16px;
+  box-shadow: var(--shadow-card, 0 6px 18px rgba(15, 23, 42, 0.04));
+}
+.ei-cache-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.ei-cache-label { font-size: 13px; color: var(--text); font-weight: 500; }
+.ei-cache-unit { font-size: 13px; color: var(--text-muted); }
+.ei-cache-tip { font-size: 12px; color: var(--text-faint); margin-left: 4px; }
+.ei-clear-all { margin-left: auto; }
+
 .ei-loading {
   display: flex; align-items: center; gap: 8px; color: var(--text-muted);
   padding: 40px 0; justify-content: center; font-size: 14px;
@@ -241,5 +335,7 @@ onMounted(load)
   .ei-header .el-button { width: 100%; }
   .ei-search { max-width: 100%; }
   .ei-source, .ei-tag { flex: 1; width: auto; }
+  .ei-cache-row { flex-direction: column; align-items: stretch; }
+  .ei-clear-all { margin-left: 0; width: 100%; }
 }
 </style>

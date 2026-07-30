@@ -6,6 +6,9 @@
         <button class="idea-btn" :class="{ active: idea.bookmarked }" type="button" @click="$emit('toggle-bookmark', idea)">
           <el-icon><Star :filled="idea.bookmarked" /></el-icon>
         </button>
+        <button class="idea-btn idea-del" type="button" title="删除" @click="$emit('delete', idea)">
+          <el-icon><Delete /></el-icon>
+        </button>
       </div>
     </div>
 
@@ -36,13 +39,14 @@
 </template>
 
 <script setup lang="ts">
-import { Star } from '@element-plus/icons-vue'
+import { Star, Delete } from '@element-plus/icons-vue'
 import type { ExternalIdea, RelatedModule } from '../services/externalIdeas'
 
 defineProps<{ idea: ExternalIdea }>()
 defineEmits<{
   (e: 'toggle-bookmark', idea: ExternalIdea): void
   (e: 'set-related', idea: ExternalIdea, mod: RelatedModule): void
+  (e: 'delete', idea: ExternalIdea): void
 }>()
 
 function fmtTime(iso: string): string {
@@ -85,6 +89,7 @@ function fmtTime(iso: string): string {
 }
 .idea-btn:hover { color: #f59e0b; }
 .idea-btn.active { color: #f59e0b; }
+.idea-btn.idea-del:hover { color: #ef4444; }
 
 .idea-title {
   font-size: 14px; font-weight: 600; color: var(--text-strong, #0f172a);

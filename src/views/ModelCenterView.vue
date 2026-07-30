@@ -63,25 +63,64 @@
       </div>
     </div>
 
-    <!-- 阿里百炼额度（用户自填已知额度，仅本地记录） -->
+    <!-- 阿里百炼·本地用量统计（Fix #2）：真实调用记录，非官方实时额度 -->
     <div class="mc-quota">
       <div class="mc-quota-head">
         <div>
-          <h3>阿里百炼额度监测</h3>
-          <p>记录本地已用调用次数；额度为你已知的上限（如免费额度 / 购买额度），仅存本地不上云。</p>
+          <h3>阿里百炼 · 本地用量统计</h3>
+          <p>
+            阿里百炼官方未开放实时余额/额度查询 API，此处展示<strong>本应用真实调用记录</strong>
+            （调用次数 + 响应 tokens，来自实际 API 返回，绝不伪造），仅存本地不上云。
+          </p>
         </div>
-        <div class="mc-quota-form" v-if="bailianQuota !== null">
+        <div class="mc-quota-actions">
+          <el-button link type="primary" @click="openBailianConsole">查看官方免费额度 ↗</el-button>
+          <el-button v-if="bailianQuota === null" link type="primary" @click="enableQuota">设置额度</el-button>
+        </div>
+      </div>
+
+      <div class="mc-bailian-stats">
+        <div class="mc-bailian-stat">
+          <div class="mc-bailian-num">{{ bailianUsage.totalCalls }}</div>
+          <div class="mc-bailian-label">总调用次数</div>
+        </div>
+        <div class="mc-bailian-stat">
+          <div class="mc-bailian-num">{{ bailianUsage.todayCalls }}</div>
+          <div class="mc-bailian-label">今日调用</div>
+        </div>
+        <div class="mc-bailian-stat">
+          <div class="mc-bailian-num">{{ tokenText(bailianUsage.totalTokens) }}</div>
+          <div class="mc-bailian-label">累计 Tokens</div>
+        </div>
+        <div class="mc-bailian-stat">
+          <div class="mc-bailian-num">{{ bailianUsage.byModel.length }}</div>
+          <div class="mc-bailian-label">调用模型数</div>
+        </div>
+      </div>
+
+      <div v-if="bailianUsage.byModel.length" class="mc-bailian-models">
+        <div class="mc-bailian-model" v-for="m in bailianUsage.byModel" :key="m.model">
+          <span class="mc-bm-name" :title="m.model">{{ m.model }}</span>
+          <span class="mc-bm-calls">{{ m.calls }} 次</span>
+          <span class="mc-bm-tokens">{{ tokenText(m.tokens) }} tok</span>
+        </div>
+      </div>
+      <div v-else class="mc-bailian-empty">暂无百炼调用记录，使用阿里百炼模型对话后将自动累计。</div>
+
+      <!-- 可选：用户已知额度（免费额度 / 购买额度）自填，用于进度提示 -->
+      <div v-if="bailianQuota !== null" class="mc-quota-sub">
+        <div class="mc-quota-form">
+          <span class="mc-quota-label">已知额度上限</span>
           <el-input-number v-model="quotaInput" :min="0" :step="100" controls-position="right" />
           <el-button type="primary" plain @click="saveQuota">保存额度</el-button>
         </div>
+        <div v-if="bailianQuota > 0" class="mc-quota-bar">
+          <div class="mc-quota-fill" :class="{ danger: quotaPercent >= 90 }" :style="{ width: quotaPercent + '%' }"></div>
+        </div>
+        <div v-if="bailianQuota > 0" class="mc-quota-meta">
+          已用 {{ bailianUsage.totalCalls }} / 额度 {{ bailianQuota }}（{{ quotaPercent }}%）
+        </div>
       </div>
-      <div class="mc-quota-bar" v-if="bailianQuota !== null && bailianQuota > 0">
-        <div class="mc-quota-fill" :class="{ danger: quotaPercent >= 90 }" :style="{ width: quotaPercent + '%' }"></div>
-      </div>
-      <div class="mc-quota-meta" v-if="bailianQuota !== null && bailianQuota > 0">
-        已用 {{ usage.bailianUsed }} / 额度 {{ bailianQuota }}（{{ quotaPercent }}%）
-      </div>
-      <el-button v-else link type="primary" @click="enableQuota">设置阿里百炼额度</el-button>
     </div>
 
     <el-tabs v-model="activeTab" class="mc-tabs">
@@ -163,7 +202,9 @@ import {
   setBailianQuota,
   getBailianQuota,
   classifyFree,
-  type UsageSummary
+  getBailianUsage,
+  type UsageSummary,
+  type BailianUsage
 } from '../services/usageTracker'
 import { checkFreeModelsV2, type FreeModelStatusV2, type FreeModelStatusKind } from '../services/freeModels'
 import { getProviderBalance, type ProviderBalance } from '../services/balanceService'
@@ -196,6 +237,14 @@ const usage = ref<UsageSummary>({
 const bailianQuota = ref<number | null>(null)
 const quotaInput = ref<number>(0)
 
+/** 阿里百炼本地真实用量（Fix #2）：调用次数 + 响应 tokens，非官方额度 */
+const bailianUsage = ref<BailianUsage>({
+  totalCalls: 0,
+  todayCalls: 0,
+  totalTokens: 0,
+  byModel: []
+})
+
 const balance = ref<ProviderBalance>({
   provider: 'siliconflow',
   totalBalance: 0,
@@ -221,6 +270,7 @@ const refreshUsage = () => {
   usage.value = getUsageStats()
   bailianQuota.value = getBailianQuota()
   quotaInput.value = bailianQuota.value ?? 0
+  bailianUsage.value = getBailianUsage()
 }
 
 /** 读取当前激活配置，构建「已配置模型」列表 */
@@ -275,6 +325,14 @@ const saveQuota = () => {
   setBailianQuota(quotaInput.value || 0)
   bailianQuota.value = getBailianQuota()
   ElMessage.success('阿里额度已更新（仅本地记录，不上云）')
+}
+
+/** 跳转阿里云百炼控制台（查看官方免费额度 / 用量） */
+const openBailianConsole = () => {
+  const url = 'https://bailian.console.aliyun.com/?tab=model#/api-key'
+  if (typeof window !== 'undefined') {
+    window.open(url, '_blank', 'noopener')
+  }
 }
 
 const confirmClear = async () => {
@@ -387,8 +445,31 @@ onBeforeUnmount(() => {
 }
 .mc-quota-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
 .mc-quota-head h3 { margin: 0 0 4px; font-size: 15px; color: var(--text-strong); }
-.mc-quota-head p { margin: 0; font-size: 12px; color: var(--text-muted); max-width: 540px; line-height: 1.6; }
-.mc-quota-form { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+.mc-quota-head p { margin: 0; font-size: 12px; color: var(--text-muted); max-width: 620px; line-height: 1.6; }
+.mc-quota-head p strong { color: var(--text-strong); }
+.mc-quota-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; flex-wrap: wrap; }
+.mc-bailian-stats {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 12px; margin-top: 14px;
+}
+.mc-bailian-stat {
+  background: var(--surface-soft); border: 1px solid var(--border); border-radius: 12px;
+  padding: 12px 14px; text-align: center;
+}
+.mc-bailian-num { font-size: 22px; font-weight: 800; color: var(--text-strong); font-variant-numeric: tabular-nums; }
+.mc-bailian-label { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+.mc-bailian-models { margin-top: 14px; display: flex; flex-direction: column; gap: 8px; }
+.mc-bailian-model {
+  display: flex; align-items: center; gap: 12px; font-size: 12px;
+  background: var(--surface-soft); border: 1px solid var(--border); border-radius: 10px; padding: 8px 12px;
+}
+.mc-bm-name { flex: 1; min-width: 0; color: var(--text-strong); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mc-bm-calls { color: var(--text-muted); flex-shrink: 0; }
+.mc-bm-tokens { color: var(--primary); flex-shrink: 0; font-weight: 600; }
+.mc-bailian-empty { margin-top: 12px; font-size: 12px; color: var(--text-faint); }
+.mc-quota-sub { margin-top: 16px; border-top: 1px dashed var(--border); padding-top: 14px; }
+.mc-quota-form { display: flex; align-items: center; gap: 10px; flex-shrink: 0; flex-wrap: wrap; }
+.mc-quota-label { font-size: 12px; color: var(--text-muted); }
 .mc-quota-bar {
   margin-top: 14px; height: 10px; border-radius: 999px; background: var(--surface-soft); overflow: hidden;
 }
