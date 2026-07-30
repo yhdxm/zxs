@@ -33,13 +33,16 @@ export function writeFreeApiKey(provider: 'tianditu' | 'tianxing', value: string
 
 /**
  * 构造天地图 WMTS 瓦片模板（Leaflet TileLayer 用）。
- * layer: 'vec' 矢量底图 / 'cva' 注记层。{s} 由 subdomains '01234567' 替换。
+ * layer: 'vec' 矢量底图 / 'cva' 注记层。
+ * 注意：URL 路径段为 `${layer}_w`（如 vec_w），但 WMTS 的 LAYER 参数必须为
+ * `vec` / `cva`（不含 _w），否则天地图会返回 400/403 导致地图空白。
+ * {s} 由 subdomains '01234567' 替换。
  */
 export function tiandituTileUrl(layer: 'vec' | 'cva', tk: string): string {
   const sub = layer === 'vec' ? 'vec_w' : 'cva_w'
   return (
     `https://t{s}.tianditu.gov.cn/${sub}/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0` +
-    `&LAYER=${sub}&STYLE=default&TILEMATRIXSET=w&FORMAT=tiles&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}&tk=${tk}`
+    `&LAYER=${layer}&STYLE=default&TILEMATRIXSET=w&FORMAT=tiles&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}&tk=${tk}`
   )
 }
 

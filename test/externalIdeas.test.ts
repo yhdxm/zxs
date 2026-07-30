@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { fetchExternalIdeas } from '../src/services/externalIdeas'
+import { fetchExternalIdeas, normalizeExternalIdea } from '../src/services/externalIdeas'
 
 // ---- mock fetch：按 URL 返回各源的桩数据 ----
 function makeFetch(handlers: Record<string, () => unknown>) {

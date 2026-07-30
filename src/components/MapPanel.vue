@@ -4,7 +4,7 @@
       <div>
         <h3>地图定位</h3>
         <p class="mp-sub">
-          底图：{{ tiandituKey ? '天地图（已配置 Key）' : 'OpenStreetMap（未配置天地图 Key，降级）' }}
+          底图：{{ tiandituKey ? '天地图（已配置 Key）' : 'OpenStreetMap（未配置天地图 Key，已降级为 OSM）' }}
         </p>
       </div>
       <div class="mp-head-actions">

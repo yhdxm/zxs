@@ -25,6 +25,9 @@ import AutomationInfoView from '../src/views/AutomationInfoView.vue'
 const EL_STUBS = {
   'el-button': true,
   'el-input-number': true,
+  'el-select': true,
+  'el-option': true,
+  'el-date-picker': true,
   'el-tag': true,
   'el-empty': true,
   'el-alert': true,

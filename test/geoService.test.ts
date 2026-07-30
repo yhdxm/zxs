@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { haversine, readFreeApiKey, writeFreeApiKey } from '../src/services/geoService'
+import { haversine, readFreeApiKey, writeFreeApiKey, tiandituTileUrl, OSM_TILE_URL } from '../src/services/geoService'
 
 describe('M9b 公里测距 haversine', () => {
   it('杭州 vs 上海 距离落在合理区间 (~165-175km)', () => {
@@ -65,5 +65,25 @@ describe('M9 免费 API Key 本地读写（天地图/天行）', () => {
     writeFreeApiKey('tianxing', 'B')
     const raw = JSON.parse(window.localStorage.getItem('zxs_free_apis') as string)
     expect(raw).toEqual({ tianditu: 'A', tianxing: 'B' })
+  })
+})
+
+describe('M9b 天地图瓦片 URL（Fix #7）', () => {
+  it('LAYER 参数必须为 vec / cva（不含 _w），路径段保留 _w', () => {
+    const vec = tiandituTileUrl('vec', 'MYKEY')
+    expect(vec).toContain('/vec_w/wmts')
+    expect(vec).toContain('LAYER=vec')
+    expect(vec).not.toContain('LAYER=vec_w')
+    expect(vec).toContain('tk=MYKEY')
+
+    const cva = tiandituTileUrl('cva', 'MYKEY')
+    expect(cva).toContain('/cva_w/wmts')
+    expect(cva).toContain('LAYER=cva')
+    expect(cva).not.toContain('LAYER=cva_w')
+  })
+
+  it('OSM 降级瓦片 URL 正确', () => {
+    expect(OSM_TILE_URL).toContain('{s}.tile.openstreetmap.org')
+    expect(OSM_TILE_URL).toContain('{z}/{x}/{y}.png')
   })
 })

@@ -1378,6 +1378,25 @@ export async function deleteAutomationInfo(userId: string, id: string): Promise<
   }
 }
 
+/** 清空该用户全部自动化信息缓存；返回实际删除条数 */
+export async function clearAllAutomationInfo(userId: string): Promise<number> {
+  if (!userId) return 0
+  try {
+    const { count, error } = await supabase
+      .from('automation_info')
+      .delete({ count: 'exact' })
+      .eq('user_id', userId)
+    if (error) {
+      console.warn('[automation] 清空失败', error.message)
+      return 0
+    }
+    return Number(count) || 0
+  } catch (e) {
+    console.warn('[automation] 清空异常', e)
+    return 0
+  }
+}
+
 /**
  * 清理过期的自动化信息缓存（expire_at < 当前时间）。
  * @returns 实际清理的条数

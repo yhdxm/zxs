@@ -28,6 +28,30 @@
         </div>
       </el-form>
     </div>
+
+    <!-- 免费 API Key 设置（Fix #7）：天地图 / 天行数据，仅存本地 -->
+    <div class="account-card free-key-card">
+      <header class="account-head">
+        <div>
+          <h2>免费 API Key 设置</h2>
+          <p>用于地图（天地图）与新闻（天行数据）的免费公开 API；密钥仅保存在本浏览器 localStorage，绝不上传云端。</p>
+        </div>
+      </header>
+
+      <el-form label-position="top" class="account-form">
+        <el-form-item label="天地图 Key（地图底图，可选）">
+          <el-input v-model="tiandituKey" placeholder="未配置则自动降级为 OpenStreetMap" clearable />
+        </el-form-item>
+
+        <el-form-item label="天行数据 Key（新闻，可选）">
+          <el-input v-model="tianxingKey" placeholder="未配置则新闻降级为公共 RSS" clearable />
+        </el-form-item>
+
+        <div class="account-actions">
+          <el-button type="primary" :loading="savingKeys" @click="saveFreeKeys">保存 Key</el-button>
+        </div>
+      </el-form>
+    </div>
   </div>
 </template>
 
@@ -41,6 +65,7 @@ import {
   refreshSavedUser,
   type AppUser
 } from '../services/appDataService'
+import { readFreeApiKey, writeFreeApiKey } from '../services/geoService'
 
 const currentUser = ref<AppUser | null>(null)
 const saving = ref(false)
@@ -49,6 +74,11 @@ const form = reactive({
   password: '',
   confirmPassword: ''
 })
+
+/* 免费 API Key 设置（Fix #7）：天地图 / 天行数据，仅存本地 localStorage，不上云 */
+const tiandituKey = ref('')
+const tianxingKey = ref('')
+const savingKeys = ref(false)
 
 const avatarText = computed(() => (currentUser.value?.nickname || '用').slice(0, 1).toUpperCase())
 const roleLabel = computed(() => {
@@ -67,6 +97,24 @@ const roleTagType = computed(() => {
 const loadUser = async () => {
   currentUser.value = await refreshSavedUser()
   form.nickname = currentUser.value?.nickname || ''
+}
+
+const loadFreeKeys = () => {
+  tiandituKey.value = readFreeApiKey('tianditu')
+  tianxingKey.value = readFreeApiKey('tianxing')
+}
+
+const saveFreeKeys = () => {
+  savingKeys.value = true
+  try {
+    writeFreeApiKey('tianditu', tiandituKey.value.trim())
+    writeFreeApiKey('tianxing', tianxingKey.value.trim())
+    ElMessage.success('免费 API Key 已保存（仅存本地，不上云）')
+  } catch {
+    ElMessage.error('保存失败')
+  } finally {
+    savingKeys.value = false
+  }
 }
 
 const save = async () => {
@@ -102,7 +150,10 @@ const save = async () => {
   }
 }
 
-onMounted(loadUser)
+onMounted(() => {
+  loadUser()
+  loadFreeKeys()
+})
 </script>
 
 <style scoped>
@@ -158,4 +209,8 @@ onMounted(loadUser)
   .account-page { padding: 12px; }
   .account-card { padding: 20px; }
 }
+
+.free-key-card { margin-top: 20px; }
+.free-key-card .account-head { margin-bottom: 16px; }
+.free-key-card p { margin: 0; font-size: 13px; color: #64748b; line-height: 1.6; }
 </style>
