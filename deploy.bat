@@ -2,11 +2,9 @@
 setlocal enabledelayedexpansion
 cd /d "%~dp0"
 set "GIT_TERMINAL_PROMPT=0"
-title ZXS Deploy
 
 echo.
 echo === Smart Dashboard Deploy ===
-echo Local build is skipped; the real build/deploy runs in GitHub Actions (cloud).
 echo.
 
 set "GIT_BIN_DIR="
@@ -26,7 +24,8 @@ if not defined GIT_BIN_DIR (
   git --version >nul 2>&1
   if !ERRORLEVEL! == 0 goto GIT_READY
   echo git.exe not found. Install Git for Windows: https://git-scm.com/download/win
-  goto DONE_FAIL
+  pause
+  exit /b 1
 )
 set "PATH=%GIT_BIN_DIR%;%PATH%"
 
@@ -62,8 +61,6 @@ if defined PROXY_PORT (
   echo Detected local proxy: 127.0.0.1:!PROXY_PORT!
   git config --local http.proxy http://127.0.0.1:!PROXY_PORT!
   git config --local https.proxy http://127.0.0.1:!PROXY_PORT!
-  set "http_proxy=http://127.0.0.1:!PROXY_PORT!"
-  set "https_proxy=http://127.0.0.1:!PROXY_PORT!"
 ) else (
   echo WARNING: No local proxy detected on common ports.
   echo If GitHub push fails with "Connection reset", start your VPN/proxy first.
@@ -72,7 +69,7 @@ if defined PROXY_PORT (
 git add -A
 git diff --cached --quiet
 if !ERRORLEVEL! neq 0 (
-  git commit -m "deploy: update"
+  git commit -m "deploy: update (%date% %time%)"
 ) else (
   echo No local changes to commit.
 )
@@ -88,72 +85,30 @@ set "GH_TOKEN=%GH_TOKEN: =%"
 
 if not defined GH_TOKEN (
   echo No token entered. Aborting.
-  goto DONE_FAIL
+  pause
+  exit /b 1
 )
 
 echo.
-echo Pushing to GitHub (up to 3 attempts)...
+echo Pushing to GitHub...
 set "REMOTE_URL=https://%GH_TOKEN%@github.com/YHDXM/ZXS.git"
 git remote set-url origin "%REMOTE_URL%"
-set "ATTEMPT=0"
-:PUSH_LOOP
-set /a ATTEMPT+=1
-echo Push attempt !ATTEMPT!...
+set "REMOTE_URL="
 git push -f origin main > "%TEMP%\zxs_deploy_push.log" 2>&1
-set "PUSH_ERR=!ERRORLEVEL!"
-if "!PUSH_ERR!"=="0" goto PUSH_OK
-if !ATTEMPT! lss 3 (
-  echo Push failed (attempt !ATTEMPT!), retry in 5s...
-  timeout /t 5 >nul
-  goto PUSH_LOOP
-)
-goto PUSH_FAIL
-
-:PUSH_OK
+set "PUSH_ERR=%ERRORLEVEL%"
 git remote set-url origin https://github.com/YHDXM/ZXS.git
-set "ZWS_TOKEN=%GH_TOKEN%"
-set "ZWS_PROXY=%PROXY_PORT%"
 set "GH_TOKEN="
 
-echo.
-echo [OK] Push succeeded. Checking GitHub Actions deployment status...
-powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0deploy_watch.ps1"
-set "WATCH_ERR=!ERRORLEVEL!"
-set "ZWS_TOKEN="
-set "ZWS_PROXY="
-set "http_proxy="
-set "https_proxy="
-
-if "!WATCH_ERR!"=="0" (
+if "%PUSH_ERR%" == "0" (
   echo.
-  echo [OK][OK] DEPLOY SUCCESS - production updated.
-) else if "!WATCH_ERR!"=="2" (
-  echo.
-  echo [!] Push succeeded, but could not auto-confirm Actions status (network/proxy limit).
-  echo     Please check manually: https://github.com/YHDXM/ZXS/actions
+  echo Push finished. Check GitHub Actions for build status:
+  echo   https://github.com/YHDXM/ZXS/actions
 ) else (
   echo.
-  echo [X][X] DEPLOY FAILED - check Actions run log:
-  echo     https://github.com/YHDXM/ZXS/actions
+  echo Push failed. Open this file for details:
+  echo   %TEMP%\zxs_deploy_push.log
+  echo Common causes: token lacks "repo" scope, or wrong GitHub account.
 )
-goto DONE
-
-:PUSH_FAIL
-git remote set-url origin https://github.com/YHDXM/ZXS.git
-set "GH_TOKEN="
-set "http_proxy="
-set "https_proxy="
 echo.
-echo [X] Push FAILED. Log: %TEMP%\zxs_deploy_push.log
-echo     Common causes: token lacks "repo" scope, or wrong GitHub account.
-goto DONE_FAIL
-
-:DONE_FAIL
-echo.
-echo [DEPLOY ABORTED]
-goto DONE
-
-:DONE
-echo.
-echo Press any key to close this window...
-pause >nul
+echo (If the window ever closes too fast, the push log is saved at %TEMP%\zxs_deploy_push.log)
+pause
