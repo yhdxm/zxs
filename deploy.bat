@@ -69,27 +69,29 @@ if defined PROXY_PORT (
 )
 
 echo.
-echo Build check first? (recommended, catches compile errors)
-echo   Press ENTER to run "npm run build" first, then deploy.
-echo   Type n then ENTER to skip build and push directly.
-set /p "BUILD_CHOICE=Your choice [Y/n]: "
-if not defined BUILD_CHOICE set "BUILD_CHOICE=Y"
+echo Local build check is OPTIONAL. The real build/deploy runs in GitHub Actions (cloud).
+echo   Press ENTER to skip local build and push directly (recommended, avoids local env issues).
+echo   Type y then ENTER to run "npm run build" locally first.
+set /p "BUILD_CHOICE=Run local build first? [y/N]: "
+if not defined BUILD_CHOICE set "BUILD_CHOICE=N"
 if /i "!BUILD_CHOICE!"=="Y" (
   where npm >nul 2>&1
   if !ERRORLEVEL! == 0 (
     echo Running build (npm run build)...
-    call npm run build > "%TEMP%\zxs_build.log" 2>&1
+    call npm run build
     set "BUILD_ERR=!ERRORLEVEL!"
     if not "!BUILD_ERR!"=="0" (
       echo.
-      echo [X] Build FAILED - deployment aborted. Log: %TEMP%\zxs_build.log
+      echo [X] Build FAILED. Fix errors above, then re-run. Deployment aborted.
       pause
       exit /b 1
     )
     echo [OK] Build passed.
   ) else (
-    echo npm not found - skipping build check (push only).
+    echo npm not found - cannot run local build. Will push only.
   )
+) else (
+  echo Skipping local build - GitHub Actions will build on push.
 )
 
 git add -A
