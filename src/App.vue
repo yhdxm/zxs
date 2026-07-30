@@ -359,8 +359,17 @@ interface SideItem {
 const canManageSystem = (u: AppUser | null) => u?.role === 'superadmin' || u?.role === 'admin'
 
 const sideMenu = reactive<SideItem[]>([
-  { key: 'ai', label: 'AI 助手', icon: MagicStick, permissionKey: 'ai', to: '/ai' },
-  { key: 'models', label: '模型中心', icon: DataAnalysis, permissionKey: 'ai', to: '/models' },
+  {
+    key: 'lianzhicang',
+    label: '联智舱',
+    icon: MagicStick,
+    expanded: true,
+    permissionKey: 'ai',
+    children: [
+      { key: 'ai', label: 'AI 助手', icon: MagicStick, permissionKey: 'ai', to: '/ai' },
+      { key: 'models', label: '模型中心', icon: DataAnalysis, permissionKey: 'ai', to: '/models' }
+    ]
+  },
   { key: 'requirements', label: '需求收集', icon: TrendCharts, permissionKey: 'dashboard', to: '/requirements' },
   {
     key: 'worktasks',
@@ -443,6 +452,7 @@ const toggleGroup = (key: string) => {
 }
 
 const isMenuActive = (key: string) => {
+  if (key === 'lianzhicang') return route.path === '/ai' || route.path === '/models'
   if (key === 'ai') return route.path === '/ai'
   if (key === 'models') return route.path === '/models'
   if (key === 'requirements') return route.path === '/requirements'
