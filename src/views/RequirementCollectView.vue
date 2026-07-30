@@ -147,9 +147,13 @@ function applyFilters() {
 }
 
 async function loadUser() {
-  if (!userId.value) {
+  if (userId.value) return
+  try {
     const u = await refreshSavedUser()
     userId.value = u?.id || ''
+  } catch {
+    // 会话刷新异常（网络/超时）时降级为空 userId，走本地缓存 + 种子兜底，绝不让页面空白
+    userId.value = ''
   }
 }
 
@@ -166,13 +170,30 @@ async function load() {
   }
 }
 
+/** 兜底：若各种原因导致列表为空，立即用真实热门项目种子填充，确保页面永不空白 */
+async function ensureSeeds() {
+  if (ideas.value.length > 0) return
+  const seeds = await fetchExternalIdeas()
+  if (seeds.length > 0) {
+    ideas.value = seeds
+    await saveExternalIdeas(userId.value, seeds)
+  }
+}
+
 async function refresh() {
   fetching.value = true
   try {
     await loadUser()
-    const fetched = await fetchExternalIdeas()
+    let fetched: ExternalIdea[] = []
+    try {
+      fetched = await fetchExternalIdeas()
+    } catch (e) {
+      console.warn('[requirement] 抓取失败，将使用兜底数据', e)
+    }
     if (fetched.length === 0) {
-      ElMessage.warning('本次未获取到任何灵感（GitHub 接口限速或网络受限，请稍后重试）')
+      // 即使 GitHub 为空/限速，也尝试用种子兜底并提示
+      await ensureSeeds()
+      ElMessage.warning('本次未获取到最新灵感，已展示热门推荐兜底数据')
     } else {
       // 与本地已收藏 / 已关联的灵感合并，避免刷新后丢失用户标记
       const prevMap = new Map(ideas.value.map((i) => [i.url || i.title, i]))
@@ -259,10 +280,18 @@ async function clearAllCache() {
 }
 
 onMounted(async () => {
-  await load()
+  try {
+    await load()
+  } catch (e) {
+    console.warn('[requirement] 初始化读取异常，将使用网络/种子兜底', e)
+  }
   // 进入页面自动抓取（缓存为空时）；若已有缓存则直接展示，无需等待网络
   if (ideas.value.length === 0) {
     await refresh()
+  }
+  // 双保险：如果 load + refresh 之后仍为空（例如 Supabase/网络全部异常），直接用种子兜底
+  if (ideas.value.length === 0) {
+    await ensureSeeds()
   }
 })
 </script>

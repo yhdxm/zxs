@@ -218,15 +218,28 @@
           <p>
             每个账号的 API Key 由本人配置、云端加密留存、互相不可见；
             超级管理员可在此<strong>查看明文</strong>并<strong>一键使用</strong>任意账号的 API 配置。
+            各账号的「调用量/问答」仅在本人「AI 助手 / 模型中心」内可见，互不串号。
           </p>
         </div>
         <div class="mc-quota-actions">
+          <el-tag v-if="adminRows.length" type="info" effect="plain" size="small">
+            共 {{ adminRows.length }} 个账号 · {{ adminRows.filter((r) => r.hasKey).length }} 个已配置 Key
+          </el-tag>
           <el-button link type="primary" :loading="adminLoading" @click="loadAdminOverview">刷新</el-button>
         </div>
       </div>
 
+      <el-alert
+        v-if="adminError"
+        type="warning"
+        :closable="false"
+        show-icon
+        class="mc-admin-alert"
+        :title="adminError"
+      />
+
       <div class="mc-table-wrap mc-admin-table">
-        <el-table :data="adminRows" v-loading="adminLoading" empty-text="暂无账号数据" style="width: 100%">
+        <el-table :data="adminRows" v-loading="adminLoading" empty-text="暂无账号数据（若始终为空，请确认已执行 rls_secure.sql / ai_keys.sql）" style="width: 100%">
           <el-table-column label="账号" min-width="150">
             <template #default="{ row }">
               <div class="mc-acc">
@@ -469,12 +482,14 @@ interface AdminApiRow {
 }
 const adminRows = ref<AdminApiRow[]>([])
 const adminLoading = ref(false)
+const adminError = ref('')
 
 const roleText = (r: string) => (r === 'superadmin' ? '超管' : r === 'admin' ? '管理员' : '用户')
 
 const loadAdminOverview = async () => {
   if (!isSuperadmin.value) return
   adminLoading.value = true
+  adminError.value = ''
   try {
     const [accounts, keys, usageAll] = await Promise.all([
       listAccounts(),
@@ -503,8 +518,12 @@ const loadAdminOverview = async () => {
           isSelf: a.authUserId === currentUid.value
         }
       })
+    if (adminRows.value.length === 0) {
+      adminError.value = '未读取到任何账号记录。请确认：①已在 Supabase 执行 rls_secure.sql（提供 list_accounts_for_admin）；②当前账号在 app_accounts 表中存在且 role=superadmin。'
+    }
   } catch (e) {
     console.warn('[modelCenter] 账号 API 总览加载失败', e)
+    adminError.value = '账号 API 总览加载失败：' + (e instanceof Error ? e.message : String(e))
   } finally {
     adminLoading.value = false
   }
@@ -836,6 +855,7 @@ onBeforeUnmount(() => {
 
 /* 超管账号 API 总览 */
 .mc-admin-table { margin-top: 14px; padding: 0; border: none; box-shadow: none; background: transparent; }
+.mc-admin-alert { margin-top: 14px; }
 .mc-acc { display: flex; flex-direction: column; line-height: 1.35; min-width: 0; }
 .mc-acc-name { font-size: 13px; font-weight: 600; color: var(--text-strong); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mc-acc-sub { font-size: 11px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

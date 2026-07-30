@@ -98,20 +98,90 @@ export interface AppDashboardData {
 
 const AUTH_KEY = 'smart-dashboard-user'
 
-/** ===== 权限树定义 ===== */
+/** ===== 权限树定义 =====
+ *  与 App.vue 侧边栏菜单保持同步。修改菜单结构后，同步更新此处。
+ */
 export const PERMISSION_TREE: PermissionNode[] = [
   {
-    key: 'dashboard',
-    label: '数据看板',
+    key: 'database',
+    label: '数据库监测',
     children: [
-      { key: 'dashboard.pc', label: 'PC端' },
-      { key: 'dashboard.mobile', label: '移动端' }
+      { key: 'database.pc', label: 'PC端' },
+      { key: 'database.mobile', label: '移动端' }
+    ]
+  },
+  {
+    key: 'lianzhicang',
+    label: '联智舱',
+    children: [
+      {
+        key: 'ai',
+        label: 'AI助手',
+        children: [
+          { key: 'ai.pc', label: 'PC端' },
+          { key: 'ai.mobile', label: '移动端' }
+        ]
+      },
+      {
+        key: 'models',
+        label: '模型中心',
+        children: [
+          { key: 'models.pc', label: 'PC端' },
+          { key: 'models.mobile', label: '移动端' }
+        ]
+      }
+    ]
+  },
+  {
+    key: 'fanjingzhixie',
+    label: '凡境智协',
+    children: [
+      {
+        key: 'news',
+        label: '新闻聚合',
+        children: [
+          { key: 'news.pc', label: 'PC端' },
+          { key: 'news.mobile', label: '移动端' }
+        ]
+      },
+      {
+        key: 'weather',
+        label: '天气',
+        children: [
+          { key: 'weather.pc', label: 'PC端' },
+          { key: 'weather.mobile', label: '移动端' }
+        ]
+      },
+      {
+        key: 'map',
+        label: '地图',
+        children: [
+          { key: 'map.pc', label: 'PC端' },
+          { key: 'map.mobile', label: '移动端' }
+        ]
+      },
+      {
+        key: 'automation',
+        label: '自动化信息',
+        children: [
+          { key: 'automation.pc', label: 'PC端' },
+          { key: 'automation.mobile', label: '移动端' }
+        ]
+      }
     ]
   },
   {
     key: 'worktasks',
     label: '工作任务',
     children: [
+      {
+        key: 'dashboard',
+        label: '数据看板',
+        children: [
+          { key: 'dashboard.pc', label: 'PC端' },
+          { key: 'dashboard.mobile', label: '移动端' }
+        ]
+      },
       {
         key: 'todos',
         label: '待办',
@@ -139,27 +209,11 @@ export const PERMISSION_TREE: PermissionNode[] = [
     ]
   },
   {
-    key: 'ai',
-    label: 'AI助手',
+    key: 'requirements',
+    label: '需求收集',
     children: [
-      { key: 'ai.pc', label: 'PC端' },
-      { key: 'ai.mobile', label: '移动端' }
-    ]
-  },
-  {
-    key: 'database',
-    label: '数据库检测',
-    children: [
-      { key: 'database.pc', label: 'PC端' },
-      { key: 'database.mobile', label: '移动端' }
-    ]
-  },
-  {
-    key: 'automation',
-    label: '自动化',
-    children: [
-      { key: 'automation.pc', label: 'PC端' },
-      { key: 'automation.mobile', label: '移动端' }
+      { key: 'requirements.pc', label: 'PC端' },
+      { key: 'requirements.mobile', label: '移动端' }
     ]
   },
   {
@@ -214,14 +268,20 @@ export const DEFAULT_ROLE_CONFIG: PermissionConfig = {
     {
       key: 'admin',
       name: '管理员',
-      description: '可进入系统管理与数据库检测，管理普通用户账号与业务数据。',
+      description: '可进入系统管理与数据库监测，管理普通用户账号与业务数据。',
       permissions: ALL_PERMISSION_KEYS.filter((k) => k !== 'system.roles.pc' && k !== 'system.roles.mobile')
     },
     {
       key: 'user',
       name: '普通用户',
       description: '仅可操作自己的数据，数据与其他账号相互隔离。',
-      permissions: ALL_PERMISSION_KEYS.filter((k) => !k.startsWith('system.') && !k.startsWith('database.'))
+      permissions: ALL_PERMISSION_KEYS.filter(
+        (k) =>
+          !k.startsWith('system.') &&
+          !k.startsWith('database.') &&
+          k !== 'lianzhicang.pc' &&
+          k !== 'lianzhicang.mobile'
+      )
     }
   ]
 }
@@ -1463,15 +1523,31 @@ export interface ModelUsageRow {
   free_until: string
 }
 
+/** 读取当前登录账号的 auth.uid()（与 AUTH_KEY 中缓存的 id 一致），用于把用量查询收敛到本账号 */
+function currentAuthUid(): string {
+  if (typeof window === 'undefined') return ''
+  try {
+    const raw = window.localStorage.getItem(AUTH_KEY)
+    if (!raw) return ''
+    const u = JSON.parse(raw) as { id?: string }
+    return u && u.id ? String(u.id) : ''
+  } catch {
+    return ''
+  }
+}
+
 /** 读取单个模型的已用 tokens（未记录返回 0） */
 export async function getModelUsage(modelId: string): Promise<number> {
   if (!modelId) return 0
   try {
-    const { data, error } = await supabase
+    const uid = currentAuthUid()
+    let query = supabase
       .from('model_usage')
       .select('used_tokens')
       .eq('model_id', modelId)
-      .maybeSingle()
+    // 仅本账号：普通用户由 RLS 自动隔离；超管需显式收敛，避免读到他人聚合
+    if (uid) query = query.eq('user_id', uid)
+    const { data, error } = await query.maybeSingle()
     if (error) {
       console.warn('[modelUsage] 读取失败', error.message)
       return 0
@@ -1486,10 +1562,13 @@ export async function getModelUsage(modelId: string): Promise<number> {
 export async function getAllModelUsage(): Promise<Record<string, number>> {
   const map: Record<string, number> = {}
   try {
-    const { data, error } = await supabase
+    const uid = currentAuthUid()
+    let query = supabase
       .from('model_usage')
       .select('model_id, used_tokens')
       .order('model_id', { ascending: true })
+    if (uid) query = query.eq('user_id', uid)
+    const { data, error } = await query
     if (error) {
       console.warn('[modelUsage] 批量读取失败', error.message)
       return map

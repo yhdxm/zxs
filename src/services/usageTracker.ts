@@ -60,6 +60,32 @@ const LOG_KEY = 'ai-usage-log'
 const QUOTA_KEY = 'ai-bailian-quota'
 const MAX_LOG = 600
 
+/**
+ * 账号级隔离：用量日志与免费额度均按当前登录账号命名空间存储，
+ * 互不串号。未登录时回退到全局键（兼容匿名/测试场景，不会写入他人记录）。
+ * 与 appDataService.AUTH_KEY 保持一致：'smart-dashboard-user' 存 { id, ... }。
+ */
+const AUTH_KEY = 'smart-dashboard-user'
+function currentUsageUid(): string {
+  if (typeof window === 'undefined') return ''
+  try {
+    const raw = window.localStorage.getItem(AUTH_KEY)
+    if (!raw) return ''
+    const u = JSON.parse(raw) as { id?: string }
+    return u && u.id ? String(u.id) : ''
+  } catch {
+    return ''
+  }
+}
+function logKey(): string {
+  const uid = currentUsageUid()
+  return uid ? `${LOG_KEY}:${uid}` : LOG_KEY
+}
+function quotaKey(): string {
+  const uid = currentUsageUid()
+  return uid ? `${QUOTA_KEY}:${uid}` : QUOTA_KEY
+}
+
 function estTokens(text: string): number {
   return Math.max(1, Math.ceil((text || '').length / 4))
 }
@@ -116,7 +142,7 @@ export interface RecordUsageOptions {
 export function recordUsage(opts: RecordUsageOptions): void {
   if (typeof window === 'undefined') return
   try {
-    const list = readLog()
+    const list = readLog(logKey())
     const isFree = classifyFree(opts.provider, opts.model)
     const realUsage = opts.realUsage
     list.push({
@@ -132,16 +158,16 @@ export function recordUsage(opts: RecordUsageOptions): void {
       isFree
     })
     if (list.length > MAX_LOG) list.splice(0, list.length - MAX_LOG)
-    window.localStorage.setItem(LOG_KEY, JSON.stringify(list))
+    window.localStorage.setItem(logKey(), JSON.stringify(list))
   } catch {
     /* 忽略写入异常 */
   }
 }
 
-function readLog(): UsageRecord[] {
+function readLog(key: string = LOG_KEY): UsageRecord[] {
   if (typeof window === 'undefined') return []
   try {
-    const raw = window.localStorage.getItem(LOG_KEY)
+    const raw = window.localStorage.getItem(key)
     if (!raw) return []
     const arr = JSON.parse(raw)
     return Array.isArray(arr) ? (arr as UsageRecord[]) : []
@@ -151,7 +177,7 @@ function readLog(): UsageRecord[] {
 }
 
 export function getUsageStats(): UsageSummary {
-  const list = readLog()
+  const list = readLog(logKey())
   const startOfToday = new Date()
   startOfToday.setHours(0, 0, 0, 0)
   const todayMs = startOfToday.getTime()
@@ -202,7 +228,7 @@ export function getUsageStats(): UsageSummary {
  * 数据全部来自本应用真实调用记录（含响应 tokens），非官方额度。
  */
 export function getBailianUsage(): BailianUsage {
-  const list = readLog().filter((r) => r.provider === 'bailian')
+  const list = readLog(logKey()).filter((r) => r.provider === 'bailian')
   const startOfToday = new Date()
   startOfToday.setHours(0, 0, 0, 0)
   const todayMs = startOfToday.getTime()
@@ -233,12 +259,12 @@ export function getBailianUsage(): BailianUsage {
 
 export function setBailianQuota(n: number): void {
   if (typeof window === 'undefined') return
-  window.localStorage.setItem(QUOTA_KEY, String(Math.max(0, Math.floor(n))))
+  window.localStorage.setItem(quotaKey(), String(Math.max(0, Math.floor(n))))
 }
 
 export function getBailianQuota(): number | null {
   if (typeof window === 'undefined') return null
-  const raw = window.localStorage.getItem(QUOTA_KEY)
+  const raw = window.localStorage.getItem(quotaKey())
   if (!raw) return null
   const n = Number(raw)
   return Number.isFinite(n) ? n : null
@@ -246,10 +272,10 @@ export function getBailianQuota(): number | null {
 
 export function clearUsage(): void {
   if (typeof window === 'undefined') return
-  window.localStorage.removeItem(LOG_KEY)
+  window.localStorage.removeItem(logKey())
 }
 
-/** 导出原始调用日志，供「需求收集」模块做每日/趋势聚合（本地读取，不消耗积分） */
+/** 导出当前账号的原始调用日志，供「需求收集」模块做每日/趋势聚合（本地读取，不消耗积分） */
 export function getUsageLog(): UsageRecord[] {
-  return readLog()
+  return readLog(logKey())
 }

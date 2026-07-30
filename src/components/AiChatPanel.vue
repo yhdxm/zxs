@@ -96,7 +96,23 @@ const messages = ref<ChatMessage[]>([])
 const loading = ref(false)
 const configVisible = ref(false)
 const scrollRef = ref<HTMLElement | null>(null)
-const STORAGE_KEY = 'ai-chat-history'
+// 账号级隔离：每个账号一套独立对话历史，互不串号；未登录回退全局键（兼容匿名/测试）。
+const AUTH_KEY = 'smart-dashboard-user'
+function currentChatUid(): string {
+  if (typeof window === 'undefined') return ''
+  try {
+    const raw = window.localStorage.getItem(AUTH_KEY)
+    if (!raw) return ''
+    const u = JSON.parse(raw) as { id?: string }
+    return u && u.id ? String(u.id) : ''
+  } catch {
+    return ''
+  }
+}
+function chatKey(): string {
+  const uid = currentChatUid()
+  return uid ? `ai-chat-history:${uid}` : 'ai-chat-history'
+}
 
 const isMobile = ref(false)
 const keyboardOffset = ref(0)
@@ -121,14 +137,14 @@ const scrollToBottom = async () => {
 
 const syncHistory = () => {
   if (typeof window !== 'undefined') {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(messages.value))
+    window.localStorage.setItem(chatKey(), JSON.stringify(messages.value))
   }
 }
 
 const loadHistory = () => {
   if (typeof window === 'undefined') return
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY)
+    const raw = window.localStorage.getItem(chatKey())
     if (raw) {
       const parsed = JSON.parse(raw)
       if (Array.isArray(parsed)) messages.value = parsed as ChatMessage[]

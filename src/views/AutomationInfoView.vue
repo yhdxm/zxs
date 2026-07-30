@@ -63,6 +63,10 @@
       <el-button type="danger" plain :loading="loading" @click="clearAll">
         <el-icon><Delete /></el-icon> 清空全部
       </el-button>
+      <el-select v-model="categoryFilter" size="default" class="ai-filter" placeholder="按行业筛选">
+        <el-option label="全部行业" value="__all__" />
+        <el-option v-for="c in categoryOptions" :key="c" :label="c" :value="c" />
+      </el-select>
       <span class="ai-stat">共 {{ list.length }} 条</span>
       <span class="ai-stat ai-stat-expired">已过期 {{ expiredCount }} 条</span>
       <span class="ai-stat ai-stat-expiring">即将过期 {{ expiringCount }} 条</span>
@@ -77,9 +81,9 @@
     </div>
 
     <div v-else class="ai-grid">
-      <div v-for="row in list" :key="row.id" class="ai-card" :class="cacheState(row)">
-        <div class="ai-card-top">
-          <span class="ai-source">{{ row.source || row.category || '未知来源' }}</span>
+      <div v-for="row in filteredList" :key="row.id" class="ai-card" :class="cacheState(row)">
+        <div class="ai-card-head">
+          <span v-if="rankOf(row)" class="ai-rank">No.{{ rankOf(row) }}</span>
           <el-tag v-if="row.category" size="small" effect="plain" class="ai-cat">{{ row.category }}</el-tag>
           <el-tag size="small" :type="stateTag(row)" effect="light">{{ stateLabel(row) }}</el-tag>
           <el-button class="ai-del" size="small" text type="danger" @click="removeRow(row)">
@@ -87,7 +91,15 @@
           </el-button>
         </div>
         <div class="ai-title">{{ row.title }}</div>
-        <p v-if="row.content" class="ai-summary">{{ row.content }}</p>
+        <div class="ai-source-line">
+          <el-icon class="ai-ico"><OfficeBuilding /></el-icon>
+          <span>{{ row.source || 'AI 生成' }}</span>
+          <span v-if="row.extra?.date" class="ai-date-tag">{{ row.extra.date }}</span>
+        </div>
+        <div v-if="cleanContent(row)" class="ai-analysis">
+          <span class="ai-analysis-label">影响解读</span>
+          <p class="ai-analysis-text">{{ cleanContent(row) }}</p>
+        </div>
         <a v-if="row.url" class="ai-link" :href="row.url" target="_blank" rel="noopener">查看原文 ↗</a>
         <div class="ai-meta">
           <div>获取：{{ fmt(row.fetched_at) }}</div>
@@ -101,7 +113,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Refresh, Delete, Loading, MagicStick } from '@element-plus/icons-vue'
+import { Refresh, Delete, Loading, MagicStick, OfficeBuilding } from '@element-plus/icons-vue'
 import {
   listAutomationInfo,
   deleteAutomationInfo,
@@ -116,6 +128,60 @@ import { CALLABLE_MODELS } from '../services/modelCatalog'
 
 const list = ref<AutomationInfo[]>([])
 const loading = ref(false)
+const categoryFilter = ref('__all__')
+
+/** 已生成行业清单（用于顶部筛选） */
+const categoryOptions = computed(() => {
+  const set = new Set<string>()
+  list.value.forEach((r) => {
+    if (r.category) set.add(r.category)
+  })
+  return Array.from(set)
+})
+
+/** 按行业筛选后的列表 */
+const filteredList = computed(() => {
+  if (categoryFilter.value === '__all__') return list.value
+  return list.value.filter((r) => r.category === categoryFilter.value)
+})
+
+/**
+ * 清洗内容：早期缓存的 content 可能存了整段 AI 原始回复（含 ```json 围栏 / 纯 JSON 数组）。
+ * 这里尝试解析，提取可读文本；无法解析则原样返回（仅去除代码围栏）。
+ */
+function cleanContent(row: AutomationInfo): string {
+  const raw = (row.content || '').trim()
+  if (!raw) return ''
+  // 去除 ```json ... ``` 围栏
+  const fence = raw.match(/```(?:json)?\s*([\s\S]*?)```/i)
+  const body = fence ? fence[1].trim() : raw
+  // 尝试解析 JSON 数组 / 对象，提取 title/analysis/content 文本
+  if (body.startsWith('[') || body.startsWith('{')) {
+    try {
+      const parsed = JSON.parse(body)
+      const arr = Array.isArray(parsed) ? parsed : [parsed]
+      const texts = arr
+        .map((it: unknown) => {
+          const o = (it || {}) as Record<string, unknown>
+          const parts = [o.title, o.标题, o.analysis, o.解读, o.分析, o.content, o.摘要]
+            .filter((v) => typeof v === 'string' && v.trim())
+            .map((v) => (v as string).trim())
+          return parts.join('：')
+        })
+        .filter((t: string) => t)
+      if (texts.length) return texts.join('\n')
+    } catch {
+      /* 非标准 JSON，继续往下 */
+    }
+  }
+  // 去掉残留的 JSON 片段痕迹（如 "title":"..." 这类）
+  return body.replace(/[{}\[\]]/g, '').replace(/"title"\s*:\s*"[^"]*"/g, '').replace(/,\s*"analysis"\s*:\s*"[^"]*"/g, '').trim()
+}
+
+const rankOf = (row: AutomationInfo): number | null => {
+  const r = row.extra?.rank
+  return typeof r === 'number' ? r : null
+}
 const retentionDays = ref(7)
 const savedTip = ref(false)
 const generating = ref(false)
@@ -191,9 +257,12 @@ function genRowId(): string {
 }
 
 async function loadUser() {
-  if (!userId.value) {
+  if (userId.value) return
+  try {
     const u = await refreshSavedUser()
     userId.value = u?.id || ''
+  } catch {
+    userId.value = ''
   }
 }
 
@@ -452,10 +521,11 @@ onBeforeUnmount(stopAutoClean)
 .ai-toolbar {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 12px;
   margin-bottom: 16px;
   flex-wrap: wrap;
 }
+.ai-filter { width: 160px; }
 .ai-stat { font-size: 12px; color: var(--text-faint); }
 .ai-stat-expired { color: #dc2626; }
 .ai-stat-expiring { color: #f59e0b; }
@@ -490,18 +560,44 @@ onBeforeUnmount(stopAutoClean)
 .ai-card.expiring { border-color: rgba(245, 158, 11, 0.45); }
 .ai-card.normal { border-color: rgba(22, 163, 74, 0.25); }
 
-.ai-card-top { display: flex; align-items: center; gap: 8px; }
-.ai-source {
-  font-size: 11px; color: var(--text-faint);
-  background: var(--surface-soft); padding: 2px 8px; border-radius: 6px;
+.ai-card-head { display: flex; align-items: center; gap: 8px; }
+.ai-rank {
+  font-size: 12px; font-weight: 700; color: #fff;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  padding: 2px 9px; border-radius: 8px; letter-spacing: 0.3px;
 }
 .ai-cat { transform: scale(0.9); transform-origin: left center; }
 .ai-del { margin-left: auto; }
 
-.ai-title { font-size: 14px; font-weight: 600; color: var(--text-strong); line-height: 1.5; word-break: break-word; }
-.ai-summary {
-  margin: 0; font-size: 12px; color: var(--text-muted); line-height: 1.6;
-  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+.ai-title {
+  font-size: 16px; font-weight: 700; color: var(--text-strong);
+  line-height: 1.5; word-break: break-word; margin-top: 2px;
+}
+.ai-source-line {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 12px; color: var(--text-muted);
+}
+.ai-ico { font-size: 14px; color: var(--text-faint); }
+.ai-date-tag {
+  font-size: 11px; color: var(--text-faint);
+  background: var(--surface-soft); padding: 1px 7px; border-radius: 6px; margin-left: 2px;
+}
+.ai-analysis {
+  background: var(--surface-soft);
+  border-left: 3px solid var(--primary);
+  border-radius: 8px;
+  padding: 8px 10px;
+  margin-top: 2px;
+}
+.ai-analysis-label {
+  display: inline-block;
+  font-size: 11px; font-weight: 600; color: var(--primary);
+  margin-bottom: 3px;
+}
+.ai-analysis-text {
+  margin: 0;
+  font-size: 12.5px; color: var(--text); line-height: 1.65;
+  white-space: pre-line;
 }
 .ai-link { font-size: 12px; color: var(--primary); text-decoration: none; }
 .ai-link:hover { text-decoration: underline; }

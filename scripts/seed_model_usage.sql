@@ -16,7 +16,7 @@ select
   '2026-09-20 23:59:59+08'
 from app_accounts a
 cross join (values
-  ('bailian:qwen3.7-plus',                      988144),  -- 剩 11,856
+  ('bailian:qwen3.7-plus',                      992192),  -- 剩 7,808（已含一次 4,048 tokens 真实调用）
   ('bailian:deepseek-v4-pro',                   71761),   -- 剩 928,239
   ('bailian:qwen-max',                         27907),   -- 剩 972,093
   ('bailian:qwen-plus',                        24171),   -- 剩 975,829
