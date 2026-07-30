@@ -590,6 +590,22 @@ function getErrorMessage(error: unknown, fallback: string) {
  * 严禁写死弱口令；未配置则随机生成并打印到控制台，请登录后立即修改。
  */
 export async function initDefaultAdmin(): Promise<string> {
+  // 防御：超级管理员已存在则直接跳过，绝不重新创建或重置密码。
+  // 保证任何部署/刷新都不会影响已在后台改过的 admin 账号。
+  try {
+    const { data: existing } = await supabase
+      .from('app_accounts')
+      .select('id')
+      .eq('username', 'admin')
+      .maybeSingle()
+    if (existing && existing.id) {
+      console.info('[init] 超级管理员已存在，跳过初始化，不修改任何密码。')
+      return ''
+    }
+  } catch (e) {
+    console.warn('[init] 检查管理员是否存在时失败，继续尝试初始化', e)
+  }
+
   const normalizedUsername = 'admin'
   const password =
     import.meta.env.VITE_ADMIN_DEFAULT_PASSWORD ||
@@ -640,6 +656,10 @@ export async function initDefaultAdmin(): Promise<string> {
 export async function bootstrapAdminIfNeeded(): Promise<{ needed: boolean; password?: string }> {
   try {
     const password = await initDefaultAdmin()
+    if (!password) {
+      // 管理员已存在，无需初始化
+      return { needed: false }
+    }
     return { needed: true, password }
   } catch (err) {
     const msg = String(err instanceof Error ? err.message : '').toLowerCase()
