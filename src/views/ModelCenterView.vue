@@ -113,7 +113,7 @@
           <div class="mc-qm-title">
             <span>阿里百炼免费模型额度（共 {{ bailianQuotaRows.length }} 个）</span>
             <span class="mc-qm-sub">
-              已用 {{ usedCount }} 个 · 未用 {{ bailianQuotaRows.length - usedCount }} 个 · 紧张 {{ dangerCount }} 个
+              已用 {{ usedCount }} 个 · 未用 {{ bailianQuotaRows.length - usedCount }} 个 · 快用完 {{ dangerCount }} 个
             </span>
           </div>
           <span class="mc-qm-tip">免费额度 1,000,000 / 模型 · 有效期至 2026-09-20</span>
@@ -146,18 +146,18 @@
             v-for="r in pagedRows"
             :key="r.id"
             class="mc-qm-card"
-            :class="{ danger: r.percent >= 90, unused: r.used === 0 }"
+            :class="{ danger: r.status === 'danger', unused: r.used === 0 }"
           >
             <div class="mc-qm-card-head">
               <span class="mc-qm-name" :title="r.model">{{ r.model }}</span>
               <el-tag v-if="r.used === 0" type="info" effect="plain" size="small">未使用</el-tag>
-              <el-tag v-else-if="r.percent >= 90" type="danger" effect="plain" size="small">紧张</el-tag>
+              <el-tag v-else-if="r.status === 'danger'" type="danger" effect="plain" size="small">快用完</el-tag>
               <el-tag v-else type="success" effect="plain" size="small">正常</el-tag>
             </div>
             <div class="mc-qm-card-bar">
               <div
                 class="mc-quota-fill"
-                :class="{ danger: r.percent >= 90 }"
+                :class="{ danger: r.status === 'danger' }"
                 :style="{ width: r.percent + '%' }"
               ></div>
             </div>
@@ -353,7 +353,6 @@ import { loadAiConfig, saveAiConfig, type AiConfig } from '../services/aiService
 import {
   getSavedUser,
   getAllModelUsage,
-  addModelUsage,
   listAccounts,
   listAiKeysForAdmin,
   getAllModelUsageForAdmin,
@@ -420,7 +419,7 @@ const page = ref(1)
 const pageSize = ref(24)
 
 const usedCount = computed(() => bailianQuotaRows.value.filter((r) => r.used > 0).length)
-const dangerCount = computed(() => bailianQuotaRows.value.filter((r) => r.percent >= 90).length)
+const dangerCount = computed(() => bailianQuotaRows.value.filter((r) => r.remaining < 10000).length)
 
 const filteredRows = computed(() => {
   let rows = bailianQuotaRows.value
@@ -428,9 +427,11 @@ const filteredRows = computed(() => {
   if (kw) {
     rows = rows.filter((r) => r.model.toLowerCase().includes(kw))
   }
+  // 已使用：剩余 < 免费额度（即已用 > 0），状态为「正常」或「快用完」均归入
   if (filterType.value === 'used') rows = rows.filter((r) => r.used > 0)
   if (filterType.value === 'unused') rows = rows.filter((r) => r.used === 0)
-  if (filterType.value === 'danger') rows = rows.filter((r) => r.percent >= 90)
+  // 快用完：剩余不足 10,000，状态标红
+  if (filterType.value === 'danger') rows = rows.filter((r) => r.remaining < 10000)
 
   if (sortType.value === 'usageDesc') rows = [...rows].sort((a, b) => b.percent - a.percent)
   if (sortType.value === 'usageAsc') rows = [...rows].sort((a, b) => a.percent - b.percent)
@@ -553,6 +554,9 @@ const bailianQuotaRows = computed(() =>
     const used = modelUsageMap.value[m.id] || 0
     const remaining = Math.max(0, free - used)
     const percent = free > 0 ? Math.min(100, Math.round((used / free) * 100)) : 0
+    // 状态：未使用(已用=0) > 快用完(剩余<1万, 标红) > 正常(已用>0 且剩余>=1万)
+    const status: 'unused' | 'danger' | 'normal' =
+      used === 0 ? 'unused' : remaining < 10000 ? 'danger' : 'normal'
     return {
       id: m.id,
       model: m.model,
@@ -561,6 +565,7 @@ const bailianQuotaRows = computed(() =>
       used,
       remaining,
       percent,
+      status,
       freeUntil: m.freeUntil || '2026-09-20'
     }
   })
@@ -604,15 +609,9 @@ const loadBalance = async () => {
   balance.value = await getProviderBalance(cfg.provider as string, cfg.baseUrl, cfg.apiKey)
 }
 
-/** 拉取阿里百炼各模型额度账本（已用 tokens） */
+/** 拉取阿里百炼各模型额度账本（已用 tokens），剩余 = 1,000,000 - 已用 */
 const loadModelUsage = async () => {
   modelUsageMap.value = await getAllModelUsage()
-  // 初始化 qwen3.7-plus 剩余额度为 11,856 / 1,000,000（已用 988,144）
-  const seedModelId = 'bailian:qwen3.7-plus'
-  if (!modelUsageMap.value[seedModelId]) {
-    await addModelUsage(seedModelId, 988144)
-    modelUsageMap.value = await getAllModelUsage()
-  }
 }
 
 const runCheck = async () => {
