@@ -177,6 +177,14 @@ as $$
 $$;
 
 -- 9. 授权给 authenticated 角色（已登录用户）
+-- 撤销 public（含 anon 匿名角色）默认执行权，避免未登录者调用管理函数（信息泄露/越权）
+revoke execute on function is_superadmin() from public;
+revoke execute on function list_accounts_for_admin() from public;
+revoke execute on function search_accounts_for_admin(text) from public;
+revoke execute on function create_account_by_admin(uuid, text, text, text, boolean) from public;
+revoke execute on function update_account_by_admin(uuid, text, text, boolean) from public;
+revoke execute on function set_account_disabled(uuid, boolean) from public;
+revoke execute on function delete_account_by_admin(uuid) from public;
 grant execute on function is_superadmin() to authenticated;
 grant execute on function list_accounts_for_admin() to authenticated;
 grant execute on function search_accounts_for_admin(text) to authenticated;

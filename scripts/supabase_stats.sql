@@ -23,5 +23,7 @@ as $$
   );
 $$;
 
+-- 先撤销 public（含 anon 匿名角色）默认执行权，再仅授予已登录用户，避免信息泄露
+revoke execute on function get_database_stats() from public;
 -- 授权：仅允许已登录用户调用，防止未登录者读取全库表结构（信息泄露）
 grant execute on function get_database_stats() to authenticated;

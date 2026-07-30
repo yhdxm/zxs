@@ -138,8 +138,9 @@ begin
 end $$;
 
 -- ============================================================
--- 6. 授权超管函数给已登录用户
+-- 6. 授权超管函数给已登录用户（先 revoke public 默认执行权，避免匿名可调用）
 -- ============================================================
+revoke execute on function is_superadmin() from public;
 grant execute on function is_superadmin() to authenticated;
 
 -- ============================================================

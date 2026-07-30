@@ -52,5 +52,7 @@ begin
 end;
 $$;
 
+-- 先撤销 public（含 anon 匿名角色）默认执行权，再仅授予已登录用户
+revoke execute on function public.admin_set_user_password(uuid, text) from public;
 -- 仅允许已登录（携带有效 JWT）的调用；函数内部再做 superadmin 校验
 grant execute on function public.admin_set_user_password(uuid, text) to authenticated;

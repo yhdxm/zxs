@@ -929,6 +929,7 @@ export async function refreshSavedUser(): Promise<AppUser | null> {
 
 export interface AccountRecord {
   id: string
+  authUserId: string | null
   username: string
   nickname: string
   role: UserRole
@@ -943,6 +944,7 @@ const toAccountRecord = (row: Record<string, unknown>): AccountRecord => {
   const role: UserRole = hasRole ? normalizeRole(row.role) : username === 'admin' ? 'superadmin' : 'user'
   return {
     id: String(row.id || ''),
+    authUserId: row.auth_user_id ? String(row.auth_user_id) : null,
     username,
     nickname: String(row.nickname || ''),
     role,
@@ -1028,6 +1030,7 @@ export async function createAccountByAdmin(params: {
 
   return {
     id: uid,
+    authUserId: uid,
     username: normalizedUsername,
     nickname: params.nickname.trim() || normalizedUsername,
     role: params.role,

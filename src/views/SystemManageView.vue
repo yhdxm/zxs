@@ -259,6 +259,7 @@ const isEdit = ref(false)
 const formRef = ref<FormInstance>()
 const form = reactive({
   id: '',
+  authUserId: '',
   username: '',
   nickname: '',
   role: 'user' as UserRole | string,
@@ -279,6 +280,7 @@ const formRules: FormRules = {
 const openAdd = () => {
   isEdit.value = false
   form.id = ''
+  form.authUserId = ''
   form.username = ''
   form.nickname = ''
   form.role = 'user'
@@ -289,6 +291,7 @@ const openAdd = () => {
 const openEdit = (row: AccountRecord) => {
   isEdit.value = true
   form.id = row.id
+  form.authUserId = row.authUserId || ''
   form.username = row.username
   form.nickname = row.nickname
   form.role = row.role
@@ -305,7 +308,7 @@ const submit = async () => {
   try {
     if (isEdit.value) {
       await updateAccount({
-        id: form.id,
+        id: form.authUserId,
         nickname: form.nickname,
         role: form.role as UserRole,
         password: form.password || undefined
@@ -342,7 +345,7 @@ const toggleDisabled = async (row: AccountRecord) => {
     return
   }
   try {
-    await toggleAccountDisabled(row.id, !row.disabled)
+    await toggleAccountDisabled(row.authUserId || '', !row.disabled)
     ElMessage.success(row.disabled ? '已启用' : '已禁用')
     await load()
   } catch (error) {
@@ -357,7 +360,7 @@ const remove = async (row: AccountRecord) => {
     return
   }
   try {
-    await deleteAccount(row.id)
+    await deleteAccount(row.authUserId || '')
     ElMessage.success('已删除')
     await load()
   } catch (error) {
