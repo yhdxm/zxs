@@ -25,10 +25,10 @@ begin
     raise exception '未登录或会话无效';
   end if;
 
-  -- 调用者必须是超级管理员
+  -- 调用者必须是超级管理员（与 is_superadmin() 保持一致，使用 auth_user_id 字段）
   select role into v_caller_role
   from public.app_accounts
-  where id = auth.uid();
+  where auth_user_id = auth.uid();
 
   if v_caller_role is distinct from 'superadmin' then
     raise exception '仅超级管理员可重置他人密码';
