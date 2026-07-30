@@ -136,7 +136,7 @@ const save = async () => {
     }
     // 2) 改昵称等资料（密码不再经 updateAccount，避免被丢弃不生效）
     await updateAccount({
-      id: currentUser.value.id,
+      id: currentUser.value.authUserId || currentUser.value.id,
       nickname: form.nickname
     })
     await loadUser()

@@ -344,8 +344,12 @@ const toggleDisabled = async (row: AccountRecord) => {
   } catch {
     return
   }
+  if (!row.authUserId) {
+    ElMessage.warning('该账号未绑定认证用户，无法操作，请删除后重建')
+    return
+  }
   try {
-    await toggleAccountDisabled(row.authUserId || '', !row.disabled)
+    await toggleAccountDisabled(row.authUserId, !row.disabled)
     ElMessage.success(row.disabled ? '已启用' : '已禁用')
     await load()
   } catch (error) {
@@ -359,8 +363,12 @@ const remove = async (row: AccountRecord) => {
   } catch {
     return
   }
+  if (!row.authUserId) {
+    ElMessage.warning('该账号未绑定认证用户，无法操作，请删除后重建')
+    return
+  }
   try {
-    await deleteAccount(row.authUserId || '')
+    await deleteAccount(row.authUserId)
     ElMessage.success('已删除')
     await load()
   } catch (error) {

@@ -33,6 +33,8 @@ export interface AppUser {
   nickname: string
   role: UserRole
   disabled: boolean
+  /** 关联 Supabase Auth 用户 id（uuid）。旧存量账号可能为空，需判空处理 */
+  authUserId?: string | null
   /** 用户实际权限 key 列表（缓存），为空时按 role 取默认角色权限 */
   permissions?: string[]
 }
@@ -567,6 +569,7 @@ function toAppUser(account: Record<string, unknown>, profileNickname?: string | 
   const disabled = account.disabled === undefined ? false : Boolean(account.disabled)
   return {
     id: String(account.id || ''),
+    authUserId: account.auth_user_id ? String(account.auth_user_id) : null,
     email: username,
     username,
     nickname,
@@ -723,6 +726,7 @@ export async function registerUser(username: string, password: string, nickname:
   await ensureProfile(uid, displayNickname)
   const user: AppUser = {
     id: uid,
+    authUserId: uid,
     email: normalizedUsername,
     username: normalizedUsername,
     nickname: displayNickname,
