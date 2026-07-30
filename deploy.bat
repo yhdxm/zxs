@@ -69,8 +69,10 @@ if defined PROXY_PORT (
 )
 
 echo.
-echo Build check first? (recommended, catches compile errors) [Y/n]
-set /p "BUILD_CHOICE=Build verify? "
+echo Build check first? (recommended, catches compile errors)
+echo   Press ENTER to run "npm run build" first, then deploy.
+echo   Type n then ENTER to skip build and push directly.
+set /p "BUILD_CHOICE=Your choice [Y/n]: "
 if not defined BUILD_CHOICE set "BUILD_CHOICE=Y"
 if /i "!BUILD_CHOICE!"=="Y" (
   where npm >nul 2>&1
