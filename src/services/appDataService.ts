@@ -1041,6 +1041,21 @@ export async function updateAccount(params: {
   }
 }
 
+/**
+ * 修改当前登录用户【自己】的密码。
+ * 直接调用 Supabase Auth 的 updateUser，作用于 auth.users，登录即立即生效。
+ * 注意：必须是已登录会话（个人设置页满足）。改其他账号密码需 service_role 后台，前端无法实现。
+ */
+export async function changeOwnPassword(password: string): Promise<void> {
+  if (!password || password.length < 6 || password.length > 32) {
+    throw new Error('密码长度为 6-32 位')
+  }
+  const { error } = await supabase.auth.updateUser({ password })
+  if (error) {
+    throw new Error(mapAuthError(error))
+  }
+}
+
 export async function toggleAccountDisabled(id: string, disabled: boolean): Promise<void> {
   const { error } = await supabase.rpc('set_account_disabled', { p_auth_user_id: id, p_disabled: disabled })
   if (error) {

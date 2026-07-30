@@ -37,6 +37,7 @@ import { ElMessage } from 'element-plus'
 import {
   getSavedUser,
   updateAccount,
+  changeOwnPassword,
   refreshSavedUser,
   type AppUser
 } from '../services/appDataService'
@@ -81,13 +82,17 @@ const save = async () => {
 
   saving.value = true
   try {
+    // 1) 改自己的登录密码：直接作用于 Supabase Auth（auth.users），立即生效
+    if (form.password) {
+      await changeOwnPassword(form.password)
+    }
+    // 2) 改昵称等资料（密码不再经 updateAccount，避免被丢弃不生效）
     await updateAccount({
       id: currentUser.value.id,
-      nickname: form.nickname,
-      password: form.password || undefined
+      nickname: form.nickname
     })
     await loadUser()
-    ElMessage.success('保存成功')
+    ElMessage.success(form.password ? '保存成功，新密码已立即生效' : '保存成功')
     form.password = ''
     form.confirmPassword = ''
   } catch (error) {
