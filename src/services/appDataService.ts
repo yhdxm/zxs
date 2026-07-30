@@ -1,5 +1,6 @@
 // Supabase 客户端统一从 lib 引入，避免多处重复创建
 import { supabase } from '../lib/supabaseClient'
+import { isolatedSupabase } from '../lib/supabaseIsolated'
 import type { AiConfig } from './aiService'
 
 export { supabase }
@@ -1007,8 +1008,10 @@ export async function createAccountByAdmin(params: {
     throw new Error('密码长度为 6-32 位')
   }
 
-  // 1) 在 Supabase Auth 创建认证用户
-  const { data: signUpData, error: signUpErr } = await supabase.auth.signUp({
+  // 1) 在隔离的 Supabase 客户端创建认证用户，避免顶替当前超管会话。
+  // 若用主客户端 signUp，新用户会话会覆盖 localStorage 中的 token，导致后续
+  // 超管 RPC（create_account_by_admin）因权限不足而失败，最终出现"账号不存在"。
+  const { data: signUpData, error: signUpErr } = await isolatedSupabase.auth.signUp({
     email: `${normalizedUsername}@zxs.local`,
     password: params.password
   })
@@ -1029,6 +1032,10 @@ export async function createAccountByAdmin(params: {
     p_disabled: false
   })
   if (rpcErr) {
+    // 档案写入失败时清理已创建的认证用户，避免留下"能登录但无档案"的孤儿账号
+    await supabase.rpc('delete_account_by_admin', { p_auth_user_id: uid }).catch(() => {
+      // 忽略清理失败，优先抛出原始错误
+    })
     throw new Error(getErrorMessage(rpcErr, '创建账号失败'))
   }
 

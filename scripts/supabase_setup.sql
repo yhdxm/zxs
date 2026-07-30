@@ -81,6 +81,7 @@ alter table news_daily enable row level security;
 --    普通 anon key 不再持有全表访问权。管理员能力由 rls_secure.sql 的
 --    SECURITY DEFINER 函数提供。Postgres 不支持 create policy if not exists，先删后建保证幂等。
 drop policy if exists "Allow anonymous access to accounts" on app_accounts;
+drop policy if exists "accounts self access" on app_accounts;
 create policy "accounts self access"
   on app_accounts
   for all
@@ -88,6 +89,7 @@ create policy "accounts self access"
   with check (auth.uid() = auth_user_id);
 
 drop policy if exists "Allow anonymous access to dashboard" on app_dashboard_data;
+drop policy if exists "dashboard self access" on app_dashboard_data;
 create policy "dashboard self access"
   on app_dashboard_data
   for all
@@ -95,6 +97,7 @@ create policy "dashboard self access"
   with check (auth.uid()::text = user_id);
 
 drop policy if exists "Allow anonymous access to profiles" on profiles;
+drop policy if exists "profiles self access" on profiles;
 create policy "profiles self access"
   on profiles
   for all

@@ -32,6 +32,7 @@ drop policy if exists "Allow anonymous access to dashboard" on app_dashboard_dat
 drop policy if exists "Allow anonymous access to profiles" on profiles;
 
 -- 3. 账号表：仅本人可访问自己的行（auth.uid() = auth_user_id）
+drop policy if exists "accounts self access" on app_accounts;
 create policy "accounts self access"
   on app_accounts
   for all
@@ -39,6 +40,7 @@ create policy "accounts self access"
   with check (auth.uid() = auth_user_id);
 
 -- 4. 资料表：仅本人可访问（auth.uid() 文本化后与 user_id 比对）
+drop policy if exists "profiles self access" on profiles;
 create policy "profiles self access"
   on profiles
   for all
@@ -46,6 +48,7 @@ create policy "profiles self access"
   with check (auth.uid()::text = user_id);
 
 -- 5. 工作台数据：仅本人可访问
+drop policy if exists "dashboard self access" on app_dashboard_data;
 create policy "dashboard self access"
   on app_dashboard_data
   for all
@@ -124,15 +127,24 @@ create or replace function create_account_by_admin(
   p_disabled boolean
 )
 returns void
-language sql
+language plpgsql
 security definer
 set search_path = public
 as $$
+begin
+  if not is_superadmin() then
+    raise exception '权限不足：仅超级管理员可创建账号';
+  end if;
+
   insert into app_accounts (id, auth_user_id, username, nickname, role, disabled)
-  select p_auth_user_id, p_auth_user_id, p_username, p_nickname,
-         coalesce(p_role, 'user'), coalesce(p_disabled, false)
-  where is_superadmin()
+  values (
+    p_auth_user_id, p_auth_user_id, p_username, p_nickname,
+    coalesce(p_role, 'user'), coalesce(p_disabled, false)
+  )
   on conflict (username) do nothing;
+
+  -- 若因唯一冲突未插入，仍视为成功；调用方后续可正常登录
+end;
 $$;
 
 -- 更新子账号档案（仅超管）
@@ -168,12 +180,24 @@ $$;
 -- 删除账号档案（仅超管；认证用户行需另行在 Auth 后台清理）
 create or replace function delete_account_by_admin(p_auth_user_id uuid)
 returns void
-language sql
+language plpgsql
 security definer
 set search_path = public
 as $$
+begin
+  -- 仅允许超管执行
+  if not is_superadmin() then
+    raise exception '权限不足：仅超级管理员可删除账号';
+  end if;
+
+  -- 先删应用档案
   delete from app_accounts
-  where auth_user_id = p_auth_user_id and is_superadmin();
+  where auth_user_id = p_auth_user_id;
+
+  -- 再删 Supabase Auth 用户，避免留下能登录但无档案的孤儿账号
+  delete from auth.users
+  where id = p_auth_user_id;
+end;
 $$;
 
 -- 9. 授权给 authenticated 角色（已登录用户）
