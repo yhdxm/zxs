@@ -2,9 +2,11 @@
 setlocal enabledelayedexpansion
 cd /d "%~dp0"
 set "GIT_TERMINAL_PROMPT=0"
+title ZXS Deploy
 
 echo.
 echo === Smart Dashboard Deploy ===
+echo Local build is skipped; the real build/deploy runs in GitHub Actions (cloud).
 echo.
 
 set "GIT_BIN_DIR="
@@ -24,8 +26,7 @@ if not defined GIT_BIN_DIR (
   git --version >nul 2>&1
   if !ERRORLEVEL! == 0 goto GIT_READY
   echo git.exe not found. Install Git for Windows: https://git-scm.com/download/win
-  pause
-  exit /b 1
+  goto DONE_FAIL
 )
 set "PATH=%GIT_BIN_DIR%;%PATH%"
 
@@ -68,36 +69,10 @@ if defined PROXY_PORT (
   echo If GitHub push fails with "Connection reset", start your VPN/proxy first.
 )
 
-echo.
-echo Local build check is OPTIONAL. The real build/deploy runs in GitHub Actions (cloud).
-echo   Press ENTER to skip local build and push directly (recommended, avoids local env issues).
-echo   Type y then ENTER to run "npm run build" locally first.
-set /p "BUILD_CHOICE=Run local build first? [y/N]: "
-if not defined BUILD_CHOICE set "BUILD_CHOICE=N"
-if /i "!BUILD_CHOICE!"=="Y" (
-  where npm >nul 2>&1
-  if !ERRORLEVEL! == 0 (
-    echo Running build (npm run build)...
-    call npm run build
-    set "BUILD_ERR=!ERRORLEVEL!"
-    if not "!BUILD_ERR!"=="0" (
-      echo.
-      echo [X] Build FAILED. Fix errors above, then re-run. Deployment aborted.
-      pause
-      exit /b 1
-    )
-    echo [OK] Build passed.
-  ) else (
-    echo npm not found - cannot run local build. Will push only.
-  )
-) else (
-  echo Skipping local build - GitHub Actions will build on push.
-)
-
 git add -A
 git diff --cached --quiet
 if !ERRORLEVEL! neq 0 (
-  git commit -m "deploy: update (%date% %time%)"
+  git commit -m "deploy: update"
 ) else (
   echo No local changes to commit.
 )
@@ -113,8 +88,7 @@ set "GH_TOKEN=%GH_TOKEN: =%"
 
 if not defined GH_TOKEN (
   echo No token entered. Aborting.
-  pause
-  exit /b 1
+  goto DONE_FAIL
 )
 
 echo.
@@ -162,9 +136,7 @@ if "!WATCH_ERR!"=="0" (
   echo [X][X] DEPLOY FAILED - check Actions run log:
   echo     https://github.com/YHDXM/ZXS/actions
 )
-echo.
-pause
-if "!WATCH_ERR!"=="0" ( exit /b 0 ) else if "!WATCH_ERR!"=="2" ( exit /b 0 ) else ( exit /b 1 )
+goto DONE
 
 :PUSH_FAIL
 git remote set-url origin https://github.com/YHDXM/ZXS.git
@@ -174,6 +146,14 @@ set "https_proxy="
 echo.
 echo [X] Push FAILED. Log: %TEMP%\zxs_deploy_push.log
 echo     Common causes: token lacks "repo" scope, or wrong GitHub account.
+goto DONE_FAIL
+
+:DONE_FAIL
 echo.
-pause
-exit /b 1
+echo [DEPLOY ABORTED]
+goto DONE
+
+:DONE
+echo.
+echo Press any key to close this window...
+pause >nul
