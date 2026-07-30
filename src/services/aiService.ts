@@ -1,5 +1,5 @@
 import { encryptSecret, decryptSecret } from './secret'
-import { loadProfileAiConfig, saveProfileAiConfig } from './appDataService'
+import { loadProfileAiConfig, saveProfileAiConfig, addModelUsage } from './appDataService'
 import { recordUsage } from './usageTracker'
 
 export type AiProvider = 'ollama' | 'openrouter' | 'openai-compatible' | 'bailian'
@@ -256,6 +256,10 @@ export async function callAi(config: AiConfig, userPrompt: string): Promise<stri
     const content = data?.choices?.[0]?.message?.content || ''
     if (typeof content === 'string' && content.trim()) {
       trackUsage('bailian', config.model || 'qwen-turbo', userPrompt, content, data?.usage)
+      // 扣减阿里百炼免费额度（真实用量优先，取不到则按字符数 / 4 估算）
+      const used =
+        Number(data?.usage?.total_tokens) || Math.ceil((userPrompt.length + content.length) / 4)
+      void addModelUsage(`bailian:${config.model || 'qwen-turbo'}`, used)
       return content
     }
 

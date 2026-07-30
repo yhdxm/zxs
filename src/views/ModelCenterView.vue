@@ -107,6 +107,24 @@
       </div>
       <div v-else class="mc-bailian-empty">暂无百炼调用记录，使用阿里百炼模型对话后将自动累计。</div>
 
+      <!-- 阿里百炼免费模型额度清单：每个模型显示免费额度 / 到期 / 已用 / 剩余进度条 -->
+      <div class="mc-quota-models">
+        <div class="mc-qm-head">
+          <span>阿里百炼免费模型额度（共 {{ bailianQuotaRows.length }} 个，已接入 {{ bailianQuotaRows.filter((r) => r.used > 0).length }} 个）</span>
+          <span class="mc-qm-tip">免费额度 1,000,000 / 模型 · 有效期至 2026-09-20</span>
+        </div>
+        <div v-for="r in bailianQuotaRows" :key="r.id" class="mc-qm-row">
+          <div class="mc-qm-top">
+            <span class="mc-qm-name" :title="r.model">{{ r.model }}</span>
+            <span class="mc-qm-remaining">剩余 {{ tokenText(r.remaining) }} / {{ tokenText(r.free) }}</span>
+          </div>
+          <div class="mc-quota-bar">
+            <div class="mc-quota-fill" :class="{ danger: r.percent >= 90 }" :style="{ width: r.percent + '%' }"></div>
+          </div>
+          <div class="mc-qm-meta">已用 {{ tokenText(r.used) }}（{{ r.percent }}%）· 到期 {{ r.freeUntil }}</div>
+        </div>
+      </div>
+
       <!-- 可选：用户已知额度（免费额度 / 购买额度）自填，用于进度提示 -->
       <div v-if="bailianQuota !== null" class="mc-quota-sub">
         <div class="mc-quota-form">
@@ -209,7 +227,8 @@ import {
 import { checkFreeModelsV2, type FreeModelStatusV2, type FreeModelStatusKind } from '../services/freeModels'
 import { getProviderBalance, type ProviderBalance } from '../services/balanceService'
 import { loadAiConfig, type AiConfig } from '../services/aiService'
-import { getSavedUser } from '../services/appDataService'
+import { getSavedUser, getAllModelUsage } from '../services/appDataService'
+import { CALLABLE_MODELS } from '../services/modelCatalog'
 
 const PROVIDER_LABELS: Record<string, string> = {
   siliconflow: '硅基流动',
@@ -257,6 +276,28 @@ const checking = ref(false)
 const autoRefresh = ref(false)
 let timer: ReturnType<typeof setInterval> | null = null
 
+/** 阿里百炼各模型额度账本（model_id -> 已用 tokens），来自 Supabase model_usage 表 */
+const modelUsageMap = ref<Record<string, number>>({})
+
+const bailianQuotaRows = computed(() =>
+  CALLABLE_MODELS.filter((m) => m.provider === 'bailian').map((m) => {
+    const free = m.freeQuota ?? 1000000
+    const used = modelUsageMap.value[m.id] || 0
+    const remaining = Math.max(0, free - used)
+    const percent = free > 0 ? Math.min(100, Math.round((used / free) * 100)) : 0
+    return {
+      id: m.id,
+      model: m.model,
+      label: m.label,
+      free,
+      used,
+      remaining,
+      percent,
+      freeUntil: m.freeUntil || '2026-09-20'
+    }
+  })
+)
+
 interface ConfiguredModelRow {
   provider: string
   model: string
@@ -295,10 +336,15 @@ const loadBalance = async () => {
   balance.value = await getProviderBalance(cfg.provider as string, cfg.baseUrl, cfg.apiKey)
 }
 
+/** 拉取阿里百炼各模型额度账本（已用 tokens） */
+const loadModelUsage = async () => {
+  modelUsageMap.value = await getAllModelUsage()
+}
+
 const runCheck = async () => {
   checking.value = true
   try {
-    await Promise.all([loadConfigured(), loadBalance()])
+    await Promise.all([loadConfigured(), loadBalance(), loadModelUsage()])
     freeList.value = await checkFreeModelsV2()
   } catch {
     ElMessage.error('检测失败，请检查网络后重试')
@@ -479,6 +525,16 @@ onBeforeUnmount(() => {
 }
 .mc-quota-fill.danger { background: linear-gradient(90deg, #f59e0b, #ef4444); }
 .mc-quota-meta { margin-top: 8px; font-size: 12px; color: var(--text-muted); }
+
+/* 百炼免费模型额度清单 */
+.mc-quota-models { margin-top: 18px; border-top: 1px dashed var(--border); padding-top: 16px; }
+.mc-qm-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; font-size: 13px; font-weight: 600; color: var(--text-strong); margin-bottom: 12px; }
+.mc-qm-tip { font-size: 12px; color: var(--text-muted); font-weight: 400; }
+.mc-qm-row { margin-bottom: 14px; }
+.mc-qm-top { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 6px; }
+.mc-qm-name { font-size: 13px; font-weight: 600; color: var(--text-strong); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.mc-qm-remaining { font-size: 12px; color: var(--primary); font-weight: 600; flex-shrink: 0; }
+.mc-qm-meta { margin-top: 6px; font-size: 11px; color: var(--text-muted); }
 
 /* 表格区 */
 .mc-tabs { --el-tabs-header-height: auto; }

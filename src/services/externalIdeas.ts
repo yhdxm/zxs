@@ -1,10 +1,9 @@
 // 外部灵感聚合服务（需求收集页 M5）
-// 数据来源（全部免费、前端直连、无需 Key）：
-//   - Hacker News（Algolia 公开 API）
-//   - Dev.to（公开 articles API）
-//   - Reddit（公开 JSON 接口）
-//   - Product Hunt（RSS 经公共代理解析）
-// 单源失败不影响其他源；结果归一化为 ExternalIdea[] 后落库 external_ideas（带本地兜底）。
+// 数据来源（全部免费、前端直连、无需 Key、国内可访问）：
+//   - GitHub 公开 Search API（api.github.com，CORS 开放、免鉴权）
+//     搜索近期高星仓库作为「需求 / 创意」灵感来源。
+// 单源失败不影响整体；结果归一化为 ExternalIdea[] 后落库 external_ideas（带本地兜底）。
+// 注意：GitHub 匿名接口限速 60 次/小时，频繁刷新可能临时受限，失败会优雅降级。
 
 import { supabase } from './appDataService'
 
@@ -55,10 +54,8 @@ function summarize(text: string, max = 120): string {
 /** 并发抓取多源并归一化 + 去重（按 url） */
 export async function fetchExternalIdeas(): Promise<ExternalIdea[]> {
   const tasks: Promise<FetchedItem[]>[] = [
-    fetchHackerNews(),
-    fetchDevTo(),
-    fetchReddit(),
-    fetchProductHunt()
+    fetchGitHubRepos('stars:%3E1000+pushed:%3E2025-01-01', 20, '需求 / 创意'),
+    fetchGitHubRepos('topic:ai+stars:%3E300', 15, 'AI / 大模型')
   ]
 
   const results = await Promise.allSettled(tasks)
@@ -91,81 +88,36 @@ export async function fetchExternalIdeas(): Promise<ExternalIdea[]> {
   }))
 }
 
-async function fetchHackerNews(): Promise<FetchedItem[]> {
+/**
+ * 从 GitHub 公开 Search API 拉取高星仓库作为灵感来源（国内可直连、CORS 开放、免鉴权）。
+ * query 形如 `stars:%3E1000+pushed:%3E2025-01-01`；topic 用于打标签。
+ * 匿名限速 60 次/小时，超限返回空（由上层提示）。
+ */
+async function fetchGitHubRepos(query: string, perPage: number, topicTag: string): Promise<FetchedItem[]> {
   try {
-    const res = await timeoutFetch('https://hn.algolia.com/api/v1/search?tags=front_page&hitsPerPage=20')
-    if (!res.ok) return []
-    const data = (await res.json().catch(() => ({}))) as { hits?: Array<Record<string, unknown>> }
-    return (data.hits || []).map((h) => ({
-      source: 'Hacker News',
-      title: String(h.title || h.story_title || '无标题'),
-      url: String(h.url || h.story_url || `https://news.ycombinator.com/item?id=${h.objectID}`),
-      summary: summarize(String(h.story_text || h.title || '')),
-      tags: ['技术', '创业']
-    }))
-  } catch {
-    return []
-  }
-}
-
-async function fetchDevTo(): Promise<FetchedItem[]> {
-  try {
-    const res = await timeoutFetch('https://dev.to/api/articles?top=1&per_page=20')
-    if (!res.ok) return []
-    const data = (await res.json().catch(() => [])) as Array<Record<string, unknown>>
-    return (Array.isArray(data) ? data : []).map((a) => ({
-      source: 'Dev.to',
-      title: String(a.title || '无标题'),
-      url: String(a.url || ''),
-      summary: summarize(String(a.description || a.title || '')),
-      tags: Array.isArray(a.tag_list) ? (a.tag_list as string[]).slice(0, 3) : ['开发']
-    }))
-  } catch {
-    return []
-  }
-}
-
-async function fetchReddit(): Promise<FetchedItem[]> {
-  try {
-    const res = await timeoutFetch('https://www.reddit.com/r/programming/top.json?limit=20&t=week', {
-      headers: { Accept: 'application/json' }
+    const url = `https://api.github.com/search/repositories?q=${query}&sort=stars&order=desc&per_page=${perPage}`
+    const res = await timeoutFetch(url, {
+      headers: { Accept: 'application/vnd.github+json' }
     })
-    if (!res.ok) return []
-    const data = (await res.json().catch(() => ({}))) as { data?: { children?: Array<Record<string, unknown>> } }
-    const children = data.data?.children || []
-    return children.map((c) => {
-      const d = (c.data || {}) as Record<string, unknown>
-      return {
-        source: 'Reddit',
-        title: String(d.title || '无标题'),
-        url: String(d.url || `https://reddit.com${d.permalink || ''}`),
-        summary: summarize(String(d.selftext || '')),
-        tags: ['社区']
+    if (!res.ok) {
+      if (res.status === 403) {
+        console.warn('[externalIdeas] GitHub 限速（60/h），稍后重试')
       }
-    })
-  } catch {
-    return []
-  }
-}
-
-async function fetchProductHunt(): Promise<FetchedItem[]> {
-  try {
-    const proxy = 'https://api.allorigins.win/raw?url=' + encodeURIComponent('https://www.producthunt.com/feed')
-    const res = await timeoutFetch(proxy)
-    if (!res.ok) return []
-    const xml = await res.text()
-    const doc = new DOMParser().parseFromString(xml, 'text/xml')
-    const items = Array.from(doc.querySelectorAll('item')).slice(0, 15)
-    return items.map((n) => {
-      const title = n.querySelector('title')?.textContent?.trim() || '无标题'
-      const link = n.querySelector('link')?.textContent?.trim() || n.querySelector('link')?.getAttribute('href') || ''
-      const desc = n.querySelector('description')?.textContent?.trim() || ''
+      return []
+    }
+    const data = (await res.json().catch(() => ({}))) as {
+      items?: Array<Record<string, unknown>>
+    }
+    return (data.items || []).map((r) => {
+      const owner = (r.owner as Record<string, unknown> | undefined)?.login || 'github'
+      const name = String(r.name || 'repo')
+      const lang = typeof r.language === 'string' && r.language ? r.language : ''
       return {
-        source: 'Product Hunt',
-        title,
-        url: link,
-        summary: summarize(desc.replace(/<[^>]+>/g, ' ')),
-        tags: ['产品', '创业']
+        source: 'GitHub',
+        title: `${owner}/${name}`,
+        url: String(r.html_url || `https://github.com/${owner}/${name}`),
+        summary: summarize(String(r.description || ''), 140),
+        tags: Array.from(new Set([lang, topicTag].filter(Boolean))) as string[]
       }
     })
   } catch {

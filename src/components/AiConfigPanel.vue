@@ -43,11 +43,12 @@
 
       <el-form-item label="API Key">
         <el-input
-          v-model="form.apiKey"
+          v-model="keyInput"
           type="password"
-          show-password
           :placeholder="hasStoredKey ? '已保存（密文），如需更换直接输入新 Key' : '填入你的 API Key，保存后无需重复输入'"
+          autocomplete="off"
         />
+        <div class="key-hint">密钥本地 AES 加密存储，界面不可查看明文；输入新 Key 即覆盖旧 Key。</div>
       </el-form-item>
 
       <el-form-item label="系统提示词">
@@ -83,6 +84,7 @@ import { CALLABLE_MODELS, toAiConfig, type CallableModel, type ModelProvider } f
 import { getSavedUser } from '../services/appDataService'
 
 const form = ref<AiConfig>({ ...defaultAiConfig })
+const keyInput = ref('')
 const hasStoredKey = ref(false)
 const ready = ref(false)
 const savedTipVisible = ref(false)
@@ -172,6 +174,19 @@ watch(form, () => {
     }, 1500)
   }, 500)
 }, { deep: true })
+
+// API Key 单独处理：仅在用户输入非空时写入 form，保存成功后清空输入框明文，
+// 界面永远不可查看明文（无 show-password 眼睛），避免 F12 窥视。换新 Key 直接输入即覆盖。
+watch(keyInput, () => {
+  if (!ready.value) return
+  const v = keyInput.value.trim()
+  if (!v) return
+  form.value.apiKey = v
+  // 延迟清空输入框：form 的 deep watch 已触发自动保存（AES 加密落盘），此处仅清除内存明文
+  setTimeout(() => {
+    keyInput.value = ''
+  }, 600)
+})
 
 // 切换服务商时自动带出默认接口地址（模型下拉重置为手动选择）
 watch(() => form.value.provider, (provider, oldProvider) => {
@@ -267,6 +282,12 @@ onBeforeUnmount(() => {
 
 .ai-form {
   margin-top: 10px;
+}
+.key-hint {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.5;
 }
 
 .hint-box {

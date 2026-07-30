@@ -1,0 +1,27 @@
+# 阿里百炼免费模型快速录入模板
+# 每行一个模型，格式（两种都支持）：
+#   模型名
+#   模型名|展示名
+# 例如：
+#   qwen-turbo
+#   qwen3-235b-a22b|qwen3-235b-a22b（旗舰）
+# 说明：
+#   - id 自动生成为 bailian:<模型名>
+#   - 免费额度统一 1,000,000 tokens，有效期 2026-09-20（来自阿里百炼控制台）
+# 使用方法：把阿里百炼控制台「免费额度」里的 134 个模型名每行一个粘到下面，
+#           然后运行：  node scripts/genBailianModels.mjs
+#           会自动重新生成 src/services/bailianModels.generated.ts
+qwen-turbo
+qwen-plus
+qwen-plus-2025-07-28
+qwen-max
+qwen-math-turbo
+qwen3.7-plus
+qwen3-vl-235b-a22b-thinking
+qwen3-vl-32b-thinking
+deepseek-r1-distill-qwen-7b
+glm-5
+qwen-long
+qwen-vl-plus
+qwen2.5-72b-instruct
+qwen3-235b-a22b

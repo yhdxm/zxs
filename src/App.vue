@@ -359,7 +359,6 @@ interface SideItem {
 const canManageSystem = (u: AppUser | null) => u?.role === 'superadmin' || u?.role === 'admin'
 
 const sideMenu = reactive<SideItem[]>([
-  { key: 'overview', label: '数据看板', icon: DataBoard, permissionKey: 'dashboard', to: { path: '/dashboard', query: { view: 'overview' } } },
   { key: 'ai', label: 'AI 助手', icon: MagicStick, permissionKey: 'ai', to: '/ai' },
   { key: 'models', label: '模型中心', icon: DataAnalysis, permissionKey: 'ai', to: '/models' },
   { key: 'requirements', label: '需求收集', icon: TrendCharts, permissionKey: 'dashboard', to: '/requirements' },
@@ -367,9 +366,10 @@ const sideMenu = reactive<SideItem[]>([
     key: 'worktasks',
     label: '工作任务',
     icon: List,
-    expanded: false,
+    expanded: true,
     permissionKey: 'worktasks',
     children: [
+      { key: 'overview', label: '数据看板', icon: DataBoard, permissionKey: 'dashboard', to: { path: '/dashboard', query: { view: 'overview' } } },
       { key: 'todos', label: '待办', icon: List, permissionKey: 'todos', to: { path: '/dashboard', query: { view: 'todos' } } },
       { key: 'points', label: '点位', icon: Location, permissionKey: 'points', to: { path: '/dashboard', query: { view: 'points' } } },
       { key: 'contents', label: '内容', icon: Document, permissionKey: 'contents', to: { path: '/dashboard', query: { view: 'contents' } } }
@@ -449,7 +449,7 @@ const isMenuActive = (key: string) => {
   if (key === 'database') return route.path === '/database'
   if (key === 'free-content') return route.path === '/free-content'
   if (key === 'automation' || key === 'automation-info') return route.path === '/automation'
-  if (key === 'worktasks') return route.path === '/dashboard' && ['todos', 'points', 'contents'].includes((route.query.view as string) || '')
+  if (key === 'worktasks') return route.path === '/dashboard' && ['overview', 'todos', 'points', 'contents'].includes((route.query.view as string) || '')
   if (key === 'system') return route.path === '/system'
   if (key === 'system-accounts') return route.path === '/system' && (route.query.view || 'accounts') === 'accounts'
   if (key === 'system-roles') return route.path === '/system' && route.query.view === 'roles'

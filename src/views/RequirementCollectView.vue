@@ -3,7 +3,7 @@
     <div class="ei-header">
       <div>
         <h2>外部灵感聚合</h2>
-        <p>免费并发聚合 Hacker News / Dev.to / Reddit / Product Hunt 等公开源，帮助你捕捉需求与产品灵感（数据仅存浏览器本地 + 云端，不消耗任何积分）</p>
+        <p>免费聚合 GitHub 近期高星开源项目（国内可直连、无需 Key），帮助你捕捉需求与产品灵感（数据仅存浏览器本地 + 云端，不消耗任何积分）</p>
       </div>
       <el-button type="primary" :loading="fetching" @click="refresh">
         <el-icon><Refresh /></el-icon> 免费查询 / 刷新
@@ -74,7 +74,7 @@
     </div>
 
     <div v-else-if="!filteredIdeas.length" class="ei-empty">
-      <el-empty :description="ideas.length ? '没有符合筛选条件的灵感' : '还没有灵感数据，点击右上角「免费查询 / 刷新」获取'" :image-size="64" />
+      <el-empty :description="ideas.length ? '没有符合筛选条件的灵感' : '暂无灵感数据，已进入页面会自动从 GitHub 获取，失败可点右上角「免费查询 / 刷新」'" :image-size="64" />
     </div>
 
     <div v-else class="ei-grid">
@@ -172,7 +172,7 @@ async function refresh() {
     await loadUser()
     const fetched = await fetchExternalIdeas()
     if (fetched.length === 0) {
-      ElMessage.warning('本次未获取到任何外部灵感（可能网络受限或所有来源超时），请稍后重试')
+      ElMessage.warning('本次未获取到任何灵感（GitHub 接口限速或网络受限，请稍后重试）')
     } else {
       // 与本地已收藏 / 已关联的灵感合并，避免刷新后丢失用户标记
       const prevMap = new Map(ideas.value.map((i) => [i.url || i.title, i]))
@@ -258,7 +258,13 @@ async function clearAllCache() {
   }
 }
 
-onMounted(load)
+onMounted(async () => {
+  await load()
+  // 进入页面自动抓取（缓存为空时）；若已有缓存则直接展示，无需等待网络
+  if (ideas.value.length === 0) {
+    await refresh()
+  }
+})
 </script>
 
 <style scoped>

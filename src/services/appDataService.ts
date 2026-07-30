@@ -1447,3 +1447,75 @@ export async function clearExpiredAutomationInfo(userId: string, _days?: number)
     return 0
   }
 }
+
+/* =========================================================================
+ * 模型额度账本（model_usage 表，M9）
+ * 记录阿里百炼免费模型已用 tokens；剩余 = 免费额度 - 已用。
+ * RLS：本人 auth.uid() = user_id 读写；原子递增走 add_model_usage RPC（SECURITY DEFINER）。
+ * ========================================================================= */
+
+export interface ModelUsageRow {
+  model_id: string
+  used_tokens: number
+  free_quota: number
+  free_until: string
+}
+
+/** 读取单个模型的已用 tokens（未记录返回 0） */
+export async function getModelUsage(modelId: string): Promise<number> {
+  if (!modelId) return 0
+  try {
+    const { data, error } = await supabase
+      .from('model_usage')
+      .select('used_tokens')
+      .eq('model_id', modelId)
+      .maybeSingle()
+    if (error) {
+      console.warn('[modelUsage] 读取失败', error.message)
+      return 0
+    }
+    return Number((data as { used_tokens?: number } | null)?.used_tokens) || 0
+  } catch {
+    return 0
+  }
+}
+
+/** 读取当前用户全部模型已用 tokens，返回 model_id -> used_tokens 映射 */
+export async function getAllModelUsage(): Promise<Record<string, number>> {
+  const map: Record<string, number> = {}
+  try {
+    const { data, error } = await supabase
+      .from('model_usage')
+      .select('model_id, used_tokens')
+      .order('model_id', { ascending: true })
+    if (error) {
+      console.warn('[modelUsage] 批量读取失败', error.message)
+      return map
+    }
+    for (const r of (data || []) as Array<{ model_id: string; used_tokens: number }>) {
+      map[r.model_id] = Number(r.used_tokens) || 0
+    }
+  } catch (e) {
+    console.warn('[modelUsage] 批量读取异常', e)
+  }
+  return map
+}
+
+/**
+ * 记录一次模型调用消耗的 tokens（原子递增到 model_usage）。
+ * 仅对阿里百炼免费模型调用，确保额度按真实用量扣减。
+ */
+export async function addModelUsage(modelId: string, tokens: number): Promise<void> {
+  if (!modelId || !tokens || tokens <= 0) return
+  try {
+    const { error } = await supabase.rpc('add_model_usage', {
+      p_model_id: modelId,
+      p_tokens: Math.round(tokens)
+    })
+    if (error) {
+      console.warn('[modelUsage] 扣减失败', error.message)
+    }
+  } catch (e) {
+    console.warn('[modelUsage] 扣减异常', e)
+  }
+}
