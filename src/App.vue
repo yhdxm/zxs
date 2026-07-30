@@ -530,8 +530,14 @@ onMounted(async () => {
   applyTheme(theme.value)
   updatePlatform()
   window.addEventListener('resize', updatePlatform)
-  await refreshUser()
-  initializing.value = false
+  try {
+    await refreshUser()
+  } catch (err) {
+    console.error('[App] refresh user failed:', err)
+    currentUser.value = null
+  } finally {
+    initializing.value = false
+  }
 })
 </script>
 
