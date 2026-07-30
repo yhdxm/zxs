@@ -1,6 +1,12 @@
 <template>
+  <!-- 初始化 loading：登录态确认前不渲染内部页面，避免未登录布局闪烁 -->
+  <div v-if="initializing && route.name !== 'login'" class="app-loading">
+    <el-icon class="loading-icon"><Loading /></el-icon>
+    <span>加载中...</span>
+  </div>
+
   <!-- 最外层登录页：未登录访问 /login 时仅渲染登录页（全屏，不带任何导航） -->
-  <div v-if="route.name === 'login'" class="login-screen">
+  <div v-else-if="route.name === 'login'" class="login-screen">
     <router-view />
   </div>
 
@@ -295,7 +301,8 @@ import {
   Moon,
   DataAnalysis,
   TrendCharts,
-  Compass
+  Compass,
+  Loading
 } from '@element-plus/icons-vue'
 import {
   logoutUser, getSavedUser, refreshSavedUser,
@@ -311,6 +318,7 @@ const currentUser = ref<AppUser | null>(null)
 const menuSearch = ref('')
 const permissionConfig = ref<PermissionConfig | null>(null)
 const isMobile = ref(false)
+const initializing = ref(true)
 const platform = computed(() => (isMobile.value ? 'mobile' : 'pc'))
 
 const isLoggedIn = computed(() => Boolean(currentUser.value))
@@ -518,15 +526,38 @@ const handleLogout = async () => {
 
 // 路由变化时刷新登录态（登录/退出后导航同步）
 watch(() => route.fullPath, refreshUser)
-onMounted(() => {
+onMounted(async () => {
   applyTheme(theme.value)
   updatePlatform()
   window.addEventListener('resize', updatePlatform)
-  void refreshUser()
+  await refreshUser()
+  initializing.value = false
 })
 </script>
 
 <style scoped>
+/* 初始化 loading：登录态确认前全屏遮挡，避免未登录布局闪烁 */
+.app-loading {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  background: var(--bg-app, #f8fafc);
+  color: var(--text-secondary, #64748b);
+  z-index: 9999;
+}
+.app-loading .loading-icon {
+  font-size: 32px;
+  animation: spin 1s linear infinite;
+}
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
 /* 最外层登录页：全屏渲染，不带任何全局导航 */
 .login-screen {
   min-height: 100vh;
