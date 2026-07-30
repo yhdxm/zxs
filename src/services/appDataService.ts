@@ -1026,18 +1026,27 @@ export async function updateAccount(params: {
   role?: UserRole
   password?: string
 }): Promise<void> {
-  const { error } = await supabase.rpc('update_account_by_admin', {
-    p_auth_user_id: params.id,
-    p_nickname: params.nickname ?? null,
-    p_role: params.role ?? null,
-    p_disabled: null
-  })
-  if (error) {
-    throw new Error(getErrorMessage(error, '更新账号失败'))
+  // 1) 昵称 / 角色走管理员 RPC
+  if (params.nickname || params.role) {
+    const { error } = await supabase.rpc('update_account_by_admin', {
+      p_auth_user_id: params.id,
+      p_nickname: params.nickname ?? null,
+      p_role: params.role ?? null,
+      p_disabled: null
+    })
+    if (error) {
+      throw new Error(getErrorMessage(error, '更新账号失败'))
+    }
   }
+  // 2) 密码：超级管理员重置他人密码，走专用 RPC（函数内校验 superadmin 权限）
   if (params.password) {
-    // 子账号密码修改需服务端 API（service_role），纯前端无法实现，记录提示
-    console.warn('[admin] 通过前端修改子账号密码需要服务端 API，已跳过')
+    const { error } = await supabase.rpc('admin_set_user_password', {
+      p_target_user_id: params.id,
+      p_new_password: params.password
+    })
+    if (error) {
+      throw new Error(getErrorMessage(error, '重置密码失败：仅超级管理员可操作'))
+    }
   }
 }
 
