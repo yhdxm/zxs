@@ -38,6 +38,7 @@
       </el-button>
       <span class="ai-stat">共 {{ list.length }} 条</span>
       <span class="ai-stat ai-stat-expired">已过期 {{ expiredCount }} 条</span>
+      <span class="ai-stat ai-stat-expiring">即将过期 {{ expiringCount }} 条</span>
     </div>
 
     <div v-if="loading && !list.length" class="ai-loading">
@@ -49,10 +50,10 @@
     </div>
 
     <div v-else class="ai-grid">
-      <div v-for="row in list" :key="row.id" class="ai-card" :class="{ expired: isExpired(row) }">
+      <div v-for="row in list" :key="row.id" class="ai-card" :class="cacheState(row)">
         <div class="ai-card-top">
           <span class="ai-source">{{ row.source || row.category || '未知来源' }}</span>
-          <el-tag v-if="isExpired(row)" size="small" type="danger" effect="light">已过期</el-tag>
+          <el-tag size="small" :type="stateTag(row)" effect="light">{{ stateLabel(row) }}</el-tag>
           <el-button class="ai-del" size="small" text type="danger" @click="removeRow(row)">
             <el-icon><Delete /></el-icon>
           </el-button>
@@ -91,12 +92,42 @@ const savedTip = ref(false)
 const SETTING_KEY = 'automation_cache_days'
 const userId = ref('')
 
-const expiredCount = computed(() => list.value.filter((r) => isExpired(r)).length)
+type CacheState = 'normal' | 'expiring' | 'expired'
 
-function isExpired(row: AutomationInfo): boolean {
-  if (!row.expire_at) return false
-  return new Date(row.expire_at).getTime() < Date.now()
+/** 距过期 < 24 小时视为「即将过期」 */
+const EXPIRING_THRESHOLD_MS = 24 * 60 * 60 * 1000
+
+const STATE_LABEL: Record<CacheState, string> = {
+  normal: '正常',
+  expiring: '即将过期',
+  expired: '已过期'
 }
+
+const STATE_TAG: Record<CacheState, 'success' | 'warning' | 'danger'> = {
+  normal: 'success',
+  expiring: 'warning',
+  expired: 'danger'
+}
+
+/** 三态判定：已过期 / 即将过期（<24h）/ 正常 */
+function cacheState(row: AutomationInfo): CacheState {
+  if (!row.expire_at) return 'normal'
+  const diff = new Date(row.expire_at).getTime() - Date.now()
+  if (diff < 0) return 'expired'
+  if (diff < EXPIRING_THRESHOLD_MS) return 'expiring'
+  return 'normal'
+}
+
+function stateLabel(row: AutomationInfo): string {
+  return STATE_LABEL[cacheState(row)]
+}
+
+function stateTag(row: AutomationInfo): 'success' | 'warning' | 'danger' {
+  return STATE_TAG[cacheState(row)]
+}
+
+const expiredCount = computed(() => list.value.filter((r) => cacheState(r) === 'expired').length)
+const expiringCount = computed(() => list.value.filter((r) => cacheState(r) === 'expiring').length)
 
 function fmt(iso?: string): string {
   if (!iso) return '—'
@@ -224,6 +255,7 @@ onMounted(async () => {
 }
 .ai-stat { font-size: 12px; color: var(--text-faint); }
 .ai-stat-expired { color: #dc2626; }
+.ai-stat-expiring { color: #f59e0b; }
 
 .ai-loading {
   display: flex; align-items: center; gap: 8px; color: var(--text-muted);
@@ -252,6 +284,8 @@ onMounted(async () => {
 }
 .ai-card:hover { transform: translateY(-2px); box-shadow: 0 12px 28px rgba(15, 23, 42, 0.1); }
 .ai-card.expired { opacity: 0.7; border-color: rgba(220, 38, 38, 0.3); }
+.ai-card.expiring { border-color: rgba(245, 158, 11, 0.45); }
+.ai-card.normal { border-color: rgba(22, 163, 74, 0.25); }
 
 .ai-card-top { display: flex; align-items: center; gap: 8px; }
 .ai-source {
