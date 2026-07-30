@@ -307,6 +307,10 @@ const submit = async () => {
   saving.value = true
   try {
     if (isEdit.value) {
+      if (!form.authUserId) {
+        ElMessage.warning('该账号未绑定认证用户，无法编辑，请删除后重建')
+        return
+      }
       await updateAccount({
         id: form.authUserId,
         nickname: form.nickname,

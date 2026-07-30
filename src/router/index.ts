@@ -10,7 +10,7 @@ import AutomationInfoView from '../views/AutomationInfoView.vue'
 import ModelCenterView from '../views/ModelCenterView.vue'
 import RequirementCollectView from '../views/RequirementCollectView.vue'
 import FreeContentView from '../views/FreeContentView.vue'
-import { hasPermission, loadPermissionConfig, type AppUser } from '../services/appDataService'
+import { hasPermission, loadPermissionConfig, getSavedUser } from '../services/appDataService'
 
 const router = createRouter({
   history: createWebHashHistory(import.meta.env.BASE_URL),
@@ -88,19 +88,9 @@ const router = createRouter({
 // ===== 全站登录门禁 =====
 // 未登录访问任何非登录页都重定向到 /login（最外层登录页）；
 // 已登录访问 /login 则直接进入工作台（登录后默认落地页，实现“工作台前移”）。
-function parseStoredUser(): AppUser | null {
-  if (typeof window === 'undefined') return null
-  try {
-    const raw = window.localStorage.getItem('smart-dashboard-user')
-    if (!raw) return null
-    return JSON.parse(raw) as AppUser
-  } catch {
-    return null
-  }
-}
-
+// 注意：这里必须真实验证 Supabase 会话，不能只看 localStorage，否则 token 过期后仍会进入内部页。
 router.beforeEach(async (to, _from, next) => {
-  const user = parseStoredUser()
+  const user = await getSavedUser()
   const isAuthenticated = Boolean(user)
 
   if (!isAuthenticated && to.name !== 'login') {
