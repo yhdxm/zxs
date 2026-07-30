@@ -27,9 +27,20 @@
             <div class="md-summary-head"><el-icon><Memo /></el-icon> 总结</div>
             <div class="md" v-html="parts(message.content).summaryHtml"></div>
           </div>
-          <button class="md-copy" type="button" @click="copyText(message.content)">
-            <el-icon><CopyDocument /></el-icon> 复制全文
-          </button>
+          <div class="msg-actions">
+            <button
+              v-if="isErrorReply(message.content)"
+              class="md-retry"
+              type="button"
+              :disabled="loading"
+              @click="retry(index)"
+            >
+              <el-icon><RefreshRight /></el-icon> 重试
+            </button>
+            <button class="md-copy" type="button" @click="copyText(message.content)">
+              <el-icon><CopyDocument /></el-icon> 复制全文
+            </button>
+          </div>
         </div>
         <div v-else class="message-bubble">{{ message.content }}</div>
       </div>
@@ -59,7 +70,7 @@
 <script setup lang="ts">
 import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
-import { MagicStick, Setting, Delete, Promotion, Memo, CopyDocument } from '@element-plus/icons-vue'
+import { MagicStick, Setting, Delete, Promotion, Memo, CopyDocument, RefreshRight } from '@element-plus/icons-vue'
 import { callAi, loadAiConfig } from '../services/aiService'
 import { recordUsage } from '../services/usageTracker'
 import { renderMarkdown, splitSummary } from '../lib/markdown'
@@ -153,26 +164,59 @@ const sendPrompt = async () => {
   messages.value.push({ role: 'user', content: text })
   syncHistory()
   prompt.value = ''
+  // 先占位一条 assistant 消息，索引固定，便于重试时原地更新
+  const assistantIndex = messages.value.length
+  messages.value.push({ role: 'assistant', content: '正在思考…' })
   loading.value = true
   await scrollToBottom()
 
+  await callAndUpdate(latestConfig, text, assistantIndex)
+}
+
+/** 复用 callAi 发起一次调用，并将结果原地写入 assistantIndex 位置的消息 */
+const callAndUpdate = async (config: Awaited<ReturnType<typeof loadAiConfig>>, userText: string, assistantIndex: number) => {
+  loading.value = true
   try {
-    const reply = await callAi(latestConfig, text)
-    messages.value.push({ role: 'assistant', content: reply })
+    const reply = await callAi(config, userText)
+    messages.value[assistantIndex] = { role: 'assistant', content: reply }
     // 记录本次调用用量（本地统计，不消耗积分、不上云）
     recordUsage({
-      provider: latestConfig.provider,
-      model: latestConfig.model,
-      promptText: text,
+      provider: config.provider,
+      model: config.model,
+      promptText: userText,
       completionText: reply
     })
   } catch (error) {
-    messages.value.push({ role: 'assistant', content: error instanceof Error ? error.message : '调用失败' })
+    messages.value[assistantIndex] = {
+      role: 'assistant',
+      content: '⚠️ 调用失败：' + (error instanceof Error ? error.message : '未知错误') + '\n\n点击「重试」可重新发送上一条消息。'
+    }
   } finally {
     loading.value = false
     syncHistory()
     await scrollToBottom()
   }
+}
+
+/** 判断助手回复是否为错误回退提示（用于展示重试按钮） */
+const isErrorReply = (content: string): boolean => content.startsWith('⚠️ 调用失败：')
+
+/** 重试某条助手消息：找到其紧邻的上一条用户消息，重新发起调用 */
+const retry = async (assistantIndex: number) => {
+  if (loading.value) return
+  let userText = ''
+  for (let i = assistantIndex - 1; i >= 0; i -= 1) {
+    if (messages.value[i]?.role === 'user') {
+      userText = messages.value[i]?.content ?? ''
+      break
+    }
+  }
+  if (!userText) {
+    ElMessage.warning('未找到可重试的原始提问')
+    return
+  }
+  const config = await loadAiConfig()
+  await callAndUpdate(config, userText, assistantIndex)
 }
 
 const clearChat = () => {
@@ -327,10 +371,19 @@ onBeforeUnmount(() => {
 .md-summary-head { display: flex; align-items: center; gap: 6px; font-weight: 700; color: var(--primary); font-size: 13px; margin-bottom: 6px; }
 .md-summary-head :deep(svg) { font-size: 15px; }
 .md-summary :deep(.md-p) { margin: 4px 0; }
+.msg-actions {
+  margin-top: 10px; display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+}
 .md-copy {
-  margin-top: 10px; display: inline-flex; align-items: center; gap: 4px; font-size: 12px;
+  display: inline-flex; align-items: center; gap: 4px; font-size: 12px;
   color: var(--text-faint); background: transparent; border: none; cursor: pointer; padding: 0; transition: color 0.2s;
 }
+.md-retry {
+  display: inline-flex; align-items: center; gap: 4px; font-size: 12px;
+  color: var(--primary); background: transparent; border: none; cursor: pointer; padding: 0; transition: opacity 0.2s;
+}
+.md-retry:hover { opacity: 0.7; }
+.md-retry:disabled { opacity: 0.45; cursor: not-allowed; }
 .md-copy:hover { color: var(--primary); }
 
 .chat-input-bar {

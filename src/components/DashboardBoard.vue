@@ -23,15 +23,27 @@
     <section v-show="viewMode === 'cards'" class="viz-grid">
       <div class="stat-card stat-todo">
         <div class="stat-icon"><el-icon><List /></el-icon></div>
-        <div class="stat-meta"><div class="stat-num">{{ counts.todos }}</div><div class="stat-label">待完成事项</div></div>
+        <div class="stat-meta">
+          <div class="stat-num">{{ boardCounts.todos.count }}</div>
+          <div class="stat-label">待完成事项</div>
+          <div class="stat-sub">共 {{ boardCounts.todos.total }} · 今日新增 {{ boardCounts.todos.newCount }}</div>
+        </div>
       </div>
       <div class="stat-card stat-point">
         <div class="stat-icon"><el-icon><Location /></el-icon></div>
-        <div class="stat-meta"><div class="stat-num">{{ counts.points }}</div><div class="stat-label">点位信息</div></div>
+        <div class="stat-meta">
+          <div class="stat-num">{{ boardCounts.points.count }}</div>
+          <div class="stat-label">点位信息<small>（未巡查）</small></div>
+          <div class="stat-sub">共 {{ boardCounts.points.total }} · 今日新增 {{ boardCounts.points.newCount }}</div>
+        </div>
       </div>
       <div class="stat-card stat-content">
         <div class="stat-icon"><el-icon><Document /></el-icon></div>
-        <div class="stat-meta"><div class="stat-num">{{ counts.contents }}</div><div class="stat-label">处理内容</div></div>
+        <div class="stat-meta">
+          <div class="stat-num">{{ boardCounts.contents.count }}</div>
+          <div class="stat-label">处理内容<small>（未完成）</small></div>
+          <div class="stat-sub">共 {{ boardCounts.contents.total }} · 今日新增 {{ boardCounts.contents.newCount }}</div>
+        </div>
       </div>
       <div class="stat-card stat-rate">
         <div class="stat-icon"><el-icon><DataLine /></el-icon></div>
@@ -117,7 +129,7 @@ import type { EChartsOption } from 'echarts'
 import {
   List, Location, Document, DataLine, Grid, TrendCharts
 } from '@element-plus/icons-vue'
-import { type AppDashboardData, type TodoItem, type PointItem, type ContentItem } from '../services/appDataService'
+import { type AppDashboardData, type TodoItem, type PointItem, type ContentItem, computeDashboardCounts, type DashboardCounts } from '../services/appDataService'
 import EChart from './EChart.vue'
 
 const props = defineProps<{ dashboard: AppDashboardData }>()
@@ -127,11 +139,8 @@ const viewMode = ref<ViewMode>('cards')
 const todoPendingCount = computed(() => props.dashboard.todos.filter((t) => t.status !== 'done').length)
 const todoDoneCount = computed(() => props.dashboard.todos.filter((t) => t.status === 'done').length)
 
-const counts = computed(() => ({
-  todos: todoPendingCount.value,
-  points: props.dashboard.points.length,
-  contents: props.dashboard.contents.length
-}))
+/** 看板统计口径（M6）：点位剔除已巡查、内容剔除已完成；含条数 / 总条数 / 新增 */
+const boardCounts = computed<DashboardCounts>(() => computeDashboardCounts(props.dashboard))
 
 const completionRate = computed(() => {
   const total = props.dashboard.todos.length
@@ -195,7 +204,7 @@ const countsOption = computed<EChartsOption>(() => ({
   yAxis: { type: 'value', splitLine: { lineStyle: { color: '#eef2f7' } }, axisLabel: { color: '#64748b' } },
   series: [{
     type: 'bar',
-    data: [counts.value.todos, counts.value.points, counts.value.contents],
+    data: [boardCounts.value.todos.count, boardCounts.value.points.count, boardCounts.value.contents.count],
     barWidth: '46%',
     itemStyle: {
       borderRadius: [8, 8, 0, 0],
@@ -383,6 +392,8 @@ const reportRows = computed<Array<Record<string, any>>>(() => {
 .stat-num { font-size: 26px; font-weight: 800; }
 .stat-num small { font-size: 15px; }
 .stat-label { font-size: 13px; color: #64748b; }
+.stat-label small { font-size: 11px; color: #94a3b8; font-weight: 400; }
+.stat-sub { font-size: 11px; color: #94a3b8; margin-top: 2px; font-variant-numeric: tabular-nums; }
 
 .chart-card {
   background: #fff;

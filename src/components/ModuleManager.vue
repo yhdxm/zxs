@@ -33,6 +33,11 @@
           <el-option label="已完成" value="done" />
         </el-select>
 
+        <el-select v-if="type === 'contents'" v-model="contentCategory" size="default" class="mm-filter">
+          <el-option label="全部分类" value="all" />
+          <el-option v-for="cat in contentCategories" :key="cat" :label="cat" :value="cat" />
+        </el-select>
+
         <el-dropdown trigger="click" @command="onMoreCommand" class="mm-more">
           <el-button size="default">
             <el-icon><More /></el-icon><span>更多</span>
@@ -162,6 +167,12 @@
           <el-form-item label="标签">
             <el-input v-model="editForm.tags" placeholder="逗号分隔，如 日常,同步" />
           </el-form-item>
+          <el-form-item label="完成状态">
+            <el-select v-model="editForm.contentStatus" style="width: 100%">
+              <el-option label="未完成" value="undone" />
+              <el-option label="已完成" value="done" />
+            </el-select>
+          </el-form-item>
           <div class="inline-fields full">
             <el-form-item label="日期">
               <el-date-picker v-model="editForm.date" type="date" value-format="YYYY-MM-DD" placeholder="选择日期" style="width: 100%" />
@@ -203,7 +214,8 @@ import {
   type TodoItem,
   type TodoPriority,
   type TodoStatus,
-  type PointStatus
+  type PointStatus,
+  type ContentStatus
 } from '../services/appDataService'
 
 export type ModuleType = 'todos' | 'points' | 'contents'
@@ -221,7 +233,17 @@ const typeIcon = computed(() => ({ todos: '✓', points: '◎', contents: '◎' 
 /* ============ 查询状态 ============ */
 const search = ref('')
 const todoFilter = ref<'all' | TodoStatus>('all')
+const contentCategory = ref<string>('all')
 const dateRange = ref<[string, string] | null>(null)
+
+/** 内容分类去重列表（用于「分类」查询框） */
+const contentCategories = computed<string[]>(() => {
+  const set = new Set<string>()
+  for (const c of props.dashboard.contents) {
+    if (c.category && c.category.trim()) set.add(c.category.trim())
+  }
+  return Array.from(set)
+})
 
 const editDialogVisible = ref(false)
 const editForm = ref({
@@ -235,6 +257,7 @@ const editForm = ref({
   priority: 'medium' as TodoPriority,
   category: '',
   status: 'pending' as PointStatus,
+  contentStatus: 'undone' as ContentStatus,
   tags: '',
   date: '',
   time: '',
@@ -299,10 +322,15 @@ const filteredList = computed(() => {
       return !kw || `${p.name} ${p.address} ${p.note} ${p.category || ''}`.toLowerCase().includes(kw)
     }
     const c = item as ContentItem
+    if (props.type === 'contents' && contentCategory.value !== 'all' && (c.category || '') !== contentCategory.value) {
+      return false
+    }
     return !kw || `${c.title} ${c.content} ${c.date} ${c.category || ''} ${c.tags || ''}`.toLowerCase().includes(kw)
   })
 
   const todoStatusRank = (s: TodoStatus) => (s === 'todo' ? 3 : s === 'doing' ? 2 : 1)
+  const pointStatusRank = (s: PointStatus) => (s === 'issue' ? 3 : s === 'pending' ? 2 : 1) // 异常 > 待巡查 > 已巡查
+  const contentStatusRank = (s?: ContentStatus) => (s === 'done' ? 1 : 2) // 未完成 > 已完成
   // 按紧急情况排序：高 > 中 > 低；同优先级未开始>进行中>已完成；再按日期倒序
   return list.sort((a, b) => {
     if (props.type === 'todos') {
@@ -313,7 +341,17 @@ const filteredList = computed(() => {
       if (statusDiff !== 0) return statusDiff
       return itemDate(tb).localeCompare(itemDate(ta))
     }
-    return itemDate(b).localeCompare(itemDate(a))
+    if (props.type === 'points') {
+      const pa = a as PointItem, pb = b as PointItem
+      const rankDiff = pointStatusRank(pb.status) - pointStatusRank(pa.status)
+      if (rankDiff !== 0) return rankDiff
+      return itemDate(pb).localeCompare(itemDate(pa))
+    }
+    // contents：未完成 > 已完成，同状态按日期倒序
+    const ca = a as ContentItem, cb = b as ContentItem
+    const rankDiff = contentStatusRank(cb.status) - contentStatusRank(ca.status)
+    if (rankDiff !== 0) return rankDiff
+    return itemDate(cb).localeCompare(itemDate(ca))
   })
 })
 
@@ -354,6 +392,78 @@ const findById = (id: string) => {
   if (props.type === 'points') return props.dashboard.points.find((i) => i.id === id) || null
   return props.dashboard.contents.find((i) => i.id === id) || null
 }
+
+/* ============ 报表列定义 ============ */
+interface ReportCol { key: string; label: string; tag?: boolean }
+const todoColumns: ReportCol[] = [
+  { key: 'title', label: '标题' },
+  { key: 'status', label: '状态', tag: true },
+  { key: 'priority', label: '优先级', tag: true },
+  { key: 'date', label: '日期' },
+  { key: 'note', label: '备注' }
+]
+const pointColumns: ReportCol[] = [
+  { key: 'name', label: '名称' },
+  { key: 'address', label: '地址' },
+  { key: 'category', label: '分类' },
+  { key: 'status', label: '巡检状态', tag: true },
+  { key: 'date', label: '日期' }
+]
+const contentColumns: ReportCol[] = [
+  { key: 'title', label: '标题' },
+  { key: 'category', label: '分类' },
+  { key: 'status', label: '状态', tag: true },
+  { key: 'tags', label: '标签' },
+  { key: 'date', label: '日期' },
+  { key: 'time', label: '时间' }
+]
+
+const reportMode = ref<'todos' | 'points' | 'contents'>('contents')
+
+const visibleColumns = computed(() => {
+  if (reportMode.value === 'todos') return todoColumns
+  if (reportMode.value === 'points') return pointColumns
+  return contentColumns
+})
+
+const contentStatusLabel = (s?: ContentStatus) => (s === 'done' ? '已完成' : '未完成')
+const contentStatusTag = (s?: ContentStatus): 'success' | 'info' => (s === 'done' ? 'success' : 'info')
+
+const reportRows = computed<Array<Record<string, any>>>(() => {
+  if (reportMode.value === 'todos') {
+    return (props.dashboard.todos as TodoItem[]).map((t) => {
+      const statusText = t.status === 'done' ? '已完成' : t.status === 'doing' ? '进行中' : '未开始'
+      const statusType = t.status === 'done' ? 'success' : t.status === 'doing' ? 'warning' : 'info'
+      return {
+        _id: t.id,
+        title: t.title,
+        status: { text: statusText, type: statusType },
+        priority: { text: t.priority === 'high' ? '高' : t.priority === 'low' ? '低' : '中', type: t.priority === 'high' ? 'danger' : t.priority === 'low' ? 'info' : 'warning' },
+        date: itemDate(t),
+        note: t.note || '—'
+      }
+    })
+  }
+  if (reportMode.value === 'points') {
+    return (props.dashboard.points as PointItem[]).map((p) => ({
+      _id: p.id,
+      name: p.name,
+      address: p.address,
+      category: p.category || '—',
+      status: { text: p.status === 'done' ? '已巡查' : p.status === 'issue' ? '异常' : '待巡查', type: p.status === 'done' ? 'success' : p.status === 'issue' ? 'danger' : 'info' },
+      date: itemDate(p)
+    }))
+  }
+  return (props.dashboard.contents as ContentItem[]).map((c) => ({
+    _id: c.id,
+    title: c.title,
+    category: c.category || '—',
+    status: { text: contentStatusLabel(c.status), type: contentStatusTag(c.status) },
+    tags: c.tags || '—',
+    date: c.date,
+    time: c.time
+  }))
+})
 
 /* ============ 交互 ============ */
 const openEditById = (id: string) => {
@@ -424,6 +534,7 @@ const openAdd = () => {
     priority: 'medium',
     category: '',
     status: 'pending',
+    contentStatus: 'undone',
     tags: '',
     date: today(),
     time: '09:00',
@@ -444,6 +555,7 @@ const openEdit = (item: TodoItem | PointItem | ContentItem) => {
   editForm.value.priority = (anyItem.priority as TodoPriority) || 'medium'
   editForm.value.category = anyItem.category ?? ''
   editForm.value.status = (anyItem.status as PointStatus) || 'pending'
+  editForm.value.contentStatus = (anyItem.status as ContentStatus) || 'undone'
   editForm.value.tags = anyItem.tags ?? ''
   editForm.value.date = anyItem.date || (anyItem.createdAt ? anyItem.createdAt.slice(0, 10) : today())
   editForm.value.time = anyItem.time || '09:00'
@@ -522,7 +634,7 @@ const submitEdit = async () => {
         target.image = f.image
       }
     } else {
-      props.dashboard.contents.unshift({ id: genId('content'), title, content, category: f.category.trim(), tags: f.tags.trim(), date, time, image: f.image, createdAt: new Date().toISOString() })
+      props.dashboard.contents.unshift({ id: genId('content'), title, content, category: f.category.trim(), tags: f.tags.trim(), status: f.contentStatus, date, time, image: f.image, createdAt: new Date().toISOString() })
     }
   }
 
@@ -662,7 +774,7 @@ const importCsv = (text: string) => {
       const title = rec['标题'] || rec['title'] || `内容 ${idx + 1}`
       const content = rec['正文'] || rec['content'] || rec['内容'] || ''
       if (!title.trim() || !content.trim()) return
-      props.dashboard.contents.unshift({ id: genId('content'), title: title.trim(), content: content.trim(), category: rec['分类'] || rec['category'] || '', tags: rec['标签'] || rec['tags'] || '', date: rec['日期'] || rec['date'] || today(), time: rec['时间'] || rec['time'] || '09:00', image: rec['图片'] || rec['image'] || '', createdAt: new Date().toISOString() })
+      props.dashboard.contents.unshift({ id: genId('content'), title: title.trim(), content: content.trim(), category: rec['分类'] || rec['category'] || '', tags: rec['标签'] || rec['tags'] || '', status: 'undone', date: rec['日期'] || rec['date'] || today(), time: rec['时间'] || rec['time'] || '09:00', image: rec['图片'] || rec['image'] || '', createdAt: new Date().toISOString() })
       added += 1
     })
   }
@@ -700,7 +812,7 @@ const importJson = (text: string) => {
       const title = String(item.title || item.标题 || '').trim()
       const content = String(item.content || item.正文 || item.内容 || '').trim()
       if (!title || !content) return
-      props.dashboard.contents.unshift({ id: genId('content'), title, content, category: String(item.category || item.分类 || ''), tags: String(item.tags || item.标签 || ''), date: String(item.date || item.日期 || today()), time: String(item.time || item.时间 || '09:00'), image: String(item.image || item.图片 || ''), createdAt: new Date().toISOString() })
+      props.dashboard.contents.unshift({ id: genId('content'), title, content, category: String(item.category || item.分类 || ''), tags: String(item.tags || item.标签 || ''), status: 'undone', date: String(item.date || item.日期 || today()), time: String(item.time || item.时间 || '09:00'), image: String(item.image || item.图片 || ''), createdAt: new Date().toISOString() })
       added += 1
     }
   })

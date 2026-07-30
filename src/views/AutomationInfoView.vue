@@ -1,44 +1,19 @@
 <template>
   <div class="auto-info">
-    <div class="auto-header">
+    <div class="ai-header">
       <div>
-        <h2>自动化 · 信息</h2>
-        <p>选择日期与行业，点击「生成」调用 AI 输出当天各行业十大新闻与分析。不选日期不会生成。</p>
+        <h2>自动化信息缓存管理</h2>
+        <p>集中管理由自动化任务产生的信息缓存（来源 / 标题 / 摘要 / 获取时间 / 过期时间），支持单条清理与一键清理过期，缓存保留天数可持久固定。</p>
       </div>
-    </div>
-
-    <div class="auto-controls">
-      <el-date-picker
-        v-model="pickDate"
-        type="date"
-        placeholder="选择日期"
-        value-format="YYYY-MM-DD"
-        :clearable="true"
-        size="default"
-        class="auto-date"
-      />
-      <el-select
-        v-model="industries"
-        multiple
-        collapse-tags
-        collapse-tags-tooltip
-        placeholder="选择行业"
-        size="default"
-        class="auto-industries"
-      >
-        <el-option v-for="ind in INDUSTRY_OPTIONS" :key="ind" :label="ind" :value="ind" />
-      </el-select>
-      <el-button type="primary" :loading="generating" @click="generate">
-        <el-icon><MagicStick /></el-icon> 生成
-      </el-button>
-      <el-button v-if="result" @click="copyResult">
-        <el-icon><CopyDocument /></el-icon> 复制
+      <el-button :loading="loading" @click="reload">
+        <el-icon><Refresh /></el-icon> 刷新
       </el-button>
     </div>
 
-    <div class="auto-cache">
-      <div class="auto-cache-row">
-        <span class="auto-cache-label">缓存保留天数</span>
+    <!-- 缓存设置 -->
+    <div class="ai-settings">
+      <div class="ai-set-row">
+        <span class="ai-set-label">缓存保留天数</span>
         <el-input-number
           v-model="retentionDays"
           :min="1"
@@ -47,187 +22,163 @@
           controls-position="right"
           @change="onRetentionChange"
         />
-        <span class="auto-cache-unit">天</span>
-        <el-button size="small" @click="clearOldCache(true)">
-          <el-icon><Delete /></el-icon> 立即清理过期缓存
-        </el-button>
-        <span v-if="lastCleared !== null" class="auto-cache-tip">已清理 {{ lastCleared }} 条</span>
+        <span class="ai-set-unit">天</span>
+        <el-tag size="small" effect="plain" type="info">默认 7 天</el-tag>
+        <span v-if="savedTip" class="ai-set-tip">已保存</span>
       </div>
-      <div class="auto-cache-note">超过保留天数的「每日新闻」本地缓存会被自动清除，释放浏览器空间；生成时也会静默清理一次。</div>
+      <div class="ai-set-note">
+        超过保留天数的缓存会在「清理过期」时删除；该设置写入 <code>app_settings.automation_cache_days</code> 并持久固定，刷新 / 重开浏览器不丢失。
+      </div>
     </div>
 
-    <div v-if="!pickDate && !generating && !result" class="auto-hint">
-      <el-icon><InfoFilled /></el-icon>
-      <span>请先选择日期，再点击「生成」。不选择日期、不点击生成，系统不会调用 AI。</span>
+    <!-- 操作栏 -->
+    <div class="ai-toolbar">
+      <el-button type="danger" plain :loading="loading" @click="clearExpired">
+        <el-icon><Delete /></el-icon> 清理过期缓存
+      </el-button>
+      <span class="ai-stat">共 {{ list.length }} 条</span>
+      <span class="ai-stat ai-stat-expired">已过期 {{ expiredCount }} 条</span>
     </div>
 
-    <div v-if="generating" class="auto-loading">
-      <el-icon class="is-loading"><Loading /></el-icon> AI 生成中，请稍候…
+    <div v-if="loading && !list.length" class="ai-loading">
+      <el-icon class="is-loading"><Loading /></el-icon> 加载缓存中…
     </div>
 
-    <div v-if="result" class="auto-result">
-      <div class="auto-result-meta">
-        <div class="meta-line">
-          <span class="meta-key">日期</span><b>{{ pickDate }}</b>
-          <span class="meta-key" style="margin-left:14px">模型</span><b>{{ usedModel }}</b>
+    <div v-else-if="!list.length" class="ai-empty">
+      <el-empty description="暂无缓存数据（自动化任务产生后会出现在这里）" :image-size="64" />
+    </div>
+
+    <div v-else class="ai-grid">
+      <div v-for="row in list" :key="row.id" class="ai-card" :class="{ expired: isExpired(row) }">
+        <div class="ai-card-top">
+          <span class="ai-source">{{ row.source || row.category || '未知来源' }}</span>
+          <el-tag v-if="isExpired(row)" size="small" type="danger" effect="light">已过期</el-tag>
+          <el-button class="ai-del" size="small" text type="danger" @click="removeRow(row)">
+            <el-icon><Delete /></el-icon>
+          </el-button>
         </div>
-        <div class="meta-industries">
-          <span class="meta-key">行业</span>
-          <el-tag v-for="ind in industries" :key="ind" size="small" effect="light" class="ind-tag">{{ ind }}</el-tag>
+        <div class="ai-title">{{ row.title }}</div>
+        <p v-if="row.content" class="ai-summary">{{ row.content }}</p>
+        <a v-if="row.url" class="ai-link" :href="row.url" target="_blank" rel="noopener">查看原文 ↗</a>
+        <div class="ai-meta">
+          <div>获取：{{ fmt(row.fetched_at) }}</div>
+          <div>过期：{{ fmt(row.expire_at) }}</div>
         </div>
       </div>
-      <div class="auto-result-body" v-html="renderedResult"></div>
-      <div class="auto-result-foot">内容为 AI 生成，仅供参考，请自行核实关键信息。</div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
-import { MagicStick, InfoFilled, CopyDocument, Loading, Delete } from '@element-plus/icons-vue'
-import { callAi, loadAiConfig } from '../services/aiService'
-import { refreshSavedUser } from '../services/appDataService'
-import { renderMarkdown } from '../lib/markdown'
-import { recordUsage } from '../services/usageTracker'
+import { ref, computed, onMounted } from 'vue'
+import { ElMessage } from 'element-plus'
+import { Refresh, Delete, Loading } from '@element-plus/icons-vue'
+import {
+  listAutomationInfo,
+  deleteAutomationInfo,
+  clearExpiredAutomationInfo,
+  getAppSetting,
+  setAppSetting,
+  refreshSavedUser,
+  type AutomationInfo
+} from '../services/appDataService'
 
-const INDUSTRY_OPTIONS = [
-  '科技', '金融', '医疗健康', '教育培训', '消费零售',
-  '能源化工', '房地产', '汽车出行', '农业食品', '文娱传媒', '体育', '旅游'
-]
+const list = ref<AutomationInfo[]>([])
+const loading = ref(false)
+const retentionDays = ref(7)
+const savedTip = ref(false)
 
-const pickDate = ref('')
-const industries = ref<string[]>(['科技', '金融', '消费零售'])
-const generating = ref(false)
-const result = ref('')
-const usedModel = ref('—')
+const SETTING_KEY = 'automation_cache_days'
 const userId = ref('')
 
-const RETENTION_KEY = 'auto_news_retention_days'
-const retentionDays = ref(30)
-const lastCleared = ref<number | null>(null)
+const expiredCount = computed(() => list.value.filter((r) => isExpired(r)).length)
 
-function cacheKey(date: string, inds: string[]): string {
-  return `news_cache_${date}_${[...inds].sort().join(',')}`
+function isExpired(row: AutomationInfo): boolean {
+  if (!row.expire_at) return false
+  return new Date(row.expire_at).getTime() < Date.now()
 }
 
-function loadRetention() {
-  try {
-    const v = Number(localStorage.getItem(RETENTION_KEY))
-    if (v >= 1 && v <= 365) retentionDays.value = v
-  } catch { /* ignore */ }
-}
-function onRetentionChange(val: number) {
-  retentionDays.value = val
-  try { localStorage.setItem(RETENTION_KEY, String(val)) } catch { /* ignore */ }
-}
-/** 清理超过保留天数的缓存；showToast=true 时提示清理条数 */
-function clearOldCache(showToast = false): number {
-  let cleared = 0
-  try {
-    const cutoff = new Date()
-    cutoff.setDate(cutoff.getDate() - retentionDays.value)
-    const cutoffTs = cutoff.getTime()
-    const keys: string[] = []
-    for (let i = 0; i < localStorage.length; i++) {
-      const k = localStorage.key(i)
-      if (k && /^news_cache_\d{4}-\d{2}-\d{2}(_.+)?$/.test(k)) keys.push(k)
-    }
-    for (const k of keys) {
-      const m = k.match(/^news_cache_(\d{4}-\d{2}-\d{2})/)
-      if (!m) continue
-      const ts = new Date(m[1] + 'T00:00:00').getTime()
-      if (!isNaN(ts) && ts < cutoffTs) {
-        localStorage.removeItem(k)
-        cleared++
-      }
-    }
-  } catch { /* ignore */ }
-  if (showToast) {
-    lastCleared.value = cleared
-    if (cleared > 0) ElMessage.success(`已清理 ${cleared} 条过期缓存`)
-    else ElMessage.info('没有需要清理的过期缓存')
-  }
-  return cleared
+function fmt(iso?: string): string {
+  if (!iso) return '—'
+  const d = new Date(iso)
+  if (isNaN(d.getTime())) return '—'
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
-loadRetention()
-
-async function ensureUser() {
+async function loadUser() {
   if (!userId.value) {
     const u = await refreshSavedUser()
     userId.value = u?.id || ''
   }
 }
 
-async function generate() {
-  if (!pickDate.value) {
-    ElMessage.warning('请先选择日期')
-    return
-  }
-  if (industries.value.length === 0) {
-    ElMessage.warning('请至少选择一个行业')
-    return
-  }
-
-  const key = cacheKey(pickDate.value, industries.value)
-  const cached = typeof localStorage !== 'undefined' ? localStorage.getItem(key) : null
-  if (cached) {
-    try {
-      await ElMessageBox.confirm('该日期+行业组合已生成过内容，是否重新生成？', '提示', { type: 'warning' })
-    } catch {
-      result.value = cached
-      usedModel.value = '（本地缓存）'
-      ElMessage.info('已展示本地已生成内容')
-      return
-    }
-  }
-
-  generating.value = true
+async function reload() {
+  loading.value = true
   try {
-    clearOldCache() // 生成前静默清理过期缓存，释放浏览器空间
-    await ensureUser()
-    const config = await loadAiConfig(userId.value)
-    if (!config.apiKey && config.provider !== 'ollama') {
-      ElMessage.warning('尚未配置 AI 密钥，请先到「AI 助手」页配置可用的模型与 Key')
-      return
-    }
-    const prompt = buildPrompt(pickDate.value, industries.value)
-    const text = await callAi(config, prompt)
-    result.value = text
-    usedModel.value = `${config.provider} / ${config.model}`
-    recordUsage({ provider: config.provider, model: config.model, promptText: prompt, completionText: text })
-    if (typeof localStorage !== 'undefined') localStorage.setItem(key, text)
-  } catch (e) {
-    ElMessage.error('生成失败：' + (e instanceof Error ? e.message : String(e)))
+    await loadUser()
+    list.value = await listAutomationInfo(userId.value)
   } finally {
-    generating.value = false
+    loading.value = false
   }
 }
 
-function buildPrompt(date: string, inds: string[]): string {
-  return [
-    `请以「${date}」为时间节点，整理并输出以下行业当天的「十大新闻与分析」：`,
-    inds.join('、') + '。',
-    '',
-    '对每一个行业，分别给出：',
-    '1）「十大新闻」列表：每条为「一句话标题 + 简短说明」；',
-    '2）一段「行业分析」：涵盖趋势、机会与风险。',
-    '',
-    '要求：信息结构化、客观、可执行；使用中文输出；行业之间用标题清晰分隔。'
-  ].join('\n')
-}
-
-const renderedResult = computed(() => renderMarkdown(result.value || ''))
-
-async function copyResult() {
+async function loadRetention() {
   try {
-    await navigator.clipboard.writeText(result.value)
-    ElMessage.success('已复制到剪贴板')
+    const v = await getAppSetting(SETTING_KEY)
+    const n = typeof v === 'number' ? v : Number(v)
+    if (Number.isFinite(n) && n >= 1 && n <= 365) {
+      retentionDays.value = n
+    } else {
+      // 首次使用时写入默认 7 天
+      await setAppSetting(SETTING_KEY, 7)
+    }
   } catch {
-    ElMessage.warning('复制失败，请手动选择文本复制')
+    /* 读取失败则保持默认 7 */
   }
 }
+
+let saveTimer: ReturnType<typeof setTimeout> | undefined
+function onRetentionChange(val: number) {
+  retentionDays.value = val
+  savedTip.value = false
+  if (saveTimer) clearTimeout(saveTimer)
+  saveTimer = setTimeout(async () => {
+    await setAppSetting(SETTING_KEY, val)
+    savedTip.value = true
+    setTimeout(() => (savedTip.value = false), 2000)
+  }, 400)
+}
+
+async function clearExpired() {
+  loading.value = true
+  try {
+    await loadUser()
+    const cleared = await clearExpiredAutomationInfo(userId.value, retentionDays.value)
+    await reload()
+    if (cleared > 0) ElMessage.success(`已清理 ${cleared} 条过期缓存`)
+    else ElMessage.info('没有需要清理的过期缓存')
+  } finally {
+    loading.value = false
+  }
+}
+
+async function removeRow(row: AutomationInfo) {
+  loading.value = true
+  try {
+    await loadUser()
+    await deleteAutomationInfo(userId.value, row.id)
+    list.value = list.value.filter((r) => r.id !== row.id)
+    ElMessage.success('已删除该缓存')
+  } finally {
+    loading.value = false
+  }
+}
+
+onMounted(async () => {
+  await loadRetention()
+  await reload()
+})
 </script>
 
 <style scoped>
@@ -237,143 +188,91 @@ async function copyResult() {
   margin: 0 auto;
   color: var(--text);
 }
-.auto-header {
-  margin-bottom: 20px;
-}
-.auto-header h2 {
-  margin: 0 0 6px;
-  font-size: 22px;
-  color: var(--text-strong);
-}
-.auto-header p {
-  margin: 0;
-  font-size: 13px;
-  color: var(--text-muted);
-}
-.auto-controls {
+.ai-header {
   display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  align-items: center;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+.ai-header h2 { margin: 0 0 6px; font-size: 22px; color: var(--text-strong); }
+.ai-header p { margin: 0; font-size: 13px; color: var(--text-muted); max-width: 720px; line-height: 1.6; }
+
+.ai-settings {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 14px;
   padding: 16px;
-  margin-bottom: 18px;
+  margin-bottom: 16px;
   box-shadow: var(--shadow-card);
 }
-.auto-date {
-  width: 180px;
+.ai-set-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.ai-set-label { font-size: 13px; color: var(--text); font-weight: 500; }
+.ai-set-unit { font-size: 13px; color: var(--text-muted); }
+.ai-set-tip { font-size: 12px; color: #16a34a; }
+.ai-set-note { font-size: 12px; color: var(--text-faint); margin-top: 10px; line-height: 1.6; }
+.ai-set-note code {
+  background: var(--surface-soft); padding: 1px 6px; border-radius: 6px;
+  font-size: 11px; color: var(--text-strong);
 }
-.auto-industries {
-  flex: 1;
-  min-width: 240px;
+
+.ai-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 16px;
 }
-.auto-cache {
+.ai-stat { font-size: 12px; color: var(--text-faint); }
+.ai-stat-expired { color: #dc2626; }
+
+.ai-loading {
+  display: flex; align-items: center; gap: 8px; color: var(--text-muted);
+  padding: 40px 0; justify-content: center; font-size: 14px;
+}
+.is-loading { animation: rotating 1.2s linear infinite; }
+@keyframes rotating { to { transform: rotate(360deg); } }
+
+.ai-empty { padding: 30px 0; }
+
+.ai-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 14px;
+}
+.ai-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 14px;
   padding: 14px 16px;
-  margin-bottom: 18px;
-}
-.auto-cache-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 10px;
-}
-.auto-cache-label {
-  font-size: 13px;
-  color: var(--text);
-  font-weight: 500;
-}
-.auto-cache-unit {
-  font-size: 13px;
-  color: var(--text-muted);
-}
-.auto-cache-tip {
-  font-size: 12px;
-  color: #16a34a;
-}
-.auto-cache-note {
-  font-size: 12px;
-  color: var(--text-faint);
-  margin-top: 8px;
-  line-height: 1.6;
-}
-.auto-hint {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  background: var(--nav-hover);
-  border-radius: 10px;
-  padding: 14px 16px;
-  font-size: 13px;
-  color: var(--text);
-  line-height: 1.6;
-}
-.auto-loading {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--primary);
-  padding: 30px 0;
-  justify-content: center;
-  font-size: 14px;
-}
-.is-loading {
-  animation: rotating 1.2s linear infinite;
-}
-@keyframes rotating {
-  to { transform: rotate(360deg); }
-}
-.auto-result {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  padding: 20px;
   box-shadow: var(--shadow-card);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
-.auto-result-meta {
-  font-size: 13px;
-  color: var(--text-muted);
-  margin-bottom: 14px;
-  padding-bottom: 12px;
-  border-bottom: 1px dashed var(--border-strong);
+.ai-card:hover { transform: translateY(-2px); box-shadow: 0 12px 28px rgba(15, 23, 42, 0.1); }
+.ai-card.expired { opacity: 0.7; border-color: rgba(220, 38, 38, 0.3); }
+
+.ai-card-top { display: flex; align-items: center; gap: 8px; }
+.ai-source {
+  font-size: 11px; color: var(--text-faint);
+  background: var(--surface-soft); padding: 2px 8px; border-radius: 6px;
 }
-.auto-result-meta b {
-  color: var(--text-strong);
+.ai-del { margin-left: auto; }
+
+.ai-title { font-size: 14px; font-weight: 600; color: var(--text-strong); line-height: 1.5; word-break: break-word; }
+.ai-summary {
+  margin: 0; font-size: 12px; color: var(--text-muted); line-height: 1.6;
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
 }
-.meta-key {
-  color: var(--text-faint);
-  margin-right: 4px;
-}
-.meta-industries {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 8px;
-}
-.ind-tag {
-  margin-right: 2px;
-}
-.auto-result-body {
-  color: var(--text);
-  font-size: 14px;
-  line-height: 1.8;
-}
-.auto-result-foot {
-  margin-top: 16px;
-  font-size: 12px;
-  color: var(--text-faint);
-  border-top: 1px dashed var(--border);
-  padding-top: 10px;
-}
+.ai-link { font-size: 12px; color: var(--primary); text-decoration: none; }
+.ai-link:hover { text-decoration: underline; }
+.ai-meta { font-size: 11px; color: var(--text-faint); display: flex; flex-direction: column; gap: 2px; margin-top: 2px; }
 
 @media (max-width: 768px) {
   .auto-info { padding: 16px; }
-  .auto-date { width: 100%; }
-  .auto-industries { width: 100%; }
+  .ai-header { flex-direction: column; }
+  .ai-header .el-button { width: 100%; }
+  .ai-grid { grid-template-columns: 1fr; }
 }
 </style>

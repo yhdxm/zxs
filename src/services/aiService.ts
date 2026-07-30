@@ -14,16 +14,29 @@ export interface AiConfig {
 const STORAGE_KEY = 'free-ai-config'
 const SECRET_KEY = 'free-ai-config-secret'
 
-// 各服务商预置模型列表：界面用下拉选择，支持自定义输入
+// 各服务商预置模型列表：界面用下拉选择，支持自定义输入。
+// 真实可调用模型统一见 services/modelCatalog.ts（CALLABLE_MODELS），此处仅作「高级手动配置」的常用候选。
 export const MODEL_PRESETS: Record<AiProvider, string[]> = {
   ollama: ['llama3.2', 'llama3.1', 'qwen2.5', 'qwen2.5-coder', 'deepseek-r1', 'gemma2', 'phi3'],
   openrouter: [
     'deepseek/deepseek-chat-v3-0324:free',
     'meta-llama/llama-3.3-70b-instruct:free',
     'qwen/qwen-2.5-72b-instruct:free',
-    'google/gemini-2.0-flash-exp:free'
+    'google/gemini-2.0-flash-exp:free',
+    'openai/gpt-4o-mini'
   ],
-  'openai-compatible': ['gpt-4o-mini', 'gpt-4o', 'deepseek-chat', 'deepseek-reasoner', 'glm-4-flash'],
+  'openai-compatible': [
+    'gpt-4o-mini',
+    'gpt-4o',
+    'deepseek-chat',
+    'deepseek-reasoner',
+    'deepseek-ai/DeepSeek-V3',
+    'deepseek-ai/DeepSeek-R1',
+    'glm-4-flash',
+    'glm-4.7-flash',
+    'Qwen/Qwen2.5-72B-Instruct',
+    'doubao-seed-1.6-250615'
+  ],
   bailian: ['qwen-turbo', 'qwen-plus', 'qwen-max', 'qwen-long', 'deepseek-v3']
 }
 

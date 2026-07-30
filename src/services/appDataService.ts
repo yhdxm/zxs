@@ -40,6 +40,8 @@ export interface AppUser {
 export type TodoPriority = 'low' | 'medium' | 'high'
 export type TodoStatus = 'todo' | 'doing' | 'done'
 export type PointStatus = 'pending' | 'done' | 'issue'
+/** 内容完成状态：未完成 / 已完成（看板统计剔除 done） */
+export type ContentStatus = 'undone' | 'done'
 
 export interface TodoItem {
   id: string
@@ -81,6 +83,8 @@ export interface ContentItem {
   time: string
   image: string
   createdAt: string
+  /** 完成状态：未完成 / 已完成（看板统计剔除 done） */
+  status?: ContentStatus
 }
 
 export interface AppDashboardData {
@@ -350,7 +354,16 @@ export async function getDatabaseStats(): Promise<DatabaseStats> {
       }
     } else {
       // 降级：逐表统计行数（API 不存在时）
-      const tables = ['app_dashboard_data', 'profiles', 'app_accounts', 'app_settings', 'news_daily']
+      const tables = [
+        'app_dashboard_data',
+        'profiles',
+        'app_accounts',
+        'app_settings',
+        'news_daily',
+        'external_ideas',
+        'automation_info',
+        'free_model_catalog'
+      ]
       for (const name of tables) {
         try {
           const { count } = await supabase.from(name).select('*', { count: 'exact', head: true })
@@ -459,7 +472,11 @@ function sanitizeDashboardData(raw: unknown): AppDashboardData | null {
   return {
     todos: obj.todos.map((t) => ({ ...(t as TodoItem), status: normalizeTodoStatus(t as unknown as Record<string, unknown>) })) as TodoItem[],
     points: obj.points as PointItem[],
-    contents: obj.contents as ContentItem[]
+    contents: obj.contents.map((c) => {
+      const item = c as ContentItem
+      const status = item.status === 'done' ? 'done' : 'undone'
+      return { ...item, status }
+    }) as ContentItem[]
   }
 }
 
@@ -1142,5 +1159,244 @@ export async function saveProfileAiConfig(userId: string, config: AiConfig) {
     }
   } catch (error) {
     console.warn('[profile] 保存 ai_config 异常', error)
+  }
+}
+
+/* =========================================================================
+ * 看板统计口径（M6）
+ * 规则：
+ * - 新增 = createdAt 日期 === 今日（本地时区）的条目数
+ * - 总条数 count = max(0, 全量剔除不计入状态后 − 新增)
+ * - 剔除规则：点位剔除 done(已巡查)，内容剔除 done(已完成)，待办 done 仍计入
+ * ========================================================================= */
+
+export interface ModuleCount {
+  /** 条数（全量） */
+  total: number
+  /** 新增（createdAt 日期 === 今日） */
+  newCount: number
+  /** 总条数 = max(0, 剔除不计入状态后 − 新增) */
+  count: number
+}
+
+export interface DashboardCounts {
+  todos: ModuleCount
+  points: ModuleCount
+  contents: ModuleCount
+}
+
+function isToday(iso: string): boolean {
+  if (!iso) return false
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return false
+  const now = new Date()
+  return (
+    d.getFullYear() === now.getFullYear() &&
+    d.getMonth() === now.getMonth() &&
+    d.getDate() === now.getDate()
+  )
+}
+
+/** 计算看板统计口径（点位剔除已巡查、内容剔除已完成；待办 done 仍计入） */
+export function computeDashboardCounts(d: AppDashboardData): DashboardCounts {
+  const todoTotal = d.todos.length
+  const todoNew = d.todos.filter((t) => isToday(t.createdAt)).length
+
+  const pointAll = d.points.filter((p) => p.status !== 'done').length // 剔除 已巡查
+  const pointNew = d.points.filter((p) => p.status !== 'done' && isToday(p.createdAt)).length
+
+  const contentAll = d.contents.filter((c) => (c.status ?? 'undone') !== 'done').length // 剔除 已完成
+  const contentNew = d.contents.filter((c) => (c.status ?? 'undone') !== 'done' && isToday(c.createdAt)).length
+
+  return {
+    todos: {
+      total: todoTotal,
+      newCount: todoNew,
+      count: Math.max(0, todoTotal - todoNew)
+    },
+    points: {
+      total: pointAll,
+      newCount: pointNew,
+      count: Math.max(0, pointAll - pointNew)
+    },
+    contents: {
+      total: contentAll,
+      newCount: contentNew,
+      count: Math.max(0, contentAll - contentNew)
+    }
+  }
+}
+
+/* =========================================================================
+ * app_settings 读写（M8：自动化缓存保留天数等）
+ * 仅认证用户可读写；失败兼容降级（返回默认值 / 静默忽略）
+ * ========================================================================= */
+
+/** 读取应用级配置项；未配置或出错时返回 null */
+export async function getAppSetting(key: string): Promise<unknown> {
+  if (!key) return null
+  try {
+    const { data, error } = await supabase
+      .from('app_settings')
+      .select('value')
+      .eq('key', key)
+      .maybeSingle()
+    if (error) {
+      console.warn('[appSettings] 读取失败', error.message)
+      return null
+    }
+    return data?.value ?? null
+  } catch (e) {
+    console.warn('[appSettings] 读取异常', e)
+    return null
+  }
+}
+
+/** 写入应用级配置项（upsert） */
+export async function setAppSetting(key: string, value: unknown): Promise<void> {
+  if (!key) return
+  try {
+    const { error } = await supabase.from('app_settings').upsert(
+      { key, value: value as unknown as Record<string, unknown>, updated_at: new Date().toISOString() },
+      { onConflict: 'key' }
+    )
+    if (error) {
+      console.warn('[appSettings] 写入失败', error.message)
+    }
+  } catch (e) {
+    console.warn('[appSettings] 写入异常', e)
+  }
+}
+
+/* =========================================================================
+ * 免费模型目录（free_model_catalog 表，M4）
+ * 登录可读；写仅超管（此处前端只读取 / 本地兜底）
+ * ========================================================================= */
+
+export interface FreeModelCatalog {
+  provider: string
+  model: string
+  endpoint?: string
+  is_free: boolean
+  free_quota?: string
+  status: 'callable' | 'limited' | 'unavailable' | 'unknown'
+  last_checked?: string
+  note?: string
+}
+
+/** 读取免费模型目录（登录可读），失败返回空数组 */
+export async function loadFreeModelCatalog(): Promise<FreeModelCatalog[]> {
+  try {
+    const { data, error } = await supabase
+      .from('free_model_catalog')
+      .select('*')
+      .order('provider', { ascending: true })
+    if (error) {
+      console.warn('[freeCatalog] 读取失败', error.message)
+      return []
+    }
+    return (data || []) as unknown as FreeModelCatalog[]
+  } catch (e) {
+    console.warn('[freeCatalog] 读取异常', e)
+    return []
+  }
+}
+
+/* =========================================================================
+ * 自动化信息缓存（automation_info 表，M8）
+ * RLS：本人 auth.uid() = user_id 读写
+ * ========================================================================= */
+
+export interface AutomationInfo {
+  id: string
+  user_id: string
+  category?: string
+  title: string
+  content?: string
+  url?: string
+  source?: string
+  extra?: Record<string, unknown>
+  fetched_at: string
+  expire_at: string
+}
+
+/** 列出当前用户的自动化信息缓存（按获取时间倒序） */
+export async function listAutomationInfo(userId: string): Promise<AutomationInfo[]> {
+  if (!userId) return []
+  try {
+    const { data, error } = await supabase
+      .from('automation_info')
+      .select('*')
+      .eq('user_id', userId)
+      .order('fetched_at', { ascending: false })
+    if (error) {
+      console.warn('[automation] 读取失败', error.message)
+      return []
+    }
+    return (data || []) as unknown as AutomationInfo[]
+  } catch (e) {
+    console.warn('[automation] 读取异常', e)
+    return []
+  }
+}
+
+/** 批量保存（upsert）自动化信息缓存 */
+export async function saveAutomationInfo(userId: string, rows: AutomationInfo[]): Promise<void> {
+  if (!userId || rows.length === 0) return
+  try {
+    const payload = rows.map((r) => ({
+      id: r.id,
+      user_id: userId,
+      category: r.category ?? null,
+      title: r.title,
+      content: r.content ?? null,
+      url: r.url ?? null,
+      source: r.source ?? null,
+      extra: (r.extra ?? null) as unknown as Record<string, unknown> | null,
+      fetched_at: r.fetched_at,
+      expire_at: r.expire_at
+    }))
+    const { error } = await supabase.from('automation_info').upsert(payload, { onConflict: 'id' })
+    if (error) {
+      console.warn('[automation] 保存失败', error.message)
+    }
+  } catch (e) {
+    console.warn('[automation] 保存异常', e)
+  }
+}
+
+/** 删除单条自动化信息缓存 */
+export async function deleteAutomationInfo(userId: string, id: string): Promise<void> {
+  if (!userId || !id) return
+  try {
+    const { error } = await supabase.from('automation_info').delete().eq('user_id', userId).eq('id', id)
+    if (error) {
+      console.warn('[automation] 删除失败', error.message)
+    }
+  } catch (e) {
+    console.warn('[automation] 删除异常', e)
+  }
+}
+
+/**
+ * 清理过期的自动化信息缓存（expire_at < 当前时间）。
+ * @returns 实际清理的条数
+ */
+export async function clearExpiredAutomationInfo(userId: string, _days?: number): Promise<number> {
+  if (!userId) return 0
+  try {
+    const { count, error } = await supabase
+      .from('automation_info')
+      .delete({ count: 'exact' })
+      .eq('user_id', userId)
+      .lt('expire_at', new Date().toISOString())
+    if (error) {
+      console.warn('[automation] 清理失败', error.message)
+      return 0
+    }
+    return Number(count) || 0
+  } catch (e) {
+    console.warn('[automation] 清理异常', e)
+    return 0
   }
 }

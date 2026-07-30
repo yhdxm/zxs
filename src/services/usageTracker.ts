@@ -38,11 +38,35 @@ function estTokens(text: string): number {
   return Math.max(1, Math.ceil((text || '').length / 4))
 }
 
-/** 判定某次调用是否免费（用于统计免费占比） */
+/**
+ * 判定某次调用是否免费（用于统计免费占比）。
+ * 免费判定规则：
+ * - ollama（本地）一律免费；
+ * - openrouter 模型中含 :free 的为免费；
+ * - siliconflow / zhipu / deepseek / volcengine 的已知免费档（模型名命中免费清单）计为免费；
+ * - bailian（阿里百炼）默认按付费计（其免费额度难以精确判定）。
+ */
 export function classifyFree(provider: string, model: string): boolean {
   if (provider === 'ollama') return true
   if (provider === 'openrouter') return model.includes(':free')
-  return false // 阿里百炼 / OpenAI 兼容接口 默认按付费计
+
+  const p = provider.toLowerCase()
+  const m = model.toLowerCase()
+  if (p === 'siliconflow') {
+    // 硅基流动免费档多为开源模型（DeepSeek / Qwen / GLM 等），命中即计免费
+    return (
+      m.includes('deepseek') ||
+      m.includes('qwen') ||
+      m.includes('glm') ||
+      m.includes('llama') ||
+      m.includes('qwq')
+    )
+  }
+  if (p === 'zhipu') return m.includes('flash') // 智谱 GLM-4-Flash / 4.7-Flash 为永久免费档
+  if (p === 'deepseek') return m.includes('chat') || m.includes('reasoner') // DeepSeek 新用户赠送额度，近似免费
+  if (p === 'volcengine') return m.includes('seed') // 火山方舟豆包 seed 系列每日刷新免费额度
+
+  return false // bailian / openai-compatible 等其他默认按付费计
 }
 
 export function recordUsage(opts: {

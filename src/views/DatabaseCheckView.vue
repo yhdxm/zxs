@@ -113,15 +113,6 @@
         <el-empty v-else description="暂无各表尺寸数据（请在 Supabase 重新执行 scripts/supabase_stats.sql 启用精确统计）" :image-size="60" />
       </div>
 
-      <div class="db-section">
-        <h3>API 网关</h3>
-        <div class="db-api-note">
-          <el-icon><InfoFilled /></el-icon>
-          <span>{{ stats.apiNote }}</span>
-          <a :href="stats.apiUrl" target="_blank" rel="noopener">前往 Supabase Dashboard ↗</a>
-        </div>
-      </div>
-
       <div v-if="stats.error" class="db-error">读取详情失败：{{ stats.error }}</div>
       <div class="db-tip">
         提示：若数据库大小为 0 / 表行数为 0，请在 Supabase 执行
@@ -134,16 +125,19 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { Refresh, InfoFilled, Loading, WarningFilled } from '@element-plus/icons-vue'
+import { Refresh, Loading, WarningFilled } from '@element-plus/icons-vue'
 import { getDatabaseStats, type DatabaseStats } from '../services/appDataService'
 
 /** 数据表中文说明映射，便于快速查询业务表用途 */
 const TABLE_DESC: Record<string, string> = {
   app_accounts: '用户账号表：存储登录账号、密码哈希、角色与禁用状态',
   profiles: '用户资料表：昵称、角色配置、AI 配置（密钥仅本地存储）',
-  app_settings: '应用配置表：角色权限、系统级开关等键值配置',
+  app_settings: '应用配置表：角色权限、系统级开关、自动化缓存天数等键值配置',
   app_dashboard_data: '看板数据表：各用户工作台数据快照',
   news_daily: '每日新闻缓存表：自动化信息生成结果的本地缓存',
+  external_ideas: '外部灵感表：需求收集页抓取并落库的灵感条目',
+  automation_info: '自动化信息缓存表：自动化生成结果，按保留天数过期清理',
+  free_model_catalog: '免费模型目录表：各厂商公开免费档模型清单',
   todos: '待办表：工作任务中的待办事项',
   points: '点位表：工作任务中的点位数据',
   contents: '内容表：工作任务中的内容条目'

@@ -22,9 +22,22 @@
         <el-input v-model="form.baseUrl" :placeholder="form.provider === 'bailian' ? '可留空，系统会直接使用阿里百炼接口' : '例如 http://localhost:11434'" />
       </el-form-item>
 
-      <el-form-item label="模型名称">
-        <el-select v-model="form.model" filterable allow-create default-first-option style="width: 100%" placeholder="下拉选择模型，也可输入自定义模型名">
-          <el-option v-for="name in modelOptions" :key="name" :label="name" :value="name" />
+      <el-form-item label="模型（已验证可调用）">
+        <el-select
+          v-model="modelPick"
+          filterable
+          allow-create
+          default-first-option
+          style="width: 100%"
+          placeholder="选择已验证模型，也可输入自定义模型名"
+          @change="onModelPick"
+        >
+          <el-option-group v-for="grp in groupedModels" :key="grp.provider" :label="providerLabel(grp.provider)">
+            <el-option v-for="m in grp.items" :key="m.id" :label="m.label" :value="m.id">
+              <span>{{ m.label }}</span>
+              <el-tag v-if="m.isFree" size="small" type="success" effect="light" style="margin-left: 6px">免费</el-tag>
+            </el-option>
+          </el-option-group>
         </el-select>
       </el-form-item>
 
@@ -58,7 +71,6 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import {
-  MODEL_PRESETS,
   PROVIDER_DEFAULT_BASE_URL,
   callAi,
   defaultAiConfig,
@@ -67,6 +79,7 @@ import {
   saveAiConfig,
   type AiConfig
 } from '../services/aiService'
+import { CALLABLE_MODELS, toAiConfig, type CallableModel, type ModelProvider } from '../services/modelCatalog'
 import { getSavedUser } from '../services/appDataService'
 
 const form = ref<AiConfig>({ ...defaultAiConfig })
@@ -75,11 +88,56 @@ const ready = ref(false)
 const savedTipVisible = ref(false)
 const testLoading = ref(false)
 const currentUserId = ref<string | null>(null)
+const modelPick = ref<string>('')
 let saveTimer: ReturnType<typeof setTimeout> | null = null
 let tipTimer: ReturnType<typeof setTimeout> | null = null
 
 const providerHint = computed(() => getProviderHint(form.value.provider))
-const modelOptions = computed(() => MODEL_PRESETS[form.value.provider] || [])
+
+/** 已验证可调用模型按 provider 分组，供下拉展示（标注 provider 与是否免费） */
+const groupedModels = computed<Array<{ provider: ModelProvider; items: CallableModel[] }>>(() => {
+  const groups = new Map<ModelProvider, CallableModel[]>()
+  for (const m of CALLABLE_MODELS) {
+    const arr = groups.get(m.provider) || []
+    arr.push(m)
+    groups.set(m.provider, arr)
+  }
+  return Array.from(groups.entries()).map(([provider, items]) => ({ provider, items }))
+})
+
+const PROVIDER_LABELS: Record<string, string> = {
+  siliconflow: '硅基流动',
+  zhipu: '智谱 AI',
+  deepseek: 'DeepSeek',
+  volcengine: '火山方舟',
+  openrouter: 'OpenRouter',
+  ollama: '本地 Ollama',
+  bailian: '阿里百炼',
+  'openai-compatible': 'OpenAI 兼容'
+}
+const providerLabel = (p: ModelProvider): string => PROVIDER_LABELS[p] || p
+
+/** 选中目录模型时，自动带出 provider / baseUrl / model（密钥仍由本地提供） */
+function onModelPick(val: string) {
+  const m = CALLABLE_MODELS.find((x) => x.id === val)
+  if (m) {
+    const cfg = toAiConfig(m)
+    form.value.provider = cfg.provider
+    form.value.baseUrl = cfg.baseUrl
+    form.value.model = cfg.model
+  } else if (val) {
+    // 允许自定义输入：仅更新 model，保留当前 provider/baseUrl
+    form.value.model = val
+  }
+}
+
+/** 将已保存配置反查到下拉选中项（若匹配目录模型） */
+function syncModelPick() {
+  const hit = CALLABLE_MODELS.find(
+    (m) => m.model === form.value.model && (m.baseUrl === form.value.baseUrl || (m.provider === 'ollama' && form.value.provider === 'ollama'))
+  )
+  modelPick.value = hit ? hit.id : ''
+}
 
 // 移动端表单标签置顶，避免窄屏挤压输入框
 const isMobile = ref(false)
@@ -115,14 +173,14 @@ watch(form, () => {
   }, 500)
 }, { deep: true })
 
-// 切换服务商时自动带出默认接口地址和推荐模型
+// 切换服务商时自动带出默认接口地址（模型下拉重置为手动选择）
 watch(() => form.value.provider, (provider, oldProvider) => {
   if (!ready.value || provider === oldProvider) {
     return
   }
 
   form.value.baseUrl = PROVIDER_DEFAULT_BASE_URL[provider]
-  form.value.model = MODEL_PRESETS[provider]?.[0] || ''
+  modelPick.value = ''
 })
 
 const resetConfig = () => {
@@ -150,6 +208,7 @@ onMounted(async () => {
     // 已登录则优先从云端带出账号级配置（跨设备免重复输入）
     form.value = await loadAiConfig(currentUserId.value || undefined)
     hasStoredKey.value = Boolean(form.value.apiKey.trim())
+    syncModelPick()
   } catch (error) {
     console.warn('[AiConfigPanel] 加载配置失败', error)
   }

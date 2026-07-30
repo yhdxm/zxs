@@ -8,7 +8,14 @@
   <div v-else-if="isLoggedIn" class="app-shell is-authed">
     <aside class="app-sidebar">
       <div class="side-brand">
-        <img class="brand-logo-img" src="/company-logo.png" alt="logo" />
+        <svg class="brand-logo-img" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Smart Dashboard">
+          <rect x="6" y="6" width="52" height="52" rx="14" fill="#6366f1" />
+          <g fill="#ffffff">
+            <rect x="16" y="36" width="8" height="12" rx="2" />
+            <rect x="28" y="28" width="8" height="20" rx="2" />
+            <rect x="40" y="20" width="8" height="28" rx="2" />
+          </g>
+        </svg>
         <div class="brand-text">
           <span class="brand-name">Smart</span>
           <span class="brand-suffix">Dashboard</span>
@@ -71,7 +78,14 @@
           <span class="theme-switch" :class="{ on: theme === 'dark' }"></span>
         </button>
         <div class="commercial-card">
-          <img class="commercial-logo" src="/company-logo.png" alt="PRO" />
+          <svg class="commercial-logo" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Smart Dashboard">
+            <rect x="6" y="6" width="52" height="52" rx="14" fill="#6366f1" />
+            <g fill="#ffffff">
+              <rect x="16" y="36" width="8" height="12" rx="2" />
+              <rect x="28" y="28" width="8" height="20" rx="2" />
+              <rect x="40" y="20" width="8" height="28" rx="2" />
+            </g>
+          </svg>
           <span class="commercial-pro">PRO</span>
         </div>
       </div>
@@ -109,7 +123,14 @@
     <!-- 已登录：移动端抽屉 -->
     <el-drawer v-model="mobileNavVisible" direction="ltr" size="280px" :with-header="false" class="mobile-drawer">
       <div class="drawer-brand">
-        <img class="brand-logo-img" src="/company-logo.png" alt="logo" />
+        <svg class="brand-logo-img" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Smart Dashboard">
+          <rect x="6" y="6" width="52" height="52" rx="14" fill="#6366f1" />
+          <g fill="#ffffff">
+            <rect x="16" y="36" width="8" height="12" rx="2" />
+            <rect x="28" y="28" width="8" height="20" rx="2" />
+            <rect x="40" y="20" width="8" height="28" rx="2" />
+          </g>
+        </svg>
         <div class="brand-text">
           <span class="brand-name">Smart</span>
           <span class="brand-suffix">Dashboard</span>
@@ -164,7 +185,14 @@
           <span class="theme-switch" :class="{ on: theme === 'dark' }"></span>
         </button>
         <div class="drawer-commercial">
-          <img class="commercial-logo" src="/company-logo.png" alt="PRO" />
+          <svg class="commercial-logo" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Smart Dashboard">
+            <rect x="6" y="6" width="52" height="52" rx="14" fill="#6366f1" />
+            <g fill="#ffffff">
+              <rect x="16" y="36" width="8" height="12" rx="2" />
+              <rect x="28" y="28" width="8" height="20" rx="2" />
+              <rect x="40" y="20" width="8" height="28" rx="2" />
+            </g>
+          </svg>
           <span class="commercial-pro">PRO</span>
         </div>
         <div class="drawer-user">
