@@ -61,9 +61,33 @@ if defined PROXY_PORT (
   echo Detected local proxy: 127.0.0.1:!PROXY_PORT!
   git config --local http.proxy http://127.0.0.1:!PROXY_PORT!
   git config --local https.proxy http://127.0.0.1:!PROXY_PORT!
+  set "http_proxy=http://127.0.0.1:!PROXY_PORT!"
+  set "https_proxy=http://127.0.0.1:!PROXY_PORT!"
 ) else (
   echo WARNING: No local proxy detected on common ports.
   echo If GitHub push fails with "Connection reset", start your VPN/proxy first.
+)
+
+echo.
+echo Build check first? (recommended, catches compile errors) [Y/n]
+set /p "BUILD_CHOICE=Build verify? "
+if not defined BUILD_CHOICE set "BUILD_CHOICE=Y"
+if /i "!BUILD_CHOICE!"=="Y" (
+  where npm >nul 2>&1
+  if !ERRORLEVEL! == 0 (
+    echo Running build (npm run build)...
+    call npm run build > "%TEMP%\zxs_build.log" 2>&1
+    set "BUILD_ERR=!ERRORLEVEL!"
+    if not "!BUILD_ERR!"=="0" (
+      echo.
+      echo [X] Build FAILED - deployment aborted. Log: %TEMP%\zxs_build.log
+      pause
+      exit /b 1
+    )
+    echo [OK] Build passed.
+  ) else (
+    echo npm not found - skipping build check (push only).
+  )
 )
 
 git add -A
@@ -90,25 +114,62 @@ if not defined GH_TOKEN (
 )
 
 echo.
-echo Pushing to GitHub...
+echo Pushing to GitHub (up to 3 attempts)...
 set "REMOTE_URL=https://%GH_TOKEN%@github.com/YHDXM/ZXS.git"
 git remote set-url origin "%REMOTE_URL%"
-set "REMOTE_URL="
+set "ATTEMPT=0"
+:PUSH_LOOP
+set /a ATTEMPT+=1
+echo Push attempt !ATTEMPT!...
 git push -f origin main > "%TEMP%\zxs_deploy_push.log" 2>&1
-set "PUSH_ERR=%ERRORLEVEL%"
+set "PUSH_ERR=!ERRORLEVEL!"
+if "!PUSH_ERR!"=="0" goto PUSH_OK
+if !ATTEMPT! lss 3 (
+  echo Push failed (attempt !ATTEMPT!), retry in 5s...
+  timeout /t 5 >nul
+  goto PUSH_LOOP
+)
+goto PUSH_FAIL
+
+:PUSH_OK
 git remote set-url origin https://github.com/YHDXM/ZXS.git
+set "ZWS_TOKEN=%GH_TOKEN%"
+set "ZWS_PROXY=%PROXY_PORT%"
 set "GH_TOKEN="
 
-if "%PUSH_ERR%" == "0" (
+echo.
+echo [OK] Push succeeded. Checking GitHub Actions deployment status...
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0deploy_watch.ps1"
+set "WATCH_ERR=!ERRORLEVEL!"
+set "ZWS_TOKEN="
+set "ZWS_PROXY="
+set "http_proxy="
+set "https_proxy="
+
+if "!WATCH_ERR!"=="0" (
   echo.
-  echo Push finished. Check GitHub Actions for build status:
-  echo   https://github.com/YHDXM/ZXS/actions
+  echo [OK][OK] DEPLOY SUCCESS - production updated.
+) else if "!WATCH_ERR!"=="2" (
+  echo.
+  echo [!] Push succeeded, but could not auto-confirm Actions status (network/proxy limit).
+  echo     Please check manually: https://github.com/YHDXM/ZXS/actions
 ) else (
   echo.
-  echo Push failed. Open this file for details:
-  echo   %TEMP%\zxs_deploy_push.log
-  echo Common causes: token lacks "repo" scope, or wrong GitHub account.
+  echo [X][X] DEPLOY FAILED - check Actions run log:
+  echo     https://github.com/YHDXM/ZXS/actions
 )
 echo.
-echo (If the window ever closes too fast, the push log is saved at %TEMP%\zxs_deploy_push.log)
 pause
+if "!WATCH_ERR!"=="0" ( exit /b 0 ) else if "!WATCH_ERR!"=="2" ( exit /b 0 ) else ( exit /b 1 )
+
+:PUSH_FAIL
+git remote set-url origin https://github.com/YHDXM/ZXS.git
+set "GH_TOKEN="
+set "http_proxy="
+set "https_proxy="
+echo.
+echo [X] Push FAILED. Log: %TEMP%\zxs_deploy_push.log
+echo     Common causes: token lacks "repo" scope, or wrong GitHub account.
+echo.
+pause
+exit /b 1
