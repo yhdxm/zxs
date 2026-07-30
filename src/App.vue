@@ -410,7 +410,7 @@ const sideMenu = reactive<SideItem[]>([
       { key: 'system-roles', label: '角色权限', permissionKey: 'system.roles', to: '/system?view=roles' }
     ]
   },
-  { key: 'account', label: '个人设置', icon: User, to: '/account', visible: (u) => !canManageSystem(u) }
+  { key: 'account', label: '个人设置', icon: User, to: '/account' }
 ])
 
 const hasMenuPermission = (item: SideItem): boolean => {

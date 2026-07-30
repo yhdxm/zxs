@@ -30,7 +30,9 @@
         </el-button>
       </div>
       <div class="ai-gen-note">
-        生成走你当前 AI 助手配置（<b>{{ aiModelLabel }}</b>）；未配置 Key 的本地模型（如 Ollama）请确保已启动。
+        生成走你当前账号的 AI 助手配置（<b>{{ aiModelLabel }}</b>），与其他账号完全隔离；
+        未配置 Key 的本地模型（如 Ollama）请确保已启动。
+        <el-button link type="primary" size="small" @click="router.push('/ai')">去配置 AI →</el-button>
       </div>
     </div>
 
@@ -112,6 +114,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Refresh, Delete, Loading, MagicStick, OfficeBuilding } from '@element-plus/icons-vue'
 import {
@@ -191,6 +194,7 @@ const genIndustry = ref('')
 const SETTING_KEY = 'automation_cache_days'
 const userId = ref('')
 const aiConfig = ref<AiConfig | null>(null)
+const router = useRouter()
 const autoCleanTimer = ref<ReturnType<typeof setInterval> | null>(null)
 
 /** 可选行业（用于生成十大热点新闻） */

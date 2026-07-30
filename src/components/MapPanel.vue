@@ -116,8 +116,8 @@ function applyTiles() {
   }
 }
 
-function refreshTiles() {
-  tiandituKey.value = readFreeApiKey('tianditu')
+async function refreshTiles() {
+  tiandituKey.value = await readFreeApiKey('tianditu')
   applyTiles()
 }
 
@@ -207,7 +207,7 @@ function initMap() {
 }
 
 onMounted(async () => {
-  tiandituKey.value = readFreeApiKey('tianditu')
+  tiandituKey.value = await readFreeApiKey('tianditu')
   await nextTick()
   initMap()
   await loadChildren()

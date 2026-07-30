@@ -70,8 +70,8 @@ async function load() {
   }
 }
 
-onMounted(() => {
-  hasKey.value = hasTianapiKey()
+onMounted(async () => {
+  hasKey.value = await hasTianapiKey()
   load()
 })
 </script>

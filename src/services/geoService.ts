@@ -1,12 +1,19 @@
 // 地理服务（M9b）—— 天地图瓦片 URL、DataV 行政区划 GeoJSON 下钻、haversine 测距。
-// 天地图免费 Key 仅存 localStorage（不上云）；无 Key 时由 MapPanel 降级 OSM。
+// 天地图免费 Key：优先使用超管在云端配置的共享 Key，其次回退到本浏览器 localStorage。
 // 公里测距使用本地 haversine，不引入第三方库。
+
+import { supabase } from './appDataService'
 
 const FREE_API_KEY = 'zxs_free_apis'
 const FETCH_TIMEOUT = 9000
 
+// 内存缓存共享 Key，避免每次读取都请求 Supabase（页面内多次调用地图/新闻）
+let sharedKeyCache: Record<string, string> | null = null
+let sharedKeyLoadTs = 0
+const SHARED_KEY_TTL_MS = 60_000
+
 /** 读取本地保存的免费 API Key（JSON 形式：{ tianditu?, tianxing? }） */
-export function readFreeApiKey(provider: 'tianditu' | 'tianxing'): string {
+function readLocalFreeApiKey(provider: string): string {
   if (typeof window === 'undefined') return ''
   try {
     const raw = window.localStorage.getItem(FREE_API_KEY)
@@ -18,8 +25,41 @@ export function readFreeApiKey(provider: 'tianditu' | 'tianxing'): string {
   }
 }
 
+/** 从 Supabase 读取超管配置的共享免费 API Key */
+export async function loadSharedFreeApiKeys(): Promise<Record<string, string>> {
+  const now = Date.now()
+  if (sharedKeyCache && now - sharedKeyLoadTs < SHARED_KEY_TTL_MS) {
+    return sharedKeyCache
+  }
+  try {
+    const { data, error } = await supabase.from('shared_free_api_keys').select('provider, key_value')
+    if (error) {
+      console.warn('[geoService] 读取共享 Key 失败', error.message)
+      return sharedKeyCache || {}
+    }
+    const map: Record<string, string> = {}
+    for (const r of (data || []) as Array<{ provider: string; key_value: string }>) {
+      map[r.provider] = r.key_value || ''
+    }
+    sharedKeyCache = map
+    sharedKeyLoadTs = now
+    return map
+  } catch (e) {
+    console.warn('[geoService] 读取共享 Key 异常', e)
+    return sharedKeyCache || {}
+  }
+}
+
+/** 公开读取入口：优先共享 Key，无共享则回退本地 Key */
+export async function readFreeApiKey(provider: 'tianditu' | 'tianxing' | 'weather'): Promise<string> {
+  const shared = await loadSharedFreeApiKeys()
+  const sharedVal = shared[provider]
+  if (sharedVal) return sharedVal
+  return readLocalFreeApiKey(provider)
+}
+
 /** 写入本地免费 API Key（合并写入，避免覆盖其它 provider） */
-export function writeFreeApiKey(provider: 'tianditu' | 'tianxing', value: string): void {
+export function writeFreeApiKey(provider: 'tianditu' | 'tianxing' | 'weather', value: string): void {
   if (typeof window === 'undefined') return
   try {
     const raw = window.localStorage.getItem(FREE_API_KEY)
@@ -29,6 +69,31 @@ export function writeFreeApiKey(provider: 'tianditu' | 'tianxing', value: string
   } catch {
     /* 忽略写入异常 */
   }
+}
+
+/** 超管保存共享免费 API Key 到云端 */
+export async function saveSharedFreeApiKey(
+  provider: 'tianditu' | 'tianxing' | 'weather',
+  value: string
+): Promise<void> {
+  const { error } = await supabase
+    .from('shared_free_api_keys')
+    .upsert(
+      { provider, key_value: value.trim(), updated_at: new Date().toISOString(), updated_by: undefined },
+      { onConflict: 'provider' }
+    )
+  if (error) {
+    throw new Error('保存共享 Key 失败：' + error.message)
+  }
+  // 刷新内存缓存
+  sharedKeyCache = null
+  await loadSharedFreeApiKeys()
+}
+
+/** 清空共享 Key 内存缓存（登录切换时调用） */
+export function clearSharedFreeApiKeyCache(): void {
+  sharedKeyCache = null
+  sharedKeyLoadTs = 0
 }
 
 /**

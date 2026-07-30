@@ -54,7 +54,7 @@ function filterByKeyword(items: NewsItem[], keyword?: string): NewsItem[] {
 
 /** 天行数据 topnews（需免费 Key） */
 async function fetchTianapi(opts: FetchNewsOptions): Promise<NewsItem[]> {
-  const key = readFreeApiKey('tianxing')
+  const key = await readFreeApiKey('tianxing')
   if (!key) return []
   const params = new URLSearchParams({ key, num: '30', page: '1' })
   if (opts.category) params.set('col', opts.category)
@@ -130,6 +130,6 @@ export async function fetchNews(opts: FetchNewsOptions = {}): Promise<NewsItem[]
 }
 
 /** 是否已配置天行 Key（用于 UI 提示降级） */
-export function hasTianapiKey(): boolean {
-  return Boolean(readFreeApiKey('tianxing'))
+export async function hasTianapiKey(): Promise<boolean> {
+  return Boolean(await readFreeApiKey('tianxing'))
 }
