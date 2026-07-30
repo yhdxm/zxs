@@ -74,7 +74,7 @@ export async function fetchExternalIdeas(): Promise<ExternalIdea[]> {
   })
 
   const now = new Date().toISOString()
-  return deduped.map((it) => ({
+  const mapped = deduped.map((it) => ({
     id: genId(),
     user_id: '',
     source: it.source,
@@ -82,6 +82,48 @@ export async function fetchExternalIdeas(): Promise<ExternalIdea[]> {
     url: it.url,
     summary: it.summary,
     tags: it.tags,
+    fetched_at: now,
+    bookmarked: false,
+    related_module: null as RelatedModule
+  }))
+
+  // GitHub 匿名接口限速（60 次/小时）或网络受限时，返回一份「真实热门开源项目」种子，
+  // 保证需求收集页在抓取失败时不空白（数据源缺失属常态，非错误）。
+  if (mapped.length === 0) {
+    return buildSeedIdeas()
+  }
+  return mapped
+}
+
+/**
+ * 真实热门开源项目种子（用于 GitHub 抓取失败/限速时的兜底）。
+ * 全部为公开高星仓库，url 指向真实主页，可正常点击。
+ */
+const SEED_REPOS: Array<{ owner: string; name: string; lang: string; desc: string; tag: string }> = [
+  { owner: 'vuejs', name: 'vue', lang: 'TypeScript', desc: '渐进式 JavaScript 框架，易学易用、性能出色。', tag: '前端框架' },
+  { owner: 'element-plus', name: 'element-plus', lang: 'TypeScript', desc: '基于 Vue 3 的桌面端组件库，企业级中后台首选。', tag: 'UI 组件库' },
+  { owner: 'supabase', name: 'supabase', lang: 'TypeScript', desc: '开源的 Firebase 替代方案，提供 Postgres、Auth 与实时能力。', tag: '后端即服务' },
+  { owner: 'langchain-ai', name: 'langchain', lang: 'Python', desc: '大模型应用开发框架，串联检索、工具与 Agent。', tag: 'AI / 大模型' },
+  { owner: 'ollama', name: 'ollama', lang: 'Go', desc: '本地运行大语言模型的工具，一行命令拉起模型。', tag: 'AI / 大模型' },
+  { owner: 'vitejs', name: 'vite', lang: 'TypeScript', desc: '下一代前端构建工具，极速冷启动与热更新。', tag: '前端工程化' },
+  { owner: 'tailwindlabs', name: 'tailwindcss', lang: 'TypeScript', desc: '原子化 CSS 框架，高效构建自定义界面。', tag: '前端工程化' },
+  { owner: 'darktable', name: 'darktable', lang: 'C', desc: '开源摄影后期处理与 Raw 管理软件。', tag: '图像处理' },
+  { owner: 'obsidianmd', name: 'obsidian-releases', lang: 'Unknown', desc: '本地优先的知识管理笔记应用发行仓库。', tag: '效率工具' },
+  { owner: 'twentyhq', name: 'twenty', lang: 'TypeScript', desc: '开源 CRM，替代 Salesforce 的现代客户关系管理。', tag: '企业应用' },
+  { owner: 'nocodb', name: 'nocodb', lang: 'TypeScript', desc: '开源 Airtable 替代方案，把数据库变成智能表格。', tag: '低代码' },
+  { owner: 'apache', name: 'echarts', lang: 'TypeScript', desc: '强大的开源可视化图表库，覆盖各类数据大屏。', tag: '数据可视化' }
+]
+
+function buildSeedIdeas(): ExternalIdea[] {
+  const now = new Date().toISOString()
+  return SEED_REPOS.map((r) => ({
+    id: genId(),
+    user_id: '',
+    source: '热门推荐',
+    title: `${r.owner}/${r.name}`,
+    url: `https://github.com/${r.owner}/${r.name}`,
+    summary: r.desc,
+    tags: Array.from(new Set([r.lang, r.tag].filter(Boolean))),
     fetched_at: now,
     bookmarked: false,
     related_module: null

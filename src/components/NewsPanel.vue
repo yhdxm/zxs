@@ -27,20 +27,21 @@
 
     <div v-if="loading && !news.length" class="np-skeleton"><el-skeleton :rows="6" animated /></div>
 
-    <div v-else-if="news.length" class="np-list">
+    <div v-else-if="news.length" class="np-grid">
       <a
         v-for="(n, i) in news"
         :key="n.link + n.title + i"
         :href="n.link"
         target="_blank"
         rel="noopener"
-        class="np-item"
+        class="np-card"
       >
-        <span class="np-title">{{ n.title }}</span>
-        <span class="np-meta">
+        <div class="np-card-top">
           <span class="np-src">{{ n.source }}</span>
-          <span class="np-date">{{ n.pubDate || '—' }}</span>
-        </span>
+          <el-icon class="np-ext"><TopRight /></el-icon>
+        </div>
+        <div class="np-title">{{ n.title }}</div>
+        <div class="np-date">{{ n.pubDate || '—' }}</div>
       </a>
     </div>
 
@@ -50,7 +51,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { Refresh, Search } from '@element-plus/icons-vue'
+import { Refresh, Search, TopRight } from '@element-plus/icons-vue'
 import { fetchNews, hasTianapiKey, type NewsItem } from '../services/newsService'
 
 const keyword = ref('')
@@ -92,25 +93,45 @@ onMounted(() => {
 .np-controls { margin-bottom: 12px; }
 .np-search { width: 100%; }
 
-.np-list { display: flex; flex-direction: column; gap: 2px; max-height: 420px; overflow-y: auto; }
-.np-item {
-  display: flex; align-items: center; justify-content: space-between; gap: 12px;
-  padding: 10px 12px; border-radius: 10px; text-decoration: none; color: var(--text);
-  transition: background 0.15s;
+.np-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 12px;
+  max-height: 560px;
+  overflow-y: auto;
+  padding-right: 2px;
 }
-.np-item:hover { background: var(--nav-hover); }
-.np-title {
-  font-size: 13px; line-height: 1.5; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+.np-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px;
+  border-radius: 12px;
+  text-decoration: none;
+  color: var(--text);
+  background: var(--surface-soft);
+  border: 1px solid var(--border);
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
 }
-.np-meta { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.np-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--primary);
+  box-shadow: 0 8px 22px rgba(99, 102, 241, 0.12);
+}
+.np-card-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .np-src {
-  font-size: 11px; color: var(--text-faint);
-  background: var(--surface-soft); padding: 2px 8px; border-radius: 6px;
+  font-size: 11px; color: var(--primary);
+  background: var(--nav-hover); padding: 2px 8px; border-radius: 6px; font-weight: 600;
+}
+.np-ext { font-size: 14px; color: var(--text-faint); }
+.np-title {
+  font-size: 14px; line-height: 1.5; font-weight: 600; color: var(--text-strong);
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
 }
 .np-date { font-size: 11px; color: var(--text-faint); font-variant-numeric: tabular-nums; }
 
 @media (max-width: 768px) {
   .news-panel { padding: 14px; }
-  .np-title { white-space: normal; -webkit-line-clamp: 2; -webkit-box-orient: vertical; display: -webkit-box; }
+  .np-grid { grid-template-columns: 1fr; }
 }
 </style>

@@ -365,7 +365,9 @@ export async function getDatabaseStats(): Promise<DatabaseStats> {
         'news_daily',
         'external_ideas',
         'automation_info',
-        'free_model_catalog'
+        'free_model_catalog',
+        'ai_keys',
+        'model_usage'
       ]
       for (const name of tables) {
         try {
@@ -1518,4 +1520,116 @@ export async function addModelUsage(modelId: string, tokens: number): Promise<vo
   } catch (e) {
     console.warn('[modelUsage] 扣减异常', e)
   }
+}
+
+/* =========================================================================
+ * 账号级 AI API Key 云端存储（ai_keys 表）
+ * - 每个账号一行，存前端 AES-GCM 加密后的密文（本模块只搬运密文，不加解密）
+ * - RLS：本人可读写自己的；超管可读所有人的；其他账号互不可见
+ * - 删除账号时 auth.users 级联删除对应行
+ * ========================================================================= */
+
+export interface AiKeyRecord {
+  userId: string
+  provider: string
+  baseUrl: string
+  model: string
+  encryptedKey: string
+  updatedAt: string
+}
+
+const toAiKeyRecord = (row: Record<string, unknown>): AiKeyRecord => ({
+  userId: String(row.user_id || ''),
+  provider: String(row.provider || ''),
+  baseUrl: String(row.base_url || ''),
+  model: String(row.model || ''),
+  encryptedKey: String(row.encrypted_key || ''),
+  updatedAt: String(row.updated_at || '')
+})
+
+/** 读取当前账号自己的云端 Key（密文），未配置返回 null */
+export async function loadOwnAiKey(userId: string): Promise<AiKeyRecord | null> {
+  if (!userId) return null
+  try {
+    const { data, error } = await supabase
+      .from('ai_keys')
+      .select('user_id, provider, base_url, model, encrypted_key, updated_at')
+      .eq('user_id', userId)
+      .maybeSingle()
+    if (error) {
+      console.warn('[aiKeys] 读取失败', error.message)
+      return null
+    }
+    return data ? toAiKeyRecord(data as Record<string, unknown>) : null
+  } catch (e) {
+    console.warn('[aiKeys] 读取异常', e)
+    return null
+  }
+}
+
+/** 保存当前账号自己的云端 Key（密文 upsert，配置一次跨设备留存） */
+export async function saveOwnAiKey(
+  userId: string,
+  payload: { provider: string; baseUrl: string; model: string; encryptedKey: string }
+): Promise<void> {
+  if (!userId) return
+  try {
+    const { error } = await supabase.from('ai_keys').upsert(
+      {
+        user_id: userId,
+        provider: payload.provider,
+        base_url: payload.baseUrl,
+        model: payload.model,
+        encrypted_key: payload.encryptedKey,
+        updated_at: new Date().toISOString()
+      },
+      { onConflict: 'user_id' }
+    )
+    if (error) {
+      console.warn('[aiKeys] 保存失败', error.message)
+    }
+  } catch (e) {
+    console.warn('[aiKeys] 保存异常', e)
+  }
+}
+
+/** 超管专用：读取所有账号的云端 Key（密文），RLS 保证非超管拿不到别人的 */
+export async function listAiKeysForAdmin(): Promise<AiKeyRecord[]> {
+  try {
+    const { data, error } = await supabase
+      .from('ai_keys')
+      .select('user_id, provider, base_url, model, encrypted_key, updated_at')
+      .order('updated_at', { ascending: false })
+    if (error) {
+      console.warn('[aiKeys] 总览读取失败', error.message)
+      return []
+    }
+    return ((data || []) as Record<string, unknown>[]).map(toAiKeyRecord)
+  } catch (e) {
+    console.warn('[aiKeys] 总览读取异常', e)
+    return []
+  }
+}
+
+/** 超管专用：读取所有账号的模型用量，返回 user_id -> (model_id -> used_tokens) */
+export async function getAllModelUsageForAdmin(): Promise<Record<string, Record<string, number>>> {
+  const map: Record<string, Record<string, number>> = {}
+  try {
+    const { data, error } = await supabase
+      .from('model_usage')
+      .select('user_id, model_id, used_tokens')
+      .order('model_id', { ascending: true })
+    if (error) {
+      console.warn('[modelUsage] 总览读取失败', error.message)
+      return map
+    }
+    for (const r of (data || []) as Array<{ user_id: string; model_id: string; used_tokens: number }>) {
+      const uid = String(r.user_id)
+      if (!map[uid]) map[uid] = {}
+      map[uid][r.model_id] = Number(r.used_tokens) || 0
+    }
+  } catch (e) {
+    console.warn('[modelUsage] 总览读取异常', e)
+  }
+  return map
 }

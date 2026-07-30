@@ -9,7 +9,9 @@ import DatabaseCheckView from '../views/DatabaseCheckView.vue'
 import AutomationInfoView from '../views/AutomationInfoView.vue'
 import ModelCenterView from '../views/ModelCenterView.vue'
 import RequirementCollectView from '../views/RequirementCollectView.vue'
-import FreeContentView from '../views/FreeContentView.vue'
+import WeatherView from '../views/WeatherView.vue'
+import MapView from '../views/MapView.vue'
+import NewsAggregateView from '../views/NewsAggregateView.vue'
 import { hasPermission, loadPermissionConfig, getSavedUser } from '../services/appDataService'
 
 const router = createRouter({
@@ -77,9 +79,21 @@ const router = createRouter({
       meta: { requirePermission: 'dashboard' }
     },
     {
-      path: '/free-content',
-      name: 'free-content',
-      component: FreeContentView,
+      path: '/weather',
+      name: 'weather',
+      component: WeatherView,
+      meta: { requirePermission: 'dashboard' }
+    },
+    {
+      path: '/map',
+      name: 'map',
+      component: MapView,
+      meta: { requirePermission: 'dashboard' }
+    },
+    {
+      path: '/news',
+      name: 'news',
+      component: NewsAggregateView,
       meta: { requirePermission: 'dashboard' }
     }
   ]

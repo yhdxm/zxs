@@ -359,6 +359,7 @@ interface SideItem {
 const canManageSystem = (u: AppUser | null) => u?.role === 'superadmin' || u?.role === 'admin'
 
 const sideMenu = reactive<SideItem[]>([
+  { key: 'database', label: '数据库监测', icon: Coin, permissionKey: 'database', to: '/database' },
   {
     key: 'lianzhicang',
     label: '联智舱',
@@ -368,6 +369,19 @@ const sideMenu = reactive<SideItem[]>([
     children: [
       { key: 'ai', label: 'AI 助手', icon: MagicStick, permissionKey: 'ai', to: '/ai' },
       { key: 'models', label: '模型中心', icon: DataAnalysis, permissionKey: 'ai', to: '/models' }
+    ]
+  },
+  {
+    key: 'fanjingzhixie',
+    label: '凡境智协',
+    icon: Compass,
+    expanded: true,
+    permissionKey: 'dashboard',
+    children: [
+      { key: 'news', label: '新闻聚合', icon: TrendCharts, permissionKey: 'dashboard', to: '/news' },
+      { key: 'weather', label: '天气', icon: Sunny, permissionKey: 'dashboard', to: '/weather' },
+      { key: 'map', label: '地图', icon: Location, permissionKey: 'dashboard', to: '/map' },
+      { key: 'automation-info', label: '自动化信息', icon: Document, permissionKey: 'automation', to: '/automation' }
     ]
   },
   { key: 'requirements', label: '需求收集', icon: TrendCharts, permissionKey: 'dashboard', to: '/requirements' },
@@ -384,18 +398,6 @@ const sideMenu = reactive<SideItem[]>([
       { key: 'contents', label: '内容', icon: Document, permissionKey: 'contents', to: { path: '/dashboard', query: { view: 'contents' } } }
     ]
   },
-  { key: 'database', label: '数据库监测', icon: Coin, permissionKey: 'database', to: '/database' },
-  {
-    key: 'automation',
-    label: '自动化',
-    icon: MagicStick,
-    expanded: false,
-    permissionKey: 'automation',
-    children: [
-      { key: 'automation-info', label: '信息', icon: Document, permissionKey: 'automation', to: '/automation' }
-    ]
-  },
-  { key: 'free-content', label: '免费内容', icon: Compass, permissionKey: 'dashboard', to: '/free-content' },
   {
     key: 'system',
     label: '权限管理',
@@ -452,12 +454,15 @@ const toggleGroup = (key: string) => {
 }
 
 const isMenuActive = (key: string) => {
+  if (key === 'database') return route.path === '/database'
   if (key === 'lianzhicang') return route.path === '/ai' || route.path === '/models'
   if (key === 'ai') return route.path === '/ai'
   if (key === 'models') return route.path === '/models'
+  if (key === 'fanjingzhixie') return ['/news', '/weather', '/map', '/automation'].includes(route.path)
+  if (key === 'news') return route.path === '/news'
+  if (key === 'weather') return route.path === '/weather'
+  if (key === 'map') return route.path === '/map'
   if (key === 'requirements') return route.path === '/requirements'
-  if (key === 'database') return route.path === '/database'
-  if (key === 'free-content') return route.path === '/free-content'
   if (key === 'automation' || key === 'automation-info') return route.path === '/automation'
   if (key === 'worktasks') return route.path === '/dashboard' && ['overview', 'todos', 'points', 'contents'].includes((route.query.view as string) || '')
   if (key === 'system') return route.path === '/system'
@@ -479,7 +484,9 @@ const currentTitle = computed(() => {
   if (route.path === '/models') return '模型中心'
   if (route.path === '/requirements') return '需求收集'
   if (route.path === '/database') return '数据库监测中心'
-  if (route.path === '/free-content') return '免费内容中心'
+  if (route.path === '/news') return '新闻聚合'
+  if (route.path === '/weather') return '实时天气'
+  if (route.path === '/map') return '地图定位'
   if (route.path === '/automation') return '自动化信息'
   if (route.path === '/system') {
     const v = route.query.view || 'accounts'

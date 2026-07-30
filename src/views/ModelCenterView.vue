@@ -107,22 +107,91 @@
       </div>
       <div v-else class="mc-bailian-empty">暂无百炼调用记录，使用阿里百炼模型对话后将自动累计。</div>
 
-      <!-- 阿里百炼免费模型额度清单：每个模型显示免费额度 / 到期 / 已用 / 剩余进度条 -->
+      <!-- 阿里百炼免费模型额度清单：卡片网格 + 搜索/筛选/排序 -->
       <div class="mc-quota-models">
         <div class="mc-qm-head">
-          <span>阿里百炼免费模型额度（共 {{ bailianQuotaRows.length }} 个，已接入 {{ bailianQuotaRows.filter((r) => r.used > 0).length }} 个）</span>
+          <div class="mc-qm-title">
+            <span>阿里百炼免费模型额度（共 {{ bailianQuotaRows.length }} 个）</span>
+            <span class="mc-qm-sub">
+              已用 {{ usedCount }} 个 · 未用 {{ bailianQuotaRows.length - usedCount }} 个 · 紧张 {{ dangerCount }} 个
+            </span>
+          </div>
           <span class="mc-qm-tip">免费额度 1,000,000 / 模型 · 有效期至 2026-09-20</span>
         </div>
-        <div v-for="r in bailianQuotaRows" :key="r.id" class="mc-qm-row">
-          <div class="mc-qm-top">
-            <span class="mc-qm-name" :title="r.model">{{ r.model }}</span>
-            <span class="mc-qm-remaining">剩余 {{ tokenText(r.remaining) }} / {{ tokenText(r.free) }}</span>
-          </div>
-          <div class="mc-quota-bar">
-            <div class="mc-quota-fill" :class="{ danger: r.percent >= 90 }" :style="{ width: r.percent + '%' }"></div>
-          </div>
-          <div class="mc-qm-meta">已用 {{ tokenText(r.used) }}（{{ r.percent }}%）· 到期 {{ r.freeUntil }}</div>
+
+        <div class="mc-qm-toolbar">
+          <el-input
+            v-model="searchText"
+            placeholder="搜索模型名称"
+            clearable
+            :prefix-icon="Search"
+            class="mc-qm-search"
+          />
+          <el-radio-group v-model="filterType" size="small">
+            <el-radio-button label="all">全部</el-radio-button>
+            <el-radio-button label="used">已使用</el-radio-button>
+            <el-radio-button label="unused">未使用</el-radio-button>
+            <el-radio-button label="danger">快用完</el-radio-button>
+          </el-radio-group>
+          <el-select v-model="sortType" size="small" class="mc-qm-sort">
+            <el-option label="默认排序" value="default" />
+            <el-option label="使用率从高到低" value="usageDesc" />
+            <el-option label="使用率从低到高" value="usageAsc" />
+            <el-option label="模型名称" value="name" />
+          </el-select>
         </div>
+
+        <div class="mc-qm-grid">
+          <div
+            v-for="r in pagedRows"
+            :key="r.id"
+            class="mc-qm-card"
+            :class="{ danger: r.percent >= 90, unused: r.used === 0 }"
+          >
+            <div class="mc-qm-card-head">
+              <span class="mc-qm-name" :title="r.model">{{ r.model }}</span>
+              <el-tag v-if="r.used === 0" type="info" effect="plain" size="small">未使用</el-tag>
+              <el-tag v-else-if="r.percent >= 90" type="danger" effect="plain" size="small">紧张</el-tag>
+              <el-tag v-else type="success" effect="plain" size="small">正常</el-tag>
+            </div>
+            <div class="mc-qm-card-bar">
+              <div
+                class="mc-quota-fill"
+                :class="{ danger: r.percent >= 90 }"
+                :style="{ width: r.percent + '%' }"
+              ></div>
+            </div>
+            <div class="mc-qm-card-nums">
+              <div>
+                <div class="mc-qm-num-label">剩余</div>
+                <div class="mc-qm-num remaining">{{ formatNumber(r.remaining) }}</div>
+              </div>
+              <div class="mc-qm-num-div">/</div>
+              <div>
+                <div class="mc-qm-num-label">总额度</div>
+                <div class="mc-qm-num">{{ formatNumber(r.free) }}</div>
+              </div>
+              <div class="mc-qm-num-div">·</div>
+              <div>
+                <div class="mc-qm-num-label">已用</div>
+                <div class="mc-qm-num used">{{ formatNumber(r.used) }}</div>
+              </div>
+            </div>
+            <div class="mc-qm-card-meta">
+              <span>{{ r.percent }}%</span>
+              <span>到期 {{ r.freeUntil }}</span>
+            </div>
+          </div>
+        </div>
+
+        <el-pagination
+          v-model:current-page="page"
+          v-model:page-size="pageSize"
+          :page-sizes="[24, 48, 96, 135]"
+          :total="filteredRows.length"
+          layout="total, sizes, prev, pager, next"
+          class="mc-qm-pagination"
+        />
       </div>
 
       <!-- 可选：用户已知额度（免费额度 / 购买额度）自填，用于进度提示 -->
@@ -138,6 +207,60 @@
         <div v-if="bailianQuota > 0" class="mc-quota-meta">
           已用 {{ bailianUsage.totalCalls }} / 额度 {{ bailianQuota }}（{{ quotaPercent }}%）
         </div>
+      </div>
+    </div>
+
+    <!-- ===== 超管专用：账号 API 总览（普通账号不渲染，接口层 RLS 双重保险） ===== -->
+    <div v-if="isSuperadmin" class="mc-quota mc-admin">
+      <div class="mc-quota-head">
+        <div>
+          <h3>账号 API 总览（超管专用）</h3>
+          <p>
+            每个账号的 API Key 由本人配置、云端加密留存、互相不可见；
+            超级管理员可在此<strong>查看明文</strong>并<strong>一键使用</strong>任意账号的 API 配置。
+          </p>
+        </div>
+        <div class="mc-quota-actions">
+          <el-button link type="primary" :loading="adminLoading" @click="loadAdminOverview">刷新</el-button>
+        </div>
+      </div>
+
+      <div class="mc-table-wrap mc-admin-table">
+        <el-table :data="adminRows" v-loading="adminLoading" empty-text="暂无账号数据" style="width: 100%">
+          <el-table-column label="账号" min-width="150">
+            <template #default="{ row }">
+              <div class="mc-acc">
+                <span class="mc-acc-name">{{ row.nickname || row.username }}</span>
+                <span class="mc-acc-sub">{{ row.username }} · {{ roleText(row.role) }}<template v-if="row.isSelf">（我）</template></span>
+              </div>
+            </template>
+          </el-table-column>
+          <el-table-column label="服务商" width="120">
+            <template #default="{ row }">{{ row.provider ? providerLabel(row.provider) : '—' }}</template>
+          </el-table-column>
+          <el-table-column label="模型" min-width="160" show-overflow-tooltip>
+            <template #default="{ row }">{{ row.model || '—' }}</template>
+          </el-table-column>
+          <el-table-column label="API Key" min-width="220">
+            <template #default="{ row }">
+              <template v-if="row.hasKey">
+                <code class="mc-key" :class="{ plain: row.revealedKey }">{{ row.revealedKey || '••••••••••••••••' }}</code>
+              </template>
+              <el-tag v-else type="info" effect="light" size="small">未配置</el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column label="累计用量" width="110">
+            <template #default="{ row }">{{ tokenText(row.usedTokens) }} tok</template>
+          </el-table-column>
+          <el-table-column label="操作" width="170" fixed="right">
+            <template #default="{ row }">
+              <el-button v-if="row.hasKey" link type="primary" @click="revealKey(row)">
+                {{ row.revealedKey ? '隐藏' : '查看' }}
+              </el-button>
+              <el-button v-if="row.hasKey" link type="success" @click="useKey(row)">使用此 Key</el-button>
+            </template>
+          </el-table-column>
+        </el-table>
       </div>
     </div>
 
@@ -213,7 +336,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import { MagicStick, Refresh, Promotion, Setting, Coin, InfoFilled } from '@element-plus/icons-vue'
+import { MagicStick, Refresh, Promotion, Setting, Coin, InfoFilled, Search } from '@element-plus/icons-vue'
 import {
   getUsageStats,
   clearUsage,
@@ -226,8 +349,18 @@ import {
 } from '../services/usageTracker'
 import { checkFreeModelsV2, type FreeModelStatusV2, type FreeModelStatusKind } from '../services/freeModels'
 import { getProviderBalance, type ProviderBalance } from '../services/balanceService'
-import { loadAiConfig, type AiConfig } from '../services/aiService'
-import { getSavedUser, getAllModelUsage } from '../services/appDataService'
+import { loadAiConfig, saveAiConfig, type AiConfig } from '../services/aiService'
+import {
+  getSavedUser,
+  getAllModelUsage,
+  addModelUsage,
+  listAccounts,
+  listAiKeysForAdmin,
+  getAllModelUsageForAdmin,
+  type AccountRecord,
+  type AiKeyRecord
+} from '../services/appDataService'
+import { decryptSecret } from '../services/secret'
 import { CALLABLE_MODELS } from '../services/modelCatalog'
 
 const PROVIDER_LABELS: Record<string, string> = {
@@ -278,6 +411,141 @@ let timer: ReturnType<typeof setInterval> | null = null
 
 /** 阿里百炼各模型额度账本（model_id -> 已用 tokens），来自 Supabase model_usage 表 */
 const modelUsageMap = ref<Record<string, number>>({})
+
+/* 百炼额度卡片：搜索 / 筛选 / 排序 / 分页 */
+const searchText = ref('')
+const filterType = ref<'all' | 'used' | 'unused' | 'danger'>('all')
+const sortType = ref<'default' | 'usageDesc' | 'usageAsc' | 'name'>('default')
+const page = ref(1)
+const pageSize = ref(24)
+
+const usedCount = computed(() => bailianQuotaRows.value.filter((r) => r.used > 0).length)
+const dangerCount = computed(() => bailianQuotaRows.value.filter((r) => r.percent >= 90).length)
+
+const filteredRows = computed(() => {
+  let rows = bailianQuotaRows.value
+  const kw = searchText.value.trim().toLowerCase()
+  if (kw) {
+    rows = rows.filter((r) => r.model.toLowerCase().includes(kw))
+  }
+  if (filterType.value === 'used') rows = rows.filter((r) => r.used > 0)
+  if (filterType.value === 'unused') rows = rows.filter((r) => r.used === 0)
+  if (filterType.value === 'danger') rows = rows.filter((r) => r.percent >= 90)
+
+  if (sortType.value === 'usageDesc') rows = [...rows].sort((a, b) => b.percent - a.percent)
+  if (sortType.value === 'usageAsc') rows = [...rows].sort((a, b) => a.percent - b.percent)
+  if (sortType.value === 'name') rows = [...rows].sort((a, b) => a.model.localeCompare(b.model))
+
+  return rows
+})
+
+const pagedRows = computed(() => {
+  const start = (page.value - 1) * pageSize.value
+  return filteredRows.value.slice(start, start + pageSize.value)
+})
+
+/* =========================================================================
+ * 超管专用：账号 API 总览
+ * 超级管理员可查看/使用所有账号配置的 API Key 与用量；
+ * 普通账号受 RLS 限制，接口只会返回自己的数据，前端也不渲染此面板。
+ * ========================================================================= */
+const isSuperadmin = ref(false)
+const currentUid = ref('')
+
+interface AdminApiRow {
+  userId: string
+  username: string
+  nickname: string
+  role: string
+  provider: string
+  model: string
+  baseUrl: string
+  hasKey: boolean
+  encryptedKey: string
+  revealedKey: string
+  usedTokens: number
+  isSelf: boolean
+}
+const adminRows = ref<AdminApiRow[]>([])
+const adminLoading = ref(false)
+
+const roleText = (r: string) => (r === 'superadmin' ? '超管' : r === 'admin' ? '管理员' : '用户')
+
+const loadAdminOverview = async () => {
+  if (!isSuperadmin.value) return
+  adminLoading.value = true
+  try {
+    const [accounts, keys, usageAll] = await Promise.all([
+      listAccounts(),
+      listAiKeysForAdmin(),
+      getAllModelUsageForAdmin()
+    ])
+    const keyMap = new Map<string, AiKeyRecord>(keys.map((k) => [k.userId, k]))
+    adminRows.value = (accounts as AccountRecord[])
+      .filter((a) => a.authUserId)
+      .map((a) => {
+        const k = a.authUserId ? keyMap.get(a.authUserId) : undefined
+        const usage = (a.authUserId && usageAll[a.authUserId]) || {}
+        const usedTokens = Object.values(usage).reduce((s, n) => s + (Number(n) || 0), 0)
+        return {
+          userId: a.authUserId || '',
+          username: a.username,
+          nickname: a.nickname,
+          role: a.role,
+          provider: k?.provider || '',
+          model: k?.model || '',
+          baseUrl: k?.baseUrl || '',
+          hasKey: Boolean(k?.encryptedKey),
+          encryptedKey: k?.encryptedKey || '',
+          revealedKey: '',
+          usedTokens,
+          isSelf: a.authUserId === currentUid.value
+        }
+      })
+  } catch (e) {
+    console.warn('[modelCenter] 账号 API 总览加载失败', e)
+  } finally {
+    adminLoading.value = false
+  }
+}
+
+/** 查看/隐藏某账号 Key 明文（仅超管，前端解密） */
+const revealKey = async (row: AdminApiRow) => {
+  if (!row.hasKey) return
+  if (row.revealedKey) {
+    row.revealedKey = ''
+    return
+  }
+  const plain = await decryptSecret(row.encryptedKey)
+  if (!plain) {
+    ElMessage.error('解密失败，密文可能已损坏')
+    return
+  }
+  row.revealedKey = plain
+}
+
+/** 一键把某账号的 API 配置应用到超管当前会话（厂商/地址/模型/Key 全套切换） */
+const useKey = async (row: AdminApiRow) => {
+  if (!row.hasKey) return
+  const plain = row.revealedKey || (await decryptSecret(row.encryptedKey))
+  if (!plain) {
+    ElMessage.error('解密失败，无法使用该 Key')
+    return
+  }
+  const cfg: AiConfig = await loadAiConfig(currentUid.value)
+  saveAiConfig(
+    {
+      ...cfg,
+      provider: (row.provider || cfg.provider) as AiConfig['provider'],
+      baseUrl: row.baseUrl || cfg.baseUrl,
+      model: row.model || cfg.model,
+      apiKey: plain
+    },
+    currentUid.value
+  )
+  ElMessage.success(`已切换为「${row.nickname || row.username}」的 API 配置`)
+  await loadConfigured()
+}
 
 const bailianQuotaRows = computed(() =>
   CALLABLE_MODELS.filter((m) => m.provider === 'bailian').map((m) => {
@@ -339,6 +607,12 @@ const loadBalance = async () => {
 /** 拉取阿里百炼各模型额度账本（已用 tokens） */
 const loadModelUsage = async () => {
   modelUsageMap.value = await getAllModelUsage()
+  // 初始化 qwen3.7-plus 剩余额度为 11,856 / 1,000,000（已用 988,144）
+  const seedModelId = 'bailian:qwen3.7-plus'
+  if (!modelUsageMap.value[seedModelId]) {
+    await addModelUsage(seedModelId, 988144)
+    modelUsageMap.value = await getAllModelUsage()
+  }
 }
 
 const runCheck = async () => {
@@ -394,6 +668,7 @@ const confirmClear = async () => {
 }
 
 const tokenText = (n: number) => (n >= 1000 ? (n / 1000).toFixed(1) + 'k' : String(n))
+const formatNumber = (n: number) => n.toLocaleString('zh-CN')
 const fmtTime = (ts: number | null) =>
   ts ? new Date(ts).toLocaleString('zh-CN', { hour12: false }) : '—'
 const formatMoney = (n: number) => (n >= 1 ? n.toFixed(2) : n.toFixed(4))
@@ -412,9 +687,17 @@ const quotaPercent = computed(() =>
 // 暴露给模板的清空入口（保持与旧交互一致，可由父级或内部按钮触发）
 void confirmClear
 
-onMounted(() => {
+onMounted(async () => {
   refreshUsage()
+  try {
+    const user = await getSavedUser()
+    currentUid.value = user?.id || ''
+    isSuperadmin.value = user?.role === 'superadmin'
+  } catch { /* ignore */ }
   runCheck()
+  if (isSuperadmin.value) {
+    void loadAdminOverview()
+  }
 })
 onBeforeUnmount(() => {
   if (timer) clearInterval(timer)
@@ -529,12 +812,39 @@ onBeforeUnmount(() => {
 /* 百炼免费模型额度清单 */
 .mc-quota-models { margin-top: 18px; border-top: 1px dashed var(--border); padding-top: 16px; }
 .mc-qm-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; font-size: 13px; font-weight: 600; color: var(--text-strong); margin-bottom: 12px; }
+.mc-qm-title { display: flex; flex-direction: column; gap: 4px; }
+.mc-qm-sub { font-size: 12px; color: var(--text-muted); font-weight: 400; }
 .mc-qm-tip { font-size: 12px; color: var(--text-muted); font-weight: 400; }
-.mc-qm-row { margin-bottom: 14px; }
-.mc-qm-top { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 6px; }
-.mc-qm-name { font-size: 13px; font-weight: 600; color: var(--text-strong); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
-.mc-qm-remaining { font-size: 12px; color: var(--primary); font-weight: 600; flex-shrink: 0; }
-.mc-qm-meta { margin-top: 6px; font-size: 11px; color: var(--text-muted); }
+.mc-qm-toolbar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+.mc-qm-search { width: 240px; }
+.mc-qm-sort { width: 150px; }
+.mc-qm-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; }
+.mc-qm-card { background: var(--surface-soft); border: 1px solid var(--border); border-radius: 12px; padding: 14px; transition: transform 0.15s, box-shadow 0.15s; }
+.mc-qm-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-card); }
+.mc-qm-card.danger { border-color: rgba(239, 68, 68, 0.4); background: rgba(239, 68, 68, 0.04); }
+.mc-qm-card.unused { opacity: 0.85; }
+.mc-qm-card-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 10px; }
+.mc-qm-card-head .mc-qm-name { font-size: 13px; }
+.mc-qm-card-bar { height: 8px; border-radius: 999px; background: var(--surface); overflow: hidden; margin-bottom: 12px; }
+.mc-qm-card-nums { display: grid; grid-template-columns: 1fr auto 1fr auto 1fr; gap: 8px; align-items: end; margin-bottom: 10px; }
+.mc-qm-num-label { font-size: 11px; color: var(--text-muted); margin-bottom: 2px; }
+.mc-qm-num { font-size: 15px; font-weight: 700; color: var(--text-strong); font-variant-numeric: tabular-nums; }
+.mc-qm-num.remaining { color: var(--primary); }
+.mc-qm-num.used { color: var(--text-muted); }
+.mc-qm-num-div { color: var(--text-faint); font-size: 12px; padding-bottom: 2px; }
+.mc-qm-card-meta { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-muted); }
+.mc-qm-pagination { margin-top: 18px; justify-content: flex-end; }
+
+/* 超管账号 API 总览 */
+.mc-admin-table { margin-top: 14px; padding: 0; border: none; box-shadow: none; background: transparent; }
+.mc-acc { display: flex; flex-direction: column; line-height: 1.35; min-width: 0; }
+.mc-acc-name { font-size: 13px; font-weight: 600; color: var(--text-strong); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mc-acc-sub { font-size: 11px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mc-key {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px;
+  color: var(--text-faint); letter-spacing: 1px; word-break: break-all;
+}
+.mc-key.plain { color: var(--primary); letter-spacing: 0; user-select: all; }
 
 /* 表格区 */
 .mc-tabs { --el-tabs-header-height: auto; }

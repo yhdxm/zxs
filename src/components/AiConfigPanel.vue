@@ -48,7 +48,7 @@
           :placeholder="hasStoredKey ? '已保存（密文），如需更换直接输入新 Key' : '填入你的 API Key，保存后无需重复输入'"
           autocomplete="off"
         />
-        <div class="key-hint">密钥本地 AES 加密存储，界面不可查看明文；输入新 Key 即覆盖旧 Key。</div>
+        <div class="key-hint">密钥按账号隔离、AES 加密后云端留存：配置一次，下次登录/换设备自动带出；其他账号不可见（超级管理员除外）。输入新 Key 即覆盖旧 Key。</div>
       </el-form-item>
 
       <el-form-item label="系统提示词">

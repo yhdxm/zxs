@@ -68,49 +68,43 @@
         点击 Resume 恢复，再刷新本页。
       </div>
 
-      <!-- 各表数据量（含中文说明行） -->
+      <!-- 各表数据量与内存占比（合并：中文说明 + 行数 + 占用空间 + 空间占比，按空间从高到低实时排序） -->
       <div class="db-section">
-        <h3>各表数据量（含中文说明）</h3>
-        <el-table :data="stats.tables" style="width: 100%" size="default" empty-text="暂无数据表" row-key="name">
+        <h3>各表数据量与内存占比（按占用空间从高到低）</h3>
+        <el-table :data="mergedTables" style="width: 100%" size="default" empty-text="暂无数据表" row-key="name">
           <el-table-column label="数据表" min-width="220">
             <template #default="{ row }">
               <div class="tbl-name">{{ row.name }}</div>
               <div class="tbl-desc">{{ tableDesc(row.name) }}</div>
             </template>
           </el-table-column>
-          <el-table-column prop="rows" label="行数" width="160">
+          <el-table-column prop="rows" label="行数" width="130" sortable>
             <template #default="{ row }"><span class="row-num">{{ row.rows.toLocaleString() }}</span></template>
           </el-table-column>
-          <el-table-column label="占用空间" width="160">
+          <el-table-column label="占用空间" width="130" sortable prop="size">
             <template #default="{ row }">
-              <span class="row-num">{{ formatBytes(row.sizeBytes || 0) }}</span>
+              <span class="row-num">{{ formatBytes(row.size) }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="空间占比" min-width="240">
+            <template #default="{ row }">
+              <div class="mem-inline">
+                <span class="mem-pct" :class="{ danger: row.pct > 40 }">{{ row.pct }}%</span>
+                <el-progress
+                  :percentage="row.pct"
+                  :stroke-width="8"
+                  :show-text="false"
+                  :color="row.pct > 40 ? '#ef4444' : 'var(--primary)'"
+                  class="mem-bar"
+                />
+              </div>
             </template>
           </el-table-column>
         </el-table>
         <p class="db-tip">
-          提示：中文说明用于快速识别业务表用途；若某表说明为「业务数据表（未登记）」，可在
-          <code>DatabaseCheckView.vue</code> 的 <code>TABLE_DESC</code> 中补充。
+          说明：中文说明用于快速识别业务表用途；新表会自动出现在此（来自 Supabase 实时统计）。
+          未登记的表会按表名智能推测中文说明，可在 <code>DatabaseCheckView.vue</code> 的 <code>TABLE_DESC</code> 中补充正式说明。
         </p>
-      </div>
-
-      <!-- 表内存占比（从高到低） -->
-      <div class="db-section">
-        <h3>表内存占比（从高到低）</h3>
-        <div v-if="sizeRanked.length" class="mem-list">
-          <div v-for="t in sizeRanked" :key="t.name" class="mem-row">
-            <div class="mem-row-head">
-              <span class="mem-name">{{ t.name }}</span>
-              <span class="mem-size">{{ formatBytes(t.sizeBytes || 0) }} · {{ memPercent(t.sizeBytes || 0) }}%</span>
-            </div>
-            <el-progress
-              :percentage="memPercent(t.sizeBytes || 0)"
-              :stroke-width="10"
-              :show-text="false"
-              :color="memPercent(t.sizeBytes || 0) > 40 ? 'var(--danger)' : 'var(--primary)'"
-            />
-          </div>
-        </div>
-        <el-empty v-else description="暂无各表尺寸数据（请在 Supabase 重新执行 scripts/supabase_stats.sql 启用精确统计）" :image-size="60" />
       </div>
 
       <div v-if="stats.error" class="db-error">读取详情失败：{{ stats.error }}</div>
@@ -140,11 +134,35 @@ const TABLE_DESC: Record<string, string> = {
   free_model_catalog: '免费模型目录表：各厂商公开免费档模型清单',
   todos: '待办表：工作任务中的待办事项',
   points: '点位表：工作任务中的点位数据',
-  contents: '内容表：工作任务中的内容条目'
+  contents: '内容表：工作任务中的内容条目',
+  ai_keys: 'AI 密钥表：各账号加密存储的 API Key，本人可读写、超管可查看',
+  model_usage: '模型用量账本：各账号调用百炼模型的 tokens 累计，用于额度扣减',
+  usage_records: '用量记录表：AI 调用明细与 tokens 记录',
+  auth_users: '认证用户表：Supabase Auth 底层账号（含邮箱、登录方式）'
+}
+
+/** 常见表名片段 → 中文词，用于未登记表的智能推测说明 */
+const WORD_MAP: Record<string, string> = {
+  account: '账号', profile: '资料', setting: '配置', dashboard: '看板',
+  news: '新闻', idea: '灵感', automation: '自动化', model: '模型',
+  usage: '用量', key: '密钥', token: '令牌', log: '日志', cache: '缓存',
+  order: '订单', user: '用户', task: '任务', point: '点位', content: '内容',
+  free: '免费', catalog: '目录', external: '外部', daily: '每日', record: '记录',
+  admin: '管理', stat: '统计', data: '数据', info: '信息', msg: '消息',
+  chat: '对话', message: '消息', file: '文件', upload: '上传', tag: '标签',
+  category: '分类', comment: '评论', config: '配置', session: '会话'
+}
+
+/** 未登记的表自动按表名片段拼出中文说明，避免显示「未登记」 */
+function guessDesc(name: string): string {
+  const parts = String(name).split(/[_-]/).filter(Boolean)
+  const segs = parts.map((p) => WORD_MAP[p.toLowerCase()] || p)
+  const cn = segs.join('')
+  return `（推测）${cn}表：自动识别到的数据表，建议在 TABLE_DESC 补充正式说明`
 }
 
 function tableDesc(name: string): string {
-  return TABLE_DESC[name] || '业务数据表（未登记）'
+  return TABLE_DESC[name] || guessDesc(name)
 }
 
 const stats = ref<DatabaseStats | null>(null)
@@ -154,17 +172,26 @@ const totalRows = computed(() =>
   stats.value ? stats.value.tables.reduce((s, t) => s + t.rows, 0) : 0
 )
 
-/** 按占用空间从高到低排序（内存占比） */
-const sizeRanked = computed(() => {
+/** 全部表的占用空间总和（用于计算各表占比） */
+const totalSize = computed(() =>
+  stats.value ? stats.value.tables.reduce((s, t) => s + (Number(t.sizeBytes) || 0), 0) : 0
+)
+
+/** 合并表：表名 + 中文说明 + 行数 + 占用空间 + 空间占比(%)，按占用空间从高到低实时排序 */
+const mergedTables = computed(() => {
   if (!stats.value) return []
   return [...stats.value.tables]
-    .filter((t) => (t.sizeBytes || 0) > 0)
-    .sort((a, b) => (b.sizeBytes || 0) - (a.sizeBytes || 0))
+    .map((t) => {
+      const size = Number(t.sizeBytes) || 0
+      return {
+        name: t.name,
+        rows: Number(t.rows) || 0,
+        size,
+        pct: totalSize.value > 0 ? Math.round((size / totalSize.value) * 1000) / 10 : 0
+      }
+    })
+    .sort((a, b) => b.size - a.size) // 占用空间从高到低
 })
-
-const totalSize = computed(() =>
-  sizeRanked.value.reduce((s, t) => s + (t.sizeBytes || 0), 0)
-)
 
 function memPercent(size: number): number {
   if (!size || !totalSize.value) return 0
@@ -387,7 +414,7 @@ onMounted(runCheck)
   margin-left: 4px;
 }
 
-/* 内存占比 */
+/* 内存占比（合并表内联进度条） */
 .mem-list {
   display: flex;
   flex-direction: column;
@@ -408,6 +435,26 @@ onMounted(runCheck)
 .mem-size {
   color: var(--text-muted);
   font-variant-numeric: tabular-nums;
+}
+.mem-inline {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.mem-pct {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--primary);
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+  min-width: 44px;
+}
+.mem-pct.danger {
+  color: #ef4444;
+}
+.mem-bar {
+  flex: 1;
+  min-width: 80px;
 }
 
 .db-error {

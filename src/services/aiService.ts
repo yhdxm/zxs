@@ -1,5 +1,12 @@
 import { encryptSecret, decryptSecret } from './secret'
-import { loadProfileAiConfig, saveProfileAiConfig, addModelUsage } from './appDataService'
+import {
+  loadProfileAiConfig,
+  saveProfileAiConfig,
+  addModelUsage,
+  loadOwnAiKey,
+  saveOwnAiKey,
+  getSavedUser
+} from './appDataService'
 import { recordUsage } from './usageTracker'
 
 export type AiProvider = 'ollama' | 'openrouter' | 'openai-compatible' | 'bailian'
@@ -12,8 +19,14 @@ export interface AiConfig {
   systemPrompt: string
 }
 
-const STORAGE_KEY = 'free-ai-config'
-const SECRET_KEY = 'free-ai-config-secret'
+// 旧版全局存储键（不分账号，历史遗留）：仅用于把老数据迁移给超管，之后不再写入
+const LEGACY_STORAGE_KEY = 'free-ai-config'
+const LEGACY_SECRET_KEY = 'free-ai-config-secret'
+
+// 账号级隔离：每个账号一套独立本地缓存键，互相不可见。
+// 未登录时不读写任何持久化配置（返回默认值），杜绝蹭到别人的 Key。
+const cfgKeyFor = (uid: string) => `free-ai-config:${uid}`
+const secretKeyFor = (uid: string) => `free-ai-config-secret:${uid}`
 
 // 各服务商预置模型列表：界面用下拉选择，支持自定义输入。
 // 真实可调用模型统一见 services/modelCatalog.ts（CALLABLE_MODELS），此处仅作「高级手动配置」的常用候选。
@@ -58,13 +71,13 @@ function sanitizeMessage(value: string): string {
     .replace(/(sk-[A-Za-z0-9_-]{4})[A-Za-z0-9_-]{8,}/g, '$1***')
 }
 
-function readConfigFromStorage(storage: Storage | null): Partial<AiConfig> | null {
+function readConfigFromStorage(storage: Storage | null, key: string): Partial<AiConfig> | null {
   if (!storage) {
     return null
   }
 
   try {
-    const raw = storage.getItem(STORAGE_KEY)
+    const raw = storage.getItem(key)
     if (!raw) {
       return null
     }
@@ -126,37 +139,108 @@ function trackUsage(
   })
 }
 
+/** 解析当前登录账号（未显式传 userId 时自动识别），返回 uid 与角色 */
+async function resolveCurrentUser(userId?: string): Promise<{ uid: string; role: string }> {
+  try {
+    const user = await getSavedUser()
+    if (user?.id && (!userId || userId === user.id)) {
+      return { uid: user.id, role: user.role || 'user' }
+    }
+    return { uid: userId || '', role: 'user' }
+  } catch {
+    return { uid: userId || '', role: 'user' }
+  }
+}
+
+/**
+ * 一次性迁移：旧版全局（不分账号）本地配置只归属超级管理员。
+ * 超管登录且尚无自己的命名空间配置时，把旧数据搬进超管专属键并删除旧键；
+ * 普通账号一律无视旧全局数据，从零开始自行配置，杜绝蹭用超管 Key。
+ */
+function migrateLegacyForSuperadmin(uid: string, role: string): void {
+  if (role !== 'superadmin') return
+  try {
+    const ls = window.localStorage
+    if (ls.getItem(cfgKeyFor(uid)) || ls.getItem(secretKeyFor(uid))) return
+    const legacyCfg = ls.getItem(LEGACY_STORAGE_KEY)
+    const legacySecret = ls.getItem(LEGACY_SECRET_KEY)
+    if (legacyCfg) {
+      ls.setItem(cfgKeyFor(uid), legacyCfg)
+      ls.removeItem(LEGACY_STORAGE_KEY)
+    }
+    if (legacySecret) {
+      ls.setItem(secretKeyFor(uid), legacySecret)
+      ls.removeItem(LEGACY_SECRET_KEY)
+    }
+  } catch {
+    /* ignore */
+  }
+}
+
 export async function loadAiConfig(userId?: string): Promise<AiConfig> {
   if (typeof window === 'undefined') {
     return defaultAiConfig
   }
 
-  const localConfig = readConfigFromStorage(window.localStorage) || {}
-  // 密钥单独混淆存储，输入一次后长期有效
-  const encodedSecret = window.localStorage.getItem(SECRET_KEY) || ''
-  const localApiKey = encodedSecret ? await decryptSecret(encodedSecret) : ''
+  const { uid, role } = await resolveCurrentUser(userId)
+
+  // 未登录：不读取任何持久化配置，返回默认值（不含任何 Key）
+  if (!uid) {
+    return { ...defaultAiConfig }
+  }
+
+  // 旧全局数据只归超管（一次性迁移）
+  migrateLegacyForSuperadmin(uid, role)
+
+  const localConfig = readConfigFromStorage(window.localStorage, cfgKeyFor(uid)) || {}
+  // 密钥单独加密存储（账号独立命名空间），输入一次后长期有效
+  const encodedSecret = window.localStorage.getItem(secretKeyFor(uid)) || ''
+  let apiKey = encodedSecret ? await decryptSecret(encodedSecret) : ''
 
   // 本地配置始终作为「当前会话的事实来源」，确保模型/厂商切换即时生效
   const merged: AiConfig = {
     ...defaultAiConfig,
     ...localConfig,
-    apiKey: localApiKey
+    apiKey
   }
 
-  // 已登录：仅用云端「填补本地缺失的字段」，云端为跨设备备份，绝不覆盖本地主动修改
-  // （修复缺陷：旧逻辑云端优先覆盖本地，导致云端 ai_config 因 RLS 未更新时切换看似失效）
-  if (userId) {
+  // 云端 ai_keys：本地没有 Key 时（换电脑 / 清缓存）从云端带出自己的 Key，
+  // RLS 保证只能拿到自己账号那一行，永远不可能读到别人的 Key。
+  if (!apiKey) {
     try {
-      const serverConfig = await loadProfileAiConfig(userId)
-      if (serverConfig && serverConfig.provider) {
-        merged.provider = (localConfig.provider as AiProvider) || serverConfig.provider
-        merged.baseUrl = localConfig.baseUrl || serverConfig.baseUrl || merged.baseUrl
-        merged.model = localConfig.model || serverConfig.model || merged.model
-        merged.systemPrompt = localConfig.systemPrompt || serverConfig.systemPrompt || merged.systemPrompt
+      const cloudKey = await loadOwnAiKey(uid)
+      if (cloudKey?.encryptedKey) {
+        apiKey = await decryptSecret(cloudKey.encryptedKey)
+        if (apiKey) {
+          merged.apiKey = apiKey
+          // 回填本地缓存，下次免请求
+          try {
+            window.localStorage.setItem(secretKeyFor(uid), cloudKey.encryptedKey)
+          } catch { /* ignore */ }
+          // 本地无配置正文时，一并带出云端记录的厂商/地址/模型
+          if (!localConfig.provider && cloudKey.provider) {
+            merged.provider = cloudKey.provider as AiProvider
+            merged.baseUrl = cloudKey.baseUrl || merged.baseUrl
+            merged.model = cloudKey.model || merged.model
+          }
+        }
       }
     } catch (error) {
-      console.warn('[ai] 读取云端配置失败，使用本地配置', error)
+      console.warn('[ai] 读取云端密钥失败，使用本地配置', error)
     }
+  }
+
+  // 云端 profiles.ai_config：仅用来「填补本地缺失的非敏感字段」，绝不覆盖本地主动修改
+  try {
+    const serverConfig = await loadProfileAiConfig(uid)
+    if (serverConfig && serverConfig.provider) {
+      merged.provider = (localConfig.provider as AiProvider) || (merged.provider !== defaultAiConfig.provider ? merged.provider : serverConfig.provider)
+      merged.baseUrl = localConfig.baseUrl || merged.baseUrl || serverConfig.baseUrl || ''
+      merged.model = localConfig.model || merged.model || serverConfig.model || ''
+      merged.systemPrompt = localConfig.systemPrompt || serverConfig.systemPrompt || merged.systemPrompt
+    }
+  } catch (error) {
+    console.warn('[ai] 读取云端配置失败，使用本地配置', error)
   }
 
   return merged
@@ -167,33 +251,42 @@ export function saveAiConfig(config: AiConfig, userId?: string) {
     return
   }
 
-  const apiKey = config.apiKey.trim()
-  // 配置正文不含密钥；密钥混淆后单独存储（本地）
-  const rest = {
-    provider: config.provider,
-    baseUrl: config.baseUrl,
-    model: config.model,
-    systemPrompt: config.systemPrompt
-  }
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(rest))
-  if (apiKey) {
-    void encryptSecret(apiKey)
-      .then((enc) => {
-        try {
-          window.localStorage.setItem(SECRET_KEY, enc)
-        } catch {
-          /* ignore */
-        }
-      })
-      .catch(() => {
-        /* ignore */
-      })
-  }
+  void (async () => {
+    const { uid } = await resolveCurrentUser(userId)
+    // 未登录：不落任何持久化存储，防止配置串号
+    if (!uid) return
 
-  // 已登录：同步到云端（账号级配置，跨 PC / 移动端自动带出）
-  if (userId) {
-    void saveProfileAiConfig(userId, config)
-  }
+    const apiKey = config.apiKey.trim()
+    // 配置正文不含密钥；密钥加密后单独存储（账号独立命名空间）
+    const rest = {
+      provider: config.provider,
+      baseUrl: config.baseUrl,
+      model: config.model,
+      systemPrompt: config.systemPrompt
+    }
+    try {
+      window.localStorage.setItem(cfgKeyFor(uid), JSON.stringify(rest))
+    } catch { /* ignore */ }
+
+    if (apiKey) {
+      try {
+        const enc = await encryptSecret(apiKey)
+        try {
+          window.localStorage.setItem(secretKeyFor(uid), enc)
+        } catch { /* ignore */ }
+        // 云端留存（密文）：配置一次，下次登录 / 换设备自动带出；删除账号时级联清除
+        void saveOwnAiKey(uid, {
+          provider: config.provider,
+          baseUrl: config.baseUrl,
+          model: config.model,
+          encryptedKey: enc
+        })
+      } catch { /* ignore */ }
+    }
+
+    // 非敏感配置同步到云端 profiles（跨 PC / 移动端自动带出）
+    void saveProfileAiConfig(uid, config)
+  })()
 }
 
 export async function callAi(config: AiConfig, userPrompt: string): Promise<string> {
