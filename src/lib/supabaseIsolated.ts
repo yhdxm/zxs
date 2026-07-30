@@ -20,9 +20,11 @@ export const isolatedSupabase = createClient(
   import.meta.env.VITE_SUPABASE_ANON_KEY ?? '',
   {
     auth: {
+      storageKey: 'isolated-auth-token',
       storage: memoryStorage(),
       persistSession: false,
-      autoRefreshToken: false
+      autoRefreshToken: false,
+      detectSessionInUrl: false
     }
   }
 )

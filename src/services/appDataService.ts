@@ -1008,6 +1008,12 @@ export async function createAccountByAdmin(params: {
     throw new Error('密码长度为 6-32 位')
   }
 
+  // 0) 保存当前超管会话。即使隔离客户端的广播事件污染了主客户端，
+  // 创建完新用户后也能立刻恢复，确保后续超管 RPC 携带正确的 JWT。
+  const { data: currentSession } = await supabase.auth.getSession()
+  const adminAccessToken = currentSession.session?.access_token
+  const adminRefreshToken = currentSession.session?.refresh_token
+
   // 1) 在隔离的 Supabase 客户端创建认证用户，避免顶替当前超管会话。
   // 若用主客户端 signUp，新用户会话会覆盖 localStorage 中的 token，导致后续
   // 超管 RPC（create_account_by_admin）因权限不足而失败，最终出现"账号不存在"。
@@ -1021,6 +1027,14 @@ export async function createAccountByAdmin(params: {
   const uid = signUpData.user?.id
   if (!uid) {
     throw new Error('创建账号失败：未返回用户')
+  }
+
+  // 1.5) 立即恢复超管会话
+  if (adminAccessToken && adminRefreshToken) {
+    await supabase.auth.setSession({
+      access_token: adminAccessToken,
+      refresh_token: adminRefreshToken
+    })
   }
 
   // 2) 写入应用档案（仅超管可调用的 SECURITY DEFINER 函数）
