@@ -1601,6 +1601,133 @@ export async function addModelUsage(modelId: string, tokens: number): Promise<vo
   }
 }
 
+/**
+ * 手动校准某模型已用 tokens（直接 set，不递增）。
+ * 用于「模型用完了/剩余不准」时，按真实剩余反算已用 = 免费额度 - 剩余，覆盖本账号自己的记录。
+ * 仅 upsert 当前登录账号（user_id 由 RLS/后端取值），不会动他人数据。
+ */
+export async function setModelUsage(modelId: string, usedTokens: number): Promise<boolean> {
+  if (!modelId) return false
+  try {
+    const uid = currentAuthUid()
+    if (!uid) return false
+    const { error } = await supabase.from('model_usage').upsert(
+      {
+        user_id: uid,
+        model_id: modelId,
+        used_tokens: Math.max(0, Math.floor(usedTokens))
+      },
+      { onConflict: 'user_id,model_id' }
+    )
+    if (error) {
+      console.warn('[modelUsage] 校准失败', error.message)
+      return false
+    }
+    return true
+  } catch (e) {
+    console.warn('[modelUsage] 校准异常', e)
+    return false
+  }
+}
+
+/* =========================================================================
+ * 自定义免费模型（custom_free_models 表）
+ * - 用户自行登记的免费 AI（如 WorkBuddy HY3 等），按账号隔离（RLS 仅本人读写）
+ * - 仅搬运数据，不做可用性校验（用户自行保证可调用）
+ * ========================================================================= */
+export interface CustomFreeModel {
+  id: string
+  provider: string
+  model: string
+  baseUrl?: string
+  note?: string
+  createdAt?: string
+}
+
+const toCustomFreeModel = (row: Record<string, unknown>): CustomFreeModel => ({
+  id: String(row.id || ''),
+  provider: String(row.provider || ''),
+  model: String(row.model || ''),
+  baseUrl: row.base_url ? String(row.base_url) : undefined,
+  note: row.note ? String(row.note) : undefined,
+  createdAt: row.created_at ? String(row.created_at) : undefined
+})
+
+export async function loadCustomFreeModels(): Promise<CustomFreeModel[]> {
+  if (!supabase) return []
+  try {
+    const { data, error } = await supabase
+      .from('custom_free_models')
+      .select('id, provider, model, base_url, note, created_at')
+      .order('created_at', { ascending: false })
+    if (error) {
+      console.warn('[customFree] 读取失败', error.message)
+      return []
+    }
+    return (data || []).map((r) => toCustomFreeModel(r as Record<string, unknown>))
+  } catch (e) {
+    console.warn('[customFree] 读取异常', e)
+    return []
+  }
+}
+
+export async function saveCustomFreeModel(input: {
+  provider: string
+  model: string
+  baseUrl?: string
+  note?: string
+  id?: string
+}): Promise<boolean> {
+  if (!supabase || !input.provider || !input.model) return false
+  try {
+    if (input.id) {
+      const { error } = await supabase
+        .from('custom_free_models')
+        .update({
+          provider: input.provider,
+          model: input.model,
+          base_url: input.baseUrl || null,
+          note: input.note || null
+        })
+        .eq('id', input.id)
+      if (error) {
+        console.warn('[customFree] 更新失败', error.message)
+        return false
+      }
+    } else {
+      const { error } = await supabase.from('custom_free_models').insert({
+        provider: input.provider,
+        model: input.model,
+        base_url: input.baseUrl || null,
+        note: input.note || null
+      })
+      if (error) {
+        console.warn('[customFree] 新增失败', error.message)
+        return false
+      }
+    }
+    return true
+  } catch (e) {
+    console.warn('[customFree] 写入异常', e)
+    return false
+  }
+}
+
+export async function deleteCustomFreeModel(id: string): Promise<boolean> {
+  if (!supabase || !id) return false
+  try {
+    const { error } = await supabase.from('custom_free_models').delete().eq('id', id)
+    if (error) {
+      console.warn('[customFree] 删除失败', error.message)
+      return false
+    }
+    return true
+  } catch (e) {
+    console.warn('[customFree] 删除异常', e)
+    return false
+  }
+}
+
 /* =========================================================================
  * 账号级 AI API Key 云端存储（ai_keys 表）
  * - 每个账号一行，存前端 AES-GCM 加密后的密文（本模块只搬运密文，不加解密）

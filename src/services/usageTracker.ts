@@ -279,3 +279,25 @@ export function clearUsage(): void {
 export function getUsageLog(): UsageRecord[] {
   return readLog(logKey())
 }
+
+/**
+ * 按小时聚合某天的 tokens 用量（24 桶，0~23 点）。
+ * @param dayOffset 0 = 今天，1 = 昨天，依此类推
+ * 返回长度为 24 的数组，每个元素是当小时累计的 tokens（真实优先，缺则估算）。
+ * 仅供「模型中心 → 查看调用详情」绘制折线图，不发起任何网络请求。
+ */
+export function getHourlyTokens(dayOffset = 0): number[] {
+  const buckets = new Array<number>(24).fill(0)
+  const list = readLog(logKey())
+  const d = new Date()
+  d.setHours(0, 0, 0, 0)
+  d.setDate(d.getDate() - dayOffset)
+  const dayStart = d.getTime()
+  const dayEnd = dayStart + 24 * 60 * 60 * 1000
+  for (const r of list) {
+    if (r.ts < dayStart || r.ts >= dayEnd) continue
+    const hour = new Date(r.ts).getHours()
+    buckets[hour] += recordTokens(r)
+  }
+  return buckets
+}

@@ -21,7 +21,12 @@ export interface FreeModelCatalogEntry {
 /** 免费模型状态（含检测时间），供前端表格渲染 */
 export interface FreeModelStatusV2 extends FreeModelCatalogEntry {
   lastChecked: number | null
-  source: 'curated' | 'live'
+  /** curated=预置、live=实时探测、custom=用户自定义（来自 custom_free_models 表） */
+  source: 'curated' | 'live' | 'custom'
+  /** 自定义模型携带的调用地址（用于一键跳转到 AI 助手配置） */
+  baseUrl?: string
+  /** 自定义模型的记录 id（仅 custom 来源有，用于删除） */
+  id?: string
 }
 
 /** 经人工筛选的稳定免费模型（多厂商：硅基流动 / 智谱 / DeepSeek / 火山 / OpenRouter / Ollama） */
@@ -100,6 +105,45 @@ export async function checkFreeModelsV2(): Promise<FreeModelStatusV2[]> {
   }
 
   return list
+}
+
+/** 用户自定义免费模型的结构（避免直接依赖 appDataService，防止循环引用） */
+export interface CustomFreeModelLite {
+  id: string
+  provider: string
+  model: string
+  baseUrl?: string
+  note?: string
+  createdAt?: string
+}
+
+/**
+ * 把用户自定义免费模型（来自 custom_free_models 表）合并进清单。
+ * 自定义模型标记为 source='custom'，状态默认 callable（用户自行保证可调用）。
+ */
+export function appendCustomFreeModels(
+  base: FreeModelStatusV2[],
+  custom: CustomFreeModelLite[]
+): FreeModelStatusV2[] {
+  const customStatus: FreeModelStatusV2[] = custom.map((c) => ({
+    provider: c.provider,
+    model: c.model,
+    endpoint: c.baseUrl,
+    baseUrl: c.baseUrl,
+    isFree: true,
+    freeQuota: undefined,
+    status: 'callable',
+    note: c.note || '用户自定义免费模型',
+    lastChecked: c.createdAt ? new Date(c.createdAt).getTime() : Date.now(),
+    source: 'custom',
+    id: c.id
+  }))
+  return [...base, ...customStatus]
+}
+
+/** 供「免费模型清单」表格排序：按 lastChecked 倒序（最新在前） */
+export function sortByLastChecked(list: FreeModelStatusV2[]): FreeModelStatusV2[] {
+  return [...list].sort((a, b) => (b.lastChecked || 0) - (a.lastChecked || 0))
 }
 
 /** 旧版检测函数（保留，供兼容）；内部复用 V2 并映射回旧结构 */

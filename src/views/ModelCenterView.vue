@@ -64,7 +64,7 @@
     </div>
 
     <!-- 阿里百炼·本地用量统计（Fix #2）：真实调用记录，非官方实时额度 -->
-    <div class="mc-quota">
+    <div class="mc-quota mc-quota-bailian">
       <div class="mc-quota-head">
         <div>
           <h3>阿里百炼 · 本地用量统计</h3>
@@ -74,6 +74,9 @@
           </p>
         </div>
         <div class="mc-quota-actions">
+          <el-button link type="primary" @click="openCallDetail">
+            <el-icon><DataLine /></el-icon> 查看调用详情
+          </el-button>
           <el-button link type="primary" @click="openBailianConsole">查看官方免费额度 ↗</el-button>
           <el-button v-if="bailianQuota === null" link type="primary" @click="enableQuota">设置额度</el-button>
         </div>
@@ -134,7 +137,7 @@
             <el-radio-button label="danger">快用完</el-radio-button>
           </el-radio-group>
           <el-select v-model="sortType" size="small" class="mc-qm-sort">
-            <el-option label="默认排序" value="default" />
+            <el-option label="智能优先级" value="priority" />
             <el-option label="使用率从高到低" value="usageDesc" />
             <el-option label="使用率从低到高" value="usageAsc" />
             <el-option label="模型名称" value="name" />
@@ -181,6 +184,11 @@
               <span>{{ r.percent }}%</span>
               <span>到期 {{ r.freeUntil }}</span>
             </div>
+            <div class="mc-qm-card-foot">
+              <el-button link type="primary" size="small" @click="openCalibrate(r)">
+                <el-icon><Edit /></el-icon> 校准剩余
+              </el-button>
+            </div>
           </div>
         </div>
 
@@ -211,7 +219,7 @@
     </div>
 
     <!-- ===== 超管专用：账号 API 总览（普通账号不渲染，接口层 RLS 双重保险） ===== -->
-    <div v-if="isSuperadmin" class="mc-quota mc-admin">
+    <div v-if="isSuperadmin" class="mc-quota mc-admin mc-quota-admin">
       <div class="mc-quota-head">
         <div>
           <h3>账号 API 总览（超管专用）</h3>
@@ -319,30 +327,83 @@
         <div class="mc-banner">
           <el-icon><Promotion /></el-icon>
           <span>
-            免费模型来自各厂商公开免费档与 <b>OpenRouter 实时模型列表</b>（前端直连）。
-            纯前端调用，<b>不消耗任何积分/额度</b>，也不写入云端，可用于免费开发实时监测。
+            免费模型来自各厂商公开免费档、<b>OpenRouter 实时模型列表</b>（前端直连探测）与<b>你自定义的免费模型</b>。
+            纯前端调用，<b>不消耗任何积分/额度</b>，也不写入云端。来源为「实时」的会现场探测可调用性，方便你直接配置与调用。
           </span>
         </div>
 
+        <!-- 筛选栏：厂商 / 状态 / 来源 + 刷新 + 添加自定义 -->
+        <div class="mc-free-toolbar">
+          <el-select v-model="freeProviderFilter" placeholder="厂商" clearable size="default" class="mc-free-sel">
+            <el-option label="全部厂商" value="" />
+            <el-option v-for="p in freeProviders" :key="p" :label="providerLabel(p)" :value="p" />
+          </el-select>
+          <el-select v-model="freeStatusFilter" placeholder="状态" clearable size="default" class="mc-free-sel">
+            <el-option label="全部状态" value="" />
+            <el-option label="可调用" value="callable" />
+            <el-option label="受限" value="limited" />
+            <el-option label="暂不可用" value="unavailable" />
+            <el-option label="未知" value="unknown" />
+          </el-select>
+          <el-select v-model="freeSourceFilter" placeholder="来源" clearable size="default" class="mc-free-sel">
+            <el-option label="全部来源" value="" />
+            <el-option label="实时" value="live" />
+            <el-option label="预置" value="curated" />
+            <el-option label="自定义" value="custom" />
+          </el-select>
+          <div class="mc-free-spacer"></div>
+          <el-button :loading="checking" @click="refreshFreeList">
+            <el-icon><Refresh /></el-icon> 刷新检测
+          </el-button>
+          <el-button type="primary" plain @click="openCustomDialog">
+            <el-icon><Plus /></el-icon> 添加自定义
+          </el-button>
+        </div>
+
         <div class="mc-table-wrap">
-          <el-table :data="freeList" empty-text="点击「立即检测」获取免费模型清单" style="width: 100%">
-            <el-table-column label="厂商" width="140">
+          <el-table :data="pagedFreeList" empty-text="点击「刷新检测」获取免费模型清单" style="width: 100%">
+            <el-table-column label="厂商" width="130">
               <template #default="{ row }">{{ providerLabel(row.provider) }}</template>
             </el-table-column>
-            <el-table-column prop="model" label="模型" min-width="220" />
-            <el-table-column prop="note" label="说明" min-width="180" show-overflow-tooltip />
-            <el-table-column label="状态" width="140">
+            <el-table-column prop="model" label="模型" min-width="200" />
+            <el-table-column prop="note" label="说明" min-width="150" show-overflow-tooltip />
+            <el-table-column label="状态" width="120">
               <template #default="{ row }">
                 <span class="mc-status" :class="statusClass(row.status)">
                   <span class="dot"></span>{{ statusText(row.status) }}
                 </span>
-                <div class="mc-status-src">{{ row.source === 'live' ? '实时' : '预置' }}</div>
               </template>
             </el-table-column>
-            <el-table-column label="最近检测" width="160">
+            <el-table-column label="来源" width="90">
+              <template #default="{ row }">
+                <el-tag size="small" :type="row.source === 'live' ? 'success' : row.source === 'custom' ? 'warning' : 'info'" effect="light">
+                  {{ row.source === 'live' ? '实时' : row.source === 'custom' ? '自定义' : '预置' }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column label="最近监测" width="150">
               <template #default="{ row }">{{ fmtTime(row.lastChecked) }}</template>
             </el-table-column>
+            <el-table-column label="操作" width="130" fixed="right">
+              <template #default="{ row }">
+                <el-button v-if="row.source === 'custom'" link type="danger" size="small" @click="removeCustom(row)">删除</el-button>
+                <el-button link type="primary" size="small" @click="goConfig(row)">去配置</el-button>
+              </template>
+            </el-table-column>
           </el-table>
+          <div class="mc-free-foot">
+            <span class="mc-free-foot-info">
+              默认展示最新 {{ freePageSize }} 条（按最近监测倒序），共 {{ filteredFreeList.length }} 条
+            </span>
+            <el-pagination
+              v-model:current-page="freePage"
+              :page-size="freePageSize"
+              :total="filteredFreeList.length"
+              layout="prev, pager, next"
+              small
+              background
+            />
+          </div>
         </div>
       </el-tab-pane>
     </el-tabs>
@@ -392,13 +453,110 @@
         <el-button type="primary" @click="submitPwdDialog">{{ pwdDialogMode === 'set' ? '保存' : '确认' }}</el-button>
       </template>
     </el-dialog>
+
+    <!-- 调用详情弹框（SVG 自绘折线，不引入图表库） -->
+    <el-dialog v-model="callDetailVisible" title="模型调用详情" width="880px" class="mc-call-dialog" destroy-on-close>
+      <div class="mc-call-stats">
+        <div class="mc-call-stat">
+          <div class="mc-call-num">{{ callDetail.modelCount }}</div>
+          <div class="mc-call-label">调用模型数</div>
+        </div>
+        <div class="mc-call-stat">
+          <div class="mc-call-num">{{ callDetail.successCalls }}</div>
+          <div class="mc-call-label">调用成功总次数</div>
+        </div>
+        <div class="mc-call-stat">
+          <div class="mc-call-num">{{ tokenText(callDetail.totalTokens) }}</div>
+          <div class="mc-call-label">Token 总量</div>
+        </div>
+        <div class="mc-call-stat">
+          <div class="mc-call-num">{{ tokenText(callDetail.avgTokens) }}</div>
+          <div class="mc-call-label">平均单次 Token</div>
+        </div>
+      </div>
+
+      <div class="mc-call-chart">
+        <div class="mc-call-chart-head">
+          <span>逐小时调用 Token 量（本周期 vs 上周期）</span>
+          <div class="mc-call-legend">
+            <span class="lg lg-today">本周期（今天）</span>
+            <span class="lg lg-yesterday">上周期（昨天）</span>
+          </div>
+        </div>
+        <div class="mc-call-chart-body" v-html="callChartSvg"></div>
+      </div>
+
+      <div class="mc-call-table">
+        <el-table :data="callDetail.byModel" empty-text="暂无调用明细" max-height="220" style="width: 100%">
+          <el-table-column prop="model" label="模型" min-width="200" />
+          <el-table-column label="调用次数" width="110">
+            <template #default="{ row }">{{ row.calls }} 次</template>
+          </el-table-column>
+          <el-table-column label="Tokens" width="120">
+            <template #default="{ row }">{{ tokenText(row.tokens) }} tok</template>
+          </el-table-column>
+          <el-table-column label="最后调用" width="170">
+            <template #default="{ row }">{{ row.lastUsed ? fmtTime(row.lastUsed) : '—' }}</template>
+          </el-table-column>
+        </el-table>
+      </div>
+    </el-dialog>
+
+    <!-- 自定义免费模型弹框 -->
+    <el-dialog
+      v-model="customDialogVisible"
+      :title="customForm.id ? '编辑自定义免费模型' : '添加自定义免费模型'"
+      width="440px"
+      :close-on-click-modal="false"
+      destroy-on-close
+    >
+      <el-form label-position="top" class="mc-custom-form">
+        <el-form-item label="厂商" required>
+          <el-input v-model="customForm.provider" placeholder="例如：WorkBuddy / 本地 Ollama / 自建" maxlength="40" />
+        </el-form-item>
+        <el-form-item label="模型名称" required>
+          <el-input v-model="customForm.model" placeholder="例如：HY3 / qwen2.5-7b" maxlength="80" />
+        </el-form-item>
+        <el-form-item label="接口地址（可选）">
+          <el-input v-model="customForm.baseUrl" placeholder="https://...  留空表示本地/默认地址" maxlength="200" />
+        </el-form-item>
+        <el-form-item label="备注（可选）">
+          <el-input v-model="customForm.note" type="textarea" :rows="2" placeholder="说明该模型的免费额度/使用方式" maxlength="200" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="customDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="customSaving" @click="submitCustom">保存</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 校准剩余 token 弹框 -->
+    <el-dialog v-model="calibrateVisible" title="校准模型剩余 Token" width="420px" :close-on-click-modal="false" destroy-on-close>
+      <div v-if="calibrateRow" class="mc-calib">
+        <div class="mc-calib-model">{{ calibrateRow.model }}</div>
+        <el-form label-position="top">
+          <el-form-item label="当前真实剩余 Token">
+            <el-input-number v-model="calibrateRemaining" :min="0" :step="1000" controls-position="right" style="width: 100%" />
+          </el-form-item>
+        </el-form>
+        <div class="mc-calib-hint">
+          将自动反算：已用 = 总额度 {{ formatNumber(calibrateRow.free) }} − 剩余 {{ formatNumber(calibrateRemaining) }}
+          = <b>{{ formatNumber(Math.max(0, calibrateRow.free - calibrateRemaining)) }}</b>
+        </div>
+      </div>
+      <template #footer>
+        <el-button @click="calibrateVisible = false">取消</el-button>
+        <el-button type="primary" :loading="calibrateSaving" @click="submitCalibrate">保存校准</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { MagicStick, Refresh, Promotion, Setting, Coin, InfoFilled, Search } from '@element-plus/icons-vue'
+import { MagicStick, Refresh, Promotion, Setting, Coin, InfoFilled, Search, DataLine, Edit, Plus } from '@element-plus/icons-vue'
 import {
   getUsageStats,
   clearUsage,
@@ -406,10 +564,17 @@ import {
   getBailianQuota,
   classifyFree,
   getBailianUsage,
+  getHourlyTokens,
   type UsageSummary,
   type BailianUsage
 } from '../services/usageTracker'
-import { checkFreeModelsV2, type FreeModelStatusV2, type FreeModelStatusKind } from '../services/freeModels'
+import {
+  checkFreeModelsV2,
+  appendCustomFreeModels,
+  sortByLastChecked,
+  type FreeModelStatusV2,
+  type FreeModelStatusKind
+} from '../services/freeModels'
 import { getProviderBalance, type ProviderBalance } from '../services/balanceService'
 import { loadAiConfig, saveAiConfig, type AiConfig } from '../services/aiService'
 import {
@@ -418,6 +583,10 @@ import {
   listAccounts,
   listAiKeysForAdmin,
   getAllModelUsageForAdmin,
+  setModelUsage,
+  loadCustomFreeModels,
+  saveCustomFreeModel,
+  deleteCustomFreeModel,
   type AccountRecord,
   type AiKeyRecord
 } from '../services/appDataService'
@@ -435,6 +604,8 @@ const PROVIDER_LABELS: Record<string, string> = {
   'openai-compatible': 'OpenAI 兼容'
 }
 const providerLabel = (p: string): string => PROVIDER_LABELS[p] || p
+
+const router = useRouter()
 
 const activeTab = ref<'configured' | 'free'>('configured')
 const usage = ref<UsageSummary>({
@@ -476,12 +647,23 @@ const modelUsageMap = ref<Record<string, number>>({})
 /* 百炼额度卡片：搜索 / 筛选 / 排序 / 分页 */
 const searchText = ref('')
 const filterType = ref<'all' | 'used' | 'unused' | 'danger'>('all')
-const sortType = ref<'default' | 'usageDesc' | 'usageAsc' | 'name'>('default')
+const sortType = ref<'priority' | 'usageDesc' | 'usageAsc' | 'name'>('priority')
 const page = ref(1)
 const pageSize = ref(24)
 
 const usedCount = computed(() => bailianQuotaRows.value.filter((r) => r.used > 0).length)
 const dangerCount = computed(() => bailianQuotaRows.value.filter((r) => r.remaining < 10000).length)
+
+/**
+ * 展示优先级（用户要求：用完的模型不要排在最前）。
+ * 快用完(剩<1万且>0) > 正常已用(剩≥1万) > 未使用(已用=0) > 已用完(剩=0 排最后)
+ */
+const priorityOf = (r: { used: number; remaining: number }): number => {
+  if (r.remaining <= 0) return 4
+  if (r.used === 0) return 3
+  if (r.remaining < 10000) return 1
+  return 2
+}
 
 const filteredRows = computed(() => {
   let rows = bailianQuotaRows.value
@@ -489,12 +671,20 @@ const filteredRows = computed(() => {
   if (kw) {
     rows = rows.filter((r) => r.model.toLowerCase().includes(kw))
   }
-  // 已使用：剩余 < 免费额度（即已用 > 0），状态为「正常」或「快用完」均归入
+  // 已使用：剩余 < 免费额度（即已用 > 0）
   if (filterType.value === 'used') rows = rows.filter((r) => r.used > 0)
   if (filterType.value === 'unused') rows = rows.filter((r) => r.used === 0)
   // 快用完：剩余不足 10,000，状态标红
   if (filterType.value === 'danger') rows = rows.filter((r) => r.remaining < 10000)
 
+  if (sortType.value === 'priority') {
+    rows = [...rows].sort((a, b) => {
+      const pa = priorityOf(a)
+      const pb = priorityOf(b)
+      if (pa !== pb) return pa - pb
+      return b.percent - a.percent // 同档按使用率从高到低
+    })
+  }
   if (sortType.value === 'usageDesc') rows = [...rows].sort((a, b) => b.percent - a.percent)
   if (sortType.value === 'usageAsc') rows = [...rows].sort((a, b) => a.percent - b.percent)
   if (sortType.value === 'name') rows = [...rows].sort((a, b) => a.model.localeCompare(b.model))
@@ -506,6 +696,218 @@ const pagedRows = computed(() => {
   const start = (page.value - 1) * pageSize.value
   return filteredRows.value.slice(start, start + pageSize.value)
 })
+
+/* =========================================================================
+ * 百炼额度卡「校准剩余」：手动反算已用 = 总额度 - 剩余，直接 upsert 当前账号行
+ * ========================================================================= */
+interface CalibrateRow { id: string; model: string; free: number; used: number; remaining: number }
+const calibrateVisible = ref(false)
+const calibrateSaving = ref(false)
+const calibrateRow = ref<CalibrateRow | null>(null)
+const calibrateRemaining = ref(0)
+const openCalibrate = (r: CalibrateRow) => {
+  calibrateRow.value = { ...r }
+  calibrateRemaining.value = r.remaining
+  calibrateVisible.value = true
+}
+const submitCalibrate = async () => {
+  if (!calibrateRow.value) return
+  calibrateSaving.value = true
+  try {
+    const used = Math.max(0, calibrateRow.value.free - calibrateRemaining.value)
+    const ok = await setModelUsage(calibrateRow.value.id, used)
+    if (ok) {
+      ElMessage.success(`已校准：剩余 ${formatNumber(calibrateRemaining.value)}，已用 ${formatNumber(used)}`)
+      calibrateVisible.value = false
+      await loadModelUsage()
+    } else {
+      ElMessage.error('校准失败，请重试')
+    }
+  } finally {
+    calibrateSaving.value = false
+  }
+}
+
+/* =========================================================================
+ * 调用详情弹框（SVG 自绘折线图，不引入图表库）
+ * ========================================================================= */
+interface CallDetailRow { model: string; calls: number; tokens: number; lastUsed: number | null }
+interface CallDetail {
+  modelCount: number
+  successCalls: number
+  totalTokens: number
+  avgTokens: number
+  byModel: CallDetailRow[]
+  todayHourly: number[]
+  yesterdayHourly: number[]
+}
+const callDetailVisible = ref(false)
+const callDetail = ref<CallDetail>({
+  modelCount: 0,
+  successCalls: 0,
+  totalTokens: 0,
+  avgTokens: 0,
+  byModel: [],
+  todayHourly: [],
+  yesterdayHourly: []
+})
+
+const openCallDetail = () => {
+  const u = usage.value
+  const byModel: CallDetailRow[] = u.byModel.map((m) => ({
+    model: m.model,
+    calls: m.calls,
+    tokens: m.tokens,
+    lastUsed: m.lastUsed
+  }))
+  const successCalls = u.totalCalls
+  const totalTokens = u.totalEstTokens
+  callDetail.value = {
+    modelCount: byModel.length,
+    successCalls,
+    totalTokens,
+    avgTokens: successCalls > 0 ? totalTokens / successCalls : 0,
+    byModel,
+    todayHourly: getHourlyTokens(0),
+    yesterdayHourly: getHourlyTokens(1)
+  }
+  callDetailVisible.value = true
+}
+
+/** 自绘逐小时折线图（今天 vs 昨天） */
+const callChartSvg = computed(() => {
+  const today = callDetail.value.todayHourly
+  const yest = callDetail.value.yesterdayHourly
+  const W = 800
+  const H = 240
+  const PL = 44
+  const PR = 16
+  const PT = 16
+  const PB = 28
+  const plotW = W - PL - PR
+  const plotH = H - PT - PB
+  const maxV = Math.max(1, ...today, ...yest)
+  const xAt = (i: number) => PL + (plotW * i) / 23
+  const yAt = (v: number) => PT + plotH - (plotH * v) / maxV
+  const pts = (arr: number[]) => arr.map((v, i) => `${xAt(i).toFixed(1)},${yAt(v).toFixed(1)}`).join(' ')
+  let grid = ''
+  for (let g = 0; g <= 4; g++) {
+    const y = PT + (plotH * g) / 4
+    const val = Math.round((maxV * (4 - g)) / 4)
+    grid += `<line x1="${PL}" y1="${y.toFixed(1)}" x2="${W - PR}" y2="${y.toFixed(1)}" stroke="#e2e8f0" stroke-width="1"/>`
+    grid += `<text x="${PL - 6}" y="${(y + 4).toFixed(1)}" text-anchor="end" font-size="10" fill="#94a3b8">${val}</text>`
+  }
+  let xlab = ''
+  for (const i of [0, 6, 12, 18, 23]) {
+    xlab += `<text x="${xAt(i).toFixed(1)}" y="${H - 8}" text-anchor="middle" font-size="10" fill="#94a3b8">${i}时</text>`
+  }
+  const yestLine = `<polyline fill="none" stroke="#10b981" stroke-width="2" stroke-dasharray="5 4" points="${pts(yest)}"/>`
+  const todayLine = `<polyline fill="none" stroke="#7c3aed" stroke-width="2.5" points="${pts(today)}"/>`
+  let dots = ''
+  today.forEach((v, i) => {
+    if (v > 0) dots += `<circle cx="${xAt(i).toFixed(1)}" cy="${yAt(v).toFixed(1)}" r="2.5" fill="#7c3aed"/>`
+  })
+  return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;display:block">${grid}${xlab}${yestLine}${todayLine}${dots}</svg>`
+})
+
+/* =========================================================================
+ * 免费模型清单：厂商/状态/来源筛选 + 默认最新 10 条 + 自定义模型
+ * ========================================================================= */
+const freeProviderFilter = ref('')
+const freeStatusFilter = ref('')
+const freeSourceFilter = ref('')
+const freePage = ref(1)
+const freePageSize = ref(10)
+const freeProviders = computed(() => Array.from(new Set(freeList.value.map((m) => m.provider))))
+
+const filteredFreeList = computed(() => {
+  let list = freeList.value
+  if (freeProviderFilter.value) list = list.filter((m) => m.provider === freeProviderFilter.value)
+  if (freeStatusFilter.value) list = list.filter((m) => m.status === freeStatusFilter.value)
+  if (freeSourceFilter.value) list = list.filter((m) => m.source === freeSourceFilter.value)
+  return sortByLastChecked(list)
+})
+const pagedFreeList = computed(() => {
+  const start = (freePage.value - 1) * freePageSize.value
+  return filteredFreeList.value.slice(start, start + freePageSize.value)
+})
+
+watch([freeProviderFilter, freeStatusFilter, freeSourceFilter], () => {
+  freePage.value = 1
+})
+
+/** 仅刷新免费模型清单（不动其他模块） */
+const refreshFreeList = async () => {
+  checking.value = true
+  try {
+    const base = await checkFreeModelsV2()
+    const custom = await loadCustomFreeModels()
+    freeList.value = appendCustomFreeModels(base, custom)
+  } catch {
+    ElMessage.error('免费模型刷新失败，请检查网络')
+  } finally {
+    checking.value = false
+  }
+}
+
+const removeCustom = async (row: FreeModelStatusV2) => {
+  if (!row.id) return
+  try {
+    await ElMessageBox.confirm(`确定删除自定义模型「${row.model}」？`, '删除确认', { type: 'warning' })
+  } catch {
+    return
+  }
+  const ok = await deleteCustomFreeModel(row.id)
+  if (ok) {
+    ElMessage.success('已删除')
+    await refreshFreeList()
+  } else {
+    ElMessage.error('删除失败')
+  }
+}
+
+const goConfig = (_row: FreeModelStatusV2) => {
+  router.push('/ai')
+}
+
+/* 自定义免费模型弹框 */
+const customDialogVisible = ref(false)
+const customSaving = ref(false)
+const customForm = ref<{ id?: string; provider: string; model: string; baseUrl: string; note: string }>({
+  provider: '',
+  model: '',
+  baseUrl: '',
+  note: ''
+})
+const openCustomDialog = () => {
+  customForm.value = { provider: '', model: '', baseUrl: '', note: '' }
+  customDialogVisible.value = true
+}
+const submitCustom = async () => {
+  if (!customForm.value.provider.trim() || !customForm.value.model.trim()) {
+    ElMessage.warning('厂商和模型名称必填')
+    return
+  }
+  customSaving.value = true
+  try {
+    const ok = await saveCustomFreeModel({
+      id: customForm.value.id,
+      provider: customForm.value.provider.trim(),
+      model: customForm.value.model.trim(),
+      baseUrl: customForm.value.baseUrl.trim() || undefined,
+      note: customForm.value.note.trim() || undefined
+    })
+    if (ok) {
+      ElMessage.success('已保存自定义免费模型')
+      customDialogVisible.value = false
+      await refreshFreeList()
+    } else {
+      ElMessage.error('保存失败')
+    }
+  } finally {
+    customSaving.value = false
+  }
+}
 
 /* =========================================================================
  * 超管专用：账号 API 总览
@@ -859,7 +1261,9 @@ const runCheck = async () => {
   checking.value = true
   try {
     await Promise.all([loadConfigured(), loadBalance(), loadModelUsage()])
-    freeList.value = await checkFreeModelsV2()
+    const base = await checkFreeModelsV2()
+    const custom = await loadCustomFreeModels()
+    freeList.value = appendCustomFreeModels(base, custom)
   } catch {
     ElMessage.error('检测失败，请检查网络后重试')
   } finally {
@@ -1138,9 +1542,51 @@ const onWindowBlur = () => {
 .mc-status.unknown { color: var(--text-faint); } .mc-status.unknown .dot { background: var(--text-faint); }
 .mc-status-src { font-size: 11px; color: var(--text-faint); margin-top: 2px; }
 
+/* 模块色彩边界：用左侧色条 + 同色标题区分各区块，避免连成一片 */
+.mc-balance { border-left: 4px solid #10b981; }
+.mc-quota-bailian { border-left: 4px solid #7c3aed; }
+.mc-quota-admin { border-left: 4px solid #f59e0b; }
+.mc-balance-title { color: #059669; }
+.mc-quota-bailian .mc-quota-head h3 { color: #7c3aed; }
+.mc-quota-admin .mc-quota-head h3 { color: #d97706; }
+/* 每张用量卡片顶部加蓝色条，彼此界限更清晰 */
+.mc-stat { border-top: 3px solid #185fa5; }
+
+/* 百炼额度卡：校准按钮 */
+.mc-qm-card-foot { margin-top: 10px; display: flex; justify-content: flex-end; }
+
+/* 免费模型清单筛选栏 */
+.mc-free-toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+.mc-free-sel { width: 130px; }
+.mc-free-spacer { flex: 1; }
+.mc-free-foot { margin-top: 14px; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.mc-free-foot-info { font-size: 12px; color: var(--text-muted); }
+
+/* 调用详情弹框 */
+.mc-call-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 16px; }
+.mc-call-stat { background: var(--surface-soft); border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; text-align: center; }
+.mc-call-num { font-size: 22px; font-weight: 800; color: var(--text-strong); font-variant-numeric: tabular-nums; }
+.mc-call-label { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+.mc-call-chart { background: var(--surface-soft); border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; margin-bottom: 16px; }
+.mc-call-chart-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 13px; color: var(--text-strong); font-weight: 600; margin-bottom: 10px; flex-wrap: wrap; }
+.mc-call-legend { display: flex; gap: 14px; font-size: 12px; color: var(--text-muted); font-weight: 400; }
+.lg { display: inline-flex; align-items: center; gap: 5px; }
+.lg::before { content: ''; width: 14px; height: 3px; border-radius: 2px; }
+.lg-today::before { background: #7c3aed; }
+.lg-yesterday::before { background: #10b981; }
+.mc-call-chart-body { width: 100%; overflow-x: auto; }
+.mc-call-table { margin-top: 4px; }
+
+/* 自定义免费模型 / 校准弹框 */
+.mc-custom-form .el-form-item { margin-bottom: 14px; }
+.mc-calib-model { font-size: 14px; font-weight: 700; color: var(--text-strong); margin-bottom: 12px; }
+.mc-calib-hint { font-size: 12px; color: var(--text-muted); line-height: 1.7; background: var(--surface-soft); border-radius: 8px; padding: 10px 12px; margin-top: 6px; }
+.mc-calib-hint b { color: var(--primary); }
+
 @media (max-width: 768px) {
   .mc-shell { padding: 14px; }
   .mc-title h1 { font-size: 18px; }
   .mc-actions { width: 100%; justify-content: space-between; }
+  .mc-call-stats { grid-template-columns: repeat(2, 1fr); }
 }
 </style>
