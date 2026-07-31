@@ -71,6 +71,27 @@ function sanitizeMessage(value: string): string {
     .replace(/(sk-[A-Za-z0-9_-]{4})[A-Za-z0-9_-]{8,}/g, '$1***')
 }
 
+/** 将百炼常见英文报错转换为中文，降低普通用户理解成本 */
+function translateBailianError(message: string): string {
+  const m = message || ''
+  if (/Free quota exhausted|quota exhausted|free tier/i.test(m)) {
+    return '该模型免费额度已用完。如需继续使用，请更换其他免费模型，或前往百炼控制台关闭「仅使用免费额度」模式并充值。'
+  }
+  if (/Insufficient balance|insufficient balance|balance insufficient/i.test(m)) {
+    return '账户余额不足。请前往百炼控制台充值，或切换至其他免费模型。'
+  }
+  if (/Invalid API key|invalid api[-_]?key|incorrect api key/i.test(m)) {
+    return 'API Key 无效或已过期。请在「AI 助手 → 配置」中重新填写正确的百炼 API Key。'
+  }
+  if (/Rate limit|rate limit|too many requests/i.test(m)) {
+    return '请求过于频繁，已触发百炼限流。请稍后再试，或降低调用频率。'
+  }
+  if (/model not found|model does not exist|unsupported model/i.test(m)) {
+    return '模型不存在或暂不可用。请检查模型名称，或切换到支持的模型。'
+  }
+  return m
+}
+
 function readConfigFromStorage(storage: Storage | null, key: string): Partial<AiConfig> | null {
   if (!storage) {
     return null
@@ -343,7 +364,8 @@ export async function callAi(config: AiConfig, userPrompt: string): Promise<stri
 
     const data = await response.json().catch(() => ({}))
     if (!response.ok) {
-      throw new Error(sanitizeMessage(data?.error?.message || data?.message || `百炼请求失败，状态码：${response.status}`))
+      const raw = data?.error?.message || data?.message || `百炼请求失败，状态码：${response.status}`
+      throw new Error(translateBailianError(sanitizeMessage(raw)))
     }
 
     const content = data?.choices?.[0]?.message?.content || ''

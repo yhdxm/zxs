@@ -225,6 +225,9 @@
           <el-tag v-if="adminRows.length" type="info" effect="plain" size="small">
             共 {{ adminRows.length }} 个账号 · {{ adminRows.filter((r) => r.hasKey).length }} 个已配置 Key
           </el-tag>
+          <el-button link type="warning" @click="openSetPwdDialog">
+            {{ adminPwdHash ? '修改查看密码' : '设置查看密码' }}
+          </el-button>
           <el-button link type="primary" :loading="adminLoading" @click="loadAdminOverview">刷新</el-button>
         </div>
       </div>
@@ -343,12 +346,58 @@
         </div>
       </el-tab-pane>
     </el-tabs>
+
+    <!-- 超管查看密码设置/验证弹框 -->
+    <el-dialog
+      v-model="pwdDialogVisible"
+      :title="pwdDialogMode === 'set' ? '设置 API Key 查看密码' : '验证查看密码'"
+      width="420px"
+      :close-on-click-modal="false"
+      destroy-on-close
+      class="mc-pwd-dialog"
+    >
+      <div v-if="pwdDialogMode === 'set'" class="mc-pwd-tips">
+        设置后，点击「查看」或「使用此 Key」需先输入密码才能解密明文。
+        <br>密码仅保存其 SHA-256 摘要，不存明文；验证通过后仅在内存中保留 10 分钟。
+      </div>
+      <div v-else class="mc-pwd-tips">
+        请输入查看密码以解密该账号的 API Key 明文。
+      </div>
+
+      <el-form label-position="top" class="mc-pwd-form">
+        <el-form-item label="查看密码">
+          <el-input
+            v-model="pwdForm.password"
+            type="password"
+            placeholder="请输入查看密码"
+            show-password
+            maxlength="32"
+            @keyup.enter="submitPwdDialog"
+          />
+        </el-form-item>
+        <el-form-item v-if="pwdDialogMode === 'set'" label="确认密码">
+          <el-input
+            v-model="pwdForm.confirm"
+            type="password"
+            placeholder="再次输入查看密码"
+            show-password
+            maxlength="32"
+            @keyup.enter="submitPwdDialog"
+          />
+        </el-form-item>
+      </el-form>
+
+      <template #footer>
+        <el-button @click="pwdDialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="submitPwdDialog">{{ pwdDialogMode === 'set' ? '保存' : '确认' }}</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { MagicStick, Refresh, Promotion, Setting, Coin, InfoFilled, Search } from '@element-plus/icons-vue'
 import {
   getUsageStats,
@@ -486,6 +535,132 @@ const adminError = ref('')
 
 const roleText = (r: string) => (r === 'superadmin' ? '超管' : r === 'admin' ? '管理员' : '用户')
 
+/* =====================================================================
+ * 超管 API Key 明文查看密码保护
+ * - 密码哈希（SHA-256）存 localStorage，不存明文
+ * - 验证通过后，10 分钟内查看/使用无需重复输密码（仅存内存）
+ * - 窗口失焦 5 秒后自动隐藏已展示的明文 Key
+ * 注意：前端实现无法 100% 防御 F12 调试，但可阻止「随手点一下就看到明文」。
+ * ===================================================================== */
+interface PwdForm { password: string; confirm: string }
+const pwdDialogVisible = ref(false)
+const pwdDialogMode = ref<'set' | 'verify'>('set')
+const pwdForm = ref<PwdForm>({ password: '', confirm: '' })
+const adminPwdHash = ref('')
+const adminPwdVerified = ref(false)
+let pwdVerifyTimer: ReturnType<typeof setTimeout> | null = null
+let blurHideTimer: ReturnType<typeof setTimeout> | null = null
+
+const getAdminPwdKey = () => `mc-admin-key-pwd-hash:${currentUid.value || 'unknown'}`
+
+const hashPwd = async (pwd: string): Promise<string> => {
+  if (typeof crypto !== 'undefined' && crypto.subtle) {
+    const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(pwd))
+    return Array.from(new Uint8Array(buf))
+      .map((b) => b.toString(16).padStart(2, '0'))
+      .join('')
+  }
+  // 降级：非安全环境使用简单摘要（仍优于明文存储）
+  let h = 0
+  for (let i = 0; i < pwd.length; i++) {
+    h = (h << 5) - h + pwd.charCodeAt(i)
+    h |= 0
+  }
+  return 'fallback:' + Math.abs(h).toString(16)
+}
+
+const loadAdminPwdHash = () => {
+  if (typeof window === 'undefined' || !currentUid.value) return
+  adminPwdHash.value = window.localStorage.getItem(getAdminPwdKey()) || ''
+}
+
+const saveAdminPwdHash = (hash: string) => {
+  if (typeof window === 'undefined' || !currentUid.value) return
+  window.localStorage.setItem(getAdminPwdKey(), hash)
+  adminPwdHash.value = hash
+}
+
+const clearPwdVerify = () => {
+  adminPwdVerified.value = false
+  if (pwdVerifyTimer) {
+    clearTimeout(pwdVerifyTimer)
+    pwdVerifyTimer = null
+  }
+}
+
+const setPwdVerified = () => {
+  adminPwdVerified.value = true
+  if (pwdVerifyTimer) clearTimeout(pwdVerifyTimer)
+  pwdVerifyTimer = setTimeout(() => {
+    adminPwdVerified.value = false
+    hideAllRevealedKeys()
+  }, 10 * 60 * 1000)
+}
+
+const hideAllRevealedKeys = () => {
+  for (const row of adminRows.value) {
+    row.revealedKey = ''
+  }
+}
+
+const openSetPwdDialog = () => {
+  loadAdminPwdHash()
+  pwdDialogMode.value = 'set'
+  pwdForm.value = { password: '', confirm: '' }
+  pwdDialogVisible.value = true
+}
+
+const openVerifyDialog = () => {
+  pwdDialogMode.value = 'verify'
+  pwdForm.value = { password: '', confirm: '' }
+  pwdDialogVisible.value = true
+}
+
+const submitPwdDialog = async () => {
+  const pwd = pwdForm.value.password
+  if (!pwd || pwd.length < 4) {
+    ElMessage.warning('密码至少 4 位')
+    return
+  }
+
+  if (pwdDialogMode.value === 'set') {
+    if (pwd !== pwdForm.value.confirm) {
+      ElMessage.warning('两次输入的密码不一致')
+      return
+    }
+    const hash = await hashPwd(pwd)
+    saveAdminPwdHash(hash)
+    setPwdVerified()
+    ElMessage.success('查看密码已设置')
+    pwdDialogVisible.value = false
+    return
+  }
+
+  // 验证模式
+  const hash = await hashPwd(pwd)
+  if (hash !== adminPwdHash.value) {
+    ElMessage.error('密码错误')
+    return
+  }
+  setPwdVerified()
+  ElMessage.success('验证通过')
+  pwdDialogVisible.value = false
+  // 验证成功后，继续执行之前挂起的查看操作
+  if (pendingRevealRow.value) {
+    const row = pendingRevealRow.value
+    pendingRevealRow.value = null
+    await revealKey(row)
+  }
+  if (pendingUseRow.value) {
+    const row = pendingUseRow.value
+    pendingUseRow.value = null
+    await useKey(row)
+  }
+}
+
+const pendingRevealRow = ref<AdminApiRow | null>(null)
+const pendingUseRow = ref<AdminApiRow | null>(null)
+
 const loadAdminOverview = async () => {
   if (!isSuperadmin.value) return
   adminLoading.value = true
@@ -529,13 +704,32 @@ const loadAdminOverview = async () => {
   }
 }
 
-/** 查看/隐藏某账号 Key 明文（仅超管，前端解密） */
+/** 查看/隐藏某账号 Key 明文（仅超管，需先通过查看密码验证） */
 const revealKey = async (row: AdminApiRow) => {
   if (!row.hasKey) return
   if (row.revealedKey) {
     row.revealedKey = ''
     return
   }
+
+  loadAdminPwdHash()
+  if (!adminPwdHash.value) {
+    ElMessageBox.confirm(
+      '当前未设置查看密码，任何人点击「查看」即可看到明文 Key。是否立即前往设置？',
+      '安全提示',
+      { confirmButtonText: '去设置', cancelButtonText: '取消', type: 'warning' }
+    )
+      .then(() => openSetPwdDialog())
+      .catch(() => {})
+    return
+  }
+
+  if (!adminPwdVerified.value) {
+    pendingRevealRow.value = row
+    openVerifyDialog()
+    return
+  }
+
   const plain = await decryptSecret(row.encryptedKey)
   if (!plain) {
     ElMessage.error('解密失败，密文可能已损坏')
@@ -547,6 +741,34 @@ const revealKey = async (row: AdminApiRow) => {
 /** 一键把某账号的 API 配置应用到超管当前会话（厂商/地址/模型/Key 全套切换） */
 const useKey = async (row: AdminApiRow) => {
   if (!row.hasKey) return
+
+  loadAdminPwdHash()
+  if (!adminPwdHash.value) {
+    ElMessageBox.confirm(
+      '当前未设置查看密码，「使用此 Key」会先解密明文。建议先设置查看密码以防误操作。',
+      '安全提示',
+      { confirmButtonText: '去设置', cancelButtonText: '继续使用', type: 'warning' }
+    )
+      .then(() => {
+        pendingUseRow.value = row
+        openSetPwdDialog()
+      })
+      .catch(async () => {
+        await applyUseKey(row)
+      })
+    return
+  }
+
+  if (!adminPwdVerified.value) {
+    pendingUseRow.value = row
+    openVerifyDialog()
+    return
+  }
+
+  await applyUseKey(row)
+}
+
+const applyUseKey = async (row: AdminApiRow) => {
   const plain = row.revealedKey || (await decryptSecret(row.encryptedKey))
   if (!plain) {
     ElMessage.error('解密失败，无法使用该 Key')
@@ -711,15 +933,32 @@ onMounted(async () => {
     const user = await getSavedUser()
     currentUid.value = user?.id || ''
     isSuperadmin.value = user?.role === 'superadmin'
+    loadAdminPwdHash()
   } catch { /* ignore */ }
   runCheck()
   if (isSuperadmin.value) {
     void loadAdminOverview()
   }
+  if (typeof window !== 'undefined') {
+    window.addEventListener('blur', onWindowBlur)
+  }
 })
 onBeforeUnmount(() => {
   if (timer) clearInterval(timer)
+  if (pwdVerifyTimer) clearTimeout(pwdVerifyTimer)
+  if (blurHideTimer) clearTimeout(blurHideTimer)
+  if (typeof window !== 'undefined') {
+    window.removeEventListener('blur', onWindowBlur)
+  }
 })
+
+const onWindowBlur = () => {
+  if (blurHideTimer) clearTimeout(blurHideTimer)
+  blurHideTimer = setTimeout(() => {
+    hideAllRevealedKeys()
+    clearPwdVerify()
+  }, 5000)
+}
 </script>
 
 <style scoped>
@@ -856,6 +1095,12 @@ onBeforeUnmount(() => {
 /* 超管账号 API 总览 */
 .mc-admin-table { margin-top: 14px; padding: 0; border: none; box-shadow: none; background: transparent; }
 .mc-admin-alert { margin-top: 14px; }
+.mc-pwd-dialog .mc-pwd-tips {
+  font-size: 13px; color: var(--text-muted); line-height: 1.7; margin-bottom: 16px;
+  background: var(--surface-soft); border-radius: 8px; padding: 10px 12px;
+}
+.mc-pwd-form .el-form-item { margin-bottom: 14px; }
+.mc-pwd-form .el-form-item:last-child { margin-bottom: 0; }
 .mc-acc { display: flex; flex-direction: column; line-height: 1.35; min-width: 0; }
 .mc-acc-name { font-size: 13px; font-weight: 600; color: var(--text-strong); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mc-acc-sub { font-size: 11px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

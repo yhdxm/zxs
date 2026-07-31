@@ -526,7 +526,21 @@ const navigate = (path: string) => {
 
 const refreshUser = async () => {
   permissionConfig.value = await loadPermissionConfig()
-  currentUser.value = await refreshSavedUser()
+  try {
+    // 优先从 Supabase 会话刷新用户（可检测账号禁用/角色变更）
+    currentUser.value = await refreshSavedUser()
+  } catch (err) {
+    console.error('[App] refresh user failed:', err)
+  }
+  // 兜底：刷新失败时尝试读取本地缓存 + 会话，避免网络抖动导致登录态丢失、
+  // 已登录用户看到未登录侧边栏而子页面已渲染的异常布局。
+  if (!currentUser.value) {
+    try {
+      currentUser.value = await getSavedUser()
+    } catch (err) {
+      console.error('[App] getSavedUser fallback failed:', err)
+    }
+  }
 }
 
 const updatePlatform = () => {
