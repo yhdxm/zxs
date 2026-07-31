@@ -303,7 +303,10 @@ import {
   TrendCharts,
   Compass,
   Loading,
-  Histogram
+  Histogram,
+  Van,
+  Cpu,
+  Reading
 } from '@element-plus/icons-vue'
 import {
   logoutUser, getSavedUser, refreshSavedUser,
@@ -369,7 +372,8 @@ const sideMenu = reactive<SideItem[]>([
     permissionKey: 'ai',
     children: [
       { key: 'ai', label: 'AI 助手', icon: MagicStick, permissionKey: 'ai', to: '/ai' },
-      { key: 'models', label: '模型中心', icon: DataAnalysis, permissionKey: 'ai', to: '/models' }
+      { key: 'models', label: '模型中心', icon: DataAnalysis, permissionKey: 'ai', to: '/models' },
+      { key: 'aimodels', label: 'AI模型知识', icon: Cpu, permissionKey: 'ai', to: '/aimodels' }
     ]
   },
   {
@@ -381,8 +385,21 @@ const sideMenu = reactive<SideItem[]>([
     children: [
       { key: 'news', label: '新闻聚合', icon: TrendCharts, permissionKey: 'dashboard', to: '/news' },
       { key: 'yingcang', label: '影仓智核', icon: Histogram, permissionKey: 'dashboard', to: '/yingcang' },
+      { key: 'xingyu', label: '星舆识途', icon: Van, permissionKey: 'dashboard', to: '/xingyu' },
       { key: 'weather', label: '天气', icon: Sunny, permissionKey: 'dashboard', to: '/weather' },
       { key: 'map', label: '地图', icon: Location, permissionKey: 'dashboard', to: '/map' }
+    ]
+  },
+  {
+    key: 'learncenter',
+    label: '学习中心',
+    icon: Reading,
+    expanded: true,
+    permissionKey: 'dashboard',
+    children: [
+      { key: 'learn-english', label: '学位英语', icon: Document, permissionKey: 'dashboard', to: '/learn/english' },
+      { key: 'learn-industry', label: '各行业知识', icon: DataBoard, permissionKey: 'dashboard', to: '/learn/industry' },
+      { key: 'learn-books', label: '书籍阅读', icon: Reading, permissionKey: 'dashboard', to: '/learn/books' }
     ]
   },
   { key: 'requirements', label: '需求收集', icon: TrendCharts, permissionKey: 'dashboard', to: '/requirements' },
@@ -456,10 +473,16 @@ const toggleGroup = (key: string) => {
 
 const isMenuActive = (key: string) => {
   if (key === 'database') return route.path === '/database'
-  if (key === 'lianzhicang') return route.path === '/ai' || route.path === '/models'
+  if (key === 'lianzhicang') return route.path === '/ai' || route.path === '/models' || route.path === '/aimodels'
   if (key === 'ai') return route.path === '/ai'
   if (key === 'models') return route.path === '/models'
-  if (key === 'fanjingzhixie') return ['/news', '/weather', '/map', '/automation', '/yingcang'].includes(route.path)
+  if (key === 'aimodels') return route.path === '/aimodels'
+  if (key === 'fanjingzhixie') return ['/news', '/weather', '/map', '/automation', '/yingcang', '/xingyu'].includes(route.path)
+  if (key === 'xingyu') return route.path === '/xingyu'
+  if (key === 'learncenter') return route.path.startsWith('/learn')
+  if (key === 'learn-english') return route.path === '/learn/english'
+  if (key === 'learn-industry') return route.path === '/learn/industry'
+  if (key === 'learn-books') return route.path === '/learn/books'
   if (key === 'news') return route.path === '/news' || route.path === '/yingcang'
   if (key === 'news-main') return route.path === '/news'
   if (key === 'yingcang') return route.path === '/yingcang'
@@ -489,6 +512,11 @@ const currentTitle = computed(() => {
   if (route.path === '/database') return '数据库监测中心'
   if (route.path === '/news') return '新闻聚合'
   if (route.path === '/yingcang') return '影仓智核'
+  if (route.path === '/xingyu') return '星舆识途'
+  if (route.path === '/aimodels') return 'AI 模型知识'
+  if (route.path === '/learn/english') return '学位英语'
+  if (route.path === '/learn/industry') return '各行业知识'
+  if (route.path === '/learn/books') return '书籍阅读'
   if (route.path === '/weather') return '实时天气'
   if (route.path === '/map') return '地图定位'
   if (route.path === '/automation') return '沸爻机'

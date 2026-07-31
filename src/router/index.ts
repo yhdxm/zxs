@@ -13,6 +13,11 @@ import WeatherView from '../views/WeatherView.vue'
 import MapView from '../views/MapView.vue'
 import NewsAggregateView from '../views/NewsAggregateView.vue'
 import YingCangView from '../views/YingCangView.vue'
+import XingYuView from '../views/XingYuView.vue'
+import AiModelsView from '../views/AiModelsView.vue'
+import LearnEnglishView from '../views/LearnEnglishView.vue'
+import LearnIndustryView from '../views/LearnIndustryView.vue'
+import LearnBooksView from '../views/LearnBooksView.vue'
 import { hasPermission, loadPermissionConfig, getSavedUser } from '../services/appDataService'
 
 const router = createRouter({
@@ -101,6 +106,36 @@ const router = createRouter({
       path: '/yingcang',
       name: 'yingcang',
       component: YingCangView,
+      meta: { requirePermission: 'dashboard' }
+    },
+    {
+      path: '/xingyu',
+      name: 'xingyu',
+      component: XingYuView,
+      meta: { requirePermission: 'dashboard' }
+    },
+    {
+      path: '/aimodels',
+      name: 'aimodels',
+      component: AiModelsView,
+      meta: { requirePermission: 'ai' }
+    },
+    {
+      path: '/learn/english',
+      name: 'learn-english',
+      component: LearnEnglishView,
+      meta: { requirePermission: 'dashboard' }
+    },
+    {
+      path: '/learn/industry',
+      name: 'learn-industry',
+      component: LearnIndustryView,
+      meta: { requirePermission: 'dashboard' }
+    },
+    {
+      path: '/learn/books',
+      name: 'learn-books',
+      component: LearnBooksView,
       meta: { requirePermission: 'dashboard' }
     }
   ]
