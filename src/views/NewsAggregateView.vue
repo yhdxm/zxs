@@ -78,30 +78,44 @@
 
       <!-- 右：上半实时脉搏 + 下半信息流 -->
       <section class="np-feed">
-        <!-- 实时脉搏 -->
+        <!-- 实时脉搏：立体时间轴 -->
         <div class="np-pulse">
           <div class="np-pulse-head">
-            <span class="np-pulse-title">实时脉搏 · 热搜走势</span>
-            <span class="np-pulse-sub">基于当前分类最热 5 条</span>
+            <span class="np-pulse-title">⏱ 实时脉搏 · 热搜时间轴</span>
+            <span class="np-pulse-sub">基于当前分类最热 5 条 · 按时间推进</span>
           </div>
-          <svg class="np-pulse-svg" viewBox="0 0 460 180" preserveAspectRatio="none">
-            <defs>
-              <linearGradient id="npPulseLine" x1="0" y1="0" x2="1" y2="0">
-                <stop offset="0%" stop-color="#6366f1" />
-                <stop offset="100%" stop-color="#ec4899" />
-              </linearGradient>
-              <linearGradient id="npPulseFill" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stop-color="#818cf8" stop-opacity="0.35" />
-                <stop offset="100%" stop-color="#c084fc" stop-opacity="0.05" />
-              </linearGradient>
-            </defs>
-            <path :d="pulseAreaPath" fill="url(#npPulseFill)" />
-            <path :d="pulseLinePath" fill="none" stroke="url(#npPulseLine)" stroke-width="2.5" />
-            <g v-for="(p, i) in pulseNodes" :key="i">
-              <circle :cx="p.x" :cy="p.y" r="5" :fill="p.color" stroke="#fff" stroke-width="2" />
-              <text :x="p.x - 4" :y="p.y - 14" class="np-pulse-cap">{{ p.short }}</text>
-            </g>
-          </svg>
+
+          <div v-if="pulse.length" class="np-timeline">
+            <div class="np-timeline-axis">
+              <div class="np-timeline-glow"></div>
+              <div
+                v-for="(p, i) in pulse"
+                :key="p.id"
+                class="np-timeline-node"
+                :style="{ left: `${i * (100 / Math.max(pulse.length - 1, 1))}%` }"
+              >
+                <div class="np-timeline-dot" :style="{ background: PULSE_RANK[i % PULSE_RANK.length] }"></div>
+                <div class="np-timeline-tick">{{ p.pubDate.slice(11, 16) }}</div>
+              </div>
+            </div>
+
+            <div class="np-pulse-cards">
+              <div
+                v-for="(p, i) in pulse"
+                :key="p.id + i"
+                class="np-pulse-card"
+                :style="pulseStyle(i)"
+                @click="openDetail(p)"
+              >
+                <div class="np-pulse-card-no">0{{ i + 1 }}</div>
+                <div class="np-pulse-card-title">{{ p.title }}</div>
+                <div class="np-pulse-card-meta">{{ p.source }} · {{ relativeTime(p.pubTimestamp) }}</div>
+                <div class="np-pulse-card-arrow">→</div>
+              </div>
+            </div>
+          </div>
+
+          <el-empty v-else-if="!loading" description="暂无实时脉搏数据" :image-size="50" />
         </div>
 
         <!-- 信息流（第 11 条起） -->
@@ -144,7 +158,10 @@
           </div>
 
           <div v-if="!feed.length && !loading" class="np-empty">
-            <el-empty :description="errorMsg || '暂无更多新闻，请切换分类或刷新'" :image-size="50" />
+            <el-empty :description="feedEmptyReason" :image-size="50" />
+            <div v-if="allCount > 0 && allCount <= 10" class="np-empty-tip">
+              当前分类共 {{ allCount }} 条新闻，已全部展示在左侧热搜榜
+            </div>
           </div>
 
           <div v-if="feed.length && hasMore" class="np-more">
@@ -179,9 +196,7 @@ import { Search, Refresh, MagicStick } from '@element-plus/icons-vue'
 import {
   NEWS_CATEGORIES,
   findCategory,
-  fetchHot,
-  fetchPulse,
-  fetchNewsTail,
+  fetchNewsAll,
   relativeTime,
   formatNow,
   type NewsItem
@@ -196,6 +211,7 @@ const lastUpdate = ref('')
 const hot = ref<NewsItem[]>([])
 const pulse = ref<NewsItem[]>([])
 const tail = ref<NewsItem[]>([])
+const allCount = ref(0)
 const feedCount = ref(12)
 const errorMsg = ref('')
 let autoTimer: ReturnType<typeof setInterval> | null = null
@@ -210,6 +226,13 @@ const todayLabel = computed(() => {
 const tailTotal = computed(() => tail.value.length)
 const feed = computed(() => tail.value.slice(0, feedCount.value))
 const hasMore = computed(() => feedCount.value < tail.value.length)
+const feedEmptyReason = computed(() => {
+  if (tail.value.length) return ''
+  if (allCount.value <= 10) {
+    return `当前「${currentCat.value.label}」共找到 ${allCount.value} 条新闻，已为您全部展示在左侧热搜榜。`
+  }
+  return errorMsg.value || '暂无更多新闻，请切换分类或刷新'
+})
 
 function firstChar(t: string): string {
   return (t || '新').trim().charAt(0)
@@ -223,18 +246,16 @@ async function loadAll() {
   loading.value = true
   errorMsg.value = ''
   try {
-    const [hotRes, pulseRes, tailRes] = await Promise.all([
-      fetchHot(selectedCat.value, 10),
-      fetchPulse(selectedCat.value, 5),
-      fetchNewsTail({ category: selectedCat.value, keyword: keyword.value, offset: 10 })
-    ])
-    hot.value = hotRes
-    pulse.value = pulseRes
-    tail.value = tailRes
+    const all = await fetchNewsAll({ category: selectedCat.value, keyword: keyword.value })
+    allCount.value = all.length
+    hot.value = all.slice(0, 10)
+    pulse.value = all.slice(0, 5)
+    tail.value = all.slice(10)
     feedCount.value = 12
     lastUpdate.value = formatNow()
   } catch (e) {
     errorMsg.value = '加载失败，请稍后刷新（代理可能限流）'
+    allCount.value = 0
   } finally {
     loading.value = false
   }
@@ -256,38 +277,21 @@ function openDetail(n: NewsItem) {
 const detail = ref<NewsItem | null>(null)
 const showDetail = ref(false)
 
-/* ---------- 实时脉搏 SVG ---------- */
-const PULSE_COLORS = ['#6366f1', '#8b5cf6', '#a855f7', '#d946ef', '#ec4899']
-const pulseNodes = computed(() => {
-  const arr = pulse.value
-  const n = arr.length
-  if (!n) return []
-  const left = 40
-  const right = 420
-  const baseY = 110
-  const amp = 46
-  return arr.map((it, i) => {
-    const x = n === 1 ? (left + right) / 2 : left + ((right - left) * i) / (n - 1)
-    const y = baseY - amp * Math.sin((i / Math.max(1, n - 1)) * Math.PI)
-    return {
-      x,
-      y,
-      color: PULSE_COLORS[i % PULSE_COLORS.length],
-      short: it.title.length > 12 ? it.title.slice(0, 12) + '…' : it.title
-    }
-  })
-})
-const pulseLinePath = computed(() => {
-  const ns = pulseNodes.value
-  if (ns.length < 2) return ''
-  return ns.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' ')
-})
-const pulseAreaPath = computed(() => {
-  const ns = pulseNodes.value
-  if (ns.length < 2) return ''
-  const line = pulseLinePath.value
-  return `${line} L ${ns[ns.length - 1].x.toFixed(1)} 170 L ${ns[0].x.toFixed(1)} 170 Z`
-})
+/* ---------- 实时脉搏 时间轴卡片 ---------- */
+const PULSE_RANK = ['#f59e0b', '#94a3b8', '#b45309', '#6366f1', '#ec4899']
+function pulseStyle(i: number) {
+  const colors = [
+    'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+    'linear-gradient(135deg, #8b5cf6 0%, #a855f7 100%)',
+    'linear-gradient(135deg, #a855f7 0%, #d946ef 100%)',
+    'linear-gradient(135deg, #d946ef 0%, #ec4899 100%)',
+    'linear-gradient(135deg, #ec4899 0%, #f43f5e 100%)'
+  ]
+  return {
+    background: colors[i % colors.length],
+    boxShadow: `0 14px 34px ${['rgba(99,102,241,0.35)', 'rgba(139,92,246,0.35)', 'rgba(168,85,247,0.35)', 'rgba(217,70,239,0.35)', 'rgba(236,72,153,0.35)'][i % 5]}`
+  }
+}
 
 watch(autoRefresh, (v) => {
   if (autoTimer) {
@@ -482,14 +486,120 @@ onBeforeUnmount(() => {
   background: linear-gradient(135deg, #f5f3ff 0%, #fdf2f8 100%);
   border: 1px solid #ede9fe;
   border-radius: 14px;
-  padding: 12px 14px 4px;
+  padding: 12px 14px 18px;
   margin-bottom: 14px;
 }
-.np-pulse-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 4px; }
+.np-pulse-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 14px; }
 .np-pulse-title { font-size: 14px; font-weight: 700; color: #1e293b; }
 .np-pulse-sub { font-size: 11px; color: #a855f7; }
-.np-pulse-svg { width: 100%; height: 150px; display: block; }
-.np-pulse-cap { font-size: 10px; fill: #6d28d9; font-weight: 600; }
+
+/* 时间轴 */
+.np-timeline { position: relative; }
+.np-timeline-axis {
+  position: relative;
+  height: 28px;
+  margin: 0 10px 16px;
+}
+.np-timeline-glow {
+  position: absolute;
+  top: 10px;
+  left: 0;
+  right: 0;
+  height: 4px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #6366f1, #a855f7, #ec4899);
+  box-shadow: 0 0 14px rgba(168, 85, 247, 0.45), inset 0 0 6px rgba(255, 255, 255, 0.4);
+}
+.np-timeline-node {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+.np-timeline-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.2), 0 2px 8px rgba(0, 0, 0, 0.12);
+}
+.np-timeline-tick {
+  font-size: 10px;
+  color: #64748b;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* 立体卡片 */
+.np-pulse-cards {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 12px;
+}
+.np-pulse-card {
+  position: relative;
+  border-radius: 14px;
+  padding: 14px 12px 32px;
+  color: #fff;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  min-height: 120px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.np-pulse-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(255,255,255,0.22) 0%, rgba(255,255,255,0) 55%);
+  border-radius: 14px;
+  pointer-events: none;
+}
+.np-pulse-card:hover {
+  transform: translateY(-6px) scale(1.02);
+  z-index: 2;
+}
+.np-pulse-card-no {
+  font-size: 22px;
+  font-weight: 800;
+  opacity: 0.35;
+  line-height: 1;
+  margin-bottom: 8px;
+}
+.np-pulse-card-title {
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.45;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  flex: 1;
+}
+.np-pulse-card-meta {
+  font-size: 10px;
+  opacity: 0.82;
+  margin-top: 8px;
+}
+.np-pulse-card-arrow {
+  position: absolute;
+  right: 10px;
+  bottom: 8px;
+  font-size: 16px;
+  opacity: 0.6;
+}
+
+@media (max-width: 1100px) {
+  .np-pulse-cards { grid-template-columns: repeat(3, 1fr); }
+}
+@media (max-width: 860px) {
+  .np-pulse-cards { grid-template-columns: repeat(2, 1fr); }
+  .np-timeline-axis { display: none; }
+}
 
 .np-feed-head {
   display: flex;
@@ -554,6 +664,13 @@ onBeforeUnmount(() => {
   font-weight: 600;
 }
 .np-empty { padding: 24px 0; }
+.np-empty-tip {
+  text-align: center;
+  font-size: 12px;
+  color: #64748b;
+  margin-top: -18px;
+  padding: 0 16px 10px;
+}
 .np-more { text-align: center; padding: 14px 0; }
 
 .np-skeleton { padding: 10px; }

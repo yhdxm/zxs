@@ -10,7 +10,12 @@
           · 时间窗口：{{ windowLabel }}
         </p>
       </div>
-      <div class="fx-hero-badge"><el-icon><MagicStick /></el-icon></div>
+      <div class="fx-hero-right">
+        <router-link to="/news" class="fx-back-btn">
+          <span>← 返回新闻聚合</span>
+        </router-link>
+        <div class="fx-hero-badge"><el-icon><MagicStick /></el-icon></div>
+      </div>
     </div>
 
     <!-- 控制栏 -->
@@ -92,11 +97,6 @@
     </div>
     <div v-else-if="triedOnce" class="fx-empty">
       <el-empty description="本次未提炼出结果：可能该领域近窗口内新闻较少，或 AI 认为素材不足以回答你的提取要求。可放宽时间窗口或调整提取要求后重试。" :image-size="64" />
-    </div>
-
-    <!-- 返回入口 -->
-    <div class="fx-back">
-      <router-link to="/news" class="fx-back-link">← 返回新闻聚合</router-link>
     </div>
   </div>
 </template>
@@ -256,6 +256,30 @@ onMounted(async () => {
 .fx-spark { font-size: 22px; }
 .fx-sub { margin: 6px 0 4px; font-size: 13px; color: #f5d0fe; }
 .fx-meta { margin: 0; font-size: 12px; color: #f3e8ff; }
+.fx-hero-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+}
+.fx-back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+.fx-back-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
+  transform: translateY(-1px);
+}
 .fx-hero-badge {
   width: 56px; height: 56px; border-radius: 16px;
   background: rgba(255, 255, 255, 0.18);
@@ -339,9 +363,6 @@ onMounted(async () => {
 .fx-src { color: #6d28d9; }
 
 .fx-empty { padding: 30px 0; }
-.fx-back { margin-top: 18px; text-align: center; }
-.fx-back-link { font-size: 13px; color: #7c3aed; text-decoration: none; }
-.fx-back-link:hover { text-decoration: underline; }
 
 @media (max-width: 768px) {
   .fx-metrics { grid-template-columns: 1fr; }
