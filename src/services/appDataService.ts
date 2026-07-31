@@ -372,6 +372,8 @@ export interface TableRowStat {
   rows: number
   /** 该表（含索引）占用的物理存储字节数；未执行精确统计时为 0 */
   sizeBytes?: number
+  /** 该表是否启用了行级安全（RLS）；仅精确统计（RPC）可返回，降级路径为 undefined */
+  rlsEnabled?: boolean
 }
 
 export interface DatabaseStats {
@@ -405,14 +407,15 @@ export async function getDatabaseStats(): Promise<DatabaseStats> {
   }
   try {
     const { data, error } = await supabase.rpc('get_database_stats').maybeSingle()
-    const raw = (data ?? null) as { db_size_bytes?: number; tables?: Array<{ name: string; rows: number; size_bytes?: number }> } | null
+    const raw = (data ?? null) as { db_size_bytes?: number; tables?: Array<{ name: string; rows: number; size_bytes?: number; rls_enabled?: boolean }> } | null
     if (!error && raw) {
       result.dbSizeBytes = Number(raw.db_size_bytes) || 0
       if (Array.isArray(raw.tables)) {
         result.tables = raw.tables.map((t) => ({
           name: t.name,
           rows: Number(t.rows) || 0,
-          sizeBytes: Number(t.size_bytes) || 0
+          sizeBytes: Number(t.size_bytes) || 0,
+          rlsEnabled: t.rls_enabled === true
         }))
       }
     } else {
@@ -427,7 +430,14 @@ export async function getDatabaseStats(): Promise<DatabaseStats> {
         'automation_info',
         'free_model_catalog',
         'ai_keys',
-        'model_usage'
+        'model_usage',
+        'custom_free_models',
+        'shared_free_api_keys',
+        'car_watchlist',
+        'model_bookmarks',
+        'learn_progress',
+        'learn_bookmarks',
+        'learn_reading'
       ]
       for (const name of tables) {
         try {

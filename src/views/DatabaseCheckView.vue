@@ -61,6 +61,27 @@
         </div>
       </div>
 
+      <!-- 问题 / 告警汇总（全面监测的「问题」维度） -->
+      <div class="db-section db-problems">
+        <h3>问题 / 告警</h3>
+        <div v-if="problems.length === 0" class="db-ok">
+          <el-icon><SuccessFilled /></el-icon> 未发现明显问题，数据库状态正常。
+        </div>
+        <ul v-else class="db-problem-list">
+          <li
+            v-for="(p, i) in problems"
+            :key="i"
+            class="db-problem-item"
+            :class="p.level"
+          >
+            <el-icon v-if="p.level === 'danger'"><WarningFilled /></el-icon>
+            <el-icon v-else-if="p.level === 'warn'"><WarningFilled /></el-icon>
+            <el-icon v-else><InfoFilled /></el-icon>
+            <span>{{ p.text }}</span>
+          </li>
+        </ul>
+      </div>
+
       <div v-if="!stats.connected" class="db-error">
         连接失败：{{ stats.error || '未知错误' }}。
         若为 Supabase 免费项目长时间未访问被暂停（Paused），请前往
@@ -70,7 +91,7 @@
 
       <!-- 各表数据量与内存占比（合并：中文说明 + 行数 + 占用空间 + 空间占比，按空间从高到低实时排序） -->
       <div class="db-section">
-        <h3>各表数据量与内存占比（按占用空间从高到低）</h3>
+        <h3>各表数据量与空间占用（按占用空间从高到低）</h3>
         <el-table :data="mergedTables" style="width: 100%" size="default" empty-text="暂无数据表" row-key="name">
           <el-table-column label="数据表" min-width="220">
             <template #default="{ row }">
@@ -100,10 +121,18 @@
               </div>
             </template>
           </el-table-column>
+          <el-table-column label="RLS" width="120">
+            <template #default="{ row }">
+              <el-tag v-if="row.rlsEnabled === true" type="success" effect="light" size="small">已启用</el-tag>
+              <el-tag v-else-if="row.rlsEnabled === false" type="danger" effect="light" size="small">未启用</el-tag>
+              <span v-else class="row-num">未知</span>
+            </template>
+          </el-table-column>
         </el-table>
         <p class="db-tip">
-          说明：中文说明用于快速识别业务表用途；新表会自动出现在此（来自 Supabase 实时统计）。
+          说明：中文说明用于快速识别业务表用途；新表建好后自动出现在此（来自 Supabase 实时统计）。
           未登记的表会按表名智能推测中文说明，可在 <code>DatabaseCheckView.vue</code> 的 <code>TABLE_DESC</code> 中补充正式说明。
+          RLS 列显示该表是否启用行级安全，「未启用」为高危项（见上方「问题 / 告警」）。
         </p>
       </div>
 
@@ -119,7 +148,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { Refresh, Loading, WarningFilled } from '@element-plus/icons-vue'
+import { Refresh, Loading, WarningFilled, SuccessFilled, InfoFilled } from '@element-plus/icons-vue'
 import { getDatabaseStats, type DatabaseStats } from '../services/appDataService'
 
 /** 数据表中文说明映射，便于快速查询业务表用途 */
@@ -138,7 +167,14 @@ const TABLE_DESC: Record<string, string> = {
   ai_keys: 'AI 密钥表：各账号加密存储的 API Key，本人可读写、超管可查看',
   model_usage: '模型用量账本：各账号调用百炼模型的 tokens 累计，用于额度扣减',
   usage_records: '用量记录表：AI 调用明细与 tokens 记录',
-  auth_users: '认证用户表：Supabase Auth 底层账号（含邮箱、登录方式）'
+  auth_users: '认证用户表：Supabase Auth 底层账号（含邮箱、登录方式）',
+  custom_free_models: '自定义免费模型表：用户在模型中心登记的自有免费 AI 模型',
+  shared_free_api_keys: '共享免费 Key 表：超管统一配置、全账号共享的免费 API Key',
+  car_watchlist: '星舆识途·自选车表：用户关注的汽车/品牌清单',
+  model_bookmarks: 'AI 模型知识·收藏表：用户收藏的全局模型',
+  learn_progress: '学习中心·进度表：各行业知识/词条的学习掌握状态',
+  learn_bookmarks: '学习中心·书签表：生词/行业知识点/书籍收藏',
+  learn_reading: '学习中心·阅读记录表：书籍阅读进度与上次位置'
 }
 
 /** 常见表名片段 → 中文词，用于未登记表的智能推测说明 */
@@ -187,6 +223,7 @@ const mergedTables = computed(() => {
         name: t.name,
         rows: Number(t.rows) || 0,
         size,
+        rlsEnabled: t.rlsEnabled,
         pct: totalSize.value > 0 ? Math.round((size / totalSize.value) * 1000) / 10 : 0
       }
     })
@@ -197,6 +234,39 @@ function memPercent(size: number): number {
   if (!size || !totalSize.value) return 0
   return Math.min(100, Math.round((size / totalSize.value) * 100))
 }
+
+/**
+ * 数据库问题与告警汇总（全面监测的「问题」维度）：
+ * - 连接失败 / 容量预警
+ * - 表未启用 RLS（已知为 false 才告警，未知不误报）
+ * - 表缺少正式中文说明（TABLE_DESC 未登记，显示「推测」）
+ * level: danger(严重) | warn(警告) | info(提示)
+ */
+const problems = computed(() => {
+  const list: { level: 'danger' | 'warn' | 'info'; text: string }[] = []
+  const s = stats.value
+  if (!s) return list
+  if (!s.connected) {
+    list.push({
+      level: 'danger',
+      text: `数据库连接失败：${s.error || '未知错误'}（多为 Supabase 免费项目长时间未访问被暂停，请到 Dashboard 点击 Resume 恢复）`
+    })
+  }
+  if (usageStatus.value === 'danger') {
+    list.push({ level: 'danger', text: '数据库容量即将用满，写入将被限制，请立即清理历史数据或升级计划。' })
+  } else if (usageStatus.value === 'warn') {
+    list.push({ level: 'warn', text: '数据库容量使用已超过 80%，建议清理旧数据或导出归档，避免写入受限。' })
+  }
+  for (const t of mergedTables.value) {
+    if (t.rlsEnabled === false) {
+      list.push({ level: 'danger', text: `表「${t.name}」未启用行级安全（RLS），存在越权读取风险，请尽快开启 RLS。` })
+    }
+    if (tableDesc(t.name).startsWith('（推测）')) {
+      list.push({ level: 'info', text: `表「${t.name}」缺少正式中文说明，建议在 DatabaseCheckView.vue 的 TABLE_DESC 补充。` })
+    }
+  }
+  return list
+})
 
 const usagePercent = computed(() => {
   if (!stats.value || !stats.value.dbSizeBytes || !stats.value.limitBytes) return 0
@@ -475,6 +545,52 @@ onMounted(runCheck)
   border-radius: 6px;
   color: var(--primary);
   font-size: 11px;
+}
+
+/* 问题 / 告警面板 */
+.db-problems .db-ok {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(34, 197, 94, 0.12);
+  color: #15803d;
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.db-problem-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.db-problem-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.db-problem-item .el-icon {
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+.db-problem-item.danger {
+  background: rgba(220, 38, 38, 0.12);
+  color: #b91c1c;
+}
+.db-problem-item.warn {
+  background: rgba(217, 119, 6, 0.12);
+  color: #b45309;
+}
+.db-problem-item.info {
+  background: var(--nav-hover);
+  color: var(--text);
 }
 
 @media (max-width: 768px) {
