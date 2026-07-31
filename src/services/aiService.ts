@@ -416,6 +416,85 @@ export async function callAi(config: AiConfig, userPrompt: string): Promise<stri
   throw new Error('返回内容为空，请检查接口地址、模型名或授权信息。')
 }
 
+/** 实时新闻种子（传入 AI 用于提炼） */
+export interface NewsSeed {
+  title: string
+  source: string
+  pubDate: string
+}
+
+/** AI 基于新闻提炼出的热点结果 */
+export interface HotspotResult {
+  title: string
+  summary: string
+  source: string
+  pubDate: string
+  rank: number
+}
+
+/**
+ * 沸爻机核心：把「实时新闻种子」+「用户想提取的信息要求」交给 AI 提炼。
+ * 强约束：只能引用传入的新闻素材，必须保留来源与时间，杜绝编造/旧闻。
+ * 返回结构化 HotspotResult 数组（按重要度排序）。
+ */
+export async function extractHotspotsFromNews(
+  config: AiConfig,
+  seeds: NewsSeed[],
+  instruction: string,
+  topN = 8
+): Promise<HotspotResult[]> {
+  if (!seeds.length) {
+    throw new Error('没有可分析的实时新闻，请先在新闻聚合刷新或切换分类')
+  }
+  const material = seeds
+    .slice(0, 40)
+    .map((s, i) => `${i + 1}. [${s.pubDate}] ${s.title}（来源：${s.source}）`)
+    .join('\n')
+
+  const prompt =
+    `你是一名专业的信息分析助手。下面是一批来自 Google News 的实时中文新闻素材（已按时间排序，均为近期新闻）：\n\n` +
+    `${material}\n\n` +
+    `用户希望从中提取的信息要求如下：\n"""${instruction}"""\n\n` +
+    `请严格基于上述新闻素材进行提取与归纳，遵守以下规则：\n` +
+    `1. 只能引用给定素材中的新闻，不得编造、不得使用素材之外的旧闻或记忆内容；\n` +
+    `2. 每条结果必须标注其依据的「来源」和「时间(pubDate)」，以便用户追溯原文；\n` +
+    `3. 输出一个 JSON 数组（不要任何代码块标记、不要额外解释），最多 ${topN} 条；` +
+    `每条对象字段：\n` +
+    `   - "title": 提炼后的标题（简洁，25 字内）\n` +
+    `   - "summary": 一句话要点（50 字内）\n` +
+    `   - "source": 来源媒体（从素材中选取，原样保留）\n` +
+    `   - "pubDate": 时间（原样保留素材中的 pubDate）\n` +
+    `   - "rank": 重要度排序（1 为最相关/最重要）\n` +
+    `若素材不足以回答用户要求，返回空数组 []。`
+
+  const reply = await callAi(config, prompt)
+  return parseHotspotReply(reply, topN)
+}
+
+function parseHotspotReply(text: string, topN: number): HotspotResult[] {
+  let raw = (text || '').trim()
+  const fence = raw.match(/```(?:json)?\s*([\s\S]*?)```/i)
+  if (fence) raw = fence[1].trim()
+  try {
+    const arr = JSON.parse(raw)
+    if (Array.isArray(arr)) {
+      return arr
+        .map((it: any) => ({
+          title: String(it.title || it.标题 || '').trim(),
+          summary: String(it.summary || it.摘要 || it.要点 || '').trim(),
+          source: String(it.source || it.来源 || '').trim(),
+          pubDate: String(it.pubDate || it.时间 || '').trim(),
+          rank: Number(it.rank || it.排名) || 0
+        }))
+        .filter((it: HotspotResult) => it.title)
+        .slice(0, topN)
+    }
+  } catch {
+    /* 非 JSON，回退空 */
+  }
+  return []
+}
+
 export function getProviderHint(provider: AiProvider) {
   if (provider === 'ollama') {
     return '推荐：先安装 Ollama，再执行 ollama pull llama3.2。'

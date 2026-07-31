@@ -382,8 +382,7 @@ const sideMenu = reactive<SideItem[]>([
       { key: 'news', label: '新闻聚合', icon: TrendCharts, permissionKey: 'dashboard', to: '/news' },
       { key: 'yingcang', label: '影仓智核', icon: Histogram, permissionKey: 'dashboard', to: '/yingcang' },
       { key: 'weather', label: '天气', icon: Sunny, permissionKey: 'dashboard', to: '/weather' },
-      { key: 'map', label: '地图', icon: Location, permissionKey: 'dashboard', to: '/map' },
-      { key: 'automation-info', label: '自动化信息', icon: Document, permissionKey: 'automation', to: '/automation' }
+      { key: 'map', label: '地图', icon: Location, permissionKey: 'dashboard', to: '/map' }
     ]
   },
   { key: 'requirements', label: '需求收集', icon: TrendCharts, permissionKey: 'dashboard', to: '/requirements' },
@@ -467,7 +466,7 @@ const isMenuActive = (key: string) => {
   if (key === 'weather') return route.path === '/weather'
   if (key === 'map') return route.path === '/map'
   if (key === 'requirements') return route.path === '/requirements'
-  if (key === 'automation' || key === 'automation-info') return route.path === '/automation'
+  if (key === 'automation') return route.path === '/automation'
   if (key === 'worktasks') return route.path === '/dashboard' && ['overview', 'todos', 'points', 'contents'].includes((route.query.view as string) || '')
   if (key === 'system') return route.path === '/system'
   if (key === 'system-accounts') return route.path === '/system' && (route.query.view || 'accounts') === 'accounts'
@@ -492,7 +491,7 @@ const currentTitle = computed(() => {
   if (route.path === '/yingcang') return '影仓智核'
   if (route.path === '/weather') return '实时天气'
   if (route.path === '/map') return '地图定位'
-  if (route.path === '/automation') return '自动化信息'
+  if (route.path === '/automation') return '沸爻机'
   if (route.path === '/system') {
     const v = route.query.view || 'accounts'
     if (v === 'roles') return '角色权限'

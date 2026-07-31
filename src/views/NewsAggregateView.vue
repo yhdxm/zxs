@@ -3,7 +3,8 @@
     <!-- 顶栏 -->
     <div class="np-top">
       <div class="np-title-row">
-        <h2>新闻聚合</h2>
+        <h2 class="np-title">新闻聚合</h2>
+        <span class="np-live"><i class="np-dot"></i>实时</span>
         <span class="np-date">{{ todayLabel }}</span>
         <div class="np-spacer"></div>
         <el-input
@@ -11,12 +12,17 @@
           placeholder="搜索关键词"
           class="np-search"
           clearable
+          @keyup.enter="loadAll"
+          @clear="loadAll"
         >
           <template #prefix><el-icon><Search /></el-icon></template>
         </el-input>
         <el-button :loading="loading" @click="loadAll">
           <el-icon><Refresh /></el-icon> 刷新
         </el-button>
+        <router-link to="/automation" class="np-fx-btn">
+          <el-icon><MagicStick /></el-icon> 沸爻机 ⚡
+        </router-link>
         <div class="np-auto">
           <span>自动</span>
           <el-switch v-model="autoRefresh" />
@@ -28,7 +34,13 @@
     <!-- 分类下拉 -->
     <div class="np-cat-row">
       <span class="np-cat-label">分类</span>
-      <el-select v-model="selectedCat" class="np-cat-select" @change="loadAll">
+      <el-select
+        v-model="selectedCat"
+        class="np-cat-select"
+        placeholder="选择行业 / 领域"
+        filterable
+        @change="loadAll"
+      >
         <el-option
           v-for="c in NEWS_CATEGORIES"
           :key="c.key"
@@ -36,13 +48,17 @@
           :value="c.key"
         />
       </el-select>
+      <span class="np-cat-hint">共 {{ NEWS_CATEGORIES.length }} 个细分领域，可输入检索</span>
     </div>
 
     <!-- 主体两栏 -->
     <div class="np-body">
-      <!-- 左：热搜 -->
+      <!-- 左：热搜 TOP10 -->
       <aside class="np-hot">
-        <h3 class="np-hot-title">{{ currentCat.label }}热搜 TOP 10</h3>
+        <h3 class="np-hot-title">
+          <span class="np-fire">🔥</span>{{ currentCat.label }}热搜 TOP 10
+          <span class="np-hot-badge">实时</span>
+        </h3>
         <ol v-if="hot.length" class="np-hot-list">
           <li
             v-for="(h, i) in hot"
@@ -60,14 +76,46 @@
         <el-empty v-else-if="!loading" description="暂无热搜" :image-size="40" />
       </aside>
 
-      <!-- 右：新闻流 -->
+      <!-- 右：上半实时脉搏 + 下半信息流 -->
       <section class="np-feed">
-        <div v-if="loading && !news.length" class="np-skeleton">
+        <!-- 实时脉搏 -->
+        <div class="np-pulse">
+          <div class="np-pulse-head">
+            <span class="np-pulse-title">实时脉搏 · 热搜走势</span>
+            <span class="np-pulse-sub">基于当前分类最热 5 条</span>
+          </div>
+          <svg class="np-pulse-svg" viewBox="0 0 460 180" preserveAspectRatio="none">
+            <defs>
+              <linearGradient id="npPulseLine" x1="0" y1="0" x2="1" y2="0">
+                <stop offset="0%" stop-color="#6366f1" />
+                <stop offset="100%" stop-color="#ec4899" />
+              </linearGradient>
+              <linearGradient id="npPulseFill" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#818cf8" stop-opacity="0.35" />
+                <stop offset="100%" stop-color="#c084fc" stop-opacity="0.05" />
+              </linearGradient>
+            </defs>
+            <path :d="pulseAreaPath" fill="url(#npPulseFill)" />
+            <path :d="pulseLinePath" fill="none" stroke="url(#npPulseLine)" stroke-width="2.5" />
+            <g v-for="(p, i) in pulseNodes" :key="i">
+              <circle :cx="p.x" :cy="p.y" r="5" :fill="p.color" stroke="#fff" stroke-width="2" />
+              <text :x="p.x - 4" :y="p.y - 14" class="np-pulse-cap">{{ p.short }}</text>
+            </g>
+          </svg>
+        </div>
+
+        <!-- 信息流（第 11 条起） -->
+        <div class="np-feed-head">
+          <span class="np-feed-title">📰 {{ currentCat.label }} 更多头条（第 11 条起）</span>
+          <span class="np-feed-count">已显示 {{ feed.length }}/{{ tailTotal }} 条</span>
+        </div>
+
+        <div v-if="loading && !feed.length" class="np-skeleton">
           <el-skeleton :rows="8" animated />
         </div>
         <template v-else>
           <div
-            v-for="(n, i) in news"
+            v-for="(n, i) in feed"
             :key="n.id + i"
             class="np-item"
             @click="openDetail(n)"
@@ -94,11 +142,14 @@
             </div>
             <span class="np-detail-btn">详情 ›</span>
           </div>
-          <el-empty
-            v-if="!news.length"
-            :description="errorMsg || '暂无新闻，请刷新或切换分类'"
-            :image-size="50"
-          />
+
+          <div v-if="!feed.length && !loading" class="np-empty">
+            <el-empty :description="errorMsg || '暂无更多新闻，请切换分类或刷新'" :image-size="50" />
+          </div>
+
+          <div v-if="feed.length && hasMore" class="np-more">
+            <el-button :loading="loadingMore" plain @click="loadMore">加载更多 ↓</el-button>
+          </div>
         </template>
       </section>
     </div>
@@ -123,338 +174,404 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
-import { Search, Refresh } from '@element-plus/icons-vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
+import { Search, Refresh, MagicStick } from '@element-plus/icons-vue'
 import {
   NEWS_CATEGORIES,
   findCategory,
-  fetchNews,
   fetchHot,
+  fetchPulse,
+  fetchNewsTail,
   relativeTime,
   formatNow,
   type NewsItem
 } from '../services/newsService'
 
-const keyword = ref('')
 const selectedCat = ref('top')
-const news = ref<NewsItem[]>([])
-const hot = ref<NewsItem[]>([])
+const keyword = ref('')
 const loading = ref(false)
-const errorMsg = ref('')
+const loadingMore = ref(false)
+const autoRefresh = ref(false)
 const lastUpdate = ref('')
-const autoRefresh = ref(true)
-const detail = ref<NewsItem | null>(null)
+const hot = ref<NewsItem[]>([])
+const pulse = ref<NewsItem[]>([])
+const tail = ref<NewsItem[]>([])
+const feedCount = ref(12)
+const errorMsg = ref('')
+let autoTimer: ReturnType<typeof setInterval> | null = null
 
 const currentCat = computed(() => findCategory(selectedCat.value))
-const showDetail = computed({
-  get: () => !!detail.value,
-  set: (v) => {
-    if (!v) detail.value = null
-  }
-})
-
-function pad(n: number): string {
-  return String(n).padStart(2, '0')
-}
 const todayLabel = computed(() => {
   const d = new Date()
   const wk = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'][d.getDay()]
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${wk}`
+  return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日 ${wk}`
 })
-function firstChar(s: string): string {
-  return (s || '新').trim().charAt(0)
+
+const tailTotal = computed(() => tail.value.length)
+const feed = computed(() => tail.value.slice(0, feedCount.value))
+const hasMore = computed(() => feedCount.value < tail.value.length)
+
+function firstChar(t: string): string {
+  return (t || '新').trim().charAt(0)
+}
+function onImgError(i: number) {
+  const img = (event?.target as HTMLImageElement) || null
+  if (img) img.style.display = 'none'
 }
 
 async function loadAll() {
   loading.value = true
   errorMsg.value = ''
   try {
-    const [n, h] = await Promise.all([
-      fetchNews({ category: selectedCat.value, keyword: keyword.value.trim(), limit: 30 }),
-      fetchHot(selectedCat.value, 10)
+    const [hotRes, pulseRes, tailRes] = await Promise.all([
+      fetchHot(selectedCat.value, 10),
+      fetchPulse(selectedCat.value, 5),
+      fetchNewsTail({ category: selectedCat.value, keyword: keyword.value, offset: 10 })
     ])
-    news.value = n
-    hot.value = h
+    hot.value = hotRes
+    pulse.value = pulseRes
+    tail.value = tailRes
+    feedCount.value = 12
     lastUpdate.value = formatNow()
-    if (!n.length) errorMsg.value = '当前分类暂无数据，可切换其它分类或稍后刷新'
-  } catch {
-    errorMsg.value = '加载失败，可能是代理限流，请稍后刷新重试'
+  } catch (e) {
+    errorMsg.value = '加载失败，请稍后刷新（代理可能限流）'
   } finally {
     loading.value = false
   }
 }
 
-function openDetail(item: NewsItem) {
-  detail.value = item
+async function loadMore() {
+  if (loadingMore.value) return
+  loadingMore.value = true
+  feedCount.value += 12
+  // 若已展示全部但本地缓存还有更多，则跳过等待
+  await new Promise((r) => setTimeout(r, 150))
+  loadingMore.value = false
 }
-function onImgError(i: number) {
-  if (news.value[i]) news.value[i].thumbnail = ''
+
+function openDetail(n: NewsItem) {
+  detail.value = n
+  showDetail.value = true
 }
+const detail = ref<NewsItem | null>(null)
+const showDetail = ref(false)
 
-// 搜索防抖（仅过滤新闻流，不影响热搜）
-let kwTimer: number | undefined
-watch(keyword, () => {
-  clearTimeout(kwTimer)
-  kwTimer = window.setTimeout(() => loadAll(), 500)
+/* ---------- 实时脉搏 SVG ---------- */
+const PULSE_COLORS = ['#6366f1', '#8b5cf6', '#a855f7', '#d946ef', '#ec4899']
+const pulseNodes = computed(() => {
+  const arr = pulse.value
+  const n = arr.length
+  if (!n) return []
+  const left = 40
+  const right = 420
+  const baseY = 110
+  const amp = 46
+  return arr.map((it, i) => {
+    const x = n === 1 ? (left + right) / 2 : left + ((right - left) * i) / (n - 1)
+    const y = baseY - amp * Math.sin((i / Math.max(1, n - 1)) * Math.PI)
+    return {
+      x,
+      y,
+      color: PULSE_COLORS[i % PULSE_COLORS.length],
+      short: it.title.length > 12 ? it.title.slice(0, 12) + '…' : it.title
+    }
+  })
+})
+const pulseLinePath = computed(() => {
+  const ns = pulseNodes.value
+  if (ns.length < 2) return ''
+  return ns.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' ')
+})
+const pulseAreaPath = computed(() => {
+  const ns = pulseNodes.value
+  if (ns.length < 2) return ''
+  const line = pulseLinePath.value
+  return `${line} L ${ns[ns.length - 1].x.toFixed(1)} 170 L ${ns[0].x.toFixed(1)} 170 Z`
 })
 
-// 自动刷新：仅当前分类 + 热搜，每 5 分钟一次
-let timer: number | undefined
-watch(autoRefresh, (on) => {
-  clearInterval(timer)
-  if (on) timer = window.setInterval(loadAll, 5 * 60 * 1000)
+watch(autoRefresh, (v) => {
+  if (autoTimer) {
+    clearInterval(autoTimer)
+    autoTimer = null
+  }
+  if (v) {
+    autoTimer = setInterval(loadAll, 5 * 60 * 1000)
+  }
 })
 
-onMounted(() => {
-  loadAll()
-  if (autoRefresh.value) timer = window.setInterval(loadAll, 5 * 60 * 1000)
+onMounted(loadAll)
+onBeforeUnmount(() => {
+  if (autoTimer) clearInterval(autoTimer)
 })
-onUnmounted(() => clearInterval(timer))
 </script>
 
 <style scoped>
 .news-page {
-  padding: 20px 24px 32px;
-  max-width: 1180px;
-  margin: 0 auto;
-  color: var(--el-text-color-primary);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px;
+  height: 100%;
+  background: linear-gradient(160deg, #f5f7ff 0%, #faf5ff 100%);
   box-sizing: border-box;
+}
+
+/* 顶栏 */
+.np-top {
+  background: linear-gradient(135deg, #ffffff 0%, #f3f0ff 100%);
+  border: 1px solid #e6e0ff;
+  border-radius: 16px;
+  padding: 14px 18px;
+  box-shadow: 0 6px 20px rgba(99, 102, 241, 0.08);
 }
 .np-title-row {
   display: flex;
   align-items: center;
   gap: 12px;
+  flex-wrap: wrap;
 }
-.np-title-row h2 {
+.np-title {
   margin: 0;
   font-size: 20px;
-  color: var(--el-text-color-primary);
+  font-weight: 800;
+  background: linear-gradient(90deg, #6366f1, #a855f7);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
-.np-date {
-  font-size: 13px;
-  color: var(--el-text-color-secondary);
-}
-.np-spacer {
-  flex: 1;
-}
-.np-search {
-  width: 200px;
-}
-.np-auto {
-  display: flex;
+.np-live {
+  display: inline-flex;
   align-items: center;
-  gap: 6px;
-  font-size: 13px;
-  color: var(--el-text-color-secondary);
-}
-.np-update {
-  margin-top: 4px;
+  gap: 4px;
   font-size: 12px;
-  color: var(--el-text-color-secondary);
-  font-variant-numeric: tabular-nums;
+  color: #16a34a;
+  font-weight: 600;
 }
+.np-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #22c55e;
+  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.18);
+  animation: npBlink 1.4s infinite;
+}
+@keyframes npBlink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+.np-date { font-size: 13px; color: #64748b; }
+.np-spacer { flex: 1; }
+.np-search { width: 180px; }
+.np-fx-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 7px 14px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #f59e0b, #f97316);
+  color: #fff !important;
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: none;
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.35);
+  transition: transform 0.15s ease;
+}
+.np-fx-btn:hover { transform: translateY(-1px); }
+.np-auto { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: #64748b; }
+.np-update { margin-top: 8px; font-size: 11px; color: #94a3b8; }
 
+/* 分类 */
 .np-cat-row {
   display: flex;
   align-items: center;
   gap: 10px;
-  margin: 14px 0 16px;
+  background: #fff;
+  border: 1px solid #e6e0ff;
+  border-radius: 12px;
+  padding: 10px 14px;
+  box-shadow: 0 4px 14px rgba(99, 102, 241, 0.05);
 }
-.np-cat-label {
-  font-size: 13px;
-  color: var(--el-text-color-regular);
-}
-.np-cat-select {
-  width: 180px;
-}
+.np-cat-label { font-size: 13px; color: #475569; font-weight: 600; }
+.np-cat-select { width: 220px; }
+.np-cat-hint { font-size: 11px; color: #94a3b8; }
 
+/* 主体 */
 .np-body {
-  display: flex;
-  gap: 16px;
-  align-items: flex-start;
+  display: grid;
+  grid-template-columns: 300px 1fr;
+  gap: 14px;
+  flex: 1;
+  min-height: 0;
 }
 .np-hot {
-  width: 260px;
-  flex-shrink: 0;
-  background: var(--el-bg-color);
-  border: 1px solid var(--el-border-color-lighter);
-  border-radius: 12px;
-  padding: 14px 14px 8px;
-  box-sizing: border-box;
+  background: #fff;
+  border: 1px solid #e6e0ff;
+  border-radius: 16px;
+  padding: 14px 16px;
+  box-shadow: 0 6px 20px rgba(99, 102, 241, 0.06);
+  overflow-y: auto;
 }
 .np-hot-title {
   margin: 0 0 12px;
   font-size: 15px;
-  font-weight: 600;
-  color: var(--el-color-danger);
-}
-.np-hot-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
+  font-weight: 700;
+  color: #1e293b;
   display: flex;
-  flex-direction: column;
-  gap: 12px;
+  align-items: center;
+  gap: 6px;
 }
+.np-fire { font-size: 15px; }
+.np-hot-badge {
+  margin-left: auto;
+  font-size: 10px;
+  font-weight: 600;
+  color: #16a34a;
+  background: #dcfce7;
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+.np-hot-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
 .np-hot-item {
   display: flex;
   gap: 10px;
   align-items: flex-start;
   cursor: pointer;
-  border-radius: 8px;
-  padding: 2px;
+  padding: 6px 6px;
+  border-radius: 10px;
   transition: background 0.15s ease;
 }
-.np-hot-item:hover {
-  background: var(--el-fill-color-light);
-}
+.np-hot-item:hover { background: #f5f3ff; }
 .np-rank {
   flex-shrink: 0;
-  width: 20px;
-  height: 20px;
-  border-radius: 4px;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 12px;
   font-weight: 700;
-  background: var(--el-fill-color);
-  color: var(--el-text-color-secondary);
+  background: #e2e8f0;
+  color: #64748b;
 }
-.np-rank.rk1 { background: #ffd54a; color: #7a5b00; }
-.np-rank.rk2 { background: #d8dde3; color: #4a5159; }
-.np-rank.rk3 { background: #e8b07a; color: #7a4a14; }
+.np-rank.rk1 { background: linear-gradient(135deg, #fbbf24, #f59e0b); color: #fff; }
+.np-rank.rk2 { background: linear-gradient(135deg, #cbd5e1, #94a3b8); color: #fff; }
+.np-rank.rk3 { background: linear-gradient(135deg, #fdba74, #fb923c); color: #fff; }
 .np-hot-main { min-width: 0; }
 .np-hot-name {
   font-size: 13px;
-  line-height: 1.35;
-  color: var(--el-text-color-primary);
+  font-weight: 600;
+  line-height: 1.4;
+  color: #1e293b;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
-.np-hot-meta {
-  margin-top: 2px;
-  font-size: 11px;
-  color: var(--el-text-color-secondary);
-}
+.np-hot-meta { font-size: 11px; color: #94a3b8; margin-top: 3px; }
 
+/* 右栏 */
 .np-feed {
-  flex: 1;
-  min-width: 0;
-  background: var(--el-bg-color);
-  border: 1px solid var(--el-border-color-lighter);
-  border-radius: 12px;
-  padding: 6px 16px;
-  box-sizing: border-box;
+  background: #fff;
+  border: 1px solid #e6e0ff;
+  border-radius: 16px;
+  padding: 14px 16px;
+  box-shadow: 0 6px 20px rgba(99, 102, 241, 0.06);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
 }
-.np-skeleton {
-  padding: 16px 0;
+.np-pulse {
+  background: linear-gradient(135deg, #f5f3ff 0%, #fdf2f8 100%);
+  border: 1px solid #ede9fe;
+  border-radius: 14px;
+  padding: 12px 14px 4px;
+  margin-bottom: 14px;
 }
+.np-pulse-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 4px; }
+.np-pulse-title { font-size: 14px; font-weight: 700; color: #1e293b; }
+.np-pulse-sub { font-size: 11px; color: #a855f7; }
+.np-pulse-svg { width: 100%; height: 150px; display: block; }
+.np-pulse-cap { font-size: 10px; fill: #6d28d9; font-weight: 600; }
+
+.np-feed-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.np-feed-title { font-size: 14px; font-weight: 700; color: #475569; }
+.np-feed-count { font-size: 11px; color: #94a3b8; }
+
 .np-item {
   display: flex;
   gap: 12px;
   align-items: center;
-  padding: 14px 4px;
-  border-bottom: 1px solid var(--el-border-color-lighter);
+  padding: 12px 6px;
+  border-bottom: 1px solid #f1f5f9;
   cursor: pointer;
   transition: background 0.15s ease;
 }
-.np-item:last-child {
-  border-bottom: none;
-}
-.np-item:hover {
-  background: var(--el-fill-color-light);
-}
+.np-item:hover { background: #faf9ff; }
 .np-thumb {
   flex-shrink: 0;
-  width: 64px;
-  height: 48px;
-  border-radius: 6px;
+  width: 56px;
+  height: 56px;
+  border-radius: 10px;
   overflow: hidden;
-  background: var(--el-fill-color);
+  background: #eef2ff;
   display: flex;
   align-items: center;
   justify-content: center;
 }
-.np-thumb img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
+.np-thumb img { width: 100%; height: 100%; object-fit: cover; }
 .np-thumb-ph {
-  font-size: 20px;
+  font-size: 22px;
   font-weight: 700;
-  color: var(--el-text-color-secondary);
+  color: #6366f1;
 }
-.np-item-main {
-  flex: 1;
-  min-width: 0;
-}
+.np-item-main { flex: 1; min-width: 0; }
 .np-tag {
   display: inline-block;
-  font-size: 11px;
-  padding: 1px 8px;
-  border-radius: 999px;
+  font-size: 10px;
   font-weight: 600;
-  margin-bottom: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  margin-bottom: 5px;
 }
 .np-item-title {
   font-size: 14px;
-  font-weight: 500;
+  font-weight: 600;
   line-height: 1.45;
-  color: var(--el-text-color-primary);
+  color: #1e293b;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
-.np-item-meta {
-  margin-top: 4px;
-  font-size: 11px;
-  color: var(--el-text-color-secondary);
-  font-variant-numeric: tabular-nums;
-}
+.np-item-meta { font-size: 11px; color: #94a3b8; margin-top: 4px; }
 .np-detail-btn {
   flex-shrink: 0;
   font-size: 12px;
-  color: var(--el-color-primary);
-  align-self: center;
+  color: #6366f1;
+  font-weight: 600;
 }
+.np-empty { padding: 24px 0; }
+.np-more { text-align: center; padding: 14px 0; }
 
-.np-dlg-body {
-  font-size: 13px;
-}
-.np-dlg-meta {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 12px;
-  color: var(--el-text-color-secondary);
-  margin-bottom: 12px;
-  flex-wrap: wrap;
-}
-.np-dlg-desc {
-  margin: 0 0 18px;
-  line-height: 1.7;
-  color: var(--el-text-color-regular);
-  white-space: pre-wrap;
-}
+.np-skeleton { padding: 10px; }
+
+.np-dlg-body { display: flex; flex-direction: column; gap: 10px; }
+.np-dlg-meta { display: flex; align-items: center; gap: 8px; font-size: 12px; color: #64748b; }
+.np-dlg-desc { margin: 0; font-size: 13px; line-height: 1.7; color: #334155; }
 .np-dlg-link {
-  display: inline-block;
-  padding: 9px 18px;
-  border-radius: 8px;
-  background: var(--el-color-primary);
-  color: #fff;
+  align-self: flex-start;
+  font-size: 13px;
+  color: #6366f1;
   text-decoration: none;
-  font-size: 14px;
+  font-weight: 600;
 }
+.np-dlg-link:hover { text-decoration: underline; }
 
-@media (max-width: 768px) {
-  .news-page { padding: 16px; }
-  .np-body { flex-direction: column; }
-  .np-hot { width: 100%; }
-  .np-search { width: 130px; }
+@media (max-width: 860px) {
+  .np-body { grid-template-columns: 1fr; }
+  .np-hot { max-height: 320px; }
 }
 </style>

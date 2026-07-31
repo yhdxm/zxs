@@ -29,9 +29,20 @@ export interface NewsCategory {
 const CACHE_PREFIX = 'zxs_news_cache_'
 const CACHE_TTL = 3 * 60 * 1000 // 3 分钟
 const FETCH_TIMEOUT = 8000
-const CACHE_LIMIT = 30 // 每分类最多缓存条数，控制存储体积
+const CACHE_LIMIT = 60 // 每分类缓存条数，支持右侧信息流翻页（Top10 + 后续分页）
 
-/** 内置分类（16 个）。headline=头条；topic=Google News 标准分区；search=关键词检索模拟分区 */
+// 鲜艳色板，按顺序分配给分类
+const PALETTE = [
+  '#2f6bff', '#e23b3b', '#7c5cff', '#1f9d55', '#0ea5e9', '#ec4899',
+  '#e08a00', '#10b981', '#6366f1', '#f59e0b', '#ef4444', '#8b5cf6',
+  '#14b8a6', '#f97316', '#64748b', '#a855f7', '#0d9488', '#db2777',
+  '#2563eb', '#dc2626', '#7c3aed', '#059669', '#0284c7', '#c026d3'
+]
+
+/**
+ * 内置分类（各行各业精细版）。
+ * headline=头条；topic=Google News 标准分区（覆盖最稳）；search=关键词检索（任意行业）。
+ */
 export const NEWS_CATEGORIES: NewsCategory[] = [
   { key: 'top', label: '头条', mode: 'headline', value: '', color: '#2f6bff' },
   { key: 'nation', label: '中国', mode: 'topic', value: 'NATION', color: '#e23b3b' },
@@ -42,13 +53,73 @@ export const NEWS_CATEGORIES: NewsCategory[] = [
   { key: 'sports', label: '体育', mode: 'topic', value: 'SPORTS', color: '#e08a00' },
   { key: 'health', label: '健康', mode: 'topic', value: 'HEALTH', color: '#10b981' },
   { key: 'science', label: '科学', mode: 'topic', value: 'SCIENCE', color: '#6366f1' },
+
+  { key: 'ai', label: '人工智能', mode: 'search', value: '人工智能', color: '#7c3aed' },
+  { key: 'internet', label: '互联网', mode: 'search', value: '互联网', color: '#0ea5e9' },
+  { key: 'chip', label: '芯片半导体', mode: 'search', value: '芯片 半导体', color: '#2563eb' },
+  { key: 'ev', label: '新能源汽车', mode: 'search', value: '新能源汽车', color: '#059669' },
+  { key: 'phone', label: '智能手机', mode: 'search', value: '智能手机', color: '#db2777' },
+  { key: 'blockchain', label: '区块链', mode: 'search', value: '区块链', color: '#f59e0b' },
+  { key: 'metaverse', label: '元宇宙', mode: 'search', value: '元宇宙', color: '#8b5cf6' },
+  { key: 'medical', label: '医疗医药', mode: 'search', value: '医疗 医药', color: '#dc2626' },
+  { key: 'biotech', label: '生物医药', mode: 'search', value: '生物医药', color: '#e11d48' },
   { key: 'edu', label: '教育', mode: 'search', value: '教育', color: '#f59e0b' },
-  { key: 'movie', label: '影视', mode: 'search', value: '影视', color: '#ef4444' },
-  { key: 'music', label: '音乐', mode: 'search', value: '音乐', color: '#8b5cf6' },
+  { key: 'kaoyan', label: '考研', mode: 'search', value: '考研', color: '#ca8a04' },
+  { key: 'liuxue', label: '留学', mode: 'search', value: '留学', color: '#0891b2' },
+  { key: 'realestate', label: '房地产', mode: 'search', value: '房地产', color: '#7c3aed' },
+  { key: 'stock', label: '股市', mode: 'search', value: '股市 A股', color: '#dc2626' },
+  { key: 'fund', label: '基金', mode: 'search', value: '基金', color: '#16a34a' },
+  { key: 'bond', label: '债券', mode: 'search', value: '债券', color: '#65a30d' },
+  { key: 'forex', label: '汇率', mode: 'search', value: '汇率 人民币', color: '#0d9488' },
+  { key: 'logistics', label: '物流', mode: 'search', value: '物流 快递', color: '#ea580c' },
+  { key: 'ecommerce', label: '电商', mode: 'search', value: '电商 直播带货', color: '#c026d3' },
+  { key: 'retail', label: '零售', mode: 'search', value: '零售 消费', color: '#db2777' },
+  { key: 'food', label: '餐饮美食', mode: 'search', value: '餐饮 美食', color: '#f97316' },
   { key: 'travel', label: '旅游', mode: 'search', value: '旅游', color: '#14b8a6' },
-  { key: 'food', label: '美食', mode: 'search', value: '美食', color: '#f97316' },
+  { key: 'aviation', label: '航空', mode: 'search', value: '航空 民航', color: '#2563eb' },
+  { key: 'game', label: '游戏', mode: 'search', value: '游戏', color: '#7c3aed' },
+  { key: 'esports', label: '电竞', mode: 'search', value: '电竞', color: '#9333ea' },
+  { key: 'anime', label: '动漫', mode: 'search', value: '动漫', color: '#ec4899' },
+  { key: 'movie', label: '影视', mode: 'search', value: '影视 电影', color: '#ef4444' },
+  { key: 'music', label: '音乐', mode: 'search', value: '音乐', color: '#8b5cf6' },
+  { key: 'star', label: '明星', mode: 'search', value: '明星', color: '#db2777' },
+  { key: 'football', label: '足球', mode: 'search', value: '足球', color: '#16a34a' },
+  { key: 'basketball', label: '篮球', mode: 'search', value: '篮球', color: '#ea580c' },
+  { key: 'tennis', label: '网球', mode: 'search', value: '网球', color: '#ca8a04' },
   { key: 'car', label: '汽车', mode: 'search', value: '汽车', color: '#64748b' },
-  { key: 'book', label: '读书', mode: 'search', value: '读书', color: '#a855f7' }
+  { key: 'luxurycar', label: '豪华车', mode: 'search', value: '豪华车', color: '#a855f7' },
+  { key: 'energy', label: '能源', mode: 'search', value: '能源', color: '#0891b2' },
+  { key: 'oil', label: '石油', mode: 'search', value: '石油', color: '#1e293b' },
+  { key: 'power', label: '电力', mode: 'search', value: '电力', color: '#f59e0b' },
+  { key: 'pv', label: '光伏', mode: 'search', value: '光伏', color: '#eab308' },
+  { key: 'wind', label: '风电', mode: 'search', value: '风电', color: '#0ea5e9' },
+  { key: 'climate', label: '气候', mode: 'search', value: '气候', color: '#0284c7' },
+  { key: 'env', label: '环保', mode: 'search', value: '环保', color: '#10b981' },
+  { key: 'agri', label: '农业', mode: 'search', value: '农业', color: '#65a30d' },
+  { key: 'rural', label: '乡村振兴', mode: 'search', value: '乡村振兴', color: '#15803d' },
+  { key: 'mil', label: '军事', mode: 'search', value: '军事', color: '#334155' },
+  { key: 'space', label: '航天', mode: 'search', value: '航天', color: '#4338ca' },
+  { key: 'ship', label: '航海', mode: 'search', value: '航海 航运', color: '#0e7490' },
+  { key: 'history', label: '历史', mode: 'search', value: '历史', color: '#92400e' },
+  { key: 'culture', label: '文化', mode: 'search', value: '文化', color: '#be123c' },
+  { key: 'archaeo', label: '考古', mode: 'search', value: '考古', color: '#a16207' },
+  { key: 'book', label: '读书', mode: 'search', value: '读书', color: '#a855f7' },
+  { key: 'career', label: '职场', mode: 'search', value: '职场', color: '#475569' },
+  { key: 'startup', label: '创业', mode: 'search', value: '创业 融资', color: '#7c3aed' },
+  { key: 'invest', label: '投资', mode: 'search', value: '投资', color: '#dc2626' },
+  { key: 'wealth', label: '理财', mode: 'search', value: '理财', color: '#16a34a' },
+  { key: 'ins', label: '保险', mode: 'search', value: '保险', color: '#0891b2' },
+  { key: 'bank', label: '银行', mode: 'search', value: '银行', color: '#1d4ed8' },
+  { key: 'consumer', label: '消费', mode: 'search', value: '消费', color: '#db2777' },
+  { key: 'fashion', label: '时尚', mode: 'search', value: '时尚', color: '#c026d3' },
+  { key: 'beauty', label: '美妆', mode: 'search', value: '美妆', color: '#ec4899' },
+  { key: 'baby', label: '母婴', mode: 'search', value: '母婴', color: '#f472b6' },
+  { key: 'home', label: '家居', mode: 'search', value: '家居', color: '#a16207' },
+  { key: 'pet', label: '宠物', mode: 'search', value: '宠物', color: '#ca8a04' },
+  { key: 'law', label: '法律', mode: 'search', value: '法律', color: '#334155' },
+  { key: 'legal', label: '法治', mode: 'search', value: '法治', color: '#1e40af' },
+  { key: 'gov', label: '政务', mode: 'search', value: '政务 政策', color: '#0d9488' },
+  { key: 'livelihood', label: '民生', mode: 'search', value: '民生', color: '#059669' }
 ]
 
 export function findCategory(key: string): NewsCategory {
@@ -271,21 +342,11 @@ export interface FetchNewsOptions {
   limit?: number
 }
 
-/**
- * 获取某分类新闻列表：先读缓存（3 分钟内直接返回，不发请求）；
- * 缓存未命中则三级代理兜底，按发布时间倒序，keyword 过滤后截断。
- * 同一分类并发请求会被去重为一次。
- */
-export async function fetchNews(opts: FetchNewsOptions = {}): Promise<NewsItem[]> {
-  const cat = findCategory(opts.category || 'top')
+/** 拉取某分类全部新闻（最多 CACHE_LIMIT 条），已按时间倒序、已缓存。统一去重入口。 */
+async function loadAll(cat: NewsCategory): Promise<NewsItem[]> {
   const cacheKey = cat.key
-
-  if (inFlight.has(cacheKey)) {
-    const all = await inFlight.get(cacheKey)!
-    return filterByKeyword(all, opts.keyword).slice(0, opts.limit || 30)
-  }
-
-  const run = async (): Promise<NewsItem[]> => {
+  if (inFlight.has(cacheKey)) return inFlight.get(cacheKey)!
+  const p = (async () => {
     const cached = getCache(cacheKey)
     if (cached) return cached
     let items: NewsItem[] = []
@@ -300,20 +361,51 @@ export async function fetchNews(opts: FetchNewsOptions = {}): Promise<NewsItem[]
     items.sort((a, b) => b.pubTimestamp - a.pubTimestamp)
     if (items.length) setCache(cacheKey, items)
     return items
-  }
-
-  const p = run()
+  })()
   inFlight.set(cacheKey, p)
   try {
-    const all = await p
-    return filterByKeyword(all, opts.keyword).slice(0, opts.limit || 30)
+    return await p
   } finally {
     inFlight.delete(cacheKey)
   }
 }
 
+/**
+ * 获取某分类新闻列表：先读缓存（3 分钟内直接返回，不发请求）；
+ * 缓存未命中则三级代理兜底，按发布时间倒序，keyword 过滤后截断。
+ * 同一分类并发请求会被去重为一次。
+ */
+export async function fetchNews(opts: FetchNewsOptions = {}): Promise<NewsItem[]> {
+  const cat = findCategory(opts.category || 'top')
+  const all = await loadAll(cat)
+  return filterByKeyword(all, opts.keyword).slice(0, opts.limit || 30)
+}
+
+/**
+ * 取某分类全部新闻（用于分页/切分：Top10 热搜 + 右侧 11 条起信息流）。
+ * 已按时间倒序，已应用 keyword 过滤。最多返回 CACHE_LIMIT 条。
+ */
+export async function fetchNewsAll(opts: FetchNewsOptions = {}): Promise<NewsItem[]> {
+  const cat = findCategory(opts.category || 'top')
+  const all = await loadAll(cat)
+  return filterByKeyword(all, opts.keyword)
+}
+
 /** 热搜：取某分类按时间倒序的前 N 条（N 默认 10）。跟随所选分类。 */
 export async function fetchHot(category?: string, topN = 10): Promise<NewsItem[]> {
-  const items = await fetchNews({ category, limit: topN })
-  return items.slice(0, topN)
+  const all = await fetchNewsAll({ category })
+  return all.slice(0, topN)
+}
+
+/** 实时脉搏 Top5：取热搜前 5 条，用于首页波浪节点展示。 */
+export async function fetchPulse(category?: string, topN = 5): Promise<NewsItem[]> {
+  const all = await fetchNewsAll({ category })
+  return all.slice(0, topN)
+}
+
+/** 信息流（第 offset 条及之后）：默认从第 11 条开始（offset=10），避免与 Top10 重复。 */
+export async function fetchNewsTail(opts: FetchNewsOptions & { offset?: number } = {}): Promise<NewsItem[]> {
+  const all = await fetchNewsAll(opts)
+  const offset = opts.offset ?? 10
+  return all.slice(offset)
 }
