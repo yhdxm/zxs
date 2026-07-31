@@ -12,6 +12,7 @@ import RequirementCollectView from '../views/RequirementCollectView.vue'
 import WeatherView from '../views/WeatherView.vue'
 import MapView from '../views/MapView.vue'
 import NewsAggregateView from '../views/NewsAggregateView.vue'
+import YingCangView from '../views/YingCangView.vue'
 import { hasPermission, loadPermissionConfig, getSavedUser } from '../services/appDataService'
 
 const router = createRouter({
@@ -94,6 +95,12 @@ const router = createRouter({
       path: '/news',
       name: 'news',
       component: NewsAggregateView,
+      meta: { requirePermission: 'dashboard' }
+    },
+    {
+      path: '/yingcang',
+      name: 'yingcang',
+      component: YingCangView,
       meta: { requirePermission: 'dashboard' }
     }
   ]

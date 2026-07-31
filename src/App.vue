@@ -302,7 +302,8 @@ import {
   DataAnalysis,
   TrendCharts,
   Compass,
-  Loading
+  Loading,
+  Histogram
 } from '@element-plus/icons-vue'
 import {
   logoutUser, getSavedUser, refreshSavedUser,
@@ -378,7 +379,17 @@ const sideMenu = reactive<SideItem[]>([
     expanded: true,
     permissionKey: 'dashboard',
     children: [
-      { key: 'news', label: '新闻聚合', icon: TrendCharts, permissionKey: 'dashboard', to: '/news' },
+      {
+        key: 'news',
+        label: '新闻聚合',
+        icon: TrendCharts,
+        permissionKey: 'dashboard',
+        expanded: true,
+        children: [
+          { key: 'news-main', label: '新闻', icon: TrendCharts, permissionKey: 'dashboard', to: '/news' },
+          { key: 'yingcang', label: '影仓智核', icon: Histogram, permissionKey: 'dashboard', to: '/yingcang' }
+        ]
+      },
       { key: 'weather', label: '天气', icon: Sunny, permissionKey: 'dashboard', to: '/weather' },
       { key: 'map', label: '地图', icon: Location, permissionKey: 'dashboard', to: '/map' },
       { key: 'automation-info', label: '自动化信息', icon: Document, permissionKey: 'automation', to: '/automation' }
@@ -458,8 +469,10 @@ const isMenuActive = (key: string) => {
   if (key === 'lianzhicang') return route.path === '/ai' || route.path === '/models'
   if (key === 'ai') return route.path === '/ai'
   if (key === 'models') return route.path === '/models'
-  if (key === 'fanjingzhixie') return ['/news', '/weather', '/map', '/automation'].includes(route.path)
-  if (key === 'news') return route.path === '/news'
+  if (key === 'fanjingzhixie') return ['/news', '/weather', '/map', '/automation', '/yingcang'].includes(route.path)
+  if (key === 'news') return route.path === '/news' || route.path === '/yingcang'
+  if (key === 'news-main') return route.path === '/news'
+  if (key === 'yingcang') return route.path === '/yingcang'
   if (key === 'weather') return route.path === '/weather'
   if (key === 'map') return route.path === '/map'
   if (key === 'requirements') return route.path === '/requirements'
@@ -485,6 +498,7 @@ const currentTitle = computed(() => {
   if (route.path === '/requirements') return '需求收集'
   if (route.path === '/database') return '数据库监测中心'
   if (route.path === '/news') return '新闻聚合'
+  if (route.path === '/yingcang') return '影仓智核'
   if (route.path === '/weather') return '实时天气'
   if (route.path === '/map') return '地图定位'
   if (route.path === '/automation') return '自动化信息'
