@@ -24,7 +24,7 @@
     <section class="yc-section">
       <div class="yc-section-title">
         核心指数
-        <span class="yc-hint">红涨绿跌 · 每 15 秒自动刷新</span>
+        <span class="yc-hint">红涨绿跌 · 每 15 秒自动刷新 · v20260731</span>
       </div>
       <div v-if="indices.length" class="yc-grid">
         <div
