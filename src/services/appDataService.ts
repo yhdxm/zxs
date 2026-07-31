@@ -447,7 +447,9 @@ export async function getDatabaseStats(): Promise<DatabaseStats> {
         'model_bookmarks',
         'learn_progress',
         'learn_bookmarks',
-        'learn_reading'
+        'learn_reading',
+        'third_party_apis',
+        'api_grants'
       ]
       for (const name of tables) {
         try {

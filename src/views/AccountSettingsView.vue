@@ -28,55 +28,6 @@
         </div>
       </el-form>
     </div>
-
-    <!-- 免费 API Key 设置：超管配置全局共享 Key，普通账号使用共享 Key（未共享时可本地兜底） -->
-    <div v-loading="loadingKeys" class="account-card free-key-card">
-      <header class="account-head">
-        <div>
-          <h2>{{ isSuperadmin ? '全局共享 API Key 设置' : '免费 API Key 设置' }}</h2>
-          <p v-if="isSuperadmin">
-            用于地图（天地图）与新闻（天行数据）的免费公开 API；
-            在此处保存的 Key 会写入云端并由<strong>所有账号共享使用</strong>。
-          </p>
-          <p v-else>
-            用于地图（天地图）与新闻（天行数据）的免费公开 API；
-            管理员已配置共享 Key 时自动生效，未配置时可设置本机 Key 作为兜底。
-          </p>
-        </div>
-      </header>
-
-      <el-form label-position="top" class="account-form">
-        <el-form-item label="天地图 Key（地图底图，可选）">
-          <el-input
-            v-model="tiandituKey"
-            :placeholder="isSuperadmin ? '未配置则所有账号自动降级为 OpenStreetMap' : '未配置则自动降级为 OpenStreetMap'"
-            :disabled="!isSuperadmin && Boolean(sharedKeys.tianditu)"
-            clearable
-          />
-          <div v-if="!isSuperadmin && sharedKeys.tianditu" class="key-note">
-            <el-tag size="small" type="success" effect="light">已使用管理员共享 Key</el-tag>
-          </div>
-        </el-form-item>
-
-        <el-form-item label="天行数据 Key（新闻，可选）">
-          <el-input
-            v-model="tianxingKey"
-            :placeholder="isSuperadmin ? '未配置则所有账号新闻降级为公共 RSS' : '未配置则新闻降级为公共 RSS'"
-            :disabled="!isSuperadmin && Boolean(sharedKeys.tianxing)"
-            clearable
-          />
-          <div v-if="!isSuperadmin && sharedKeys.tianxing" class="key-note">
-            <el-tag size="small" type="success" effect="light">已使用管理员共享 Key</el-tag>
-          </div>
-        </el-form-item>
-
-        <div class="account-actions">
-          <el-button type="primary" :loading="savingKeys" @click="saveFreeKeys">
-            {{ isSuperadmin ? '保存共享 Key' : '保存本机 Key' }}
-          </el-button>
-        </div>
-      </el-form>
-    </div>
   </div>
 </template>
 
@@ -90,13 +41,6 @@ import {
   refreshSavedUser,
   type AppUser
 } from '../services/appDataService'
-import {
-  readFreeApiKey,
-  writeFreeApiKey,
-  saveSharedFreeApiKey,
-  loadSharedFreeApiKeys,
-  clearSharedFreeApiKeyCache
-} from '../services/geoService'
 
 const currentUser = ref<AppUser | null>(null)
 const saving = ref(false)
@@ -105,13 +49,6 @@ const form = reactive({
   password: '',
   confirmPassword: ''
 })
-
-/* 免费 API Key 设置：超管配置全局共享 Key，普通账号默认使用共享 Key（无共享时可设本地） */
-const tiandituKey = ref('')
-const tianxingKey = ref('')
-const sharedKeys = ref<Record<string, string>>({})
-const loadingKeys = ref(false)
-const savingKeys = ref(false)
 
 const isSuperadmin = computed(() => currentUser.value?.role === 'superadmin')
 
@@ -132,47 +69,6 @@ const roleTagType = computed(() => {
 const loadUser = async () => {
   currentUser.value = await refreshSavedUser()
   form.nickname = currentUser.value?.nickname || ''
-}
-
-const loadFreeKeys = async () => {
-  loadingKeys.value = true
-  try {
-    clearSharedFreeApiKeyCache()
-    const [td, tx, sharedMap] = await Promise.all([
-      readFreeApiKey('tianditu'),
-      readFreeApiKey('tianxing'),
-      loadSharedFreeApiKeys()
-    ])
-    tiandituKey.value = td
-    tianxingKey.value = tx
-    sharedKeys.value = sharedMap
-  } finally {
-    loadingKeys.value = false
-  }
-}
-
-const saveFreeKeys = async () => {
-  savingKeys.value = true
-  try {
-    if (isSuperadmin.value) {
-      // 超管：保存到云端共享 Key，所有账号共用
-      await Promise.all([
-        saveSharedFreeApiKey('tianditu', tiandituKey.value),
-        saveSharedFreeApiKey('tianxing', tianxingKey.value)
-      ])
-      ElMessage.success('全局共享 API Key 已保存（所有账号共用）')
-    } else {
-      // 普通账号：保存到本地，仅本浏览器使用；若超管已配共享 Key 则共享优先
-      writeFreeApiKey('tianditu', tiandituKey.value.trim())
-      writeFreeApiKey('tianxing', tianxingKey.value.trim())
-      ElMessage.success('本机 API Key 已保存（管理员共享 Key 优先）')
-    }
-    await loadFreeKeys()
-  } catch (e) {
-    ElMessage.error(e instanceof Error ? e.message : '保存失败')
-  } finally {
-    savingKeys.value = false
-  }
 }
 
 const save = async () => {
@@ -210,7 +106,6 @@ const save = async () => {
 
 onMounted(() => {
   loadUser()
-  loadFreeKeys()
 })
 </script>
 
@@ -267,9 +162,4 @@ onMounted(() => {
   .account-page { padding: 12px; }
   .account-card { padding: 20px; }
 }
-
-.free-key-card { margin-top: 20px; }
-.free-key-card .account-head { margin-bottom: 16px; }
-.free-key-card p { margin: 0; font-size: 13px; color: #64748b; line-height: 1.6; }
-.key-note { margin-top: 8px; }
 </style>

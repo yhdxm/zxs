@@ -1,6 +1,9 @@
 // 天气服务（M9a）—— 封装 Open-Meteo（免费、无需 Key、前端直连）
 // 提供城市地理编码 + 当前实况 + 24h 逐时 + 7 天预报。
-// 无任何降级源（Open-Meteo 已是最自由的天气源），失败时向上抛出错误由组件处理。
+// 高德（免费 Web 服务档）作为可选第三方源：当本账号已获授权且配置了高德 Key 时优先使用，
+// 否则自动回退到 Open-Meteo（默认保底，免费无 Key）。
+
+import { resolveApi } from './thirdPartyApi'
 
 export interface WeatherNow {
   /** ISO 时间 */
@@ -191,4 +194,149 @@ export function weatherEmoji(code: number): string {
   if (code >= 85 && code <= 86) return '🌨️'
   if (code >= 95) return '⛈️'
   return '🌡️'
+}
+
+/* ============================================================
+ * 高德天气（免费 Web 服务档）—— 可选第三方源
+ * 端点：https://restapi.amap.com/v3/weather/weatherInfo
+ * 免费个人开发者配额（气象查询），需「Web 服务」类型 Key。
+ * 仅在 resolveApi('weather') 返回 amap + key 时使用；任何失败都回退 Open-Meteo。
+ * ============================================================ */
+interface AmapLive {
+  weather: string
+  temperature: string
+  winddirection: string
+  windpower: string
+  humidity: string
+  reporttime: string
+  city: string
+  adcode: string
+}
+interface AmapCast {
+  date: string
+  dayweather: string
+  nightweather: string
+  daytemp: string
+  nighttemp: string
+  daywind: string
+  daypower: string
+}
+interface AmapWeatherResp {
+  status: string
+  info?: string
+  lives?: AmapLive[]
+  forecasts?: Array<{ city: string; adcode: string; casts: AmapCast[] }>
+}
+
+/** 高德天气中文描述 → WMO 代码（用于复用现有 weatherText/Emoji 映射） */
+function amapWeatherToWmo(text: string): number {
+  const t = (text || '').trim()
+  const map: Record<string, number> = {
+    晴: 0, 少云: 1, 晴间多云: 1, 多云: 2, 阴: 3,
+    阵雨: 80, 强阵雨: 81, 雷阵雨: 95, 雷阵雨伴大风: 95,
+    小雨: 61, 中雨: 63, 大雨: 65, 暴雨: 82, 大暴雨: 82, 特大暴雨: 82,
+    小雪: 71, 中雪: 73, 大雪: 75, 暴雪: 75, 雨夹雪: 85, 阵雪: 85,
+    雾: 45, 浓雾: 45, 霾: 45, 沙尘: 45, 浮尘: 45, 扬沙: 45, 强沙尘暴: 45,
+    飑: 75, 龙卷风: 95, 弱高吹雪: 73, 高吹雪: 73, 轻雾: 45
+  }
+  return map[t] ?? 0
+}
+
+/** 高德风力等级（如 "≤3"、"4"）近似换算为 km/h */
+function amapWindPowerToSpeed(power: string): number {
+  const m = /(\d+)/.exec(power || '')
+  const lvl = m ? Number(m[1]) : 0
+  if (!lvl) return 0
+  // 蒲福风级近似：等级 * 4.5 km/h
+  return Math.round(lvl * 4.5)
+}
+
+/** 用首日昼夜温差近似合成 24h 逐时曲线（高德免费接口无逐时数据，仅供趋势展示） */
+function buildHourlyFromCast(dayTemp: number, nightTemp: number): HourlyPoint[] {
+  const out: HourlyPoint[] = []
+  const now = new Date()
+  const base = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0)
+  for (let h = 0; h < 24; h++) {
+    const t = new Date(base.getTime() + h * 3600_000)
+    // 白天 14 点最暖、凌晨 4 点最冷，余弦曲线近似
+    const phase = Math.cos(((h - 14) / 24) * 2 * Math.PI)
+    const temp = Math.round(nightTemp + ((dayTemp - nightTemp) * (1 - phase)) / 2)
+    out.push({ time: t.toISOString(), temperature: temp, weatherCode: 0 })
+  }
+  return out
+}
+
+function mapAmapToWeather(resp: AmapWeatherResp): WeatherResult | null {
+  const live = resp.lives && resp.lives[0]
+  if (!live) return null
+  const code = amapWeatherToWmo(live.weather)
+  const temp = Number(live.temperature) || 0
+  const current: WeatherNow = {
+    time: live.reporttime || new Date().toISOString(),
+    temperature: temp,
+    apparentTemperature: temp,
+    humidity: Number(live.humidity) || 0,
+    windSpeed: amapWindPowerToSpeed(live.windpower),
+    weatherCode: code
+  }
+
+  const casts = resp.forecasts && resp.forecasts[0]?.casts
+  const daily: DailyPoint[] = []
+  let dayT = temp
+  let nightT = temp
+  if (casts && casts.length) {
+    for (const c of casts) {
+      daily.push({
+        date: c.date,
+        weatherCode: amapWeatherToWmo(c.dayweather || c.nightweather),
+        tempMin: Number(c.nighttemp) || 0,
+        tempMax: Number(c.daytemp) || 0,
+        precipProb: 0
+      })
+    }
+    // 逐时：用首日昼夜温差近似
+    const first = casts[0]!
+    dayT = Number(first.daytemp) || temp
+    nightT = Number(first.nighttemp) || temp
+  }
+  const hourly = casts && casts.length ? buildHourlyFromCast(dayT, nightT) : []
+
+  return { current, hourly, daily: daily.slice(0, 7) }
+}
+
+async function fetchAmapWeather(city: string, key: string): Promise<WeatherResult> {
+  const q = encodeURIComponent((city || '').trim())
+  const url = `https://restapi.amap.com/v3/weather/weatherInfo?city=${q}&key=${encodeURIComponent(key)}&extensions=all`
+  const res = await timeoutFetch(url)
+  if (!res.ok) throw new Error('高德天气请求失败')
+  const data = (await res.json().catch(() => ({}))) as AmapWeatherResp
+  if (data.status !== '1') throw new Error('高德：' + (data.info || '请求异常'))
+  const mapped = mapAmapToWeather(data)
+  if (!mapped) throw new Error('高德天气数据解析失败')
+  return mapped
+}
+
+export interface WeatherByCityResult {
+  result: WeatherResult
+  /** 实际数据来源 */
+  source: 'amap' | 'open-meteo'
+}
+
+/**
+ * 按城市获取天气：优先使用本账号已授权且配置的高德 Key；
+ * 否则（未授权 / 未配置 / 高德失败）回退 Open-Meteo（默认保底，免费无 Key）。
+ */
+export async function getWeatherByCity(city: string): Promise<WeatherByCityResult> {
+  const resolved = await resolveApi('weather')
+  if (resolved && resolved.provider === 'amap' && resolved.apiKey) {
+    try {
+      const result = await fetchAmapWeather(city, resolved.apiKey)
+      return { result, source: 'amap' }
+    } catch (e) {
+      console.warn('[weather] 高德获取失败，回退 Open-Meteo：', e)
+    }
+  }
+  const geo = await geocode(city)
+  const result = await getWeather(geo.lat, geo.lon)
+  return { result, source: 'open-meteo' }
 }

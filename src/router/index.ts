@@ -18,6 +18,7 @@ import AiModelsView from '../views/AiModelsView.vue'
 import LearnEnglishView from '../views/LearnEnglishView.vue'
 import LearnIndustryView from '../views/LearnIndustryView.vue'
 import LearnBooksView from '../views/LearnBooksView.vue'
+import ThirdPartyApiView from '../views/ThirdPartyApiView.vue'
 import { hasPermission, loadPermissionConfig, getSavedUser } from '../services/appDataService'
 
 const router = createRouter({
@@ -136,6 +137,12 @@ const router = createRouter({
       path: '/learn/books',
       name: 'learn-books',
       component: LearnBooksView,
+      meta: { requirePermission: 'dashboard' }
+    },
+    {
+      path: '/third-api',
+      name: 'third-api',
+      component: ThirdPartyApiView,
       meta: { requirePermission: 'dashboard' }
     }
   ]

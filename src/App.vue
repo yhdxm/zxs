@@ -11,7 +11,7 @@
   </div>
 
   <!-- 已登录：左侧全局侧边栏 + 主区域 -->
-  <div v-else-if="isLoggedIn" class="app-shell is-authed">
+  <div v-else-if="isLoggedIn" class="app-shell is-authed" :class="{ collapsed: sidebarCollapsed }">
     <aside class="app-sidebar">
       <div class="side-brand">
         <svg class="brand-logo-img" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Smart Dashboard">
@@ -95,6 +95,11 @@
           <span class="commercial-pro">PRO</span>
         </div>
       </div>
+
+      <!-- 折叠/展开侧边栏（PC 端，三角形按钮） -->
+      <button class="side-collapse" @click="toggleSidebar" :title="sidebarCollapsed ? '展开侧边栏' : '收起侧边栏'">
+        <el-icon><component :is="sidebarCollapsed ? ArrowRight : ArrowLeft" /></el-icon>
+      </button>
     </aside>
 
     <!-- 主区域 -->
@@ -305,7 +310,10 @@ import {
   Histogram,
   Van,
   Cpu,
-  Reading
+  Reading,
+  Link,
+  ArrowLeft,
+  ArrowRight
 } from '@element-plus/icons-vue'
 import {
   logoutUser, getSavedUser, refreshSavedUser,
@@ -323,6 +331,15 @@ const permissionConfig = ref<PermissionConfig | null>(null)
 const isMobile = ref(false)
 const initializing = ref(true)
 const platform = computed(() => (isMobile.value ? 'mobile' : 'pc'))
+
+/* ===== 侧边栏折叠（PC 端，三角形按钮） ===== */
+const sidebarCollapsed = ref(
+  typeof localStorage !== 'undefined' && localStorage.getItem('zxs-sidebar-collapsed') === '1'
+)
+function toggleSidebar() {
+  sidebarCollapsed.value = !sidebarCollapsed.value
+  try { localStorage.setItem('zxs-sidebar-collapsed', sidebarCollapsed.value ? '1' : '0') } catch { /* ignore */ }
+}
 
 const isLoggedIn = computed(() => Boolean(currentUser.value))
 const avatarText = computed(() => (currentUser.value?.nickname || '用').slice(0, 1).toUpperCase())
@@ -386,7 +403,8 @@ const sideMenu = reactive<SideItem[]>([
       { key: 'yingcang', label: '影仓智核', icon: Histogram, permissionKey: 'dashboard', to: '/yingcang' },
       { key: 'xingyu', label: '星舆识途', icon: Van, permissionKey: 'dashboard', to: '/xingyu' },
       { key: 'weather', label: '天气', icon: Sunny, permissionKey: 'dashboard', to: '/weather' },
-      { key: 'map', label: '地图', icon: Location, permissionKey: 'dashboard', to: '/map' }
+      { key: 'map', label: '地图', icon: Location, permissionKey: 'dashboard', to: '/map' },
+      { key: 'third-api', label: '第三方API', icon: Link, permissionKey: 'dashboard', to: '/third-api' }
     ]
   },
   {
@@ -476,7 +494,7 @@ const isMenuActive = (key: string) => {
   if (key === 'ai') return route.path === '/ai'
   if (key === 'models') return route.path === '/models'
   if (key === 'aimodels') return route.path === '/aimodels'
-  if (key === 'fanjingzhixie') return ['/news', '/weather', '/map', '/automation', '/yingcang', '/xingyu'].includes(route.path)
+  if (key === 'fanjingzhixie') return ['/news', '/weather', '/map', '/automation', '/yingcang', '/xingyu', '/third-api'].includes(route.path)
   if (key === 'xingyu') return route.path === '/xingyu'
   if (key === 'learncenter') return route.path.startsWith('/learn')
   if (key === 'learn-english') return route.path === '/learn/english'
@@ -487,6 +505,7 @@ const isMenuActive = (key: string) => {
   if (key === 'yingcang') return route.path === '/yingcang'
   if (key === 'weather') return route.path === '/weather'
   if (key === 'map') return route.path === '/map'
+  if (key === 'third-api') return route.path === '/third-api'
   if (key === 'requirements') return route.path === '/requirements'
   if (key === 'automation') return route.path === '/automation'
   if (key === 'worktasks') return route.path === '/dashboard' && ['overview', 'todos', 'points', 'contents'].includes((route.query.view as string) || '')
@@ -620,7 +639,10 @@ onMounted(async () => {
 .app-shell.is-authed {
   display: flex;
   --side-w: 250px;
-  --topbar-h: 60px;
+  --topbar-h: 48px;
+}
+.app-shell.is-authed.collapsed {
+  --side-w: 64px;
 }
 .app-sidebar {
   width: var(--side-w);
@@ -656,11 +678,51 @@ onMounted(async () => {
   background: radial-gradient(circle, var(--nav-hover) 0%, transparent 70%);
   pointer-events: none;
 }
+
+/* 折叠/展开按钮（PC 端，侧边栏底部三角形按钮） */
+.side-collapse {
+  position: relative;
+  z-index: 1;
+  flex-shrink: 0;
+  width: 100%;
+  border: none;
+  border-top: 1px solid var(--border);
+  background: var(--surface-soft);
+  color: var(--text-muted);
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.side-collapse:hover {
+  background: var(--nav-hover);
+  color: var(--primary);
+}
+.side-collapse :deep(svg) { font-size: 16px; transition: transform 0.2s ease; }
+
+/* 折叠态：仅显示图标，隐藏文字 */
+.app-shell.is-authed.collapsed .side-brand { justify-content: center; padding: 14px 0 10px; }
+.app-shell.is-authed.collapsed .brand-text { display: none; }
+.app-shell.is-authed.collapsed .side-search { display: none; }
+.app-shell.is-authed.collapsed .side-item { justify-content: center; padding: 12px 0; }
+.app-shell.is-authed.collapsed .side-item > span:not(.child-dot) { display: none; }
+.app-shell.is-authed.collapsed .group-arrow { display: none; }
+.app-shell.is-authed.collapsed .side-group-children { padding-left: 0; }
+.app-shell.is-authed.collapsed .side-child { justify-content: center; padding: 10px 0; }
+.app-shell.is-authed.collapsed .side-child .child-dot { display: none; }
+.app-shell.is-authed.collapsed .side-footer .toggle-label,
+.app-shell.is-authed.collapsed .commercial-card .commercial-pro { display: none; }
+.app-shell.is-authed.collapsed .theme-toggle { justify-content: center; }
+.app-shell.is-authed.collapsed .theme-switch { margin-left: 0; }
+.app-shell.is-authed.collapsed .commercial-card { height: 48px; }
+.app-shell.is-authed.collapsed .side-collapse :deep(svg) { transform: scale(1.1); }
 .side-brand {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 24px 20px 18px;
+  padding: 16px 18px 12px;
 }
 .brand-logo-img {
   width: 38px;

@@ -219,7 +219,9 @@ const TABLE_DESC: Record<string, string> = {
   model_bookmarks: 'AI 模型知识·收藏表：用户收藏的全局模型',
   learn_progress: '学习中心·进度表：各行业知识/词条的学习掌握状态',
   learn_bookmarks: '学习中心·书签表：生词/行业知识点/书籍收藏',
-  learn_reading: '学习中心·阅读记录表：书籍阅读进度与上次位置'
+  learn_reading: '学习中心·阅读记录表：书籍阅读进度与上次位置',
+  third_party_apis: '第三方 API 配置表：各账号自行填写的天气/地图等免费 API 地址与 Key（按账号隔离）',
+  api_grants: '第三方 API 授权表：超级管理员授权哪些账号可使用第三方 API 调用'
 }
 
 /** Supabase 平台托管的系统表（多建在 public 模式下但由平台管理、默认不开 RLS），不纳入「业务表未开 RLS」告警，避免误报 */
@@ -243,7 +245,8 @@ const TABLE_GROUP: Record<string, string> = {
   app_dashboard_data: 'biz', news_daily: 'biz', external_ideas: 'biz', automation_info: 'biz',
   todos: 'biz', points: 'biz', contents: 'biz',
   car_watchlist: 'xingyu',
-  learn_progress: 'learn', learn_bookmarks: 'learn', learn_reading: 'learn'
+  learn_progress: 'learn', learn_bookmarks: 'learn', learn_reading: 'learn',
+  third_party_apis: 'third', api_grants: 'third'
 }
 
 /** 业务域元信息：中文名 + 主题色（浅色主题下的柔和色，用于分组色条与标识） */
@@ -253,6 +256,7 @@ const GROUP_META: Record<string, { label: string; color: string }> = {
   biz: { label: '业务数据', color: '#0ea5e9' },
   xingyu: { label: '星舆识途', color: '#f59e0b' },
   learn: { label: '学习中心', color: '#10b981' },
+  third: { label: '第三方 API', color: '#14b8a6' },
   archive: { label: '消息归档', color: '#ec4899' },
   other: { label: '其他表', color: '#64748b' }
 }

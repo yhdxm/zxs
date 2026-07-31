@@ -51,7 +51,7 @@ export async function loadSharedFreeApiKeys(): Promise<Record<string, string>> {
 }
 
 /** 公开读取入口：优先共享 Key，无共享则回退本地 Key */
-export async function readFreeApiKey(provider: 'tianditu' | 'tianxing' | 'weather'): Promise<string> {
+export async function readFreeApiKey(provider: 'tianditu' | 'tianxing' | 'weather' | 'amap'): Promise<string> {
   const shared = await loadSharedFreeApiKeys()
   const sharedVal = shared[provider]
   if (sharedVal) return sharedVal
@@ -59,7 +59,7 @@ export async function readFreeApiKey(provider: 'tianditu' | 'tianxing' | 'weathe
 }
 
 /** 写入本地免费 API Key（合并写入，避免覆盖其它 provider） */
-export function writeFreeApiKey(provider: 'tianditu' | 'tianxing' | 'weather', value: string): void {
+export function writeFreeApiKey(provider: 'tianditu' | 'tianxing' | 'weather' | 'amap', value: string): void {
   if (typeof window === 'undefined') return
   try {
     const raw = window.localStorage.getItem(FREE_API_KEY)
@@ -73,7 +73,7 @@ export function writeFreeApiKey(provider: 'tianditu' | 'tianxing' | 'weather', v
 
 /** 超管保存共享免费 API Key 到云端 */
 export async function saveSharedFreeApiKey(
-  provider: 'tianditu' | 'tianxing' | 'weather',
+  provider: 'tianditu' | 'tianxing' | 'weather' | 'amap',
   value: string
 ): Promise<void> {
   const { error } = await supabase
