@@ -3,7 +3,7 @@
 // 高德（免费 Web 服务档）作为可选第三方源：当本账号已获授权且配置了高德 Key 时优先使用，
 // 否则自动回退到 Open-Meteo（默认保底，免费无 Key）。
 
-import { resolveApi } from './thirdPartyApi'
+import { resolveApi, logApiUsage } from './thirdPartyApi'
 
 export interface WeatherNow {
   /** ISO 时间 */
@@ -18,6 +18,17 @@ export interface WeatherNow {
   windSpeed: number
   /** WMO 天气代码 */
   weatherCode: number
+  /** —— 以下为高德原生扩展（Open-Meteo 时为空） —— */
+  /** 风向，如「西」 */
+  windDirection?: string
+  /** 风力等级原文，如「≤3」 */
+  windPower?: string
+  /** 数据发布时间，如「2026-08-01 10:00:00」 */
+  reportTime?: string
+  /** 省 */
+  province?: string
+  /** 市 */
+  cityName?: string
 }
 
 export interface HourlyPoint {
@@ -34,6 +45,19 @@ export interface DailyPoint {
   tempMax: number
   /** 降水概率 % */
   precipProb: number
+  /** —— 以下为高德原生扩展（Open-Meteo 时为空） —— */
+  /** 白天天气文字 */
+  dayWeather?: string
+  /** 夜间天气文字 */
+  nightWeather?: string
+  /** 白天风向 */
+  dayWind?: string
+  /** 夜间风向 */
+  nightWind?: string
+  /** 白天风力 */
+  dayPower?: string
+  /** 夜间风力 */
+  nightPower?: string
 }
 
 export interface WeatherResult {
@@ -224,12 +248,14 @@ interface AmapCast {
 interface AmapWeatherResp {
   status: string
   info?: string
+  /** 高德业务状态码，如 10000=成功，10001=Key 非法，10003=Key 类型不匹配等 */
+  infocode?: string
   lives?: AmapLive[]
   forecasts?: Array<{ city: string; adcode: string; casts: AmapCast[] }>
 }
 
 /** 高德天气中文描述 → WMO 代码（用于复用现有 weatherText/Emoji 映射） */
-function amapWeatherToWmo(text: string): number {
+export function gaodeTextToWmo(text: string): number {
   const t = (text || '').trim()
   const map: Record<string, number> = {
     晴: 0, 少云: 1, 晴间多云: 1, 多云: 2, 阴: 3,
@@ -252,7 +278,7 @@ function amapWindPowerToSpeed(power: string): number {
 }
 
 /** 用首日昼夜温差近似合成 24h 逐时曲线（高德免费接口无逐时数据，仅供趋势展示） */
-function buildHourlyFromCast(dayTemp: number, nightTemp: number): HourlyPoint[] {
+function buildHourlyFromCast(dayTemp: number, nightTemp: number, code = 0): HourlyPoint[] {
   const out: HourlyPoint[] = []
   const now = new Date()
   const base = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0)
@@ -261,65 +287,164 @@ function buildHourlyFromCast(dayTemp: number, nightTemp: number): HourlyPoint[] 
     // 白天 14 点最暖、凌晨 4 点最冷，余弦曲线近似
     const phase = Math.cos(((h - 14) / 24) * 2 * Math.PI)
     const temp = Math.round(nightTemp + ((dayTemp - nightTemp) * (1 - phase)) / 2)
-    out.push({ time: t.toISOString(), temperature: temp, weatherCode: 0 })
+    out.push({ time: t.toISOString(), temperature: temp, weatherCode: code })
   }
   return out
 }
 
 function mapAmapToWeather(resp: AmapWeatherResp): WeatherResult | null {
   const live = resp.lives && resp.lives[0]
-  if (!live) return null
-  const code = amapWeatherToWmo(live.weather)
-  const temp = Number(live.temperature) || 0
-  const current: WeatherNow = {
-    time: live.reporttime || new Date().toISOString(),
-    temperature: temp,
-    apparentTemperature: temp,
-    humidity: Number(live.humidity) || 0,
-    windSpeed: amapWindPowerToSpeed(live.windpower),
-    weatherCode: code
+  const casts = resp.forecasts && resp.forecasts[0]?.casts
+  if (!live && (!casts || !casts.length)) return null
+
+  // 如果实况 lives 为空，用首日预报兜底构造 current（避免 adcode 不匹配导致整次查询失败）
+  let current: WeatherNow
+  let code: number
+  if (live) {
+    code = gaodeTextToWmo(live.weather)
+    const temp = Number(live.temperature) || 0
+    current = {
+      time: live.reporttime || new Date().toISOString(),
+      temperature: temp,
+      apparentTemperature: temp,
+      humidity: Number(live.humidity) || 0,
+      windSpeed: amapWindPowerToSpeed(live.windpower),
+      weatherCode: code,
+      windDirection: live.winddirection || undefined,
+      windPower: live.windpower || undefined,
+      reportTime: live.reporttime || undefined,
+      province: live.province || undefined,
+      cityName: live.city || undefined
+    }
+  } else {
+    const first = casts![0]!
+    code = gaodeTextToWmo(first.dayweather || first.nightweather)
+    const temp = Number(first.daytemp) || 0
+    current = {
+      time: new Date().toISOString(),
+      temperature: temp,
+      apparentTemperature: temp,
+      humidity: 0,
+      windSpeed: 0,
+      weatherCode: code
+    }
   }
 
-  const casts = resp.forecasts && resp.forecasts[0]?.casts
   const daily: DailyPoint[] = []
-  let dayT = temp
-  let nightT = temp
+  let dayT = current.temperature
+  let nightT = current.temperature
   if (casts && casts.length) {
     for (const c of casts) {
       daily.push({
         date: c.date,
-        weatherCode: amapWeatherToWmo(c.dayweather || c.nightweather),
+        weatherCode: gaodeTextToWmo(c.dayweather || c.nightweather),
         tempMin: Number(c.nighttemp) || 0,
         tempMax: Number(c.daytemp) || 0,
-        precipProb: 0
+        precipProb: 0,
+        dayWeather: c.dayweather,
+        nightWeather: c.nightweather,
+        dayWind: c.daywind,
+        nightWind: c.nightwind,
+        dayPower: c.daypower,
+        nightPower: c.nightpower
       })
     }
-    // 逐时：用首日昼夜温差近似
     const first = casts[0]!
-    dayT = Number(first.daytemp) || temp
-    nightT = Number(first.nighttemp) || temp
+    dayT = Number(first.daytemp) || current.temperature
+    nightT = Number(first.nighttemp) || current.temperature
   }
-  const hourly = casts && casts.length ? buildHourlyFromCast(dayT, nightT) : []
+  const hourly = casts && casts.length ? buildHourlyFromCast(dayT, nightT, code) : []
 
   return { current, hourly, daily: daily.slice(0, 7) }
 }
 
-async function fetchAmapWeather(city: string, key: string): Promise<WeatherResult> {
+/** 高德地理编码：城市名 → adcode（天气接口用 adcode 比城市名更准） */
+async function amapGeocodeAdcode(city: string, key: string): Promise<string | null> {
   const q = encodeURIComponent((city || '').trim())
-  const url = `https://restapi.amap.com/v3/weather/weatherInfo?city=${q}&key=${encodeURIComponent(key)}&extensions=all`
-  const res = await timeoutFetch(url)
-  if (!res.ok) throw new Error('高德天气请求失败')
-  const data = (await res.json().catch(() => ({}))) as AmapWeatherResp
-  if (data.status !== '1') throw new Error('高德：' + (data.info || '请求异常'))
-  const mapped = mapAmapToWeather(data)
-  if (!mapped) throw new Error('高德天气数据解析失败')
-  return mapped
+  const url = `https://restapi.amap.com/v3/geocode/geo?address=${q}&key=${encodeURIComponent(key)}`
+  try {
+    const res = await timeoutFetch(url)
+    if (!res.ok) return null
+    const data = (await res.json().catch(() => ({}))) as {
+      status?: string
+      geocodes?: Array<{ adcode?: string }>
+    }
+    if (data.status !== '1' || !data.geocodes || !data.geocodes.length) return null
+    return data.geocodes[0]?.adcode || null
+  } catch {
+    return null
+  }
+}
+
+async function fetchAmapWeather(city: string, key: string): Promise<WeatherResult> {
+  const raw = encodeURIComponent((city || '').trim())
+
+  // 先尝试用高德地理编码把城市名解析为 adcode（更准）
+  let adcode: string | null = null
+  try {
+    adcode = await amapGeocodeAdcode(city, key)
+  } catch {
+    /* 忽略，后续回退城市名 */
+  }
+
+  async function tryFetch(cityParam: string): Promise<
+    { ok: true; data: WeatherResult } | { ok: false; info: string; raw: AmapWeatherResp }
+  > {
+    const url = `https://restapi.amap.com/v3/weather/weatherInfo?city=${cityParam}&key=${encodeURIComponent(key)}&extensions=all`
+    const res = await timeoutFetch(url)
+    if (!res.ok) {
+      return { ok: false, info: `HTTP ${res.status}`, raw: { status: '0', info: `HTTP ${res.status}` } }
+    }
+    const data = (await res.json().catch(() => ({}))) as AmapWeatherResp
+    if (data.status !== '1') {
+      return {
+        ok: false,
+        info: `高德接口返回失败：status=${data.status}, info=${data.info || '-'}, infocode=${data.infocode || '-'}`,
+        raw: data
+      }
+    }
+    const mapped = mapAmapToWeather(data)
+    if (!mapped) {
+      const livesLen = data.lives?.length ?? 0
+      const forecastsLen = data.forecasts?.length ?? 0
+      const castsLen = data.forecasts?.[0]?.casts?.length ?? 0
+      return {
+        ok: false,
+        info: `高德天气数据解析失败：lives=${livesLen}, forecasts=${forecastsLen}, casts=${castsLen}（可能 Key 无天气权限或该城市无数据）`,
+        raw: data
+      }
+    }
+    return { ok: true, data: mapped }
+  }
+
+  // 先按 adcode 查；若失败（含 lives 为空）回退城市名再查一次
+  let lastError = ''
+  if (adcode) {
+    const r1 = await tryFetch(encodeURIComponent(adcode))
+    if (r1.ok) {
+      await logApiUsage({ service: 'weather', provider: 'amap', endpoint: 'weatherInfo', status: 'success' })
+      return r1.data
+    }
+    lastError = r1.info
+  }
+
+  const r2 = await tryFetch(raw)
+  if (r2.ok) {
+    await logApiUsage({ service: 'weather', provider: 'amap', endpoint: 'weatherInfo', status: 'success' })
+    return r2.data
+  }
+  if (!lastError) lastError = r2.info
+
+  await logApiUsage({ service: 'weather', provider: 'amap', endpoint: 'weatherInfo', status: 'error' })
+  throw new Error(lastError || '高德请求异常')
 }
 
 export interface WeatherByCityResult {
   result: WeatherResult
   /** 实际数据来源 */
   source: 'amap' | 'open-meteo'
+  /** 回退到 Open-Meteo 时的原因（高德失败 / 未配置 / 配额保护等） */
+  fallbackReason?: string
 }
 
 /**
@@ -327,16 +452,24 @@ export interface WeatherByCityResult {
  * 否则（未授权 / 未配置 / 高德失败）回退 Open-Meteo（默认保底，免费无 Key）。
  */
 export async function getWeatherByCity(city: string): Promise<WeatherByCityResult> {
-  const resolved = await resolveApi('weather')
+  const { api: resolved, disabledReason } = await resolveApi('weather')
   if (resolved && resolved.provider === 'amap' && resolved.apiKey) {
     try {
       const result = await fetchAmapWeather(city, resolved.apiKey)
       return { result, source: 'amap' }
     } catch (e) {
+      const msg = e instanceof Error ? e.message : '高德请求异常'
       console.warn('[weather] 高德获取失败，回退 Open-Meteo：', e)
+      const geo = await geocode(city)
+      const result = await getWeather(geo.lat, geo.lon)
+      return { result, source: 'open-meteo', fallbackReason: '高德失败，已回退：' + msg }
     }
   }
   const geo = await geocode(city)
   const result = await getWeather(geo.lat, geo.lon)
-  return { result, source: 'open-meteo' }
+  return {
+    result,
+    source: 'open-meteo',
+    fallbackReason: disabledReason || '未配置高德 Key，使用 Open-Meteo 默认源'
+  }
 }

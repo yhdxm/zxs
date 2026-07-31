@@ -14,7 +14,7 @@ import PageHeader from '../components/PageHeader.vue'
 
 <style scoped>
 .map-page {
-  padding: 24px;
+  padding: 0 24px 24px;
   max-width: 1280px;
   margin: 0 auto;
   color: var(--text);
@@ -29,7 +29,7 @@ import PageHeader from '../components/PageHeader.vue'
 }
 
 @media (max-width: 768px) {
-  .map-page { padding: 16px; }
+  .map-page { padding: 0 16px 16px; }
   .mp-page-body :deep(.map-panel) { height: calc(100vh - 200px); min-height: 420px; }
 }
 </style>

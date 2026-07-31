@@ -217,8 +217,9 @@ const TABLE_DESC: Record<string, string> = {
   learn_progress: '学习中心·进度表：各行业知识/词条的学习掌握状态',
   learn_bookmarks: '学习中心·书签表：生词/行业知识点/书籍收藏',
   learn_reading: '学习中心·阅读记录表：书籍阅读进度与上次位置',
-  third_party_apis: '第三方 API 配置表：各账号自行填写的天气/地图等免费 API 地址与 Key（按账号隔离）',
-  api_grants: '第三方 API 授权表：超级管理员授权哪些账号可使用第三方 API 调用'
+  third_party_apis: '第三方 API 配置表：各账号自行填写的天气/地图等免费 API 地址与 Key（含每日额度与配额保护开关，按账号隔离）',
+  api_grants: '第三方 API 授权表：超级管理员授权哪些账号可使用第三方 API 调用',
+  api_usage_logs: '第三方 API 调用日志表：记录每次高德等第三方接口调用，用于实时统计、配额保护与用量分析'
 }
 
 /** Supabase 平台托管的系统表（多建在 public 模式下但由平台管理、默认不开 RLS），不纳入「业务表未开 RLS」告警，避免误报 */
@@ -243,7 +244,7 @@ const TABLE_GROUP: Record<string, string> = {
   todos: 'biz', points: 'biz', contents: 'biz',
   car_watchlist: 'xingyu',
   learn_progress: 'learn', learn_bookmarks: 'learn', learn_reading: 'learn',
-  third_party_apis: 'third', api_grants: 'third'
+  third_party_apis: 'third', api_grants: 'third', api_usage_logs: 'third'
 }
 
 /** 业务域元信息：中文名 + 主题色（浅色主题下的柔和色，用于分组色条与标识） */
@@ -454,7 +455,7 @@ onMounted(runCheck)
 
 <style scoped>
 .db-check {
-  padding: 24px;
+  padding: 0 24px 24px;
   max-width: 1080px;
   margin: 0 auto;
   color: var(--text);
@@ -784,7 +785,7 @@ onMounted(runCheck)
 .db-problem-item.info { background: var(--nav-hover); color: var(--text); }
 
 @media (max-width: 768px) {
-  .db-check { padding: 16px; }
+  .db-check { padding: 0 16px 16px; }
   .db-cards { grid-template-columns: repeat(2, 1fr); }
   .db-capacity-time { margin-left: 0; width: 100%; }
   .tbl-row { flex-wrap: wrap; }

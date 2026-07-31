@@ -1367,7 +1367,7 @@ const onWindowBlur = () => {
 
 <style scoped>
 .mc-shell {
-  padding: 22px;
+  padding: 0 22px 22px;
   font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
   background: var(--bg-app);
   min-height: calc(100vh - var(--nav-h, 56px));
@@ -1584,7 +1584,7 @@ const onWindowBlur = () => {
 .mc-calib-hint b { color: var(--primary); }
 
 @media (max-width: 768px) {
-  .mc-shell { padding: 14px; }
+  .mc-shell { padding: 0 14px 14px; }
   .mc-title h1 { font-size: 18px; }
   .mc-actions { width: 100%; justify-content: space-between; }
   .mc-call-stats { grid-template-columns: repeat(2, 1fr); }

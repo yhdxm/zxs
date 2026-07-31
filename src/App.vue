@@ -639,7 +639,7 @@ onMounted(async () => {
 .app-shell.is-authed {
   display: flex;
   --side-w: 250px;
-  --topbar-h: 48px;
+  --topbar-h: 42px;
 }
 .app-shell.is-authed.collapsed {
   --side-w: 64px;
@@ -736,7 +736,7 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 16px 18px 12px;
+  padding: 12px 18px 10px;
 }
 .brand-logo-img {
   width: 38px;

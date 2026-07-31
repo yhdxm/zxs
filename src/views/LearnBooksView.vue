@@ -140,7 +140,7 @@ onUnmounted(() => { if (clockTimer) window.clearInterval(clockTimer) })
 
 <style scoped>
 .lb-root { min-height: 100%; }
-.lb-top { position: sticky; top: 0; z-index: 10; display: flex; align-items: center; gap: 16px; padding: 10px 24px; background: var(--surface); border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+.lb-top { position: sticky; top: 0; z-index: 10; display: flex; align-items: center; gap: 16px; padding: 0 24px 10px; background: var(--surface); border-bottom: 1px solid var(--border); flex-wrap: wrap; }
 .lb-brand { display: flex; align-items: baseline; gap: 8px; }
 .lb-logo { font-size: 18px; font-weight: 600; color: var(--text-strong); }
 .lb-tag { font-size: 11px; color: var(--text-faint); }
@@ -148,7 +148,7 @@ onUnmounted(() => { if (clockTimer) window.clearInterval(clockTimer) })
 .lb-dot { width: 8px; height: 8px; border-radius: 50%; background: #22c55e; box-shadow: 0 0 0 3px rgba(34,197,94,.2); }
 .lb-clock { font-variant-numeric: tabular-nums; font-size: 13px; color: var(--text-strong); }
 .lb-clock-hint { font-size: 11px; color: var(--text-faint); }
-.lb-main { padding: 18px 24px; }
+.lb-main { padding: 0 24px 24px; }
 .lb-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 18px; margin-bottom: 16px; }
 .lb-row { display: flex; gap: 8px; flex-wrap: wrap; }
 .lb-input { width: 360px; }

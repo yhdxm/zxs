@@ -26,7 +26,7 @@ defineProps<{
   align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
-  margin-bottom: 18px;
+  margin-bottom: 2px;
 }
 .ph-left {
   min-width: 0;

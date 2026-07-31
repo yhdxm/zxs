@@ -103,7 +103,7 @@ onUnmounted(() => { if (clockTimer) window.clearInterval(clockTimer) })
 
 <style scoped>
 .li-root { min-height: 100%; }
-.li-top { position: sticky; top: 0; z-index: 10; display: flex; align-items: center; gap: 16px; padding: 10px 24px; background: var(--surface); border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+.li-top { position: sticky; top: 0; z-index: 10; display: flex; align-items: center; gap: 16px; padding: 0 24px 10px; background: var(--surface); border-bottom: 1px solid var(--border); flex-wrap: wrap; }
 .li-brand { display: flex; align-items: baseline; gap: 8px; }
 .li-logo { font-size: 18px; font-weight: 600; color: var(--text-strong); }
 .li-tag { font-size: 11px; color: var(--text-faint); }
@@ -111,7 +111,7 @@ onUnmounted(() => { if (clockTimer) window.clearInterval(clockTimer) })
 .li-dot { width: 8px; height: 8px; border-radius: 50%; background: #22c55e; box-shadow: 0 0 0 3px rgba(34,197,94,.2); }
 .li-clock { font-variant-numeric: tabular-nums; font-size: 13px; color: var(--text-strong); }
 .li-clock-hint { font-size: 11px; color: var(--text-faint); }
-.li-main { padding: 18px 24px; }
+.li-main { padding: 0 24px 24px; }
 .li-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 18px; }
 .li-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; }
 .li-topic { padding: 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-soft); display: flex; flex-direction: column; gap: 8px; }

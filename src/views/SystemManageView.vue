@@ -517,7 +517,7 @@ onMounted(async () => {
 
 <style scoped>
 .sys-page {
-  padding: 22px 26px calc(22px + env(safe-area-inset-bottom, 0px));
+  padding: 0 26px calc(22px + env(safe-area-inset-bottom, 0px));
   max-width: 1280px;
   margin: 0 auto;
 }
@@ -660,7 +660,7 @@ onMounted(async () => {
   .section-filter .el-button { flex: 1; }
 }
 @media (max-width: 640px) {
-  .sys-page { padding: 16px 14px calc(16px + env(safe-area-inset-bottom, 0px)); }
+  .sys-page { padding: 0 14px calc(16px + env(safe-area-inset-bottom, 0px)); }
   .section-head { flex-direction: column; align-items: flex-start; }
   .sys-section { padding: 16px; }
   .role-edit-head { flex-direction: column; }

@@ -314,7 +314,7 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   gap: 14px;
-  padding: 16px;
+  padding: 0 16px 16px;
   height: 100%;
   background: linear-gradient(160deg, #f5f7ff 0%, #faf5ff 100%);
   box-sizing: border-box;

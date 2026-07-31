@@ -172,7 +172,7 @@ onUnmounted(() => { if (clockTimer) window.clearInterval(clockTimer) })
 
 <style scoped>
 .am-root { min-height: 100%; }
-.am-top { position: sticky; top: 0; z-index: 10; display: flex; align-items: center; gap: 16px; padding: 10px 24px; background: var(--surface); border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+.am-top { position: sticky; top: 0; z-index: 10; display: flex; align-items: center; gap: 16px; padding: 0 24px 10px; background: var(--surface); border-bottom: 1px solid var(--border); flex-wrap: wrap; }
 .am-brand { display: flex; align-items: baseline; gap: 8px; }
 .am-logo { font-size: 18px; font-weight: 600; color: var(--text-strong); }
 .am-tag { font-size: 11px; color: var(--text-faint); }
@@ -184,7 +184,7 @@ onUnmounted(() => { if (clockTimer) window.clearInterval(clockTimer) })
 .am-dot { width: 8px; height: 8px; border-radius: 50%; background: #22c55e; box-shadow: 0 0 0 3px rgba(34,197,94,.2); }
 .am-clock { font-variant-numeric: tabular-nums; font-size: 13px; color: var(--text-strong); }
 .am-clock-hint { font-size: 11px; color: var(--text-faint); }
-.am-main { padding: 18px 24px; }
+.am-main { padding: 0 24px 24px; }
 .am-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 18px; }
 .am-h { font-size: 15px; color: var(--text-strong); margin: 0 0 6px; }
 .am-sub { font-size: 12px; color: var(--text-faint); margin: 0 0 12px; }

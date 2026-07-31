@@ -83,7 +83,7 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 16px;
-  padding: 10px 24px;
+  padding: 0 24px 10px;
   background: var(--surface);
   border-bottom: 1px solid var(--border);
   flex-wrap: wrap;
@@ -149,7 +149,7 @@ onUnmounted(() => {
 }
 @media (max-width: 768px) {
   .yc-top {
-    padding: 8px 14px;
+    padding: 0 14px 6px;
   }
   .yc-clock-hint {
     display: none;

@@ -111,7 +111,7 @@ onMounted(() => {
 
 <style scoped>
 .account-page {
-  padding: 20px;
+  padding: 0 20px 20px;
   max-width: 680px;
   margin: 0 auto;
 }
@@ -160,7 +160,7 @@ onMounted(() => {
 }
 
 @media (max-width: 768px) {
-  .account-page { padding: 12px; }
+  .account-page { padding: 0 12px 12px; }
   .account-card { padding: 20px; }
 }
 </style>

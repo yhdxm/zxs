@@ -135,13 +135,13 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .dash-shell {
-  padding: 22px;
+  padding: 0 22px 22px;
   font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
   background: var(--bg-app);
   min-height: calc(100vh - var(--nav-h, 56px));
 }
 
 @media (max-width: 768px) {
-  .dash-shell { padding: 14px; }
+  .dash-shell { padding: 0 14px 14px; }
 }
 </style>

@@ -35,6 +35,9 @@ export interface ThirdPartyApiConfig {
   api_url: string
   api_key: string
   enabled: boolean
+  daily_limit: number
+  monthly_limit: number
+  quota_protection: boolean
   updated_at?: string
 }
 
@@ -90,6 +93,9 @@ export async function upsertMyApi(cfg: {
   api_url: string
   api_key: string
   enabled: boolean
+  daily_limit?: number
+  monthly_limit?: number
+  quota_protection?: boolean
 }): Promise<void> {
   const u = await uid()
   const { error } = await supabase
@@ -102,6 +108,9 @@ export async function upsertMyApi(cfg: {
         api_url: cfg.api_url,
         api_key: cfg.api_key,
         enabled: cfg.enabled,
+        daily_limit: cfg.daily_limit ?? 5000,
+        monthly_limit: cfg.monthly_limit ?? 5000,
+        quota_protection: cfg.quota_protection ?? true,
         updated_at: new Date().toISOString()
       },
       { onConflict: 'user_id,service' }
@@ -147,23 +156,155 @@ export async function isGranted(service: ApiService): Promise<boolean> {
   return rows.some((r) => r.service === 'all' || r.service === service)
 }
 
+/* ---------------- 调用日志与配额保护 ---------------- */
+
+export interface ApiUsageLog {
+  id?: string
+  user_id: string
+  service: ApiService
+  provider: ApiProvider
+  endpoint: string
+  status: 'success' | 'error'
+  created_at?: string
+}
+
+/** 记录一次第三方 API 调用 */
+export async function logApiUsage(params: {
+  service: ApiService
+  provider: ApiProvider
+  endpoint?: string
+  status?: 'success' | 'error'
+}): Promise<void> {
+  const u = await uid()
+  const { error } = await supabase.from('api_usage_logs').insert({
+    user_id: u,
+    service: params.service,
+    provider: params.provider,
+    endpoint: params.endpoint || '',
+    status: params.status || 'success'
+  })
+  if (error) console.warn('[logApiUsage] 写入调用日志失败', error)
+}
+
+/** 查询今日调用量 */
+export async function countApiUsageToday(service: ApiService, provider: ApiProvider): Promise<number> {
+  const u = await uid()
+  try {
+    const { data, error } = await supabase.rpc('count_api_usage_today', {
+      p_user_id: u,
+      p_service: service,
+      p_provider: provider
+    })
+    if (error) throw error
+    return Number(data) || 0
+  } catch (e) {
+    // RPC 不存在时降级：前端按当天 00:00 至今直接计数
+    console.warn('[countApiUsageToday] RPC 失败，降级前端计数', e)
+    const start = new Date()
+    start.setHours(0, 0, 0, 0)
+    const { count, error: err2 } = await supabase
+      .from('api_usage_logs')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', u)
+      .eq('service', service)
+      .eq('provider', provider)
+      .eq('status', 'success')
+      .gte('created_at', start.toISOString())
+    if (err2) throw err2
+    return Number(count) || 0
+  }
+}
+
+/** 查询本月调用量 */
+export async function countApiUsageThisMonth(service: ApiService, provider: ApiProvider): Promise<number> {
+  const u = await uid()
+  const start = new Date()
+  start.setDate(1)
+  start.setHours(0, 0, 0, 0)
+  const { count, error } = await supabase
+    .from('api_usage_logs')
+    .select('*', { count: 'exact', head: true })
+    .eq('user_id', u)
+    .eq('service', service)
+    .eq('provider', provider)
+    .eq('status', 'success')
+    .gte('created_at', start.toISOString())
+  if (error) throw error
+  return Number(count) || 0
+}
+
+/** 查询最近一段时间内的调用日志（用于折线图） */
+export async function listApiUsageLogs(params: {
+  service: ApiService
+  provider: ApiProvider
+  from: string
+  to: string
+}): Promise<ApiUsageLog[]> {
+  const u = await uid()
+  const { data, error } = await supabase
+    .from('api_usage_logs')
+    .select('*')
+    .eq('user_id', u)
+    .eq('service', params.service)
+    .eq('provider', params.provider)
+    .gte('created_at', params.from)
+    .lte('created_at', params.to)
+    .order('created_at', { ascending: true })
+  if (error) throw new Error('读取调用日志失败：' + error.message)
+  return (data as ApiUsageLog[] | null) || []
+}
+
+/** 禁用某项第三方 API 服务（配额不足时由系统自动调用） */
+export async function disableMyApi(service: ApiService): Promise<void> {
+  const u = await uid()
+  const { error } = await supabase
+    .from('third_party_apis')
+    .update({ enabled: false, updated_at: new Date().toISOString() })
+    .eq('user_id', u)
+    .eq('service', service)
+  if (error) throw new Error('自动禁用服务失败：' + error.message)
+}
+
+const QUOTA_THRESHOLD = 100
+
 /* ---------------- 解析：某服务最终使用哪个 API ---------------- */
 /**
  * 返回该账号对某服务应使用的第三方 API；返回 null 表示「未授权/未配置」，
  * 调用方应回退到默认保底源（天气→Open-Meteo；地图→OSM）。
  * 优先级：本人配置 > 超管共享 Key > 默认保底。
  */
-export async function resolveApi(service: ApiService): Promise<ResolvedApi | null> {
+export async function resolveApi(
+  service: ApiService
+): Promise<{ api: ResolvedApi | null; disabledReason?: string }> {
   const granted = await isGranted(service)
-  if (!granted) return null
+  if (!granted) return { api: null, disabledReason: '当前账号未获得第三方 API 使用授权' }
 
   const mine = await getMyApi(service)
   if (mine && mine.enabled && (mine.api_key || mine.api_url)) {
+    // 配额保护：高德 Key 在剩余 < 100 时自动禁用并回退默认源
+    if (mine.provider === 'amap' && mine.quota_protection) {
+      try {
+        const used = await countApiUsageToday(service, mine.provider)
+        const dailyLimit = Number(mine.daily_limit) || 5000
+        const remaining = dailyLimit - used
+        if (remaining < QUOTA_THRESHOLD) {
+          await disableMyApi(service)
+          return {
+            api: null,
+            disabledReason: `配额保护：今日已用 ${used} 次，日额度 ${dailyLimit}，剩余 ${remaining} 次（< 100），高德已自动禁用`
+          }
+        }
+      } catch (e) {
+        console.warn('[resolveApi] 配额检查失败，继续允许调用', e)
+      }
+    }
     return {
-      provider: mine.provider,
-      apiKey: mine.api_key || '',
-      apiUrl: mine.api_url || PROVIDER_META[mine.provider]?.url || '',
-      fromShared: false
+      api: {
+        provider: mine.provider,
+        apiKey: mine.api_key || '',
+        apiUrl: mine.api_url || PROVIDER_META[mine.provider]?.url || '',
+        fromShared: false
+      }
     }
   }
 
@@ -173,12 +314,14 @@ export async function resolveApi(service: ApiService): Promise<ResolvedApi | nul
   const sharedKey = shared[sharedProvider]
   if (sharedKey) {
     return {
-      provider: sharedProvider,
-      apiKey: sharedKey,
-      apiUrl: PROVIDER_META[sharedProvider]?.url || '',
-      fromShared: true
+      api: {
+        provider: sharedProvider,
+        apiKey: sharedKey,
+        apiUrl: PROVIDER_META[sharedProvider]?.url || '',
+        fromShared: true
+      }
     }
   }
 
-  return null
+  return { api: null, disabledReason: '未配置高德 Key，将使用 Open-Meteo 默认源' }
 }

@@ -234,7 +234,7 @@ onMounted(async () => {
 
 <style scoped>
 .fx-page {
-  padding: 20px;
+  padding: 0 20px 20px;
   max-width: 1080px;
   margin: 0 auto;
   color: var(--text);
