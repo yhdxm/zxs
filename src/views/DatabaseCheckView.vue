@@ -15,7 +15,7 @@
     </div>
 
     <div v-else-if="stats" class="db-body">
-      <!-- 容量概览：进度条 + 剩余 + 预警 -->
+      <!-- 容量概览 -->
       <div class="db-capacity" :class="usageStatus">
         <div class="db-capacity-head">
           <span class="db-capacity-title">数据库容量（免费计划 {{ formatBytes(stats.limitBytes) }}）</span>
@@ -40,30 +40,37 @@
         </div>
       </div>
 
+      <!-- 状态速览卡 -->
       <div class="db-cards">
-        <div class="db-card">
+        <div class="db-card" :class="{ bad: !stats.connected }">
+          <span class="db-card-icon" :style="{ color: stats.connected ? '#16a34a' : '#ef4444' }">
+            <el-icon><Connection /></el-icon>
+          </span>
           <div class="db-card-label">连接状态</div>
           <el-tag :type="stats.connected ? 'success' : 'danger'" effect="light">
             {{ stats.connected ? '已连接' : '连接失败' }}
           </el-tag>
         </div>
         <div class="db-card">
+          <span class="db-card-icon" :style="{ color: '#3b6fd4' }"><el-icon><Coin /></el-icon></span>
           <div class="db-card-label">数据库大小</div>
           <div class="db-card-value">{{ formatBytes(stats.dbSizeBytes) }}</div>
         </div>
         <div class="db-card">
+          <span class="db-card-icon" :style="{ color: '#8b5cf6' }"><el-icon><Grid /></el-icon></span>
           <div class="db-card-label">数据表数量</div>
           <div class="db-card-value">{{ stats.tables.length }}</div>
         </div>
         <div class="db-card">
+          <span class="db-card-icon" :style="{ color: '#0ea5e9' }"><el-icon><DataLine /></el-icon></span>
           <div class="db-card-label">总数据量（行）</div>
           <div class="db-card-value">{{ totalRows.toLocaleString() }}</div>
         </div>
       </div>
 
-      <!-- 问题 / 告警汇总（全面监测的「问题」维度） -->
-      <div class="db-section db-problems">
-        <h3>问题 / 告警</h3>
+      <!-- 问题 / 告警 -->
+      <div class="db-section">
+        <h3 class="db-section-title"><span class="bar"></span>问题 / 告警</h3>
         <div v-if="problems.length === 0" class="db-ok">
           <el-icon><SuccessFilled /></el-icon> 未发现明显问题，数据库状态正常。
         </div>
@@ -89,50 +96,84 @@
         点击 Resume 恢复，再刷新本页。
       </div>
 
-      <!-- 各表数据量与内存占比（合并：中文说明 + 行数 + 占用空间 + 空间占比，按空间从高到低实时排序） -->
+      <!-- 数据表分布：分组 + 工具栏 -->
       <div class="db-section">
-        <h3>各表数据量与空间占用（按占用空间从高到低）</h3>
-        <el-table :data="mergedTables" style="width: 100%" size="default" empty-text="暂无数据表" row-key="name">
-          <el-table-column label="数据表" min-width="220">
-            <template #default="{ row }">
-              <div class="tbl-name">{{ row.name }}</div>
-              <div class="tbl-desc">{{ tableDesc(row.name) }}</div>
-            </template>
-          </el-table-column>
-          <el-table-column prop="rows" label="行数" width="130" sortable>
-            <template #default="{ row }"><span class="row-num">{{ row.rows.toLocaleString() }}</span></template>
-          </el-table-column>
-          <el-table-column label="占用空间" width="130" sortable prop="size">
-            <template #default="{ row }">
-              <span class="row-num">{{ formatBytes(row.size) }}</span>
-            </template>
-          </el-table-column>
-          <el-table-column label="空间占比" min-width="240">
-            <template #default="{ row }">
-              <div class="mem-inline">
-                <span class="mem-pct" :class="{ danger: row.pct > 40 }">{{ row.pct }}%</span>
-                <el-progress
-                  :percentage="row.pct"
-                  :stroke-width="8"
-                  :show-text="false"
-                  :color="row.pct > 40 ? '#ef4444' : 'var(--primary)'"
-                  class="mem-bar"
-                />
+        <h3 class="db-section-title"><span class="bar"></span>各表数据量与空间占用</h3>
+
+        <div class="db-toolbar">
+          <el-input
+            v-model="search"
+            placeholder="搜索表名 / 说明"
+            :prefix-icon="Search"
+            clearable
+            class="db-search"
+          />
+          <el-radio-group v-model="filterMode" size="small">
+            <el-radio-button label="all">全部</el-radio-button>
+            <el-radio-button label="rls-off">仅看未开 RLS</el-radio-button>
+            <el-radio-button label="alert">仅看有告警</el-radio-button>
+          </el-radio-group>
+          <el-select v-model="sortMode" size="small" class="db-sort">
+            <el-option label="按占用空间" value="size" />
+            <el-option label="按行数" value="rows" />
+          </el-select>
+        </div>
+
+        <div v-if="groupedTables.length === 0" class="db-empty">没有匹配的表</div>
+
+        <div
+          v-for="g in groupedTables"
+          :key="g.key"
+          class="db-group"
+          :style="{ '--gc': g.meta.color }"
+        >
+          <div class="db-group-head">
+            <span class="db-group-dot"></span>
+            <span class="db-group-name">{{ g.meta.label }}</span>
+            <span class="db-group-count">{{ g.tables.length }} 张表</span>
+            <span class="db-group-sum">{{ formatBytes(g.totalSize) }} · {{ g.totalRows.toLocaleString() }} 行</span>
+          </div>
+
+          <div class="db-group-body">
+            <div
+              v-for="t in g.tables"
+              :key="t.name"
+              class="tbl-row"
+              :class="{ 'row-alert': tableHasAlert(t) }"
+            >
+              <div class="tbl-main">
+                <div class="tbl-name">{{ t.name }}</div>
+                <div class="tbl-desc">{{ tableDesc(t.name) }}</div>
               </div>
-            </template>
-          </el-table-column>
-          <el-table-column label="RLS" width="120">
-            <template #default="{ row }">
-              <el-tag v-if="row.rlsEnabled === true" type="success" effect="light" size="small">已启用</el-tag>
-              <el-tag v-else-if="row.rlsEnabled === false" type="danger" effect="light" size="small">未启用</el-tag>
-              <span v-else class="row-num">未知</span>
-            </template>
-          </el-table-column>
-        </el-table>
+              <div class="tbl-metrics">
+                <div class="metric">
+                  <span class="m-label">行数</span>
+                  <span class="m-val">{{ t.rows.toLocaleString() }}</span>
+                </div>
+                <div class="metric">
+                  <span class="m-label">占用</span>
+                  <span class="m-val">{{ formatBytes(t.size) }}</span>
+                </div>
+                <div class="metric metric-bar">
+                  <span class="m-label">占比</span>
+                  <div class="m-track">
+                    <div class="m-fill" :class="{ danger: t.pct > 40 }" :style="{ width: t.pct + '%' }"></div>
+                  </div>
+                  <span class="m-pct">{{ t.pct }}%</span>
+                </div>
+                <div class="metric">
+                  <el-tag v-if="t.rlsEnabled === true" type="success" effect="light" size="small">RLS 开</el-tag>
+                  <el-tag v-else-if="t.rlsEnabled === false" type="danger" effect="light" size="small">RLS 关</el-tag>
+                  <span v-else class="m-val muted">未知</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <p class="db-tip">
-          说明：中文说明用于快速识别业务表用途；新表建好后自动出现在此（来自 Supabase 实时统计）。
-          未登记的表会按表名智能推测中文说明，可在 <code>DatabaseCheckView.vue</code> 的 <code>TABLE_DESC</code> 中补充正式说明。
-          RLS 列显示该表是否启用行级安全，「未启用」为高危项（见上方「问题 / 告警」）。
+          说明：表按业务域分组展示；新表建好后自动出现（来自 Supabase 实时统计），未登记的表会按表名智能推测说明，
+          可在 <code>DatabaseCheckView.vue</code> 的 <code>TABLE_DESC</code> 补充。RLS 列显示行级安全状态，「未启用」为高危项（见上方「问题 / 告警」）。
         </p>
       </div>
 
@@ -148,12 +189,16 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { Refresh, Loading, WarningFilled, SuccessFilled, InfoFilled } from '@element-plus/icons-vue'
+import {
+  Refresh, Loading, WarningFilled, SuccessFilled, InfoFilled,
+  Search, Connection, Coin, Grid, DataLine
+} from '@element-plus/icons-vue'
 import { getDatabaseStats, type DatabaseStats } from '../services/appDataService'
 
 /** 数据表中文说明映射，便于快速查询业务表用途 */
 const TABLE_DESC: Record<string, string> = {
   app_accounts: '用户账号表：存储登录账号、密码哈希、角色与禁用状态',
+  user_info: '用户账号信息表：登录账号、密码、角色、状态等核心认证信息',
   profiles: '用户资料表：昵称、角色配置、AI 配置（密钥仅本地存储）',
   app_settings: '应用配置表：角色权限、系统级开关、自动化缓存天数等键值配置',
   app_dashboard_data: '看板数据表：各用户工作台数据快照',
@@ -179,43 +224,38 @@ const TABLE_DESC: Record<string, string> = {
 
 /** Supabase 平台托管的系统表（多建在 public 模式下但由平台管理、默认不开 RLS），不纳入「业务表未开 RLS」告警，避免误报 */
 const SYSTEM_TABLES = new Set([
-  'schema_migrations',
-  'supabase_migrations',
-  'migrations',
-  'audit_log_entries',
-  'instances',
-  'users',
-  'refresh_tokens',
-  'one_time_tokens',
-  'sessions',
-  'identities',
-  'mfa_factors',
-  'mfa_amr_claims',
-  'mfa_challenges',
-  'flow_state',
-  'saml_providers',
-  'saml_relay_states',
-  'sso_providers',
-  'sso_domains',
-  'oauth_providers',
-  'oauth_clients',
-  'oauth_consents',
-  'oauth_authorizations',
-  'oauth_client_states',
-  'custom_oauth_providers',
-  'webauthn_credentials',
-  'webauthn_challenges',
-  'subscription',
-  'secrets',
-  'objects',
-  'buckets',
-  'buckets_analytics',
-  'buckets_vectors',
-  's3_multipart_uploads',
-  's3_multipart_uploads_parts',
-  'vector_indexes',
-  'user_info'
+  'schema_migrations', 'supabase_migrations', 'migrations', 'audit_log_entries', 'instances',
+  'users', 'refresh_tokens', 'one_time_tokens', 'sessions', 'identities',
+  'mfa_factors', 'mfa_amr_claims', 'mfa_challenges', 'flow_state',
+  'saml_providers', 'saml_relay_states', 'sso_providers', 'sso_domains',
+  'oauth_providers', 'oauth_clients', 'oauth_consents', 'oauth_authorizations',
+  'oauth_client_states', 'custom_oauth_providers', 'webauthn_credentials',
+  'webauthn_challenges', 'subscription', 'secrets', 'objects', 'buckets',
+  'buckets_analytics', 'buckets_vectors', 's3_multipart_uploads',
+  's3_multipart_uploads_parts', 'vector_indexes'
 ])
+
+/** 表名 → 业务域分组 */
+const TABLE_GROUP: Record<string, string> = {
+  app_accounts: 'auth', user_info: 'auth', profiles: 'auth', app_settings: 'auth',
+  free_model_catalog: 'ai', ai_keys: 'ai', model_usage: 'ai', usage_records: 'ai',
+  custom_free_models: 'ai', shared_free_api_keys: 'ai', model_bookmarks: 'ai',
+  app_dashboard_data: 'biz', news_daily: 'biz', external_ideas: 'biz', automation_info: 'biz',
+  todos: 'biz', points: 'biz', contents: 'biz',
+  car_watchlist: 'xingyu',
+  learn_progress: 'learn', learn_bookmarks: 'learn', learn_reading: 'learn'
+}
+
+/** 业务域元信息：中文名 + 主题色（浅色主题下的柔和色，用于分组色条与标识） */
+const GROUP_META: Record<string, { label: string; color: string }> = {
+  auth: { label: '认证与账号', color: '#3b6fd4' },
+  ai: { label: 'AI 与模型', color: '#8b5cf6' },
+  biz: { label: '业务数据', color: '#0ea5e9' },
+  xingyu: { label: '星舆识途', color: '#f59e0b' },
+  learn: { label: '学习中心', color: '#10b981' },
+  archive: { label: '消息归档', color: '#ec4899' },
+  other: { label: '其他表', color: '#64748b' }
+}
 
 /** 常见表名片段 → 中文词，用于未登记表的智能推测说明 */
 const WORD_MAP: Record<string, string> = {
@@ -229,16 +269,18 @@ const WORD_MAP: Record<string, string> = {
   category: '分类', comment: '评论', config: '配置', session: '会话'
 }
 
-/** 未登记的表自动按表名片段拼出中文说明，避免显示「未登记」 */
+function groupKeyOf(name: string): string {
+  if (/^messages_\d{4}_\d{2}_\d{2}$/.test(name)) return 'archive'
+  return TABLE_GROUP[name] || 'other'
+}
+
 function guessDesc(name: string): string {
   const parts = String(name).split(/[_-]/).filter(Boolean)
   const segs = parts.map((p) => WORD_MAP[p.toLowerCase()] || p)
-  const cn = segs.join('')
-  return `（推测）${cn}表：自动识别到的数据表，建议在 TABLE_DESC 补充正式说明`
+  return `（推测）${segs.join('')}表：自动识别到的数据表，建议在 TABLE_DESC 补充正式说明`
 }
 
 function tableDesc(name: string): string {
-  // 按日期分区的消息历史表（messages_YYYY_MM_DD），统一识别为正式说明，避免缺中文说明告警
   if (/^messages_\d{4}_\d{2}_\d{2}$/.test(name)) {
     return '消息历史分表（按日期）：自动化/对话产生的消息归档，按天分表存储'
   }
@@ -248,59 +290,84 @@ function tableDesc(name: string): string {
 const stats = ref<DatabaseStats | null>(null)
 const loading = ref(false)
 
+/** 工具栏状态 */
+const search = ref('')
+const filterMode = ref<'all' | 'rls-off' | 'alert'>('all')
+const sortMode = ref<'size' | 'rows'>('size')
+
 const totalRows = computed(() =>
   stats.value ? stats.value.tables.reduce((s, t) => s + t.rows, 0) : 0
 )
 
-/** 全部表的占用空间总和（用于计算各表占比） */
 const totalSize = computed(() =>
   stats.value ? stats.value.tables.reduce((s, t) => s + (Number(t.sizeBytes) || 0), 0) : 0
 )
 
-/** 合并表：表名 + 中文说明 + 行数 + 占用空间 + 空间占比(%)，按占用空间从高到低实时排序 */
+/** 合并表（去重 + 算占比），合并表格渲染基础数据 */
 const mergedTables = computed(() => {
   if (!stats.value) return []
-  // 同名表去重（pg_stat 偶发重复，如 schema_migrations 在多个模式各一条），优先保留 RLS 已启用的一条
   const byName = new Map<string, { name: string; rows: number; size: number; rlsEnabled?: boolean; schema?: string; pct: number }>()
   for (const t of stats.value.tables) {
     const size = Number(t.sizeBytes) || 0
     const prev = byName.get(t.name)
     if (!prev || (prev.rlsEnabled !== true && t.rlsEnabled === true)) {
       byName.set(t.name, {
-        name: t.name,
-        rows: Number(t.rows) || 0,
-        size,
-        rlsEnabled: t.rlsEnabled,
-        schema: t.schema,
-        pct: 0
+        name: t.name, rows: Number(t.rows) || 0, size,
+        rlsEnabled: t.rlsEnabled, schema: t.schema, pct: 0
       })
     }
   }
-  return [...byName.values()]
-    .map((t) => ({
-      ...t,
-      pct: totalSize.value > 0 ? Math.round((t.size / totalSize.value) * 1000) / 10 : 0
-    }))
-    .sort((a, b) => b.size - a.size) // 占用空间从高到低
+  return [...byName.values()].map((t) => ({
+    ...t,
+    pct: totalSize.value > 0 ? Math.round((t.size / totalSize.value) * 1000) / 10 : 0
+  }))
 })
 
-function memPercent(size: number): number {
-  if (!size || !totalSize.value) return 0
-  return Math.min(100, Math.round((size / totalSize.value) * 100))
+/** 某表是否触发告警（业务表未开 RLS 或缺少说明，且非系统表） */
+function tableHasAlert(t: { name: string; rlsEnabled?: boolean }): boolean {
+  if (SYSTEM_TABLES.has(t.name)) return false
+  if (t.rlsEnabled === false) return true
+  if (tableDesc(t.name).startsWith('（推测）')) return true
+  return false
 }
 
-/**
- * 数据库问题与告警汇总（全面监测的「问题」维度）：
- * - 连接失败 / 容量预警
- * - 表未启用 RLS（已知为 false 才告警，未知不误报）
- * - 表缺少正式中文说明（TABLE_DESC 未登记，显示「推测」）
- * level: danger(严重) | warn(警告) | info(提示)
- */
+/** 工具栏过滤后的表 */
+const filteredTables = computed(() => {
+  let arr = mergedTables.value
+  const q = search.value.trim().toLowerCase()
+  if (q) {
+    arr = arr.filter(
+      (t) => t.name.toLowerCase().includes(q) || tableDesc(t.name).toLowerCase().includes(q)
+    )
+  }
+  if (filterMode.value === 'rls-off') arr = arr.filter((t) => t.rlsEnabled === false)
+  else if (filterMode.value === 'alert') arr = arr.filter((t) => tableHasAlert(t))
+  return arr
+})
+
+/** 按业务域分组（用于卡片化展示），组内按工具栏排序 */
+const groupedTables = computed(() => {
+  const buckets: Record<string, typeof filteredTables.value> = {}
+  for (const t of filteredTables.value) {
+    const key = groupKeyOf(t.name)
+    ;(buckets[key] ||= []).push(t)
+  }
+  return Object.keys(GROUP_META)
+    .filter((k) => buckets[k]?.length)
+    .map((k) => {
+      const tables = [...buckets[k]].sort((a, b) =>
+        sortMode.value === 'rows' ? b.rows - a.rows : b.size - a.size
+      )
+      const totalRows = tables.reduce((s, t) => s + t.rows, 0)
+      const totalSize = tables.reduce((s, t) => s + t.size, 0)
+      return { key: k, meta: GROUP_META[k], tables, totalRows, totalSize }
+    })
+})
+
 const problems = computed(() => {
   const list: { level: 'danger' | 'warn' | 'info'; text: string }[] = []
   const s = stats.value
   if (!s) return list
-  // 降级模式：没跑 supabase_stats.sql 时 dbSizeBytes 恒为 0，看不到空间/RLS——明确提示，避免误以为「一切正常」
   if (!s.dbSizeBytes) {
     list.push({
       level: 'info',
@@ -319,10 +386,7 @@ const problems = computed(() => {
     list.push({ level: 'warn', text: '数据库容量使用已超过 80%，建议清理旧数据或导出归档，避免写入受限。' })
   }
   for (const t of mergedTables.value) {
-    // Supabase 托管系统表（即使在 public 模式）默认不开 RLS、且不对 anon 开放，属正常，跳过避免误报
     if (SYSTEM_TABLES.has(t.name)) continue
-    // 业务表未开 RLS → 危险：任何人（含未登录）都可直读/直写，存在越权与数据泄露风险
-    // 不依赖 schema 字段（旧 SQL 不返回 schema 也能告警），靠系统表白名单排除平台表
     if (t.rlsEnabled === false) {
       list.push({ level: 'danger', text: `业务表「${t.name}」未启用行级安全（RLS），任何人（含未登录）都可直读/直写，存在越权与数据泄露风险，请尽快开启 RLS 并配置策略。` })
     }
@@ -399,7 +463,7 @@ onMounted(runCheck)
   align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
-  margin-bottom: 20px;
+  margin-bottom: 22px;
 }
 .db-header h2 {
   margin: 0 0 6px;
@@ -419,22 +483,21 @@ onMounted(runCheck)
   padding: 40px 0;
   justify-content: center;
 }
-.is-loading {
-  animation: rotating 1.2s linear infinite;
-}
-@keyframes rotating {
-  to { transform: rotate(360deg); }
-}
+.is-loading { animation: rotating 1.2s linear infinite; }
+@keyframes rotating { to { transform: rotate(360deg); } }
 
 /* 容量概览 */
 .db-capacity {
   background: var(--surface);
   border: 1px solid var(--border);
+  border-left: 4px solid var(--primary);
   border-radius: 14px;
   padding: 18px;
-  margin-bottom: 18px;
+  margin-bottom: 20px;
   box-shadow: var(--shadow-card);
 }
+.db-capacity.warn { border-left-color: #f59e0b; }
+.db-capacity.danger { border-left-color: #ef4444; }
 .db-capacity-head {
   display: flex;
   align-items: center;
@@ -480,18 +543,35 @@ onMounted(runCheck)
   color: #b91c1c;
 }
 
+/* 状态速览卡 */
 .db-cards {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 14px;
-  margin-bottom: 22px;
+  margin-bottom: 24px;
 }
 .db-card {
+  position: relative;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 14px;
-  padding: 16px;
+  padding: 16px 16px 16px 18px;
   box-shadow: var(--shadow-card);
+  overflow: hidden;
+}
+.db-card::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 3px;
+  background: var(--primary);
+  opacity: 0.85;
+}
+.db-card.bad::before { background: #ef4444; }
+.db-card-icon {
+  display: inline-flex;
+  font-size: 20px;
+  margin-bottom: 8px;
 }
 .db-card-label {
   font-size: 12px;
@@ -503,23 +583,110 @@ onMounted(runCheck)
   font-weight: 800;
   color: var(--primary);
 }
+
+/* 通用区块卡片 + 标题色条 */
 .db-section {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 14px;
-  padding: 18px;
-  margin-bottom: 18px;
+  padding: 20px;
+  margin-bottom: 22px;
+  box-shadow: var(--shadow-card);
 }
-.db-section h3 {
-  margin: 0 0 14px;
-  font-size: 15px;
+.db-section-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 16px;
+  font-size: 16px;
+  font-weight: 700;
   color: var(--text-strong);
 }
+.db-section-title .bar {
+  width: 4px;
+  height: 18px;
+  border-radius: 3px;
+  background: var(--primary);
+}
+
+/* 工具栏 */
+.db-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+.db-search { max-width: 280px; flex: 1 1 220px; }
+.db-sort { width: 140px; }
+
+/* 分组卡片 */
+.db-group {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  margin-bottom: 14px;
+  overflow: hidden;
+  background: var(--surface-soft);
+}
+.db-group:last-child { margin-bottom: 0; }
+.db-group-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  background: color-mix(in srgb, var(--gc) 10%, var(--surface));
+  border-bottom: 1px solid var(--border);
+}
+.db-group-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--gc);
+  flex-shrink: 0;
+}
+.db-group-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-strong);
+}
+.db-group-count {
+  font-size: 12px;
+  color: var(--gc);
+  font-weight: 600;
+  background: color-mix(in srgb, var(--gc) 14%, transparent);
+  border-radius: 999px;
+  padding: 2px 10px;
+}
+.db-group-sum {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+}
+.db-group-body { padding: 6px 8px; }
+
+/* 单表行卡片 */
+.tbl-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 12px;
+  border-radius: 10px;
+  transition: background 0.15s;
+}
+.tbl-row:hover { background: var(--nav-hover); }
+.tbl-row + .tbl-row { border-top: 1px solid var(--border); }
+.tbl-row.row-alert {
+  background: rgba(220, 38, 38, 0.06);
+}
+.tbl-row.row-alert:hover { background: rgba(220, 38, 38, 0.1); }
+.tbl-main { flex: 1 1 auto; min-width: 0; }
 .tbl-name {
   font-weight: 600;
   color: var(--text-strong);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 13px;
+  word-break: break-all;
 }
 .tbl-desc {
   font-size: 12px;
@@ -527,69 +694,55 @@ onMounted(runCheck)
   margin-top: 2px;
   line-height: 1.4;
 }
-.row-num {
-  font-variant-numeric: tabular-nums;
-  font-weight: 600;
-  color: var(--text);
-}
-.db-api-note {
+.tbl-metrics {
   display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  background: var(--nav-hover);
-  border-radius: 10px;
-  padding: 12px 14px;
-  font-size: 13px;
-  color: var(--text);
-  line-height: 1.6;
+  align-items: center;
+  gap: 18px;
+  flex-shrink: 0;
 }
-.db-api-note a {
-  color: var(--primary);
-  white-space: nowrap;
-  margin-left: 4px;
-}
-
-/* 内存占比（合并表内联进度条） */
-.mem-list {
+.metric {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  align-items: flex-start;
+  gap: 3px;
+  min-width: 56px;
 }
-.mem-row-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 6px;
-  font-size: 13px;
+.m-label {
+  font-size: 11px;
+  color: var(--text-faint);
 }
-.mem-name {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  color: var(--text-strong);
-  font-weight: 600;
-}
-.mem-size {
-  color: var(--text-muted);
-  font-variant-numeric: tabular-nums;
-}
-.mem-inline {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-.mem-pct {
+.m-val {
   font-size: 13px;
   font-weight: 700;
-  color: var(--primary);
+  color: var(--text);
   font-variant-numeric: tabular-nums;
-  flex-shrink: 0;
-  min-width: 44px;
 }
-.mem-pct.danger {
-  color: #ef4444;
+.m-val.muted { color: var(--text-faint); font-weight: 500; }
+.metric-bar { min-width: 120px; }
+.m-track {
+  width: 100%;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--surface-soft);
+  overflow: hidden;
 }
-.mem-bar {
-  flex: 1;
-  min-width: 80px;
+.m-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--primary);
+  transition: width 0.3s;
+}
+.m-fill.danger { background: #ef4444; }
+.m-pct {
+  font-size: 11px;
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+}
+.db-empty {
+  text-align: center;
+  color: var(--text-faint);
+  padding: 30px 0;
+  font-size: 13px;
 }
 
 .db-error {
@@ -613,7 +766,7 @@ onMounted(runCheck)
 }
 
 /* 问题 / 告警面板 */
-.db-problems .db-ok {
+.db-ok {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -641,27 +794,23 @@ onMounted(runCheck)
   font-size: 13px;
   line-height: 1.6;
 }
-.db-problem-item .el-icon {
-  margin-top: 2px;
-  flex-shrink: 0;
-}
-.db-problem-item.danger {
-  background: rgba(220, 38, 38, 0.12);
-  color: #b91c1c;
-}
-.db-problem-item.warn {
-  background: rgba(217, 119, 6, 0.12);
-  color: #b45309;
-}
-.db-problem-item.info {
-  background: var(--nav-hover);
-  color: var(--text);
-}
+.db-problem-item .el-icon { margin-top: 2px; flex-shrink: 0; }
+.db-problem-item.danger { background: rgba(220, 38, 38, 0.12); color: #b91c1c; }
+.db-problem-item.warn { background: rgba(217, 119, 6, 0.12); color: #b45309; }
+.db-problem-item.info { background: var(--nav-hover); color: var(--text); }
 
 @media (max-width: 768px) {
   .db-check { padding: 16px; }
   .db-header { flex-direction: column; }
   .db-cards { grid-template-columns: repeat(2, 1fr); }
   .db-capacity-time { margin-left: 0; width: 100%; }
+  .tbl-row { flex-wrap: wrap; }
+  .tbl-metrics {
+    width: 100%;
+    gap: 12px;
+    flex-wrap: wrap;
+    justify-content: space-between;
+  }
+  .metric-bar { flex: 1 1 100%; min-width: 0; }
 }
 </style>

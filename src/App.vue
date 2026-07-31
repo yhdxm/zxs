@@ -104,7 +104,6 @@
           <el-button text class="menu-btn" @click="mobileNavVisible = true">
             <el-icon><Menu /></el-icon>
           </el-button>
-          <span class="page-title">{{ currentTitle }}</span>
         </div>
         <div class="topbar-user">
           <span class="user-avatar">{{ avatarText }}</span>
@@ -505,36 +504,7 @@ const goMenu = (item: SideItem) => {
   router.push(item.to)
 }
 
-const currentTitle = computed(() => {
-  if (route.path === '/ai') return 'AI 助手'
-  if (route.path === '/models') return '模型中心'
-  if (route.path === '/requirements') return '需求收集'
-  if (route.path === '/database') return '数据库监测中心'
-  if (route.path === '/news') return '新闻聚合'
-  if (route.path === '/yingcang') return '影仓智核'
-  if (route.path === '/xingyu') return '星舆识途'
-  if (route.path === '/aimodels') return 'AI 模型知识'
-  if (route.path === '/learn/english') return '学位英语'
-  if (route.path === '/learn/industry') return '各行业知识'
-  if (route.path === '/learn/books') return '书籍阅读'
-  if (route.path === '/weather') return '实时天气'
-  if (route.path === '/map') return '地图定位'
-  if (route.path === '/automation') return '沸爻机'
-  if (route.path === '/system') {
-    const v = route.query.view || 'accounts'
-    if (v === 'roles') return '角色权限'
-    return '账号管理'
-  }
-  if (route.path === '/account') return '个人设置'
-  if (route.path === '/dashboard') {
-    const v = route.query.view || 'overview'
-    if (v === 'todos') return '待办'
-    if (v === 'points') return '点位'
-    if (v === 'contents') return '内容'
-    return '数据看板'
-  }
-  return 'Smart Dashboard'
-})
+// 页面标题由各视图自身渲染（单一标题铁律），顶部 topbar 不再重复展示
 
 /* ===== 未登录：全局侧边栏菜单 ===== */
 const menuItems = computed(() => [
@@ -994,14 +964,6 @@ onMounted(async () => {
   min-width: 0;
 }
 .menu-btn { padding: 4px 8px; display: none; }
-.page-title {
-  font-size: 17px;
-  font-weight: 700;
-  color: var(--text-strong);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
 .topbar-user {
   display: flex;
   align-items: center;
@@ -1169,7 +1131,6 @@ onMounted(async () => {
   .app-sidebar { display: none; }
   .menu-btn { display: inline-flex; }
   .app-topbar { padding: 0 14px; height: 56px; }
-  .page-title { font-size: 15px; }
   .user-nickname { max-width: 80px; }
   .sidebar { display: none; }
   .mobile-topbar { display: flex; }
