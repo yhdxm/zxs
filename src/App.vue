@@ -679,28 +679,33 @@ onMounted(async () => {
   pointer-events: none;
 }
 
-/* 折叠/展开按钮（PC 端，侧边栏底部三角形按钮） */
+/* 折叠/展开按钮（PC 端，侧边栏垂直居中悬浮按钮） */
 .side-collapse {
-  position: relative;
-  z-index: 1;
-  flex-shrink: 0;
-  width: 100%;
-  border: none;
-  border-top: 1px solid var(--border);
-  background: var(--surface-soft);
+  position: absolute;
+  top: 50%;
+  right: 0;
+  transform: translateY(-50%);
+  z-index: 5;
+  width: 22px;
+  height: 46px;
+  border: 1px solid var(--border);
+  border-right: none;
+  border-radius: 10px 0 0 10px;
+  background: var(--surface);
   color: var(--text-muted);
-  height: 40px;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
+  box-shadow: var(--shadow-card);
   transition: all 0.2s ease;
 }
 .side-collapse:hover {
   background: var(--nav-hover);
   color: var(--primary);
+  border-color: var(--primary);
 }
-.side-collapse :deep(svg) { font-size: 16px; transition: transform 0.2s ease; }
+.side-collapse :deep(svg) { font-size: 15px; transition: transform 0.2s ease; }
 
 /* 折叠态：仅显示图标，隐藏文字 */
 .app-shell.is-authed.collapsed .side-brand { justify-content: center; padding: 14px 0 10px; }
@@ -717,6 +722,15 @@ onMounted(async () => {
 .app-shell.is-authed.collapsed .theme-toggle { justify-content: center; }
 .app-shell.is-authed.collapsed .theme-switch { margin-left: 0; }
 .app-shell.is-authed.collapsed .commercial-card { height: 48px; }
+.app-shell.is-authed.collapsed .side-collapse {
+  left: 50%;
+  right: auto;
+  transform: translate(-50%, -50%);
+  width: 34px;
+  height: 42px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
 .app-shell.is-authed.collapsed .side-collapse :deep(svg) { transform: scale(1.1); }
 .side-brand {
   display: flex;

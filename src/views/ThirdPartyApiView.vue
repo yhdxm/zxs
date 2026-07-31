@@ -1,14 +1,6 @@
 <template>
   <div class="tp-page">
-    <header class="tp-head">
-      <div>
-        <h2>第三方 API</h2>
-        <p>
-          自行填写天气、地图等免费 API 地址与 Key，按账号隔离、互不干扰。
-          若未填写或未被授权，将自动回退到默认保底源（天气 → Open-Meteo 免费无 Key；地图 → OpenStreetMap）。
-        </p>
-      </div>
-    </header>
+    <PageHeader title="第三方 API" subtitle="自行填写天气、地图等免费 API 地址与 Key，按账号隔离、互不干扰。若未填写或未被授权，将自动回退到默认保底源（天气 → Open-Meteo 免费无 Key；地图 → OpenStreetMap）。" />
 
     <!-- 我的 API 配置 -->
     <section class="tp-section">
@@ -173,6 +165,7 @@ import {
   type AccountBasic,
   type ThirdPartyApiConfig
 } from '../services/thirdPartyApi'
+import PageHeader from '../components/PageHeader.vue'
 import {
   loadSharedFreeApiKeys,
   saveSharedFreeApiKey,
@@ -371,9 +364,6 @@ onMounted(async () => {
   margin: 0 auto;
   color: var(--text);
 }
-.tp-head { margin-bottom: 18px; }
-.tp-head h2 { margin: 0 0 6px; font-size: 22px; color: var(--text-strong); }
-.tp-head p { margin: 0; font-size: 13px; color: var(--text-muted); line-height: 1.6; max-width: 760px; }
 
 .tp-section { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 18px; margin-bottom: 18px; box-shadow: var(--shadow-card); }
 .tp-section-title { display: flex; align-items: center; gap: 10px; margin: 0 0 14px; font-size: 16px; font-weight: 700; color: var(--text-strong); }

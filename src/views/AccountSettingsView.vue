@@ -144,8 +144,9 @@ onMounted(() => {
 }
 .account-meta h2 {
   margin: 0 0 4px;
-  font-size: 20px;
-  color: #0f172a;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-strong);
 }
 .account-meta p {
   margin: 0 0 8px;

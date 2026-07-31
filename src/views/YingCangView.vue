@@ -94,8 +94,8 @@ onUnmounted(() => {
   gap: 8px;
 }
 .yc-logo {
-  font-size: 16px;
-  font-weight: 700;
+  font-size: 18px;
+  font-weight: 600;
   color: var(--text-strong);
 }
 .yc-tag {

@@ -1,14 +1,10 @@
 <template>
   <div class="ext-ideas">
-    <div class="ei-header">
-      <div>
-        <h2>外部灵感聚合</h2>
-        <p>免费聚合 GitHub 近期高星开源项目（国内可直连、无需 Key），帮助你捕捉需求与产品灵感（数据仅存浏览器本地 + 云端，不消耗任何积分）</p>
-      </div>
+    <PageHeader title="外部灵感聚合" subtitle="免费聚合 GitHub 近期高星开源项目（国内可直连、无需 Key），帮助你捕捉需求与产品灵感（数据仅存浏览器本地 + 云端，不消耗任何积分）">
       <el-button type="primary" :loading="fetching" @click="refresh">
         <el-icon><Refresh /></el-icon> 免费查询 / 刷新
       </el-button>
-    </div>
+    </PageHeader>
 
     <div class="ei-toolbar">
       <el-input
@@ -109,6 +105,7 @@ import {
   type RelatedModule
 } from '../services/externalIdeas'
 import { refreshSavedUser } from '../services/appDataService'
+import PageHeader from '../components/PageHeader.vue'
 
 const ideas = ref<ExternalIdea[]>([])
 const loading = ref(false)
@@ -303,16 +300,6 @@ onMounted(async () => {
   margin: 0 auto;
   color: var(--text);
 }
-.ei-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 18px;
-}
-.ei-header h2 { margin: 0 0 6px; font-size: 22px; color: var(--text-strong); }
-.ei-header p { margin: 0; font-size: 13px; color: var(--text-muted); max-width: 760px; line-height: 1.6; }
-
 .ei-toolbar {
   display: flex;
   flex-wrap: wrap;
@@ -366,8 +353,6 @@ onMounted(async () => {
 
 @media (max-width: 768px) {
   .ext-ideas { padding: 16px; }
-  .ei-header { flex-direction: column; }
-  .ei-header .el-button { width: 100%; }
   .ei-search { max-width: 100%; }
   .ei-source, .ei-tag { flex: 1; width: auto; }
   .ei-cache-row { flex-direction: column; align-items: stretch; }

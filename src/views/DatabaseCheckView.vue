@@ -1,14 +1,10 @@
 <template>
   <div class="db-check">
-    <div class="db-header">
-      <div>
-        <h2>数据库监测中心</h2>
-        <p>实时读取 Supabase 数据库现状、存储、数据量与容量预警（当前为免费计划，无需付费）</p>
-      </div>
+    <PageHeader title="数据库监测中心" subtitle="实时读取 Supabase 数据库现状、存储、数据量与容量预警（当前为免费计划，无需付费）">
       <el-button type="primary" :loading="loading" @click="runCheck">
         <el-icon><Refresh /></el-icon> 刷新检测
       </el-button>
-    </div>
+    </PageHeader>
 
     <div v-if="loading && !stats" class="db-loading">
       <el-icon class="is-loading"><Loading /></el-icon> 正在检测…
@@ -194,6 +190,7 @@ import {
   Search, Connection, Coin, Grid, DataLine
 } from '@element-plus/icons-vue'
 import { getDatabaseStats, type DatabaseStats } from '../services/appDataService'
+import PageHeader from '../components/PageHeader.vue'
 
 /** 数据表中文说明映射，便于快速查询业务表用途 */
 const TABLE_DESC: Record<string, string> = {
@@ -461,23 +458,6 @@ onMounted(runCheck)
   max-width: 1080px;
   margin: 0 auto;
   color: var(--text);
-}
-.db-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 22px;
-}
-.db-header h2 {
-  margin: 0 0 6px;
-  font-size: 22px;
-  color: var(--text-strong);
-}
-.db-header p {
-  margin: 0;
-  font-size: 13px;
-  color: var(--text-muted);
 }
 .db-loading {
   display: flex;
@@ -805,7 +785,6 @@ onMounted(runCheck)
 
 @media (max-width: 768px) {
   .db-check { padding: 16px; }
-  .db-header { flex-direction: column; }
   .db-cards { grid-template-columns: repeat(2, 1fr); }
   .db-capacity-time { margin-left: 0; width: 100%; }
   .tbl-row { flex-wrap: wrap; }

@@ -1390,7 +1390,7 @@ const onWindowBlur = () => {
   box-shadow: 0 8px 18px var(--accent-glow);
 }
 .mc-icon :deep(svg) { font-size: 22px; }
-.mc-title h1 { margin: 0; font-size: 20px; font-weight: 800; color: var(--text-strong); }
+.mc-title h1 { margin: 0; font-size: 18px; font-weight: 600; color: var(--text-strong); }
 .mc-title p { margin: 2px 0 0; font-size: 12px; color: var(--text-muted); }
 .mc-actions { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
 .mc-actions :deep(.el-button) { display: inline-flex; align-items: center; gap: 4px; }

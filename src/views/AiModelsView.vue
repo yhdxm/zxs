@@ -174,7 +174,7 @@ onUnmounted(() => { if (clockTimer) window.clearInterval(clockTimer) })
 .am-root { min-height: 100%; }
 .am-top { position: sticky; top: 0; z-index: 10; display: flex; align-items: center; gap: 16px; padding: 10px 24px; background: var(--surface); border-bottom: 1px solid var(--border); flex-wrap: wrap; }
 .am-brand { display: flex; align-items: baseline; gap: 8px; }
-.am-logo { font-size: 16px; font-weight: 700; color: var(--text-strong); }
+.am-logo { font-size: 18px; font-weight: 600; color: var(--text-strong); }
 .am-tag { font-size: 11px; color: var(--text-faint); }
 .am-tabs { display: flex; gap: 4px; flex: 1; flex-wrap: wrap; }
 .am-tab { font-size: 13px; padding: 6px 12px; border-radius: 8px; color: var(--text-muted); cursor: pointer; border: 1px solid transparent; }

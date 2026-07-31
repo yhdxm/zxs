@@ -304,7 +304,7 @@ onBeforeUnmount(() => {
 }
 .ai-title-icon :deep(svg) { font-size: 20px; }
 .ai-title-text { min-width: 0; }
-.ai-title h2 { margin: 0; font-size: 18px; font-weight: 800; color: var(--text-strong); }
+.ai-title h2 { margin: 0; font-size: 18px; font-weight: 600; color: var(--text-strong); }
 .ai-title p { margin: 2px 0 0; font-size: 12px; color: var(--text-muted); }
 .ai-header-actions { display: flex; gap: 8px; flex-shrink: 0; }
 .ai-header-actions :deep(.el-button) { display: inline-flex; align-items: center; gap: 4px; }

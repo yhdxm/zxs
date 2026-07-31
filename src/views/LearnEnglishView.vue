@@ -117,7 +117,7 @@ onUnmounted(() => { if (clockTimer) window.clearInterval(clockTimer) })
 .le-root { min-height: 100%; }
 .le-top { position: sticky; top: 0; z-index: 10; display: flex; align-items: center; gap: 16px; padding: 10px 24px; background: var(--surface); border-bottom: 1px solid var(--border); flex-wrap: wrap; }
 .le-brand { display: flex; align-items: baseline; gap: 8px; }
-.le-logo { font-size: 16px; font-weight: 700; color: var(--text-strong); }
+.le-logo { font-size: 18px; font-weight: 600; color: var(--text-strong); }
 .le-tag { font-size: 11px; color: var(--text-faint); }
 .le-clock-box { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; }
 .le-dot { width: 8px; height: 8px; border-radius: 50%; background: #22c55e; box-shadow: 0 0 0 3px rgba(34,197,94,.2); }

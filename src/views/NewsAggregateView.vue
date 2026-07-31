@@ -336,12 +336,9 @@ onBeforeUnmount(() => {
 }
 .np-title {
   margin: 0;
-  font-size: 20px;
-  font-weight: 800;
-  background: linear-gradient(90deg, #6366f1, #a855f7);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-strong);
 }
 .np-live {
   display: inline-flex;

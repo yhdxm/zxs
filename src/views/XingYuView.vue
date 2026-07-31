@@ -289,7 +289,7 @@ onUnmounted(() => { if (clockTimer) window.clearInterval(clockTimer) })
 .xy-root { min-height: 100%; }
 .xy-top { position: sticky; top: 0; z-index: 10; display: flex; align-items: center; gap: 16px; padding: 10px 24px; background: var(--surface); border-bottom: 1px solid var(--border); flex-wrap: wrap; }
 .xy-brand { display: flex; align-items: baseline; gap: 8px; }
-.xy-logo { font-size: 16px; font-weight: 700; color: var(--text-strong); }
+.xy-logo { font-size: 18px; font-weight: 600; color: var(--text-strong); }
 .xy-tag { font-size: 11px; color: var(--text-faint); }
 .xy-tabs { display: flex; gap: 4px; flex: 1; flex-wrap: wrap; }
 .xy-tab { font-size: 13px; padding: 6px 12px; border-radius: 8px; color: var(--text-muted); cursor: pointer; border: 1px solid transparent; }

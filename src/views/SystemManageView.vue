@@ -1,5 +1,6 @@
 <template>
   <div class="sys-page">
+    <PageHeader title="权限管理" subtitle="账号与角色权限统一管理" />
     <!-- ===== 账号管理 ===== -->
     <section v-if="activeView === 'accounts'" class="sys-section">
       <div class="section-head">
@@ -180,6 +181,7 @@ import {
   type RoleConfig,
   type PermissionNode
 } from '../services/appDataService'
+import PageHeader from '../components/PageHeader.vue'
 
 const route = useRoute()
 const router = useRouter()

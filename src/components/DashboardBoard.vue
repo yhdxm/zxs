@@ -332,7 +332,7 @@ const reportRows = computed<Array<Record<string, any>>>(() => {
   margin: 0 auto;
 }
 .board-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; padding: 4px 0 4px; }
-.board-head h2 { margin: 0 0 4px; font-size: 24px; font-weight: 800; }
+.board-head h2 { margin: 0 0 4px; font-size: 18px; font-weight: 600; color: var(--text-strong); }
 .board-head p { margin: 0; color: #64748b; font-size: 14px; }
 
 .board-switch {
