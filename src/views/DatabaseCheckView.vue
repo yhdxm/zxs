@@ -177,6 +177,46 @@ const TABLE_DESC: Record<string, string> = {
   learn_reading: '学习中心·阅读记录表：书籍阅读进度与上次位置'
 }
 
+/** Supabase 平台托管的系统表（多建在 public 模式下但由平台管理、默认不开 RLS），不纳入「业务表未开 RLS」告警，避免误报 */
+const SYSTEM_TABLES = new Set([
+  'schema_migrations',
+  'supabase_migrations',
+  'migrations',
+  'audit_log_entries',
+  'instances',
+  'users',
+  'refresh_tokens',
+  'one_time_tokens',
+  'sessions',
+  'identities',
+  'mfa_factors',
+  'mfa_amr_claims',
+  'mfa_challenges',
+  'flow_state',
+  'saml_providers',
+  'saml_relay_states',
+  'sso_providers',
+  'sso_domains',
+  'oauth_providers',
+  'oauth_clients',
+  'oauth_consents',
+  'oauth_authorizations',
+  'oauth_client_states',
+  'custom_oauth_providers',
+  'webauthn_credentials',
+  'webauthn_challenges',
+  'subscription',
+  'secrets',
+  'objects',
+  'buckets',
+  'buckets_analytics',
+  'buckets_vectors',
+  's3_multipart_uploads',
+  's3_multipart_uploads_parts',
+  'vector_indexes',
+  'user_info'
+])
+
 /** 常见表名片段 → 中文词，用于未登记表的智能推测说明 */
 const WORD_MAP: Record<string, string> = {
   account: '账号', profile: '资料', setting: '配置', dashboard: '看板',
@@ -198,6 +238,10 @@ function guessDesc(name: string): string {
 }
 
 function tableDesc(name: string): string {
+  // 按日期分区的消息历史表（messages_YYYY_MM_DD），统一识别为正式说明，避免缺中文说明告警
+  if (/^messages_\d{4}_\d{2}_\d{2}$/.test(name)) {
+    return '消息历史分表（按日期）：自动化/对话产生的消息归档，按天分表存储'
+  }
   return TABLE_DESC[name] || guessDesc(name)
 }
 
@@ -216,17 +260,27 @@ const totalSize = computed(() =>
 /** 合并表：表名 + 中文说明 + 行数 + 占用空间 + 空间占比(%)，按占用空间从高到低实时排序 */
 const mergedTables = computed(() => {
   if (!stats.value) return []
-  return [...stats.value.tables]
-    .map((t) => {
-      const size = Number(t.sizeBytes) || 0
-      return {
+  // 同名表去重（pg_stat 偶发重复，如 schema_migrations 在多个模式各一条），优先保留 RLS 已启用的一条
+  const byName = new Map<string, { name: string; rows: number; size: number; rlsEnabled?: boolean; schema?: string; pct: number }>()
+  for (const t of stats.value.tables) {
+    const size = Number(t.sizeBytes) || 0
+    const prev = byName.get(t.name)
+    if (!prev || (prev.rlsEnabled !== true && t.rlsEnabled === true)) {
+      byName.set(t.name, {
         name: t.name,
         rows: Number(t.rows) || 0,
         size,
         rlsEnabled: t.rlsEnabled,
-        pct: totalSize.value > 0 ? Math.round((size / totalSize.value) * 1000) / 10 : 0
-      }
-    })
+        schema: t.schema,
+        pct: 0
+      })
+    }
+  }
+  return [...byName.values()]
+    .map((t) => ({
+      ...t,
+      pct: totalSize.value > 0 ? Math.round((t.size / totalSize.value) * 1000) / 10 : 0
+    }))
     .sort((a, b) => b.size - a.size) // 占用空间从高到低
 })
 
@@ -246,6 +300,13 @@ const problems = computed(() => {
   const list: { level: 'danger' | 'warn' | 'info'; text: string }[] = []
   const s = stats.value
   if (!s) return list
+  // 降级模式：没跑 supabase_stats.sql 时 dbSizeBytes 恒为 0，看不到空间/RLS——明确提示，避免误以为「一切正常」
+  if (!s.dbSizeBytes) {
+    list.push({
+      level: 'info',
+      text: '当前为降级统计（逐表 count），看不到库总大小 / 各表空间 / RLS 状态。请在 Supabase 执行 scripts/supabase_stats.sql 启用精确统计，监测才算完整。'
+    })
+  }
   if (!s.connected) {
     list.push({
       level: 'danger',
@@ -258,11 +319,15 @@ const problems = computed(() => {
     list.push({ level: 'warn', text: '数据库容量使用已超过 80%，建议清理旧数据或导出归档，避免写入受限。' })
   }
   for (const t of mergedTables.value) {
+    // Supabase 托管系统表（即使在 public 模式）默认不开 RLS、且不对 anon 开放，属正常，跳过避免误报
+    if (SYSTEM_TABLES.has(t.name)) continue
+    // 业务表未开 RLS → 危险：任何人（含未登录）都可直读/直写，存在越权与数据泄露风险
+    // 不依赖 schema 字段（旧 SQL 不返回 schema 也能告警），靠系统表白名单排除平台表
     if (t.rlsEnabled === false) {
-      list.push({ level: 'danger', text: `表「${t.name}」未启用行级安全（RLS），存在越权读取风险，请尽快开启 RLS。` })
+      list.push({ level: 'danger', text: `业务表「${t.name}」未启用行级安全（RLS），任何人（含未登录）都可直读/直写，存在越权与数据泄露风险，请尽快开启 RLS 并配置策略。` })
     }
     if (tableDesc(t.name).startsWith('（推测）')) {
-      list.push({ level: 'info', text: `表「${t.name}」缺少正式中文说明，建议在 DatabaseCheckView.vue 的 TABLE_DESC 补充。` })
+      list.push({ level: 'info', text: `业务表「${t.name}」缺少正式中文说明，建议在 DatabaseCheckView.vue 的 TABLE_DESC 补充。` })
     }
   }
   return list

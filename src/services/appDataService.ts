@@ -374,6 +374,8 @@ export interface TableRowStat {
   sizeBytes?: number
   /** 该表是否启用了行级安全（RLS）；仅精确统计（RPC）可返回，降级路径为 undefined */
   rlsEnabled?: boolean
+  /** 所属模式（schema）；精确统计（RPC）返回，降级路径为 undefined。仅 public 模式下的业务表才纳入 RLS 告警 */
+  schema?: string
 }
 
 export interface DatabaseStats {
@@ -406,16 +408,24 @@ export async function getDatabaseStats(): Promise<DatabaseStats> {
     limitBytes: FREE_DB_LIMIT
   }
   try {
-    const { data, error } = await supabase.rpc('get_database_stats').maybeSingle()
-    const raw = (data ?? null) as { db_size_bytes?: number; tables?: Array<{ name: string; rows: number; size_bytes?: number; rls_enabled?: boolean }> } | null
-    if (!error && raw) {
-      result.dbSizeBytes = Number(raw.db_size_bytes) || 0
-      if (Array.isArray(raw.tables)) {
-        result.tables = raw.tables.map((t) => ({
+    // 该 RPC 返回 json 标量（非表），不要用 maybeSingle()（那是为「返回表的 0/1 行」设计的）。
+    // Supabase 对标量函数可能直接返回 json 对象，也可能包一层 { get_database_stats: {...} }，两种都兼容解析。
+    const { data, error } = await supabase.rpc('get_database_stats')
+    const raw = (data ?? null) as
+      | { db_size_bytes?: number; tables?: Array<{ name: string; rows: number; size_bytes?: number; rls_enabled?: boolean; schema?: string }> }
+      | { get_database_stats?: { db_size_bytes?: number; tables?: Array<{ name: string; rows: number; size_bytes?: number; rls_enabled?: boolean; schema?: string }> } }
+      | null
+    const payload =
+      raw && 'get_database_stats' in raw && raw.get_database_stats ? raw.get_database_stats : raw
+    if (!error && payload) {
+      result.dbSizeBytes = Number(payload.db_size_bytes) || 0
+      if (Array.isArray(payload.tables)) {
+        result.tables = payload.tables.map((t) => ({
           name: t.name,
           rows: Number(t.rows) || 0,
           sizeBytes: Number(t.size_bytes) || 0,
-          rlsEnabled: t.rls_enabled === true
+          rlsEnabled: t.rls_enabled === true,
+          schema: t.schema
         }))
       }
     } else {
@@ -442,9 +452,9 @@ export async function getDatabaseStats(): Promise<DatabaseStats> {
       for (const name of tables) {
         try {
           const { count } = await supabase.from(name).select('*', { count: 'exact', head: true })
-          result.tables.push({ name, rows: Number(count) || 0 })
+          result.tables.push({ name, rows: Number(count) || 0, schema: 'public' })
         } catch {
-          result.tables.push({ name, rows: 0 })
+          result.tables.push({ name, rows: 0, schema: 'public' })
         }
       }
     }

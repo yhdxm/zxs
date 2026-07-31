@@ -10,19 +10,22 @@ returns json
 language sql
 security definer
 as $$
-  select json_build_object(
-    'db_size_bytes', pg_database_size(current_database()),
-    'tables', coalesce((
-      select json_agg(json_build_object(
-        'name', t.relname,
-        'rows', t.n_live_tup::bigint,
-        'size_bytes', pg_total_relation_size(t.relid)::bigint,
-        'rls_enabled', c.relrowsecurity
-      ) order by pg_total_relation_size(t.relid) desc)
-      from pg_stat_user_tables t
-      join pg_class c on c.oid = t.relid
-    ), '[]'::json)
-  );
+    select json_build_object(
+      'db_size_bytes', pg_database_size(current_database()),
+      'tables', coalesce((
+        select json_agg(json_build_object(
+          'name', t.relname,
+          'schema', t.schemaname,
+          'rows', t.n_live_tup::bigint,
+          'size_bytes', pg_total_relation_size(t.relid)::bigint,
+          'rls_enabled', c.relrowsecurity
+        ) order by pg_total_relation_size(t.relid) desc)
+        -- 只统计 public 模式（应用业务表）；auth/storage 等 Supabase 内置模式由平台托管、默认不开放 anon，不应纳入「业务表未开 RLS」告警
+        from pg_stat_user_tables t
+        join pg_class c on c.oid = t.relid
+        where t.schemaname = 'public'
+      ), '[]'::json)
+    );
 $$;
 
 -- 本项目为「自建账号表 + 纯前端」架构，客户端一律以 anon 角色连接数据库，
