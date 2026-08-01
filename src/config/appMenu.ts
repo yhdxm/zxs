@@ -19,7 +19,8 @@ import {
   List,
   Setting,
   User,
-  Cpu
+  Cpu,
+  ChatLineSquare
 } from '@element-plus/icons-vue'
 
 export interface SideItem {
@@ -107,6 +108,13 @@ export const APP_MENU: SideItem[] = [
     ]
   },
   {
+    key: 'feedback',
+    label: '意见反馈',
+    icon: ChatLineSquare,
+    permissionKey: 'feedback',
+    to: '/feedback'
+  },
+  {
     key: 'system',
     label: '权限管理',
     icon: Setting,
@@ -115,7 +123,9 @@ export const APP_MENU: SideItem[] = [
     permissionKey: 'system',
     children: [
       { key: 'system-accounts', label: '账号管理', permissionKey: 'system.accounts', to: '/system?view=accounts' },
-      { key: 'system-roles', label: '角色权限', permissionKey: 'system.roles', to: '/system?view=roles' }
+      { key: 'system-roles', label: '角色权限', permissionKey: 'system.roles', to: '/system?view=roles' },
+      // 反馈管理：仅超级管理员可见（普通管理员/子账号无入口；视图内 isFeedbackAdmin() 二次拦截）
+      { key: 'feedback-admin', label: '反馈管理', permissionKey: 'feedback.admin', to: '/feedback-admin', visible: (u) => u?.role === 'superadmin' }
     ]
   },
   { key: 'account', label: '个人设置', icon: User, to: '/account' }

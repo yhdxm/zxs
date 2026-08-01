@@ -19,6 +19,8 @@ import LearnEnglishView from '../views/LearnEnglishView.vue'
 import LearnIndustryView from '../views/LearnIndustryView.vue'
 import LearnBooksView from '../views/LearnBooksView.vue'
 import ThirdPartyApiView from '../views/ThirdPartyApiView.vue'
+import FeedbackView from '../views/FeedbackView.vue'
+import FeedbackAdminView from '../views/FeedbackAdminView.vue'
 import { hasPermission, loadPermissionConfig, getSavedUser } from '../services/appDataService'
 
 // 数据看板（同一路由 /dashboard 通过 query.view 区分）的细粒度权限映射
@@ -152,6 +154,18 @@ const router = createRouter({
       name: 'third-api',
       component: ThirdPartyApiView,
       meta: { requirePermission: 'third-api' }
+    },
+    {
+      path: '/feedback',
+      name: 'feedback',
+      component: FeedbackView,
+      meta: { requirePermission: 'feedback' }
+    },
+    {
+      path: '/feedback-admin',
+      name: 'feedback-admin',
+      component: FeedbackAdminView,
+      meta: { requirePermission: 'feedback.admin' }
     }
   ]
 })

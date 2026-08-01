@@ -406,9 +406,11 @@ const isMenuActive = (key: string) => {
   if (key === 'requirements') return route.path === '/requirements'
   if (key === 'automation') return route.path === '/automation'
   if (key === 'worktasks') return route.path === '/dashboard' && ['overview', 'todos', 'points', 'contents'].includes((route.query.view as string) || '')
-  if (key === 'system') return route.path === '/system'
+  if (key === 'system') return route.path === '/system' || route.path === '/feedback-admin'
   if (key === 'system-accounts') return route.path === '/system' && (route.query.view || 'accounts') === 'accounts'
   if (key === 'system-roles') return route.path === '/system' && route.query.view === 'roles'
+  if (key === 'feedback') return route.path === '/feedback'
+  if (key === 'feedback-admin') return route.path === '/feedback-admin'
   if (key === 'account') return route.path === '/account'
   if (key === 'overview') return route.path === '/dashboard' && (route.query.view || 'overview') === 'overview'
   return route.path === '/dashboard' && route.query.view === key

@@ -169,7 +169,8 @@ const baseKeyOf = (k: string): string => k.replace(/\.(pc|mobile)$/, '')
 const USER_ALLOWED_BASES = new Set<string>([
   'news', 'yingcang', 'xingyu', 'weather', 'map', 'third-api',
   'learn-english', 'learn-industry', 'learn-books',
-  'requirements', 'dashboard', 'todos', 'points', 'contents'
+  'requirements', 'dashboard', 'todos', 'points', 'contents',
+  'feedback'
 ])
 
 export const DEFAULT_ROLE_CONFIG: PermissionConfig = {
@@ -185,7 +186,7 @@ export const DEFAULT_ROLE_CONFIG: PermissionConfig = {
       key: 'admin',
       name: '管理员',
       description: '可进入系统管理与数据库监测，管理普通用户账号与业务数据。',
-      permissions: ALL_PERMISSION_KEYS.filter((k) => !k.startsWith('system.roles.'))
+      permissions: ALL_PERMISSION_KEYS.filter((k) => !k.startsWith('system.roles.') && !k.startsWith('feedback.admin.'))
     },
     {
       key: 'user',
@@ -447,7 +448,9 @@ export async function getDatabaseStats(): Promise<DatabaseStats> {
         'learn_reading',
         'third_party_apis',
         'api_grants',
-        'api_usage_logs'
+        'api_usage_logs',
+        'feedbacks',
+        'feedback_replies'
       ]
       for (const name of tables) {
         try {
