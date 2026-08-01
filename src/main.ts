@@ -25,6 +25,25 @@ app.use(router)
 app.use(ElementPlus, { locale: zhCn })
 app.use(Vant)
 
+// 全局运行时错误兜底层：任何渲染/逻辑异常都变为可见红条，避免静默白屏（如移动端崩溃难以排查）
+app.config.errorHandler = (err, _instance, info) => {
+  const msg = err instanceof Error ? err.message : String(err)
+  console.error('[全局错误]', info, err)
+  if (typeof document !== 'undefined') {
+    let bar = document.getElementById('global-error-bar')
+    if (!bar) {
+      bar = document.createElement('div')
+      bar.id = 'global-error-bar'
+      bar.style.cssText =
+        'position:fixed;top:0;left:0;right:0;z-index:99999;background:#ef4444;color:#fff;' +
+        'font-size:13px;line-height:1.5;padding:10px 14px;box-shadow:0 2px 8px rgba(0,0,0,.25);' +
+        'font-family:system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;'
+      document.body.appendChild(bar)
+    }
+    bar.textContent = `页面运行出错（请截图反馈）：${msg} 〔${info || ''}〕`
+  }
+}
+
 // 静默初始化工作台数据（优雅降级，失败不影响页面渲染）
 void initDatabase()
 

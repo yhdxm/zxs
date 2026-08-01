@@ -200,7 +200,13 @@ router.beforeEach(async (to, _from, next) => {
     const platform = typeof window !== 'undefined' && window.innerWidth <= 768 ? 'mobile' : 'pc'
     const config = await loadPermissionConfig()
     if (!hasPermission(user, moduleKey, platform, config)) {
-      next({ name: 'dashboard' })
+      // 权限不足：跳转到「用户有权限的第一个页面」，避免无限重定向到被拒页面（白屏/无反应）。
+      // 优先回主页 dashboard；若连 dashboard 都无权限，则回 account（已登录恒可访问），杜绝死循环。
+      if (moduleKey !== 'dashboard' && hasPermission(user, 'dashboard', platform, config)) {
+        next({ name: 'dashboard' })
+      } else {
+        next({ name: 'account' })
+      }
       return
     }
   }

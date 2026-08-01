@@ -291,6 +291,40 @@ export function wgs84ToGcj02(lng: number, lat: number): [number, number] {
   return [lng + dLng, lat + dLat]
 }
 
+/** GCJ-02（火星坐标）→ WGS84，迭代反算（高德/GeoQ 底图上点击的点需先转 WGS84 再给 OSRM） */
+export function gcj02ToWgs84(lng: number, lat: number): [number, number] {
+  if (outOfChina(lng, lat)) return [lng, lat]
+  let wgsLng = lng
+  let wgsLat = lat
+  for (let i = 0; i < 6; i++) {
+    const [gcjLng, gcjLat] = wgs84ToGcj02(wgsLng, wgsLat)
+    const dLng = gcjLng - lng
+    const dLat = gcjLat - lat
+    if (Math.abs(dLng) < 1e-7 && Math.abs(dLat) < 1e-7) break
+    wgsLng -= dLng
+    wgsLat -= dLat
+  }
+  return [wgsLng, wgsLat]
+}
+
+/** 把当前底图坐标系的点转成 WGS84（给路由/搜索等外部服务用） */
+export function mapPointToWgs84(
+  lng: number,
+  lat: number,
+  crs: 'wgs84' | 'gcj02' = 'wgs84'
+): [number, number] {
+  return crs === 'gcj02' ? gcj02ToWgs84(lng, lat) : [lng, lat]
+}
+
+/** 把 WGS84 点转成当前底图坐标系（外部服务结果回显到地图用） */
+export function wgs84ToMapPoint(
+  lng: number,
+  lat: number,
+  crs: 'wgs84' | 'gcj02' = 'wgs84'
+): [number, number] {
+  return crs === 'gcj02' ? wgs84ToGcj02(lng, lat) : [lng, lat]
+}
+
 /** 递归转换 GeoJSON 坐标（WGS84 → GCJ-02），返回新对象，不改原数据 */
 export function shiftGeoJsonToGcj02<T>(geo: T): T {
   const convert = (coords: unknown): unknown => {
@@ -422,4 +456,124 @@ export function haversine(a: { lat: number; lon: number }, b: { lat: number; lon
   const h =
     Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) ** 2
   return 2 * R * Math.asin(Math.sqrt(h))
+}
+
+/* ==================== 免费公开路由服务 OSRM ==================== */
+
+export interface OsrmRouteResult {
+  distanceKm: number
+  durationMin: number
+  geometry: GeoJSON.LineString
+}
+
+/**
+ * 调用 OSRM 公开演示服务查询驾车路线（免费、无 Key）。
+ * start/end 为 WGS84 [经度, 纬度]。
+ */
+export async function osrmRoute(
+  start: [number, number],
+  end: [number, number]
+): Promise<OsrmRouteResult> {
+  const url =
+    `https://router.project-osrm.org/route/v1/driving/` +
+    `${start[0]},${start[1]};${end[0]},${end[1]}?overview=full&geometries=geojson&steps=false`
+  const res = await timeoutFetch(url)
+  if (!res.ok) throw new Error('路线规划服务请求失败')
+  const data = (await res.json()) as {
+    code: string
+    routes?: Array<{ distance: number; duration: number; geometry: GeoJSON.LineString }>
+  }
+  if (data.code !== 'Ok' || !data.routes?.length) throw new Error('未找到可用路线，可能两点之间无道路连通')
+  const r = data.routes[0]
+  if (!r) throw new Error('未找到可用路线')
+  return {
+    distanceKm: r.distance / 1000,
+    durationMin: Math.round(r.duration / 60),
+    geometry: r.geometry
+  }
+}
+
+/* ==================== 免费公开地名服务 Nominatim ==================== */
+
+export interface NominatimAddress {
+  country?: string
+  state?: string
+  city?: string
+  district?: string
+  suburb?: string
+  town?: string
+  village?: string
+  municipality?: string
+  region?: string
+  county?: string
+}
+
+export interface NominatimResult {
+  placeId: number
+  name: string
+  displayName: string
+  lat: number
+  lon: number
+  boundingbox: [number, number, number, number]
+}
+
+export interface NominatimReverseResult {
+  displayName: string
+  lat: number
+  lon: number
+  address: NominatimAddress
+}
+
+/**
+ * Nominatim 地名搜索（OpenStreetMap，免费、无 Key）。
+ * 限定中国（countrycodes=cn），遵守其使用政策（约 1 req/s，需有效 User-Agent）。
+ */
+export async function nominatimSearch(q: string, limit = 5): Promise<NominatimResult[]> {
+  const query = q.trim()
+  if (!query) return []
+  const url =
+    `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}` +
+    `&format=json&limit=${limit}&countrycodes=cn&accept-language=zh-CN`
+  const res = await timeoutFetch(url)
+  if (!res.ok) throw new Error('地名搜索服务请求失败')
+  const data = (await res.json()) as Array<{
+    place_id: number
+    name?: string
+    display_name?: string
+    lat?: string
+    lon?: string
+    boundingbox?: string[]
+  }>
+  return data.map((item) => ({
+    placeId: item.place_id,
+    name: item.name || '',
+    displayName: item.display_name || '',
+    lat: Number(item.lat || 0),
+    lon: Number(item.lon || 0),
+    boundingbox: (item.boundingbox || []).map(Number) as [number, number, number, number]
+  }))
+}
+
+/** Nominatim 逆地址解析（坐标 → 省/市/区/街道/村等层级，数据覆盖决定精度） */
+export async function nominatimReverse(
+  lat: number,
+  lon: number
+): Promise<NominatimReverseResult> {
+  const url =
+    `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}` +
+    `&format=json&accept-language=zh-CN`
+  const res = await timeoutFetch(url)
+  if (!res.ok) throw new Error('逆地址解析服务请求失败')
+  const data = (await res.json()) as {
+    display_name?: string
+    lat?: string | number
+    lon?: string | number
+    address?: NominatimAddress
+  }
+  return {
+    displayName: data.display_name || '',
+    lat: Number(data.lat || lat),
+    lon: Number(data.lon || lon),
+    address: data.address || {}
+  }
 }

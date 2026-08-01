@@ -249,6 +249,20 @@ function normalizeConfig(cfg: PermissionConfig): PermissionConfig {
   }
   const sa = cfg.roles.find((r) => r.key === 'superadmin')
   if (sa) sa.permissions = [...ALL_PERMISSION_KEYS]
+  // 防止配置漂移把普通用户锁在门外：普通用户（及管理员）必须始终持有
+  // 个人数据主页（dashboard 及 todos/points/contents、各个人模块）权限，
+  // 否则登录后会因路由守卫权限校验不通过而陷入重定向死循环（白屏/无反应）。
+  const ensureBases = (roleKey: string, bases: Set<string>) => {
+    const r = cfg.roles.find((x) => x.key === roleKey)
+    if (!r) return
+    const set = new Set(r.permissions)
+    ALL_PERMISSION_KEYS.forEach((k) => {
+      if (bases.has(baseKeyOf(k))) set.add(k)
+    })
+    r.permissions = [...set]
+  }
+  ensureBases('user', USER_ALLOWED_BASES)
+  ensureBases('admin', USER_ALLOWED_BASES)
   return cfg
 }
 
