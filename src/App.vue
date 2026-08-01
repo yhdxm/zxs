@@ -103,16 +103,16 @@
         </el-tooltip>
       </div>
 
-      <!-- 移动端：悬浮菜单按钮（PC 端侧栏常驻，不显示） -->
-      <button class="mobile-menu-fab" @click="mobileNavVisible = true" title="打开菜单">
-        <el-icon><Menu /></el-icon>
-      </button>
-
       <!-- 折叠/展开侧边栏（PC 端，三角形按钮） -->
       <button class="side-collapse" @click="toggleSidebar" :title="sidebarCollapsed ? '展开侧边栏' : '收起侧边栏'">
         <el-icon><component :is="sidebarCollapsed ? ArrowRight : ArrowLeft" /></el-icon>
       </button>
     </aside>
+
+    <!-- 移动端悬浮菜单按钮：放在 app-shell 直接子级，避免被侧边栏 display:none 隐藏 -->
+    <button class="mobile-menu-fab" @click="mobileNavVisible = true" title="打开菜单">
+      <el-icon><Menu /></el-icon>
+    </button>
 
     <!-- 主区域（无独立顶栏，页面自身标题顶到最上方） -->
     <div class="app-main">
@@ -412,6 +412,7 @@ const isMenuActive = (key: string) => {
   if (key === 'feedback') return route.path === '/feedback'
   if (key === 'feedback-admin') return route.path === '/feedback-admin'
   if (key === 'account') return route.path === '/account'
+  if (key === 'responsive') return route.path === '/responsive'
   if (key === 'overview') return route.path === '/dashboard' && (route.query.view || 'overview') === 'overview'
   return route.path === '/dashboard' && route.query.view === key
 }
@@ -1078,6 +1079,9 @@ onMounted(async () => {
   .app-shell.is-authed .app-main {
     height: 100vh;
     height: 100dvh;
+    width: 100%;
+    flex: 1 1 auto;
+    min-width: 0;
   }
   /* 抽屉内用户卡片：手机上放宽显示，昵称仍截断避免撑破 */
   .drawer-footer .side-user { padding: 9px 10px; }

@@ -20,7 +20,8 @@ import {
   Setting,
   User,
   Cpu,
-  ChatLineSquare
+  ChatLineSquare,
+  Monitor
 } from '@element-plus/icons-vue'
 
 export interface SideItem {
@@ -113,6 +114,12 @@ export const APP_MENU: SideItem[] = [
     icon: ChatLineSquare,
     permissionKey: 'feedback',
     to: '/feedback'
+  },
+  {
+    key: 'responsive',
+    label: '自适应展示',
+    icon: Monitor,
+    to: '/responsive'
   },
   {
     key: 'system',

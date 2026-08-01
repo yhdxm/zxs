@@ -1016,6 +1016,15 @@ export async function getSavedUser(): Promise<AppUser | null> {
   }
   const cached = getStoredUser()
   if (cached && cached.id === data.session.user.id) {
+    // 角色权限配置可能已被超管修改，必须重新按最新配置计算权限，
+    // 否则返回旧快照会导致「改了角色权限、其他账号登录不生效」的问题。
+    // 仅重算权限字段，其余用户信息沿用缓存以减少会话重建开销。
+    try {
+      const roleConfig = await loadPermissionConfig()
+      cached.permissions = getRolePermissions(cached.role, roleConfig)
+    } catch {
+      // 读取失败则沿用缓存中的权限，不阻断登录
+    }
     return cached
   }
   return await buildUserFromSession(data.session)
