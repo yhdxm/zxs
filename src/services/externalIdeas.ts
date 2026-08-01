@@ -189,18 +189,19 @@ function writeLocalCache(items: ExternalIdea[]) {
 }
 
 /** 将任意来源的一行（Supabase / 本地）规范化为稳定的 ExternalIdea，避免渲染异常 */
-export function normalizeExternalIdea(raw: Partial<ExternalIdea> & Record<string, unknown>): ExternalIdea {
+export function normalizeExternalIdea(input: unknown): ExternalIdea {
+  const raw = (input ?? {}) as Partial<ExternalIdea> & Record<string, unknown>
   let tags: string[] = []
-  const rawTags = raw.tags
+  const rawTags: unknown = raw.tags
   if (Array.isArray(rawTags)) {
-    tags = rawTags.filter((t) => typeof t === 'string') as string[]
+    tags = rawTags.filter((t): t is string => typeof t === 'string')
   } else if (typeof rawTags === 'string' && rawTags.trim()) {
     // Supabase 可能以 `{a,b}` 原生数组或 JSON 字符串形式返回
     const s = rawTags.trim()
     if (s.startsWith('[')) {
       try {
-        const arr = JSON.parse(s)
-        if (Array.isArray(arr)) tags = arr.filter((t: unknown) => typeof t === 'string')
+        const arr: unknown = JSON.parse(s)
+        if (Array.isArray(arr)) tags = arr.filter((t: unknown): t is string => typeof t === 'string')
       } catch {
         tags = []
       }
@@ -208,7 +209,7 @@ export function normalizeExternalIdea(raw: Partial<ExternalIdea> & Record<string
       tags = s
         .slice(1, -1)
         .split(',')
-        .map((t) => t.trim())
+        .map((t: string) => t.trim())
         .filter(Boolean)
     } else {
       tags = [s]

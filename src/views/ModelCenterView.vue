@@ -1,20 +1,15 @@
 <template>
   <div class="mc-shell">
-    <header class="mc-header">
-      <div class="mc-title">
-        <span class="mc-icon"><el-icon><MagicStick /></el-icon></span>
-        <div>
-          <h1>模型中心</h1>
-          <p>实时额度 · 已配置模型 · 免费模型清单 · 全程本地记录，不消耗任何积分</p>
-        </div>
-      </div>
-      <div class="mc-actions">
-        <el-switch v-model="autoRefresh" active-text="自动检测(60s)" @change="toggleAuto" />
-        <el-button type="primary" :loading="checking" @click="runCheck">
-          <el-icon><Refresh /></el-icon> 立即检测
-        </el-button>
-      </div>
-    </header>
+    <PageHeader
+      title="模型中心"
+      subtitle="实时额度 · 已配置模型 · 免费模型清单 · 全程本地记录，不消耗任何积分"
+      :icon="MagicStick"
+    >
+      <el-switch v-model="autoRefresh" active-text="自动检测(60s)" @change="toggleAuto" />
+      <el-button type="primary" :loading="checking" @click="runCheck">
+        <el-icon><Refresh /></el-icon> 立即检测
+      </el-button>
+    </PageHeader>
 
     <!-- ===== 实时额度卡片（硅基流动） ===== -->
     <div class="mc-balance" :class="{ ok: balance.supported, warn: !balance.supported }">
@@ -590,6 +585,7 @@ import {
   type AccountRecord,
   type AiKeyRecord
 } from '../services/appDataService'
+import PageHeader from '../components/PageHeader.vue'
 import { decryptSecret } from '../services/secret'
 import { CALLABLE_MODELS } from '../services/modelCatalog'
 
@@ -1367,33 +1363,14 @@ const onWindowBlur = () => {
 
 <style scoped>
 .mc-shell {
-  padding: 0 22px 22px;
-  font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
-  background: var(--bg-app);
-  min-height: calc(100vh - var(--nav-h, 56px));
-  max-width: 1200px;
+  padding: 0 18px 18px;
+  max-width: 1400px;
   margin: 0 auto;
+  color: var(--text);
 }
 
-.mc-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-  margin-bottom: 18px;
-}
-.mc-title { display: flex; align-items: center; gap: 12px; min-width: 0; }
-.mc-icon {
-  width: 42px; height: 42px; border-radius: 13px; display: grid; place-items: center; flex-shrink: 0;
-  background: linear-gradient(135deg, var(--primary-3), var(--primary-2)); color: #fff;
-  box-shadow: 0 8px 18px var(--accent-glow);
-}
-.mc-icon :deep(svg) { font-size: 22px; }
-.mc-title h1 { margin: 0; font-size: 18px; font-weight: 600; color: var(--text-strong); }
-.mc-title p { margin: 2px 0 0; font-size: 12px; color: var(--text-muted); }
-.mc-actions { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
-.mc-actions :deep(.el-button) { display: inline-flex; align-items: center; gap: 4px; }
+/* 页头统一使用 PageHeader 卡片组件（与数据库监测中心一致） */
+.mc-shell :deep(.ph-actions .el-button) { display: inline-flex; align-items: center; gap: 4px; }
 
 /* 实时额度卡片 */
 .mc-balance {
@@ -1585,8 +1562,7 @@ const onWindowBlur = () => {
 
 @media (max-width: 768px) {
   .mc-shell { padding: 0 14px 14px; }
-  .mc-title h1 { font-size: 18px; }
-  .mc-actions { width: 100%; justify-content: space-between; }
+  .mc-shell :deep(.ph-actions) { width: 100%; justify-content: space-between; }
   .mc-call-stats { grid-template-columns: repeat(2, 1fr); }
 }
 </style>

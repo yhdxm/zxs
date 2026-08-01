@@ -53,7 +53,8 @@ export interface FreeModelEntry {
 export interface FreeModelStatus extends FreeModelEntry {
   available: boolean | null
   lastChecked: number | null
-  source: 'curated' | 'live'
+  /** curated=内置精选，live=在线拉取，custom=用户自定义模型 */
+  source: 'curated' | 'live' | 'custom'
 }
 
 /**

@@ -17,6 +17,11 @@ const isAuthed = ref(typeof window !== 'undefined' && Boolean(window.localStorag
   display: flex;
   flex-direction: column;
   min-width: 0;
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 0 18px 18px;
+  width: 100%;
+  box-sizing: border-box;
 }
 .ai-page.ai-fixed {
   position: relative;

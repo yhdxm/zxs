@@ -1,37 +1,75 @@
 <template>
-  <header class="page-header">
-    <div class="ph-left">
-      <h2 class="ph-title">{{ title }}</h2>
-      <p v-if="subtitle" class="ph-sub">{{ subtitle }}</p>
-      <slot name="sub" />
-    </div>
-    <div v-if="$slots.actions || $slots.default" class="ph-actions">
-      <slot name="actions" />
-      <slot />
+  <header class="page-header-card">
+    <div class="ph-inner">
+      <div class="ph-brand">
+        <span class="ph-icon">
+          <slot name="icon">
+            <el-icon><component :is="icon" /></el-icon>
+          </slot>
+        </span>
+        <div class="ph-text">
+          <h2 class="ph-title">{{ title }}</h2>
+          <p v-if="subtitle" class="ph-sub">{{ subtitle }}</p>
+          <slot name="sub" />
+        </div>
+      </div>
+      <div v-if="$slots.actions || $slots.default" class="ph-actions">
+        <slot name="actions" />
+        <slot />
+      </div>
     </div>
   </header>
 </template>
 
 <script setup lang="ts">
-defineProps<{
+import { Grid } from '@element-plus/icons-vue'
+import type { Component } from 'vue'
+
+withDefaults(defineProps<{
   title: string
   subtitle?: string
-}>()
+  icon?: Component
+}>(), {
+  // 对象/组件类型的默认值必须使用工厂函数形式
+  icon: () => Grid as unknown as Component
+})
 </script>
 
 <style scoped>
-/* 统一页头：标题字号/颜色全局一致，紧凑一行布局 */
-.page-header {
+.page-header-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: var(--shadow-card);
+  margin-bottom: 18px;
+}
+.ph-inner {
   display: flex;
-  align-items: flex-start;
   justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 2px;
-}
-.ph-left {
+  align-items: center;
+  gap: 12px;
+  padding: 14px 20px;
   min-width: 0;
-  flex: 1;
 }
+.ph-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+.ph-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  background: linear-gradient(135deg, var(--primary-3), var(--primary-2));
+  color: #fff;
+  box-shadow: 0 8px 18px var(--accent-glow);
+}
+.ph-icon :deep(svg) { font-size: 20px; }
+.ph-text { min-width: 0; }
 .ph-title {
   margin: 0;
   font-size: 18px;
@@ -40,8 +78,8 @@ defineProps<{
   line-height: 1.3;
 }
 .ph-sub {
-  margin: 4px 0 0;
-  font-size: 13px;
+  margin: 2px 0 0;
+  font-size: 12px;
   font-weight: 400;
   color: var(--text-muted);
   line-height: 1.6;
@@ -52,16 +90,18 @@ defineProps<{
   display: flex;
   align-items: center;
   gap: 10px;
-  padding-top: 2px;
 }
 @media (max-width: 768px) {
-  .page-header {
+  .page-header-card { margin-bottom: 14px; }
+  .ph-inner {
     flex-direction: column;
     align-items: stretch;
     gap: 12px;
+    padding: 12px 14px;
   }
   .ph-actions {
     flex-wrap: wrap;
+    justify-content: flex-end;
   }
 }
 </style>

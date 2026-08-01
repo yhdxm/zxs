@@ -193,7 +193,7 @@ async function generate() {
     const all = await fetchNewsAll({ category: selectedCat.value })
     totalCount.value = all.length
     // 2) 时间窗口过滤（解决旧闻/2023 年问题）
-    const cutoff = Date.now() - WINDOWS[windowKey.value].ms
+    const cutoff = Date.now() - (WINDOWS[windowKey.value]?.ms ?? 24 * 60 * 60 * 1000)
     const fresh = all.filter((n) => n.pubTimestamp >= cutoff)
     freshCount.value = fresh.length
     sampleCount.value = fresh.length
@@ -234,8 +234,8 @@ onMounted(async () => {
 
 <style scoped>
 .fx-page {
-  padding: 0 20px 20px;
-  max-width: 1080px;
+  padding: 0 18px 18px;
+  max-width: 1400px;
   margin: 0 auto;
   color: var(--text);
   min-height: 100%;

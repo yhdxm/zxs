@@ -83,7 +83,7 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 16px;
-  padding: 0 24px 10px;
+  padding: 0 18px 10px;
   background: var(--surface);
   border-bottom: 1px solid var(--border);
   flex-wrap: wrap;

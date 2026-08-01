@@ -83,18 +83,30 @@
           <span class="toggle-label">{{ theme === 'dark' ? '深色模式' : '浅色模式' }}</span>
           <span class="theme-switch" :class="{ on: theme === 'dark' }"></span>
         </button>
-        <div class="commercial-card">
-          <svg class="commercial-logo" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Smart Dashboard">
-            <rect x="6" y="6" width="52" height="52" rx="14" fill="#6366f1" />
-            <g fill="#ffffff">
-              <rect x="16" y="36" width="8" height="12" rx="2" />
-              <rect x="28" y="28" width="8" height="20" rx="2" />
-              <rect x="40" y="20" width="8" height="28" rx="2" />
-            </g>
-          </svg>
-          <span class="commercial-pro">PRO</span>
-        </div>
+        <!-- 用户身份 + 退出（原 PRO 卡片位置）；空间不足时 hover 显示完整身份 -->
+        <el-tooltip
+          :content="`${currentUser?.nickname || '用户'} · ${roleLabel}`"
+          placement="right"
+          :show-after="150"
+          :offset="14"
+        >
+          <div class="side-user">
+            <span class="su-avatar">{{ avatarText }}</span>
+            <div class="su-meta">
+              <span class="su-name">{{ currentUser?.nickname || '用户' }}</span>
+              <span class="su-role">{{ roleLabel }}</span>
+            </div>
+            <button class="su-logout" type="button" title="退出登录" @click.stop="handleLogout">
+              <el-icon><SwitchButton /></el-icon>
+            </button>
+          </div>
+        </el-tooltip>
       </div>
+
+      <!-- 移动端：悬浮菜单按钮（PC 端侧栏常驻，不显示） -->
+      <button class="mobile-menu-fab" @click="mobileNavVisible = true" title="打开菜单">
+        <el-icon><Menu /></el-icon>
+      </button>
 
       <!-- 折叠/展开侧边栏（PC 端，三角形按钮） -->
       <button class="side-collapse" @click="toggleSidebar" :title="sidebarCollapsed ? '展开侧边栏' : '收起侧边栏'">
@@ -102,25 +114,8 @@
       </button>
     </aside>
 
-    <!-- 主区域 -->
+    <!-- 主区域（无独立顶栏，页面自身标题顶到最上方） -->
     <div class="app-main">
-      <header class="app-topbar">
-        <div class="topbar-left">
-          <el-button text class="menu-btn" @click="mobileNavVisible = true">
-            <el-icon><Menu /></el-icon>
-          </el-button>
-        </div>
-        <div class="topbar-user">
-          <span class="user-avatar">{{ avatarText }}</span>
-          <div class="user-meta">
-            <span class="user-nickname">{{ currentUser?.nickname || '用户' }}</span>
-            <span class="user-role">{{ roleLabel }}</span>
-          </div>
-          <el-button class="user-logout" text circle @click="handleLogout">
-            <el-icon><SwitchButton /></el-icon>
-          </el-button>
-        </div>
-      </header>
       <main class="main-content authed-main">
         <router-view v-slot="{ Component }">
           <transition name="fade" mode="out-in">
@@ -194,27 +189,16 @@
           <span class="toggle-label">{{ theme === 'dark' ? '深色模式' : '浅色模式' }}</span>
           <span class="theme-switch" :class="{ on: theme === 'dark' }"></span>
         </button>
-        <div class="drawer-commercial">
-          <svg class="commercial-logo" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Smart Dashboard">
-            <rect x="6" y="6" width="52" height="52" rx="14" fill="#6366f1" />
-            <g fill="#ffffff">
-              <rect x="16" y="36" width="8" height="12" rx="2" />
-              <rect x="28" y="28" width="8" height="20" rx="2" />
-              <rect x="40" y="20" width="8" height="28" rx="2" />
-            </g>
-          </svg>
-          <span class="commercial-pro">PRO</span>
-        </div>
-        <div class="drawer-user">
-          <span class="user-avatar">{{ avatarText }}</span>
-          <div class="user-meta">
-            <span class="user-nickname">{{ currentUser?.nickname || '用户' }}</span>
-            <span class="user-role">{{ roleLabel }}</span>
+        <div class="side-user" :title="`${currentUser?.nickname || '用户'} · ${roleLabel}`">
+          <span class="su-avatar">{{ avatarText }}</span>
+          <div class="su-meta">
+            <span class="su-name">{{ currentUser?.nickname || '用户' }}</span>
+            <span class="su-role">{{ roleLabel }}</span>
           </div>
+          <button class="su-logout" type="button" title="退出登录" @click.stop="handleLogout">
+            <el-icon><SwitchButton /></el-icon>
+          </button>
         </div>
-        <el-button type="danger" plain class="full" @click="handleLogout">
-          <el-icon><SwitchButton /></el-icon> 退出登录
-        </el-button>
       </div>
     </el-drawer>
   </div>
@@ -289,29 +273,13 @@ import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import type { Component } from 'vue'
 import {
-  MagicStick,
-  DataBoard,
-  List,
-  Location,
-  Document,
   SwitchButton,
   Menu,
-  Setting,
-  User,
   Search,
   ArrowDown,
-  Coin,
   Sunny,
   Moon,
-  DataAnalysis,
-  TrendCharts,
-  Compass,
   Loading,
-  Histogram,
-  Van,
-  Cpu,
-  Reading,
-  Link,
   ArrowLeft,
   ArrowRight
 } from '@element-plus/icons-vue'
@@ -320,6 +288,7 @@ import {
   hasPermission, hasModulePermission, loadPermissionConfig, type PermissionConfig,
   type AppUser
 } from './services/appDataService'
+import { APP_MENU, canManageSystem, type SideItem } from './config/appMenu'
 
 const router = useRouter()
 const route = useRoute()
@@ -365,88 +334,16 @@ const roleLabel = computed(() => {
   return '普通用户'
 })
 
-/* ===== 已登录：左侧全局侧边栏菜单 ===== */
-interface SideItem {
-  key: string
-  label: string
-  icon?: Component
-  to?: string | { path: string; query: Record<string, string> }
-  visible?: (user: AppUser | null) => boolean
-  permissionKey?: string
-  children?: SideItem[]
-  expanded?: boolean
+/* ===== 已登录：左侧全局侧边栏菜单（由全局菜单配置 APP_MENU 派生，与权限树自动同步） ===== */
+// 保留可变的 expanded 状态，同时保留 visible 函数引用（APP_MENU 已内联 canManageSystem）
+function cloneMenu(items: SideItem[]): SideItem[] {
+  return items.map((it) => ({
+    ...it,
+    children: it.children ? cloneMenu(it.children) : undefined,
+    expanded: it.expanded ?? false
+  }))
 }
-const canManageSystem = (u: AppUser | null) => u?.role === 'superadmin' || u?.role === 'admin'
-
-const sideMenu = reactive<SideItem[]>([
-  { key: 'database', label: '数据库监测', icon: Coin, permissionKey: 'database', to: '/database' },
-  {
-    key: 'lianzhicang',
-    label: '联智舱',
-    icon: MagicStick,
-    expanded: true,
-    permissionKey: 'ai',
-    children: [
-      { key: 'ai', label: 'AI 助手', icon: MagicStick, permissionKey: 'ai', to: '/ai' },
-      { key: 'models', label: '模型中心', icon: DataAnalysis, permissionKey: 'ai', to: '/models' },
-      { key: 'aimodels', label: 'AI模型知识', icon: Cpu, permissionKey: 'ai', to: '/aimodels' }
-    ]
-  },
-  {
-    key: 'fanjingzhixie',
-    label: '凡境智协',
-    icon: Compass,
-    expanded: true,
-    permissionKey: 'dashboard',
-    children: [
-      { key: 'news', label: '新闻聚合', icon: TrendCharts, permissionKey: 'dashboard', to: '/news' },
-      { key: 'yingcang', label: '影仓智核', icon: Histogram, permissionKey: 'dashboard', to: '/yingcang' },
-      { key: 'xingyu', label: '星舆识途', icon: Van, permissionKey: 'dashboard', to: '/xingyu' },
-      { key: 'weather', label: '天气', icon: Sunny, permissionKey: 'dashboard', to: '/weather' },
-      { key: 'map', label: '地图', icon: Location, permissionKey: 'dashboard', to: '/map' },
-      { key: 'third-api', label: '第三方API', icon: Link, permissionKey: 'dashboard', to: '/third-api' }
-    ]
-  },
-  {
-    key: 'learncenter',
-    label: '学习中心',
-    icon: Reading,
-    expanded: true,
-    permissionKey: 'dashboard',
-    children: [
-      { key: 'learn-english', label: '学位英语', icon: Document, permissionKey: 'dashboard', to: '/learn/english' },
-      { key: 'learn-industry', label: '各行业知识', icon: DataBoard, permissionKey: 'dashboard', to: '/learn/industry' },
-      { key: 'learn-books', label: '书籍阅读', icon: Reading, permissionKey: 'dashboard', to: '/learn/books' }
-    ]
-  },
-  { key: 'requirements', label: '需求收集', icon: TrendCharts, permissionKey: 'dashboard', to: '/requirements' },
-  {
-    key: 'worktasks',
-    label: '工作任务',
-    icon: List,
-    expanded: true,
-    permissionKey: 'worktasks',
-    children: [
-      { key: 'overview', label: '数据看板', icon: DataBoard, permissionKey: 'dashboard', to: { path: '/dashboard', query: { view: 'overview' } } },
-      { key: 'todos', label: '待办', icon: List, permissionKey: 'todos', to: { path: '/dashboard', query: { view: 'todos' } } },
-      { key: 'points', label: '点位', icon: Location, permissionKey: 'points', to: { path: '/dashboard', query: { view: 'points' } } },
-      { key: 'contents', label: '内容', icon: Document, permissionKey: 'contents', to: { path: '/dashboard', query: { view: 'contents' } } }
-    ]
-  },
-  {
-    key: 'system',
-    label: '权限管理',
-    icon: Setting,
-    expanded: false,
-    visible: canManageSystem,
-    permissionKey: 'system',
-    children: [
-      { key: 'system-accounts', label: '账号管理', permissionKey: 'system.accounts', to: '/system?view=accounts' },
-      { key: 'system-roles', label: '角色权限', permissionKey: 'system.roles', to: '/system?view=roles' }
-    ]
-  },
-  { key: 'account', label: '个人设置', icon: User, to: '/account' }
-])
+const sideMenu = reactive(cloneMenu(APP_MENU))
 
 const hasMenuPermission = (item: SideItem): boolean => {
   if (!item.permissionKey) return true
@@ -582,6 +479,10 @@ onMounted(async () => {
   applyTheme(theme.value)
   updatePlatform()
   window.addEventListener('resize', updatePlatform)
+  // 角色权限变更后实时刷新侧边栏权限（与权限管理页联动）
+  window.addEventListener('permission-config-updated', () => {
+    loadPermissionConfig().then((c) => (permissionConfig.value = c))
+  })
   try {
     await refreshUser()
   } catch (err) {
@@ -628,7 +529,7 @@ onMounted(async () => {
 }
 
 .main-content.authed-main {
-  padding: 0;
+  padding: 14px 0 0;
   flex: 1;
   min-height: 0;
   overflow-y: auto;
@@ -639,7 +540,6 @@ onMounted(async () => {
 .app-shell.is-authed {
   display: flex;
   --side-w: 250px;
-  --topbar-h: 42px;
 }
 .app-shell.is-authed.collapsed {
   --side-w: 64px;
@@ -717,11 +617,16 @@ onMounted(async () => {
 .app-shell.is-authed.collapsed .side-group-children { padding-left: 0; }
 .app-shell.is-authed.collapsed .side-child { justify-content: center; padding: 10px 0; }
 .app-shell.is-authed.collapsed .side-child .child-dot { display: none; }
-.app-shell.is-authed.collapsed .side-footer .toggle-label,
-.app-shell.is-authed.collapsed .commercial-card .commercial-pro { display: none; }
-.app-shell.is-authed.collapsed .theme-toggle { justify-content: center; }
-.app-shell.is-authed.collapsed .theme-switch { margin-left: 0; }
-.app-shell.is-authed.collapsed .commercial-card { height: 48px; }
+.app-shell.is-authed.collapsed .side-footer .toggle-label { display: none; }
+.app-shell.is-authed.collapsed .theme-toggle { justify-content: center; padding: 9px 0; }
+.app-shell.is-authed.collapsed .theme-switch { display: none; }
+/* 折叠态：用户卡片只留头像 + 退出图标，纵向堆叠；身份由 tooltip 展示 */
+.app-shell.is-authed.collapsed .side-user {
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 0;
+}
+.app-shell.is-authed.collapsed .su-meta { display: none; }
 .app-shell.is-authed.collapsed .side-collapse {
   left: 50%;
   right: auto;
@@ -963,49 +868,78 @@ onMounted(async () => {
 .theme-switch.on::after {
   transform: translateX(16px);
 }
-.commercial-card {
-  background: var(--surface-mute);
-  border-radius: 14px;
-  height: 64px;
+/* 侧栏底部：用户身份 + 退出（替代原 PRO 卡片） */
+.side-user {
   display: flex;
   align-items: center;
-  justify-content: center;
   gap: 10px;
+  padding: 8px 10px;
+  background: var(--surface-mute);
   border: 1px solid var(--border-strong);
-  position: relative;
-  overflow: hidden;
-  backdrop-filter: blur(8px);
+  border-radius: 14px;
+  min-width: 0;
+  transition: border-color 0.2s ease, background 0.2s ease;
 }
-.commercial-card::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: -100%;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(99, 102, 241, 0.06), transparent);
-  animation: proShine 3s infinite;
+.side-user:hover {
+  border-color: var(--primary);
+  background: var(--nav-hover);
 }
-@keyframes proShine {
-  0% { left: -100%; }
-  100% { left: 100%; }
-}
-.commercial-logo {
-  width: 38px;
-  height: 38px;
-  object-fit: contain;
+.su-avatar {
+  width: 34px;
+  height: 34px;
   border-radius: 50%;
-  position: relative;
-  z-index: 1;
-  filter: drop-shadow(0 0 10px var(--accent-glow));
+  background: linear-gradient(135deg, var(--primary), var(--primary-2));
+  color: var(--primary-contrast);
+  display: grid;
+  place-items: center;
+  font-size: 14px;
+  font-weight: 700;
+  flex-shrink: 0;
+  box-shadow: 0 3px 10px var(--accent-glow);
 }
-.commercial-pro {
+.su-meta {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+  min-width: 0;
+  flex: 1;
+}
+.su-name {
   font-size: 13px;
-  font-weight: 800;
-  letter-spacing: 0.16em;
-  color: var(--primary);
-  position: relative;
+  font-weight: 600;
+  color: var(--text-strong);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
+.su-role {
+  font-size: 11px;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.su-logout {
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-faint);
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+.su-logout:hover {
+  color: #ef4444;
+  border-color: #ef4444;
+  background: rgba(239, 68, 68, 0.08);
+}
+.su-logout:active { transform: scale(0.92); }
+.su-logout :deep(svg) { font-size: 16px; }
 
 /* 主区域 */
 .app-main {
@@ -1017,81 +951,6 @@ onMounted(async () => {
   overflow: hidden;
   background: var(--bg-main-grad);
 }
-.app-topbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  height: var(--topbar-h);
-  padding: 0 24px;
-  background: var(--topbar-bg);
-  backdrop-filter: blur(18px);
-  border-bottom: 1px solid var(--border);
-  flex-shrink: 0;
-  z-index: 30;
-  min-width: 0;
-  width: 100%;
-  box-sizing: border-box;
-}
-.topbar-left {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-width: 0;
-}
-.menu-btn { padding: 4px 8px; display: none; }
-.topbar-user {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-width: 0;
-  flex-shrink: 0;
-}
-.user-avatar {
-  width: 36px;
-  height: 36px;
-  border-radius: 10px;
-  background: linear-gradient(135deg, var(--primary), var(--primary-2));
-  color: var(--primary-contrast);
-  display: grid;
-  place-items: center;
-  font-size: 13px;
-  font-weight: 700;
-  flex-shrink: 0;
-  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
-}
-.user-meta {
-  display: flex;
-  flex-direction: column;
-  line-height: 1.2;
-  text-align: right;
-  min-width: 0;
-  max-width: 150px;
-}
-.user-nickname {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-strong);
-  max-width: 120px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.user-role {
-  font-size: 11px;
-  color: var(--text-muted);
-  max-width: 120px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.user-logout {
-  color: var(--text-faint);
-  margin-left: 4px;
-  flex-shrink: 0;
-}
-.user-logout:hover { color: #ef4444; }
-
 .drawer-brand {
   display: flex;
   align-items: center;
@@ -1104,35 +963,9 @@ onMounted(async () => {
 .drawer-footer {
   padding: 14px;
   border-top: 1px solid var(--border);
-}
-.drawer-commercial {
   display: flex;
-  align-items: center;
-  justify-content: center;
+  flex-direction: column;
   gap: 10px;
-  background: var(--nav-hover);
-  border: 1px solid var(--border-strong);
-  border-radius: 14px;
-  height: 56px;
-  margin-bottom: 12px;
-  position: relative;
-  overflow: hidden;
-}
-.drawer-commercial::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: -100%;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(99, 102, 241, 0.05), transparent);
-  animation: proShine 3s infinite;
-}
-.drawer-user {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 12px;
 }
 .mobile-drawer :deep(.el-drawer__body) {
   background: var(--bg-app-grad);
@@ -1202,20 +1035,50 @@ onMounted(async () => {
 .mobile-topbar .brand { font-size: 16px; font-weight: 700; color: var(--primary); flex: 1; }
 .topbar-user { font-size: 13px; color: var(--text-muted); max-width: 90px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
+/* 移动端悬浮菜单按钮（PC 端侧栏常驻，隐藏） */
+.mobile-menu-fab {
+  display: none;
+  position: fixed;
+  left: 14px;
+  bottom: 18px;
+  z-index: 40;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: none;
+  background: var(--primary);
+  color: var(--primary-contrast);
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 6px 18px rgba(99, 102, 241, 0.45);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.mobile-menu-fab:hover { transform: translateY(-2px); box-shadow: 0 10px 24px rgba(99, 102, 241, 0.55); }
+.mobile-menu-fab:active { transform: scale(0.94); }
+.mobile-menu-fab :deep(svg) { font-size: 22px; }
+
 /* ===== 响应式切换 ===== */
+/* 中屏（1024~1280）：侧栏收窄，用户卡片同步紧凑 */
+@media (max-width: 1180px) {
+  .app-shell.is-authed { --side-w: 226px; }
+  .side-user { padding: 7px 8px; gap: 8px; }
+  .su-avatar { width: 30px; height: 30px; font-size: 13px; }
+  .su-name { font-size: 12px; }
+  .su-role { font-size: 10px; }
+}
+
 @media (max-width: 768px) {
   .app-sidebar { display: none; }
-  .menu-btn { display: inline-flex; }
-  .app-topbar { padding: 0 14px; height: 56px; }
-  .user-nickname { max-width: 80px; }
   .sidebar { display: none; }
   .mobile-topbar { display: flex; }
-  .app-shell.is-authed .main-content.authed-main {
-    height: calc(100vh - 56px);
+  .mobile-menu-fab { display: flex; }
+  .app-shell.is-authed .app-main {
+    height: 100vh;
+    height: 100dvh;
   }
-}
-@media (max-width: 640px) {
-  .app-topbar { padding: 0 12px; }
-  .user-meta { display: none; }
+  /* 抽屉内用户卡片：手机上放宽显示，昵称仍截断避免撑破 */
+  .drawer-footer .side-user { padding: 9px 10px; }
+  .drawer-footer .su-name { font-size: 13px; }
 }
 </style>

@@ -2,6 +2,7 @@
 // 由于本项目为自建账号体系（非 Supabase Auth），RLS 在数据库层无法隔离，
 // 故所有读写均由前端按「当前登录账号 id」过滤（见 scripts/new_modules_tables.sql 说明）。
 
+import type { StudyPlan } from './learningService'
 import { supabase, getSavedUser } from './appDataService'
 
 async function uid(): Promise<string> {
@@ -133,4 +134,22 @@ export async function upsertReading(bookId: number, bookTitle: string, progress 
       { user_id: u, book_id: bookId, book_title: bookTitle, progress, last_pos: lastPos, updated_at: new Date().toISOString() },
       { onConflict: 'user_id,book_id' }
     )
+}
+
+/* ---------- 学习中心：备考学习计划（复用 learn_bookmarks，kind='plan'，按账号隔离） ---------- */
+export async function listStudyPlans(): Promise<LearnBookmark[]> {
+  return listLearnBookmarks('plan')
+}
+export async function saveStudyPlan(plan: StudyPlan, examDate: string): Promise<void> {
+  const u = await uid()
+  const title = `学习计划 · ${examDate}`
+  const exist = (await listLearnBookmarks('plan')).find((p) => p.title === title)
+  if (exist) {
+    await supabase.from('learn_bookmarks').update({ ref_id: JSON.stringify(plan), note: new Date().toISOString() }).eq('id', exist.id)
+    return
+  }
+  await addLearnBookmark('plan', JSON.stringify(plan), title)
+}
+export async function removeStudyPlan(id: string): Promise<void> {
+  await removeLearnBookmark(id)
 }

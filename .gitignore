@@ -10,6 +10,8 @@ lerna-debug.log*
 node_modules
 .DS_Store
 dist
+# 临时/带时间戳的构建输出目录（如 dist_1785518949、dist_verify）
+dist_*
 dist-ssr
 coverage
 *.local

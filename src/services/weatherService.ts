@@ -235,6 +235,8 @@ interface AmapLive {
   reporttime: string
   city: string
   adcode: string
+  /** 省份名称，高德实况接口会返回 */
+  province?: string
 }
 interface AmapCast {
   date: string
@@ -244,6 +246,9 @@ interface AmapCast {
   nighttemp: string
   daywind: string
   daypower: string
+  /** 夜间风向 / 风力，高德预报接口会返回 */
+  nightwind?: string
+  nightpower?: string
 }
 interface AmapWeatherResp {
   status: string

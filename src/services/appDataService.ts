@@ -5,6 +5,8 @@ import type { AiConfig } from './aiService'
 
 export { supabase }
 
+import { APP_MENU, type SideItem } from '../config/appMenu'
+
 export type UserRole = 'superadmin' | 'admin' | 'user'
 
 /** 权限平台：pc 或 mobile */
@@ -25,6 +27,8 @@ export interface RoleConfig {
 
 export interface PermissionConfig {
   roles: RoleConfig[]
+  /** 权限方案版本。v2 起权限 key 细粒度化（每个菜单独立 key），用于旧配置自动迁移 */
+  version?: number
 }
 
 export interface AppUser {
@@ -98,147 +102,45 @@ export interface AppDashboardData {
 
 const AUTH_KEY = 'smart-dashboard-user'
 
-/** ===== 权限树定义 =====
- *  与 App.vue 侧边栏菜单保持同步。修改菜单结构后，同步更新此处。
+/** ===== 权限树：由全局菜单配置（APP_MENU）自动派生 =====
+ *  与 App.vue 侧边栏菜单保持 100% 同步。新增菜单项即自动出现在权限树中，
+ *  无需手动维护（满足「权限管理要自动添加」需求）。
  */
-export const PERMISSION_TREE: PermissionNode[] = [
-  {
-    key: 'database',
-    label: '数据库监测',
-    children: [
-      { key: 'database.pc', label: 'PC端' },
-      { key: 'database.mobile', label: '移动端' }
-    ]
-  },
-  {
-    key: 'lianzhicang',
-    label: '联智舱',
-    children: [
-      {
-        key: 'ai',
-        label: 'AI助手',
-        children: [
-          { key: 'ai.pc', label: 'PC端' },
-          { key: 'ai.mobile', label: '移动端' }
-        ]
-      },
-      {
-        key: 'models',
-        label: '模型中心',
-        children: [
-          { key: 'models.pc', label: 'PC端' },
-          { key: 'models.mobile', label: '移动端' }
-        ]
+function buildPermissionTree(menu: SideItem[]): PermissionNode[] {
+  const tree: PermissionNode[] = []
+  for (const node of menu) {
+    if (!node.permissionKey && !node.children) continue
+    if (node.children && node.children.length > 0) {
+      const children: PermissionNode[] = []
+      for (const child of node.children) {
+        if (!child.permissionKey) continue
+        children.push({
+          key: child.permissionKey,
+          label: child.label,
+          children: [
+            { key: `${child.permissionKey}.pc`, label: 'PC端' },
+            { key: `${child.permissionKey}.mobile`, label: '移动端' }
+          ]
+        })
       }
-    ]
-  },
-  {
-    key: 'fanjingzhixie',
-    label: '凡境智协',
-    children: [
-      {
-        key: 'news',
-        label: '新闻聚合',
-        children: [
-          { key: 'news.pc', label: 'PC端' },
-          { key: 'news.mobile', label: '移动端' }
-        ]
-      },
-      {
-        key: 'weather',
-        label: '天气',
-        children: [
-          { key: 'weather.pc', label: 'PC端' },
-          { key: 'weather.mobile', label: '移动端' }
-        ]
-      },
-      {
-        key: 'map',
-        label: '地图',
-        children: [
-          { key: 'map.pc', label: 'PC端' },
-          { key: 'map.mobile', label: '移动端' }
-        ]
-      },
-      {
-        key: 'automation',
-        label: '自动化信息',
-        children: [
-          { key: 'automation.pc', label: 'PC端' },
-          { key: 'automation.mobile', label: '移动端' }
-        ]
+      if (children.length > 0) {
+        tree.push({ key: node.key, label: node.label, children })
       }
-    ]
-  },
-  {
-    key: 'worktasks',
-    label: '工作任务',
-    children: [
-      {
-        key: 'dashboard',
-        label: '数据看板',
+    } else if (node.permissionKey) {
+      tree.push({
+        key: node.permissionKey,
+        label: node.label,
         children: [
-          { key: 'dashboard.pc', label: 'PC端' },
-          { key: 'dashboard.mobile', label: '移动端' }
+          { key: `${node.permissionKey}.pc`, label: 'PC端' },
+          { key: `${node.permissionKey}.mobile`, label: '移动端' }
         ]
-      },
-      {
-        key: 'todos',
-        label: '待办',
-        children: [
-          { key: 'todos.pc', label: 'PC端' },
-          { key: 'todos.mobile', label: '移动端' }
-        ]
-      },
-      {
-        key: 'points',
-        label: '点位',
-        children: [
-          { key: 'points.pc', label: 'PC端' },
-          { key: 'points.mobile', label: '移动端' }
-        ]
-      },
-      {
-        key: 'contents',
-        label: '内容',
-        children: [
-          { key: 'contents.pc', label: 'PC端' },
-          { key: 'contents.mobile', label: '移动端' }
-        ]
-      }
-    ]
-  },
-  {
-    key: 'requirements',
-    label: '需求收集',
-    children: [
-      { key: 'requirements.pc', label: 'PC端' },
-      { key: 'requirements.mobile', label: '移动端' }
-    ]
-  },
-  {
-    key: 'system',
-    label: '权限管理',
-    children: [
-      {
-        key: 'system.accounts',
-        label: '账号管理',
-        children: [
-          { key: 'system.accounts.pc', label: 'PC端' },
-          { key: 'system.accounts.mobile', label: '移动端' }
-        ]
-      },
-      {
-        key: 'system.roles',
-        label: '角色权限',
-        children: [
-          { key: 'system.roles.pc', label: 'PC端' },
-          { key: 'system.roles.mobile', label: '移动端' }
-        ]
-      }
-    ]
+      })
+    }
   }
-]
+  return tree
+}
+
+export const PERMISSION_TREE: PermissionNode[] = buildPermissionTree(APP_MENU)
 
 function collectPermissionKeys(nodes: PermissionNode[]): string[] {
   const keys: string[] = []
@@ -257,7 +159,21 @@ function collectPermissionKeys(nodes: PermissionNode[]): string[] {
 
 const ALL_PERMISSION_KEYS = collectPermissionKeys(PERMISSION_TREE)
 
+/** 已知权限基础 key 集合（用于未知模块安全放行，避免配置漂移导致锁死） */
+const KNOWN_BASE_KEYS = new Set(ALL_PERMISSION_KEYS.map((k) => k.replace(/\.(pc|mobile)$/, '')))
+
+/** 提取权限 key 的基础模块名（去掉 .pc / .mobile 后缀） */
+const baseKeyOf = (k: string): string => k.replace(/\.(pc|mobile)$/, '')
+
+/** 普通用户默认可访问的模块（仅个人数据类，与「账号级数据隔离」一致） */
+const USER_ALLOWED_BASES = new Set<string>([
+  'news', 'yingcang', 'xingyu', 'weather', 'map', 'third-api',
+  'learn-english', 'learn-industry', 'learn-books',
+  'requirements', 'dashboard', 'todos', 'points', 'contents'
+])
+
 export const DEFAULT_ROLE_CONFIG: PermissionConfig = {
+  version: 2,
   roles: [
     {
       key: 'superadmin',
@@ -269,21 +185,70 @@ export const DEFAULT_ROLE_CONFIG: PermissionConfig = {
       key: 'admin',
       name: '管理员',
       description: '可进入系统管理与数据库监测，管理普通用户账号与业务数据。',
-      permissions: ALL_PERMISSION_KEYS.filter((k) => k !== 'system.roles.pc' && k !== 'system.roles.mobile')
+      permissions: ALL_PERMISSION_KEYS.filter((k) => !k.startsWith('system.roles.'))
     },
     {
       key: 'user',
       name: '普通用户',
       description: '仅可操作自己的数据，数据与其他账号相互隔离。',
-      permissions: ALL_PERMISSION_KEYS.filter(
-        (k) =>
-          !k.startsWith('system.') &&
-          !k.startsWith('database.') &&
-          k !== 'lianzhicang.pc' &&
-          k !== 'lianzhicang.mobile'
-      )
+      permissions: ALL_PERMISSION_KEYS.filter((k) => USER_ALLOWED_BASES.has(baseKeyOf(k)))
     }
   ]
+}
+
+/** 当前权限方案版本：v2 起权限 key 细粒度化（每个菜单一个独立 key） */
+export const PERMISSION_SCHEMA_VERSION = 2
+
+/**
+ * v1 → v2 权限迁移映射。
+ * v1 时期 `dashboard` / `ai` 是两个粗粒度大权限，覆盖了下面这些页面；
+ * v2 拆成每页独立 key 后，需要把老配置里的粗粒度权限自动展开，
+ * 否则老账号升级后左侧菜单会大面积消失。
+ */
+const LEGACY_KEY_EXPANSION: Record<string, string[]> = {
+  dashboard: [
+    'dashboard',
+    'news', 'yingcang', 'xingyu', 'weather', 'map', 'third-api',
+    'learn-english', 'learn-industry', 'learn-books',
+    'requirements'
+  ],
+  ai: ['ai', 'models', 'aimodels']
+}
+
+/** 把 v1 粗粒度权限列表展开为 v2 细粒度权限列表（幂等；只增不减，保证升级不掉权限） */
+export function migratePermissionList(perms: string[]): string[] {
+  const out = new Set(perms)
+  const allKeys = new Set(ALL_PERMISSION_KEYS)
+  perms.forEach((k) => {
+    const m = /^(.*)\.(pc|mobile)$/.exec(k)
+    if (!m) return
+    const legacyBase = m[1] ?? ''
+    const platform = m[2] ?? ''
+    const expansion = LEGACY_KEY_EXPANSION[legacyBase]
+    if (!expansion) return
+    expansion.forEach((base: string) => {
+      const nk = `${base}.${platform}`
+      if (allKeys.has(nk)) out.add(nk)
+    })
+  })
+  return [...out]
+}
+
+/**
+ * 归一化配置：
+ * 1. 老版本（无 version 或 < 2）配置自动做 v1→v2 权限迁移，避免升级后菜单消失；
+ * 2. 超级管理员始终拥有全部权限，避免配置漂移导致锁死。
+ */
+function normalizeConfig(cfg: PermissionConfig): PermissionConfig {
+  if ((cfg.version ?? 1) < PERMISSION_SCHEMA_VERSION) {
+    cfg.roles.forEach((r) => {
+      r.permissions = migratePermissionList(r.permissions || [])
+    })
+    cfg.version = PERMISSION_SCHEMA_VERSION
+  }
+  const sa = cfg.roles.find((r) => r.key === 'superadmin')
+  if (sa) sa.permissions = [...ALL_PERMISSION_KEYS]
+  return cfg
 }
 
 /** 读取全局角色权限配置（优先 app_settings 表，其次 admin profile，最后默认） */
@@ -292,7 +257,7 @@ export async function loadPermissionConfig(): Promise<PermissionConfig> {
     const { data, error } = await supabase.from('app_settings').select('value').eq('key', 'role_config').maybeSingle()
     if (!error && data?.value) {
       const cfg = data.value as PermissionConfig
-      if (Array.isArray(cfg.roles)) return cfg
+      if (Array.isArray(cfg.roles)) return normalizeConfig(cfg)
     }
   } catch {
     // ignore
@@ -302,7 +267,7 @@ export async function loadPermissionConfig(): Promise<PermissionConfig> {
     const { data, error } = await supabase.from('profiles').select('role_config').eq('user_id', 'admin-default').maybeSingle()
     if (!error && data?.role_config) {
       const cfg = data.role_config as PermissionConfig
-      if (Array.isArray(cfg.roles)) return cfg
+      if (Array.isArray(cfg.roles)) return normalizeConfig(cfg)
     }
   } catch {
     // ignore
@@ -313,6 +278,8 @@ export async function loadPermissionConfig(): Promise<PermissionConfig> {
 
 /** 保存全局角色权限配置（优先 app_settings 表，失败则写入 admin profile） */
 export async function savePermissionConfig(config: PermissionConfig): Promise<boolean> {
+  // 标记为当前权限方案版本，避免下次加载时被重复迁移（尊重管理员手动取消的权限）
+  config.version = PERMISSION_SCHEMA_VERSION
   try {
     const { error } = await supabase.from('app_settings').upsert(
       { key: 'role_config', value: config as unknown as Record<string, unknown>, updated_at: new Date().toISOString() },
@@ -334,6 +301,19 @@ export async function savePermissionConfig(config: PermissionConfig): Promise<bo
   }
 }
 
+/** 权限展开结果缓存（菜单渲染会高频调用 hasPermission，避免重复计算） */
+const effectivePermCache = new Map<string, Set<string>>()
+function effectivePermSet(perms: string[]): Set<string> {
+  const cacheKey = perms.join('|')
+  let set = effectivePermCache.get(cacheKey)
+  if (!set) {
+    set = new Set(migratePermissionList(perms))
+    if (effectivePermCache.size > 50) effectivePermCache.clear()
+    effectivePermCache.set(cacheKey, set)
+  }
+  return set
+}
+
 /** 获取某角色的默认权限 key 列表 */
 export function getRolePermissions(role: UserRole | string, config?: PermissionConfig): string[] {
   const cfg = config || DEFAULT_ROLE_CONFIG
@@ -349,12 +329,21 @@ export function hasPermission(
   config?: PermissionConfig
 ): boolean {
   if (!user) return false
+  // 未知模块（如后续新增页面尚未登记到权限树）默认放行，避免配置漂移导致锁死
+  if (!KNOWN_BASE_KEYS.has(moduleKey)) return true
   const key = `${moduleKey}.${platform}`
-  const perms = user.permissions && user.permissions.length > 0 ? user.permissions : getRolePermissions(user.role, config)
-  if (perms.includes(key)) return true
+  const raw = user.permissions && user.permissions.length > 0 ? user.permissions : getRolePermissions(user.role, config)
+  // 账号上可能存着 v1 粗粒度权限，这里同样做一次展开，避免老账号升级后被锁在门外
+  const perms = effectivePermSet(raw)
+  if (perms.has(key)) return true
   // 父模块兜底：如 system 没有 system.pc/mobile 叶子节点，
   // 只要拥有 system.accounts.pc/mobile 或 system.roles.pc/mobile 等子权限，即视为有权限
-  return perms.some((k) => k.startsWith(`${moduleKey}.`) && k.endsWith(`.${platform}`))
+  const prefix = `${moduleKey}.`
+  const suffix = `.${platform}`
+  for (const k of perms) {
+    if (k.startsWith(prefix) && k.endsWith(suffix)) return true
+  }
+  return false
 }
 
 /** 判断用户是否拥有某模块任一平台的权限（用于菜单显示） */
@@ -411,16 +400,24 @@ export async function getDatabaseStats(): Promise<DatabaseStats> {
     // 该 RPC 返回 json 标量（非表），不要用 maybeSingle()（那是为「返回表的 0/1 行」设计的）。
     // Supabase 对标量函数可能直接返回 json 对象，也可能包一层 { get_database_stats: {...} }，两种都兼容解析。
     const { data, error } = await supabase.rpc('get_database_stats')
-    const raw = (data ?? null) as
-      | { db_size_bytes?: number; tables?: Array<{ name: string; rows: number; size_bytes?: number; rls_enabled?: boolean; schema?: string }> }
-      | { get_database_stats?: { db_size_bytes?: number; tables?: Array<{ name: string; rows: number; size_bytes?: number; rls_enabled?: boolean; schema?: string }> } }
-      | null
-    const payload =
-      raw && 'get_database_stats' in raw && raw.get_database_stats ? raw.get_database_stats : raw
+    interface RpcTableStat {
+      name: string
+      rows: number
+      size_bytes?: number
+      rls_enabled?: boolean
+      schema?: string
+    }
+    interface RpcStatsPayload {
+      db_size_bytes?: number
+      tables?: RpcTableStat[]
+      get_database_stats?: RpcStatsPayload
+    }
+    const raw = (data ?? null) as RpcStatsPayload | null
+    const payload: RpcStatsPayload | null = raw?.get_database_stats ? raw.get_database_stats : raw
     if (!error && payload) {
       result.dbSizeBytes = Number(payload.db_size_bytes) || 0
       if (Array.isArray(payload.tables)) {
-        result.tables = payload.tables.map((t) => ({
+        result.tables = payload.tables.map((t: RpcTableStat) => ({
           name: t.name,
           rows: Number(t.rows) || 0,
           sizeBytes: Number(t.size_bytes) || 0,
@@ -1132,9 +1129,12 @@ export async function createAccountByAdmin(params: {
   })
   if (rpcErr) {
     // 档案写入失败时清理已创建的认证用户，避免留下"能登录但无档案"的孤儿账号
-    await supabase.rpc('delete_account_by_admin', { p_auth_user_id: uid }).catch(() => {
+    // 注：supabase.rpc() 返回的是 PostgrestFilterBuilder（thenable，无 .catch），需用 try/catch
+    try {
+      await supabase.rpc('delete_account_by_admin', { p_auth_user_id: uid })
+    } catch {
       // 忽略清理失败，优先抛出原始错误
-    })
+    }
     throw new Error(getErrorMessage(rpcErr, '创建账号失败'))
   }
 

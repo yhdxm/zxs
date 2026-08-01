@@ -1,6 +1,6 @@
 <template>
   <div class="tp-page">
-    <PageHeader title="第三方 API" subtitle="自行填写天气、地图等免费 API 地址与 Key，按账号隔离、互不干扰。若未填写或未被授权，将自动回退到默认保底源（天气 → Open-Meteo 免费无 Key；地图 → OpenStreetMap）。" />
+    <PageHeader title="第三方 API" subtitle="自行填写天气、地图等免费 API 地址与 Key，按账号隔离、互不干扰。若未填写或未被授权，将自动回退到默认保底源（天气 → Open-Meteo 免费无 Key；地图 → OpenStreetMap）。" :icon="Link" />
 
     <!-- 我的 API 配置 -->
     <section class="tp-section">
@@ -234,7 +234,7 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
-import { WarningFilled, Refresh } from '@element-plus/icons-vue'
+import { WarningFilled, Refresh, Link } from '@element-plus/icons-vue'
 import { getSavedUser, type AppUser } from '../services/appDataService'
 import {
   listMyApis,
@@ -257,6 +257,7 @@ import {
 } from '../services/thirdPartyApi'
 import PageHeader from '../components/PageHeader.vue'
 import EChart from '../components/EChart.vue'
+import type { EChartsOption } from 'echarts'
 import {
   loadSharedFreeApiKeys,
   saveSharedFreeApiKey,
@@ -346,7 +347,7 @@ async function loadStats() {
   }
 }
 
-function buildChartOption() {
+function buildChartOption(): EChartsOption {
   const range = chartRange.value
   const now = new Date()
   let intervalMs = 60_000
@@ -383,7 +384,7 @@ function buildChartOption() {
     const t = new Date(log.created_at || '')
     if (isNaN(t.getTime()) || t < from || t > now) continue
     const idx = Math.min(points - 1, Math.max(0, Math.floor((t.getTime() - from.getTime()) / intervalMs)))
-    buckets[idx]++
+    buckets[idx] = (buckets[idx] ?? 0) + 1
   }
 
   return {
@@ -597,8 +598,8 @@ onMounted(async () => {
 
 <style scoped>
 .tp-page {
-  padding: 0 20px 20px;
-  max-width: 980px;
+  padding: 0 18px 18px;
+  max-width: 1400px;
   margin: 0 auto;
   color: var(--text);
 }

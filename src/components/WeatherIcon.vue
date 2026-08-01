@@ -28,7 +28,7 @@
         <line x1="15" y1="37" x2="18" y2="34" />
         <line x1="34" y1="18" x2="37" y2="15" />
       </g>
-      <CloudShape x="14" y="24" scale="0.85" />
+      <CloudShape :x="14" :y="24" :scale="0.85" />
     </g>
 
     <!-- 局部多云 -->
@@ -40,17 +40,17 @@
         <line x1="8" y1="22" x2="11" y2="22" />
         <line x1="33" y1="22" x2="36" y2="22" />
       </g>
-      <CloudShape x="12" y="22" scale="0.95" />
+      <CloudShape :x="12" :y="22" :scale="0.95" />
     </g>
 
     <!-- 阴 / 雾 / 霾 -->
     <g v-else-if="isOvercast || isFog">
-      <CloudShape x="8" y="18" scale="1" />
+      <CloudShape :x="8" :y="18" :scale="1" />
     </g>
 
     <!-- 毛毛雨 / 小雨 -->
     <g v-else-if="isDrizzle || isLightRain">
-      <CloudShape x="8" y="16" scale="1" />
+      <CloudShape :x="8" :y="16" :scale="1" />
       <g stroke="#38bdf8" stroke-width="2.5" stroke-linecap="round">
         <line x1="22" y1="42" x2="20" y2="50" />
         <line x1="32" y1="42" x2="30" y2="50" />
@@ -60,7 +60,7 @@
 
     <!-- 中雨 / 大雨 / 冻雨 -->
     <g v-else-if="isRain">
-      <CloudShape x="8" y="14" scale="1" />
+      <CloudShape :x="8" :y="14" :scale="1" />
       <g stroke="#38bdf8" stroke-width="3" stroke-linecap="round">
         <line x1="20" y1="44" x2="17" y2="54" />
         <line x1="32" y1="44" x2="29" y2="54" />
@@ -70,7 +70,7 @@
 
     <!-- 阵雨 / 强阵雨 / 暴雨 -->
     <g v-else-if="isShower">
-      <CloudShape x="8" y="14" scale="1" />
+      <CloudShape :x="8" :y="14" :scale="1" />
       <g stroke="#38bdf8" stroke-width="3" stroke-linecap="round">
         <line x1="22" y1="44" x2="16" y2="54" />
         <line x1="32" y1="44" x2="26" y2="54" />
@@ -80,7 +80,7 @@
 
     <!-- 雪 / 阵雪 -->
     <g v-else-if="isSnow">
-      <CloudShape x="8" y="16" scale="1" />
+      <CloudShape :x="8" :y="16" :scale="1" />
       <g fill="#bae6fd">
         <circle cx="22" cy="48" r="2.5" />
         <circle cx="32" cy="52" r="2.5" />
@@ -90,13 +90,13 @@
 
     <!-- 雷暴 -->
     <g v-else-if="isThunder">
-      <CloudShape x="8" y="14" scale="1" />
+      <CloudShape :x="8" :y="14" :scale="1" />
       <path d="M30 40 L26 50 L32 50 L28 60 L40 46 L34 46 L38 40 Z" fill="#f59e0b" stroke="#f59e0b" stroke-width="1" stroke-linejoin="round" />
     </g>
 
     <!-- 默认 -->
     <g v-else>
-      <CloudShape x="8" y="18" scale="1" />
+      <CloudShape :x="8" :y="18" :scale="1" />
     </g>
   </svg>
 </template>

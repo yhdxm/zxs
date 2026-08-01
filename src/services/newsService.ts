@@ -123,7 +123,9 @@ export const NEWS_CATEGORIES: NewsCategory[] = [
 ]
 
 export function findCategory(key: string): NewsCategory {
-  return NEWS_CATEGORIES.find((c) => c.key === key) || NEWS_CATEGORIES[0]
+  const found = NEWS_CATEGORIES.find((c) => c.key === key) ?? NEWS_CATEGORIES[0]
+  // NEWS_CATEGORIES 为非空常量数组，此处兜底仅为满足类型收窄
+  return found as NewsCategory
 }
 
 function buildRssUrl(cat: NewsCategory): string {
@@ -183,7 +185,7 @@ function stripHtml(html: string): string {
 function extractThumbFromHtml(html: string): string {
   if (!html) return ''
   const m = html.match(/<img[^>]+src=["']([^"']+)["']/i)
-  return m ? m[1] : ''
+  return m?.[1] ?? ''
 }
 
 /** 从 "标题 - 来源" 中拆出真实标题；source 已知时优先用 source 截断 */
@@ -303,6 +305,88 @@ async function tryCodetabs(cat: NewsCategory): Promise<NewsItem[]> {
 
 const PROXIES = [tryRss2Json, tryAllOrigins, tryCodetabs]
 
+/* ---------- 数据来源托底（全部免费公开 RSS，Google News 不可达时降级） ---------- */
+
+/** UI 用：展示给用户看的数据源托底说明。 */
+export const NEWS_FALLBACK_SOURCES: { label: string; note: string }[] = [
+  { label: '国内应用', note: '少数派 RSS + 爱范儿 RSS' },
+  { label: '人工智能 / 科技', note: '机器之心 RSS + 量子位 RSS' },
+  { label: '通用兜底', note: '36氪 RSS' }
+]
+
+/**
+ * 各分类的免费 RSS 托底源（按 cat.key 映射），全部免 Key、前端直连。
+ * Google News 三级代理全部失败时，按分类降级抓取这些源，保证有数据展示。
+ */
+const FALLBACK_FEEDS: Record<string, string[]> = {
+  ai: [
+    'https://www.jiqizhixin.com/rss',
+    'https://www.qbitai.com/feed',
+    'https://sspai.com/feed',
+    'https://www.ifanr.com/feed'
+  ],
+  internet: ['https://sspai.com/feed', 'https://www.ifanr.com/feed'],
+  tech: ['https://sspai.com/feed', 'https://www.ifanr.com/feed'],
+  chip: ['https://www.jiqizhixin.com/rss', 'https://www.qbitai.com/feed'],
+  ev: ['https://www.ifanr.com/feed', 'https://sspai.com/feed'],
+  phone: ['https://www.ifanr.com/feed', 'https://sspai.com/feed'],
+  game: ['https://www.ifanr.com/feed'],
+  movie: ['https://www.ifanr.com/feed'],
+  ent: ['https://www.ifanr.com/feed'],
+  // 通用兜底（任意分类失败都尝试）
+  __all: ['https://36kr.com/feed', 'https://sspai.com/feed']
+}
+
+async function fetchRssRaw(url: string, kind: 'allorigins' | 'codetabs'): Promise<NewsItem[]> {
+  const proxyUrl =
+    kind === 'allorigins'
+      ? `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`
+      : `https://api.codetabs.com/v1/proxy/?quest=${url}`
+  const res = await timeoutFetch(proxyUrl)
+  if (!res.ok) throw new Error('http ' + res.status)
+  const xml = await res.text()
+  return parseXmlItems(xml)
+}
+
+/**
+ * 通用 RSS 抓取（经 allorigins / codetabs 代理，免费无 Key）：供其他模块（如星舆识途汽车兜底）复用。
+ * 失败返回空数组，由调用方决定是否降级到内置数据。
+ */
+export async function fetchRssViaProxies(url: string): Promise<NewsItem[]> {
+  for (const kind of ['allorigins', 'codetabs'] as const) {
+    try {
+      const items = await fetchRssRaw(url, kind)
+      if (items.length) return items
+    } catch (e) {
+      console.warn('[news] fetchRssViaProxies 失败:', url, e)
+    }
+  }
+  return []
+}
+
+/** 尝试分类托底 RSS；成功返回条目，全部失败返回空数组。 */
+async function tryFallbackRss(cat: NewsCategory): Promise<NewsItem[]> {
+  const feeds = [...(FALLBACK_FEEDS[cat.key] ?? []), ...(FALLBACK_FEEDS.__all ?? [])]
+  const seen = new Set<string>()
+  const out: NewsItem[] = []
+  for (const url of feeds) {
+    for (const kind of ['allorigins', 'codetabs'] as const) {
+      try {
+        const items = await fetchRssRaw(url, kind)
+        for (const it of items) {
+          if (!it.title || seen.has(it.id)) continue
+          seen.add(it.id)
+          out.push(it)
+        }
+        if (out.length >= 12) return out
+      } catch (e) {
+        console.warn('[news] 托底源失败:', url, e)
+      }
+    }
+  }
+  return out
+}
+
 /* ---------- 缓存 + 并发去重 ---------- */
 
 const inFlight = new Map<string, Promise<NewsItem[]>>()
@@ -357,6 +441,10 @@ async function loadAll(cat: NewsCategory): Promise<NewsItem[]> {
       } catch (e) {
         console.warn(`[news] 代理失败:`, e)
       }
+    }
+    // Google News 三级代理全失败 → 降级到分类免费 RSS 托底
+    if (!items.length) {
+      items = await tryFallbackRss(cat)
     }
     items.sort((a, b) => b.pubTimestamp - a.pubTimestamp)
     if (items.length) setCache(cacheKey, items)

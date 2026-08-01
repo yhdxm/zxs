@@ -1,6 +1,6 @@
 <template>
   <div class="ext-ideas">
-    <PageHeader title="外部灵感聚合" subtitle="免费聚合 GitHub 近期高星开源项目（国内可直连、无需 Key），帮助你捕捉需求与产品灵感（数据仅存浏览器本地 + 云端，不消耗任何积分）">
+    <PageHeader title="外部灵感聚合" subtitle="免费聚合 GitHub 近期高星开源项目（国内可直连、无需 Key），帮助你捕捉需求与产品灵感（数据仅存浏览器本地 + 云端，不消耗任何积分）" :icon="Collection">
       <el-button type="primary" :loading="fetching" @click="refresh">
         <el-icon><Refresh /></el-icon> 免费查询 / 刷新
       </el-button>
@@ -89,7 +89,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Refresh, Search, Star, Loading, Delete } from '@element-plus/icons-vue'
+import { Refresh, Search, Star, Loading, Delete, Collection } from '@element-plus/icons-vue'
 import {
   fetchExternalIdeas,
   loadExternalIdeas,
@@ -295,8 +295,8 @@ onMounted(async () => {
 
 <style scoped>
 .ext-ideas {
-  padding: 0 24px 24px;
-  max-width: 1200px;
+  padding: 0 18px 18px;
+  max-width: 1400px;
   margin: 0 auto;
   color: var(--text);
 }

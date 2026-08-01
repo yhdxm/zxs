@@ -1,6 +1,78 @@
 <template>
   <div class="sys-page">
-    <PageHeader title="权限管理" subtitle="账号与角色权限统一管理" />
+    <PageHeader title="权限管理" subtitle="账号与角色权限统一管理" :icon="Lock" />
+
+    <!-- ===== 数据库连接情况 ===== -->
+    <section class="sys-section db-section">
+      <div class="section-head">
+        <div>
+          <h3>数据库连接情况</h3>
+          <p class="section-tip">实时检测 Supabase 数据库连通性与容量占用</p>
+        </div>
+        <el-button :loading="dbLoading" @click="loadDbStats"><el-icon><Refresh /></el-icon> 刷新</el-button>
+      </div>
+
+      <el-row :gutter="14" class="db-cards">
+        <el-col :xs="12" :sm="12" :md="6">
+          <div class="db-card">
+            <span class="db-card-label">连接状态</span>
+            <span class="db-card-value" :class="dbStats?.connected ? 'ok' : 'bad'">
+              <el-icon v-if="dbStats?.connected"><CircleCheck /></el-icon>
+              <el-icon v-else><CircleClose /></el-icon>
+              {{ dbStats?.connected ? '已连接' : (dbStats ? '未连接' : '检测中') }}
+            </span>
+          </div>
+        </el-col>
+        <el-col :xs="12" :sm="12" :md="6">
+          <div class="db-card">
+            <span class="db-card-label">数据库大小</span>
+            <span class="db-card-value">{{ formatBytes(dbStats?.dbSizeBytes) }}</span>
+          </div>
+        </el-col>
+        <el-col :xs="12" :sm="12" :md="6">
+          <div class="db-card">
+            <span class="db-card-label">数据表数量</span>
+            <span class="db-card-value">{{ dbStats?.tables?.length ?? '—' }} <small>张</small></span>
+          </div>
+        </el-col>
+        <el-col :xs="12" :sm="12" :md="6">
+          <div class="db-card">
+            <span class="db-card-label">检测时间</span>
+            <span class="db-card-value small">{{ dbStats ? formatDateTime(new Date(dbStats.checkedAt).toISOString()) : '—' }}</span>
+          </div>
+        </el-col>
+      </el-row>
+
+      <div v-if="dbStats" class="db-usage">
+        <div class="db-usage-head">
+          <span>容量占用（免费额度 500MB）</span>
+          <span>{{ formatBytes(dbStats.dbSizeBytes) }} / 500MB</span>
+        </div>
+        <el-progress
+          :percentage="dbUsagePercent"
+          :status="dbUsagePercent >= 80 ? 'exception' : 'success'"
+          :stroke-width="10"
+        />
+      </div>
+
+      <el-table v-if="dbStats && dbStats.tables.length" :data="dbStats.tables" size="small" class="db-table" stripe>
+        <el-table-column prop="name" label="数据表" min-width="170" />
+        <el-table-column prop="rows" label="行数" min-width="100" align="right" />
+        <el-table-column label="大小" min-width="110" align="right">
+          <template #default="{ row }">{{ formatBytes(row.sizeBytes) }}</template>
+        </el-table-column>
+        <el-table-column label="RLS" min-width="96">
+          <template #default="{ row }">
+            <el-tag v-if="row.rlsEnabled === true" type="success" effect="light" size="small">已启用</el-tag>
+            <el-tag v-else-if="row.rlsEnabled === false" type="warning" effect="light" size="small">未启用</el-tag>
+            <span v-else class="text-muted">未知</span>
+          </template>
+        </el-table-column>
+      </el-table>
+
+      <div v-if="dbStats?.error" class="db-error">检测异常：{{ dbStats.error }}</div>
+    </section>
+
     <!-- ===== 账号管理 ===== -->
     <section v-if="activeView === 'accounts'" class="sys-section">
       <div class="section-head">
@@ -159,7 +231,7 @@ import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox, ElTree, type FormInstance, type FormRules } from 'element-plus'
 import {
-  Plus, Search, Edit, Delete, Document, UserFilled
+  Plus, Search, Edit, Delete, Document, UserFilled, Lock, Refresh, CircleCheck, CircleClose
 } from '@element-plus/icons-vue'
 import {
   listAccounts,
@@ -172,6 +244,7 @@ import {
   refreshSavedUser,
   loadPermissionConfig,
   savePermissionConfig,
+  getDatabaseStats,
   PERMISSION_TREE,
   DEFAULT_ROLE_CONFIG,
   type AccountRecord,
@@ -179,7 +252,8 @@ import {
   type AppUser,
   type PermissionConfig,
   type RoleConfig,
-  type PermissionNode
+  type PermissionNode,
+  type DatabaseStats
 } from '../services/appDataService'
 import PageHeader from '../components/PageHeader.vue'
 
@@ -197,6 +271,36 @@ const accounts = ref<AccountRecord[]>([])
 const keyword = ref('')
 const currentUser = ref<AppUser | null>(null)
 const permissionConfig = ref<PermissionConfig>(JSON.parse(JSON.stringify(DEFAULT_ROLE_CONFIG)) as PermissionConfig)
+
+/* ============ 数据库连接情况 ============ */
+const dbStats = ref<DatabaseStats | null>(null)
+const dbLoading = ref(false)
+const dbUsagePercent = computed(() => {
+  const b = dbStats.value?.dbSizeBytes || 0
+  return Math.min(100, Math.round((b / (500 * 1024 * 1024)) * 100))
+})
+const loadDbStats = async () => {
+  dbLoading.value = true
+  try {
+    dbStats.value = await getDatabaseStats()
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '数据库连接检测失败')
+  } finally {
+    dbLoading.value = false
+  }
+}
+const formatBytes = (bytes?: number): string => {
+  if (bytes == null || Number.isNaN(bytes)) return '—'
+  if (bytes < 1024) return `${bytes} B`
+  const units = ['KB', 'MB', 'GB', 'TB']
+  let val = bytes / 1024
+  let i = 0
+  while (val >= 1024 && i < units.length - 1) {
+    val /= 1024
+    i++
+  }
+  return `${val.toFixed(val >= 10 || i === 0 ? 0 : 1)} ${units[i]}`
+}
 
 const availableRoles = computed(() => permissionConfig.value.roles)
 
@@ -453,6 +557,7 @@ const removeRole = async (role: RoleConfig) => {
   } else {
     ElMessage.warning('云端保存失败，已仅本地生效')
   }
+  window.dispatchEvent(new CustomEvent('permission-config-updated'))
 }
 
 const saveRole = async () => {
@@ -485,6 +590,8 @@ const saveRole = async () => {
     } else {
       ElMessage.warning('云端保存失败，已仅本地生效')
     }
+    // 广播给全局（App.vue），实时刷新侧边栏权限，无需刷新页面
+    window.dispatchEvent(new CustomEvent('permission-config-updated'))
   } catch (error) {
     ElMessage.error(error instanceof Error ? error.message : '保存失败')
   } finally {
@@ -509,6 +616,7 @@ watch(() => route.query.view, () => {
 onMounted(async () => {
   currentUser.value = await refreshSavedUser()
   await loadConfig()
+  await loadDbStats()
   if (activeView.value === 'accounts') {
     await load()
   }
@@ -517,8 +625,8 @@ onMounted(async () => {
 
 <style scoped>
 .sys-page {
-  padding: 0 26px calc(22px + env(safe-area-inset-bottom, 0px));
-  max-width: 1280px;
+  padding: 0 18px calc(18px + env(safe-area-inset-bottom, 0px));
+  max-width: 1400px;
   margin: 0 auto;
 }
 
@@ -558,6 +666,53 @@ onMounted(async () => {
   padding: 48px 20px;
 }
 .section-empty :deep(svg) { font-size: 36px; margin-bottom: 10px; }
+
+/* ===== 数据库连接情况 ===== */
+.db-section { margin-bottom: 18px; }
+.db-cards { margin-bottom: 4px; }
+.db-cards .el-col { margin-bottom: 12px; }
+.db-card {
+  background: #f8fafc;
+  border: 1px solid #eef2f7;
+  border-radius: 14px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  height: 100%;
+}
+.db-card-label { font-size: 12px; color: #64748b; }
+.db-card-value {
+  font-size: 20px;
+  font-weight: 700;
+  color: #0f172a;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.db-card-value.small { font-size: 14px; font-weight: 600; }
+.db-card-value.ok { color: #16a34a; }
+.db-card-value.bad { color: #dc2626; }
+.db-card-value small { font-size: 13px; color: #94a3b8; font-weight: 600; }
+.db-usage { margin: 14px 0 16px; }
+.db-usage-head {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: #64748b;
+  margin-bottom: 8px;
+}
+.db-table { margin-top: 4px; }
+.text-muted { color: #94a3b8; font-size: 13px; }
+.db-error {
+  margin-top: 12px;
+  padding: 10px 14px;
+  background: rgba(220, 38, 38, 0.06);
+  border: 1px solid rgba(220, 38, 38, 0.2);
+  border-radius: 10px;
+  color: #dc2626;
+  font-size: 13px;
+}
 
 /* ===== 角色权限 ===== */
 .role-section { padding: 0; overflow: hidden; }

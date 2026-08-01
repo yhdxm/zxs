@@ -1,43 +1,21 @@
 <template>
-  <div class="news-page">
-    <!-- 顶栏 -->
-    <div class="np-top">
-      <div class="np-title-row">
-        <h2 class="np-title">新闻聚合</h2>
-        <span class="np-live"><i class="np-dot"></i>实时</span>
-        <span class="np-date">{{ todayLabel }}</span>
-        <div class="np-spacer"></div>
-        <el-input
-          v-model="keyword"
-          placeholder="搜索关键词"
-          class="np-search"
-          clearable
-          @keyup.enter="loadAll"
-          @clear="loadAll"
-        >
-          <template #prefix><el-icon><Search /></el-icon></template>
-        </el-input>
-        <el-button :loading="loading" @click="loadAll">
-          <el-icon><Refresh /></el-icon> 刷新
-        </el-button>
-        <router-link to="/automation" class="np-fx-btn">
-          <el-icon><MagicStick /></el-icon> 沸爻机 ⚡
-        </router-link>
-        <div class="np-auto">
-          <span>自动</span>
-          <el-switch v-model="autoRefresh" />
-        </div>
-      </div>
-      <div class="np-update">更新于 {{ lastUpdate || '—' }}</div>
-    </div>
+  <div class="news-page" :style="{ '--cat': currentCat.color }">
+    <PageHeader
+      title="新闻聚合"
+      subtitle="数据源：Google News 公开 RSS（中文区）｜前端直连免费聚合，不消耗任何额度"
+      :icon="Bell"
+    >
+      <span class="np-live"><i class="np-dot"></i>实时聚合</span>
+      <span class="np-beijing">北京时间 {{ beijingTime }}</span>
+    </PageHeader>
 
-    <!-- 分类下拉 -->
-    <div class="np-cat-row">
-      <span class="np-cat-label">分类</span>
+    <!-- 筛选行：分类 + 搜索关键词 合并 -->
+    <div class="np-filter-row">
+      <span class="np-fl-label">筛选</span>
       <el-select
         v-model="selectedCat"
         class="np-cat-select"
-        placeholder="选择行业 / 领域"
+        placeholder="选择领域"
         filterable
         @change="loadAll"
       >
@@ -48,7 +26,24 @@
           :value="c.key"
         />
       </el-select>
-      <span class="np-cat-hint">共 {{ NEWS_CATEGORIES.length }} 个细分领域，可输入检索</span>
+      <el-input
+        v-model="keyword"
+        placeholder="搜索关键词"
+        class="np-search"
+        clearable
+        @keyup.enter="loadAll"
+        @clear="loadAll"
+      >
+        <template #prefix><el-icon><Search /></el-icon></template>
+      </el-input>
+      <span class="np-fl-hint">共 {{ NEWS_CATEGORIES.length }} 个领域 · 当前「{{ currentCat.label }}」{{ allCount }} 条</span>
+      <router-link to="/automation" class="np-fx-btn">
+        <el-icon><MagicStick /></el-icon> 沸爻机 ⚡
+      </router-link>
+      <el-button :loading="loading" @click="loadAll">
+        <el-icon><Refresh /></el-icon> 刷新
+      </el-button>
+      <span class="np-auto"><span>自动</span><el-switch v-model="autoRefresh" /></span>
     </div>
 
     <!-- 主体两栏 -->
@@ -56,7 +51,7 @@
       <!-- 左：热搜 TOP10 -->
       <aside class="np-hot">
         <h3 class="np-hot-title">
-          <span class="np-fire">🔥</span>{{ currentCat.label }}热搜 TOP 10
+          <span class="np-fire">🔥</span>{{ currentCat.label }} 热搜 TOP 10
           <span class="np-hot-badge">实时</span>
         </h3>
         <ol v-if="hot.length" class="np-hot-list">
@@ -76,58 +71,76 @@
         <el-empty v-else-if="!loading" description="暂无热搜" :image-size="40" />
       </aside>
 
-      <!-- 右：上半实时脉搏 + 下半信息流 -->
+      <!-- 右：上=实时脉搏动态曲线图，下=所选分类其他新闻 -->
       <section class="np-feed">
-        <!-- 实时脉搏：立体时间轴 -->
+        <!-- 实时脉搏：动态曲线图（数据=各领域热搜第一） -->
         <div class="np-pulse">
           <div class="np-pulse-head">
-            <span class="np-pulse-title">⏱ 实时脉搏 · 热搜时间轴</span>
-            <span class="np-pulse-sub">基于当前分类最热 5 条 · 按时间推进</span>
+            <span class="np-pulse-title">📈 实时脉搏 · 热搜第一曲线</span>
+            <span class="np-pulse-sub">
+              已采集 {{ pulseAll.length }} / {{ NEWS_CATEGORIES.length }} 个领域的热搜第一
+            </span>
           </div>
 
-          <div v-if="pulse.length" class="np-timeline">
-            <div class="np-timeline-axis">
-              <div class="np-timeline-glow"></div>
-              <div
-                v-for="(p, i) in pulse"
-                :key="p.id"
-                class="np-timeline-node"
-                :style="{ left: `${i * (100 / Math.max(pulse.length - 1, 1))}%` }"
-              >
-                <div class="np-timeline-dot" :style="{ background: PULSE_RANK[i % PULSE_RANK.length] }"></div>
-                <div class="np-timeline-tick">{{ p.pubDate.slice(11, 16) }}</div>
+          <div class="np-chart">
+            <!-- 未加载 / 采集中占位 -->
+            <div v-if="pulseAll.length === 0" class="np-chart-empty">
+              <div class="np-skeleton-bars">
+                <i v-for="n in 9" :key="n" :style="{ animationDelay: (n * 0.1) + 's' }"></i>
               </div>
+              <p>{{ loading ? '正在采集各域热搜第一…' : '暂无数据，切换或刷新分类后自动累积' }}</p>
             </div>
-
-            <div class="np-pulse-cards">
-              <div
-                v-for="(p, i) in pulse"
-                :key="p.id + i"
-                class="np-pulse-card"
-                :style="pulseStyle(i)"
-                @click="openDetail(p)"
-              >
-                <div class="np-pulse-card-no">0{{ i + 1 }}</div>
-                <div class="np-pulse-card-title">{{ p.title }}</div>
-                <div class="np-pulse-card-meta">{{ p.source }} · {{ relativeTime(p.pubTimestamp) }}</div>
-                <div class="np-pulse-card-arrow">→</div>
-              </div>
-            </div>
+            <!-- 动态曲线 -->
+            <svg
+              v-else
+              :viewBox="`0 0 ${PULSE_W} ${PULSE_H}`"
+              class="np-chart-svg"
+              preserveAspectRatio="none"
+            >
+              <defs>
+                <linearGradient id="npFill" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stop-color="#7F77DD" stop-opacity="0.30" />
+                  <stop offset="100%" stop-color="#7F77DD" stop-opacity="0" />
+                </linearGradient>
+                <linearGradient id="npStroke" x1="0" y1="0" x2="1" y2="0">
+                  <stop offset="0%" stop-color="#8b5cf6" />
+                  <stop offset="100%" stop-color="#06b6d4" />
+                </linearGradient>
+              </defs>
+              <line x1="2" y1="30" :x2="PULSE_W - 2" y2="30" class="np-grid" />
+              <line x1="2" y1="70" :x2="PULSE_W - 2" y2="70" class="np-grid" />
+              <line x1="2" y1="110" :x2="PULSE_W - 2" y2="110" class="np-grid" />
+              <path :d="pulseArea" fill="url(#npFill)" />
+              <path :d="pulsePath" class="np-line" fill="none" />
+              <circle
+                v-for="(p, i) in pulseDots"
+                :key="i"
+                :cx="p.x"
+                :cy="p.y"
+                r="3"
+                class="np-dot"
+                :style="{ animationDelay: (i * 0.15) + 's' }"
+              />
+            </svg>
           </div>
-
-          <el-empty v-else-if="!loading" description="暂无实时脉搏数据" :image-size="50" />
+          <div class="np-chart-foot">
+            <span class="np-chart-caption">{{ pulseCaption }}</span>
+            <span v-if="pulseAll.length > WINDOW" class="np-chart-roll">
+              <i class="np-roll-dot"></i>自动轮播
+            </span>
+          </div>
         </div>
 
-        <!-- 信息流（第 11 条起） -->
+        <!-- 信息流：所选分类的其他新闻（随分类变化） -->
         <div class="np-feed-head">
-          <span class="np-feed-title">📰 {{ currentCat.label }} 更多头条（第 11 条起）</span>
-          <span class="np-feed-count">已显示 {{ feed.length }}/{{ tailTotal }} 条</span>
+          <span class="np-feed-title">📰 {{ currentCat.label }} · 其他头条</span>
+          <span class="np-feed-count">已显示 {{ feed.length }} / {{ tailTotal }} 条</span>
         </div>
 
         <div v-if="loading && !feed.length" class="np-skeleton">
           <el-skeleton :rows="8" animated />
         </div>
-        <template v-else>
+        <template v-else-if="feed.length">
           <div
             v-for="(n, i) in feed"
             :key="n.id + i"
@@ -157,17 +170,15 @@
             <span class="np-detail-btn">详情 ›</span>
           </div>
 
-          <div v-if="!feed.length && !loading" class="np-empty">
-            <el-empty :description="feedEmptyReason" :image-size="50" />
-            <div v-if="allCount > 0 && allCount <= 10" class="np-empty-tip">
-              当前分类共 {{ allCount }} 条新闻，已全部展示在左侧热搜榜
-            </div>
-          </div>
-
-          <div v-if="feed.length && hasMore" class="np-more">
+          <div v-if="hasMore" class="np-more">
             <el-button :loading="loadingMore" plain @click="loadMore">加载更多 ↓</el-button>
           </div>
         </template>
+        <el-empty
+          v-else
+          :description="errorMsg || '该分类暂无可展示的其他新闻'"
+          :image-size="48"
+        />
       </section>
     </div>
 
@@ -192,24 +203,22 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
-import { Search, Refresh, MagicStick } from '@element-plus/icons-vue'
+import { Search, Refresh, Bell, MagicStick } from '@element-plus/icons-vue'
 import {
   NEWS_CATEGORIES,
   findCategory,
   fetchNewsAll,
   relativeTime,
-  formatNow,
   type NewsItem
 } from '../services/newsService'
+import PageHeader from '../components/PageHeader.vue'
 
 const selectedCat = ref('top')
 const keyword = ref('')
 const loading = ref(false)
 const loadingMore = ref(false)
 const autoRefresh = ref(false)
-const lastUpdate = ref('')
 const hot = ref<NewsItem[]>([])
-const pulse = ref<NewsItem[]>([])
 const tail = ref<NewsItem[]>([])
 const allCount = ref(0)
 const feedCount = ref(12)
@@ -217,22 +226,106 @@ const errorMsg = ref('')
 let autoTimer: ReturnType<typeof setInterval> | null = null
 
 const currentCat = computed(() => findCategory(selectedCat.value))
-const todayLabel = computed(() => {
+
+/* 北京时间时钟 */
+const beijingTime = ref('')
+let clockTimer: ReturnType<typeof setInterval> | null = null
+function tickBeijing() {
   const d = new Date()
-  const wk = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'][d.getDay()]
-  return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日 ${wk}`
+  const utc = d.getTime() + d.getTimezoneOffset() * 60000
+  const bj = new Date(utc + 8 * 3600000)
+  const p = (n: number) => String(n).padStart(2, '0')
+  beijingTime.value = `${p(bj.getHours())}:${p(bj.getMinutes())}:${p(bj.getSeconds())}`
+}
+
+/* ---------- 实时脉搏曲线：75 个领域各自的热搜第一 ---------- */
+const WINDOW = 14 // 曲线同屏展示的领域数量，超出则自动轮播
+const PULSE_W = 320
+const PULSE_H = 150
+const PULSE_PAD = 8
+
+const domainFirsts = ref<Record<string, { label: string; value: number }>>({})
+const carouselIdx = ref(0)
+let rollTimer: ReturnType<typeof setInterval> | null = null
+
+function freshnessValue(ts: number): number {
+  const min = (Date.now() - ts) / 60000
+  return Math.max(55, Math.min(100, 100 - Math.floor(min / 2)))
+}
+
+/** 已采集的各领域热搜第一（按标签排序，保证轮播稳定） */
+const pulseAll = computed(() =>
+  Object.values(domainFirsts.value).sort((a, b) => a.label.localeCompare(b.label))
+)
+
+/** 当前同屏可见的领域（总数 > WINDOW 时循环轮播） */
+const pulseVisible = computed(() => {
+  const all = pulseAll.value
+  if (!all.length) return []
+  if (all.length <= WINDOW) return all
+  const start = carouselIdx.value % all.length
+  const out: { label: string; value: number }[] = []
+  for (let i = 0; i < WINDOW; i++) {
+    const item = all[(start + i) % all.length]
+    if (item) out.push(item)
+  }
+  return out
+})
+
+const pulseDots = computed(() => {
+  const pts = pulseVisible.value
+  if (!pts.length) return []
+  const n = pts.length
+  const step = (PULSE_W - 2 * PULSE_PAD) / Math.max(1, n - 1)
+  return pts.map((p, i) => ({
+    x: PULSE_PAD + step * i,
+    y: PULSE_H - (p.value / 100) * (PULSE_H - 14) - 7,
+    label: p.label,
+    value: p.value
+  }))
+})
+
+/** Catmull-Rom 转贝塞尔，得到平滑曲线 */
+function smoothPath(pts: { x: number; y: number }[]): string {
+  const head = pts[0]
+  if (!head) return ''
+  if (pts.length < 2) return `M${head.x.toFixed(1)},${head.y.toFixed(1)}`
+  let d = `M${head.x.toFixed(1)},${head.y.toFixed(1)}`
+  for (let i = 0; i < pts.length - 1; i++) {
+    const p1 = pts[i]
+    const p2 = pts[i + 1]
+    if (!p1 || !p2) continue
+    const p0 = pts[i - 1] ?? p1
+    const p3 = pts[i + 2] ?? p2
+    const cp1x = p1.x + (p2.x - p0.x) / 6
+    const cp1y = p1.y + (p2.y - p0.y) / 6
+    const cp2x = p2.x - (p3.x - p1.x) / 6
+    const cp2y = p2.y - (p3.y - p1.y) / 6
+    d += ` C${cp1x.toFixed(1)},${cp1y.toFixed(1)} ${cp2x.toFixed(1)},${cp2y.toFixed(1)} ${p2.x.toFixed(1)},${p2.y.toFixed(1)}`
+  }
+  return d
+}
+
+const pulsePath = computed(() => smoothPath(pulseDots.value))
+const pulseArea = computed(() => {
+  const dots = pulseDots.value
+  if (dots.length < 2) return ''
+  const first = dots[0]
+  const last = dots[dots.length - 1]
+  if (!first || !last) return ''
+  return `${pulsePath.value} L${last.x.toFixed(1)},${PULSE_H} L${first.x.toFixed(1)},${PULSE_H} Z`
+})
+
+const pulseCaption = computed(() => {
+  const total = pulseAll.value.length
+  if (!total) return '尚未采集'
+  if (total <= WINDOW) return `已展示全部 ${total} 个领域`
+  return `共 ${total} 个领域 · 自动轮播展示`
 })
 
 const tailTotal = computed(() => tail.value.length)
 const feed = computed(() => tail.value.slice(0, feedCount.value))
 const hasMore = computed(() => feedCount.value < tail.value.length)
-const feedEmptyReason = computed(() => {
-  if (tail.value.length) return ''
-  if (allCount.value <= 10) {
-    return `当前「${currentCat.value.label}」共找到 ${allCount.value} 条新闻，已为您全部展示在左侧热搜榜。`
-  }
-  return errorMsg.value || '暂无更多新闻，请切换分类或刷新'
-})
 
 function firstChar(t: string): string {
   return (t || '新').trim().charAt(0)
@@ -249,10 +342,19 @@ async function loadAll() {
     const all = await fetchNewsAll({ category: selectedCat.value, keyword: keyword.value })
     allCount.value = all.length
     hot.value = all.slice(0, 10)
-    pulse.value = all.slice(0, 5)
+    // 累积当前领域热搜第一（用于实时脉搏曲线）
+    const firstNews = all[0]
+    if (firstNews) {
+      domainFirsts.value = {
+        ...domainFirsts.value,
+        [selectedCat.value]: {
+          label: currentCat.value.label,
+          value: freshnessValue(firstNews.pubTimestamp)
+        }
+      }
+    }
     tail.value = all.slice(10)
-    feedCount.value = 12
-    lastUpdate.value = formatNow()
+    feedCount.value = 40
   } catch (e) {
     errorMsg.value = '加载失败，请稍后刷新（代理可能限流）'
     allCount.value = 0
@@ -264,7 +366,7 @@ async function loadAll() {
 async function loadMore() {
   if (loadingMore.value) return
   loadingMore.value = true
-  feedCount.value += 12
+  feedCount.value += 40
   // 若已展示全部但本地缓存还有更多，则跳过等待
   await new Promise((r) => setTimeout(r, 150))
   loadingMore.value = false
@@ -277,22 +379,7 @@ function openDetail(n: NewsItem) {
 const detail = ref<NewsItem | null>(null)
 const showDetail = ref(false)
 
-/* ---------- 实时脉搏 时间轴卡片 ---------- */
-const PULSE_RANK = ['#f59e0b', '#94a3b8', '#b45309', '#6366f1', '#ec4899']
-function pulseStyle(i: number) {
-  const colors = [
-    'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
-    'linear-gradient(135deg, #8b5cf6 0%, #a855f7 100%)',
-    'linear-gradient(135deg, #a855f7 0%, #d946ef 100%)',
-    'linear-gradient(135deg, #d946ef 0%, #ec4899 100%)',
-    'linear-gradient(135deg, #ec4899 0%, #f43f5e 100%)'
-  ]
-  return {
-    background: colors[i % colors.length],
-    boxShadow: `0 14px 34px ${['rgba(99,102,241,0.35)', 'rgba(139,92,246,0.35)', 'rgba(168,85,247,0.35)', 'rgba(217,70,239,0.35)', 'rgba(236,72,153,0.35)'][i % 5]}`
-  }
-}
-
+/* ---------- 自动刷新 ---------- */
 watch(autoRefresh, (v) => {
   if (autoTimer) {
     clearInterval(autoTimer)
@@ -303,9 +390,16 @@ watch(autoRefresh, (v) => {
   }
 })
 
-onMounted(loadAll)
+onMounted(() => {
+  tickBeijing()
+  clockTimer = setInterval(tickBeijing, 1000)
+  rollTimer = setInterval(() => { carouselIdx.value++ }, 2800)
+  loadAll()
+})
 onBeforeUnmount(() => {
   if (autoTimer) clearInterval(autoTimer)
+  if (clockTimer) clearInterval(clockTimer)
+  if (rollTimer) clearInterval(rollTimer)
 })
 </script>
 
@@ -314,32 +408,13 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   gap: 14px;
-  padding: 0 16px 16px;
+  padding: 0 18px 18px;
   height: 100%;
   background: linear-gradient(160deg, #f5f7ff 0%, #faf5ff 100%);
   box-sizing: border-box;
 }
 
 /* 顶栏 */
-.np-top {
-  background: linear-gradient(135deg, #ffffff 0%, #f3f0ff 100%);
-  border: 1px solid #e6e0ff;
-  border-radius: 16px;
-  padding: 14px 18px;
-  box-shadow: 0 6px 20px rgba(99, 102, 241, 0.08);
-}
-.np-title-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-.np-title {
-  margin: 0;
-  font-size: 18px;
-  font-weight: 600;
-  color: var(--text-strong);
-}
 .np-live {
   display: inline-flex;
   align-items: center;
@@ -357,56 +432,32 @@ onBeforeUnmount(() => {
   animation: npBlink 1.4s infinite;
 }
 @keyframes npBlink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
-.np-date { font-size: 13px; color: #64748b; }
-.np-spacer { flex: 1; }
-.np-search { width: 180px; }
-.np-fx-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 7px 14px;
-  border-radius: 8px;
-  background: linear-gradient(135deg, #f59e0b, #f97316);
-  color: #fff !important;
-  font-size: 13px;
-  font-weight: 700;
-  text-decoration: none;
-  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.35);
-  transition: transform 0.15s ease;
-}
-.np-fx-btn:hover { transform: translateY(-1px); }
 .np-auto { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: #64748b; }
-.np-update { margin-top: 8px; font-size: 11px; color: #94a3b8; }
-
-/* 分类 */
-.np-cat-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  background: #fff;
-  border: 1px solid #e6e0ff;
-  border-radius: 12px;
-  padding: 10px 14px;
-  box-shadow: 0 4px 14px rgba(99, 102, 241, 0.05);
+.np-beijing {
+  font-size: 12px;
+  font-weight: 600;
+  color: #0c447c;
+  background: #e6f1fb;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-variant-numeric: tabular-nums;
 }
-.np-cat-label { font-size: 13px; color: #475569; font-weight: 600; }
-.np-cat-select { width: 220px; }
-.np-cat-hint { font-size: 11px; color: #94a3b8; }
 
 /* 主体 */
 .np-body {
   display: grid;
-  grid-template-columns: 300px 1fr;
-  gap: 14px;
+  grid-template-columns: 320px 1fr;
+  gap: 16px;
   flex: 1;
   min-height: 0;
 }
 .np-hot {
-  background: #fff;
-  border: 1px solid #e6e0ff;
+  background: color-mix(in srgb, var(--cat) 6%, #fff);
+  border: 1px solid color-mix(in srgb, var(--cat) 28%, var(--border));
+  border-top: 4px solid var(--cat);
   border-radius: 16px;
   padding: 14px 16px;
-  box-shadow: 0 6px 20px rgba(99, 102, 241, 0.06);
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--cat) 14%, transparent);
   overflow-y: auto;
 }
 .np-hot-title {
@@ -439,6 +490,10 @@ onBeforeUnmount(() => {
   transition: background 0.15s ease;
 }
 .np-hot-item:hover { background: #f5f3ff; }
+.np-hot-item:not(:last-child) {
+  border-bottom: 1px solid color-mix(in srgb, var(--cat) 16%, var(--border));
+  padding-bottom: 10px;
+}
 .np-rank {
   flex-shrink: 0;
   width: 22px;
@@ -471,10 +526,11 @@ onBeforeUnmount(() => {
 /* 右栏 */
 .np-feed {
   background: #fff;
-  border: 1px solid #e6e0ff;
+  border: 1px solid #c7d2fe;
+  border-top: 4px solid #14b8a6;
   border-radius: 16px;
   padding: 14px 16px;
-  box-shadow: 0 6px 20px rgba(99, 102, 241, 0.06);
+  box-shadow: 0 8px 24px rgba(20, 184, 166, 0.12);
   overflow-y: auto;
   display: flex;
   flex-direction: column;
@@ -490,113 +546,77 @@ onBeforeUnmount(() => {
 .np-pulse-title { font-size: 14px; font-weight: 700; color: #1e293b; }
 .np-pulse-sub { font-size: 11px; color: #a855f7; }
 
-/* 时间轴 */
-.np-timeline { position: relative; }
-.np-timeline-axis {
+/* 实时脉搏曲线图 */
+.np-chart {
   position: relative;
-  height: 28px;
-  margin: 0 10px 16px;
+  background: linear-gradient(135deg, #f5f3ff 0%, #fdf2f8 100%);
+  border: 1px solid #ede9fe;
+  border-radius: 12px;
+  padding: 12px 12px 8px;
 }
-.np-timeline-glow {
-  position: absolute;
-  top: 10px;
-  left: 0;
-  right: 0;
-  height: 4px;
-  border-radius: 999px;
-  background: linear-gradient(90deg, #6366f1, #a855f7, #ec4899);
-  box-shadow: 0 0 14px rgba(168, 85, 247, 0.45), inset 0 0 6px rgba(255, 255, 255, 0.4);
+.np-chart-svg { width: 100%; height: 162px; display: block; }
+.np-grid { stroke: #e9e3f7; stroke-width: 1; }
+.np-line {
+  stroke: url(#npStroke);
+  stroke-width: 2.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
-.np-timeline-node {
-  position: absolute;
-  top: 0;
-  transform: translateX(-50%);
+.np-dot {
+  fill: #7F77DD;
+  stroke: #fff;
+  stroke-width: 1.5;
+  animation: npDotPulse 1.8s ease-in-out infinite;
+}
+@keyframes npDotPulse {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 1; }
+}
+.np-chart-empty {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
+  justify-content: center;
+  gap: 12px;
+  height: 162px;
+  color: #a855f7;
+  font-size: 12px;
 }
-.np-timeline-dot {
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  border: 2px solid #fff;
-  box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.2), 0 2px 8px rgba(0, 0, 0, 0.12);
+.np-skeleton-bars { display: flex; align-items: flex-end; gap: 7px; height: 72px; }
+.np-skeleton-bars i {
+  width: 16px;
+  height: 18px;
+  border-radius: 5px;
+  background: linear-gradient(180deg, #c4b5fd, #ddd6fe);
+  animation: npBar 1.2s ease-in-out infinite alternate;
 }
-.np-timeline-tick {
-  font-size: 10px;
-  color: #64748b;
+@keyframes npBar { from { height: 14px; opacity: 0.45; } to { height: 60px; opacity: 1; } }
+.np-chart-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 8px;
+}
+.np-chart-caption { font-size: 11px; color: #8b5cf6; }
+.np-chart-roll {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: #0891b2;
   font-weight: 600;
   white-space: nowrap;
 }
-
-/* 立体卡片 */
-.np-pulse-cards {
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 12px;
-}
-.np-pulse-card {
-  position: relative;
-  border-radius: 14px;
-  padding: 14px 12px 32px;
-  color: #fff;
-  cursor: pointer;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-  min-height: 120px;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-.np-pulse-card::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(180deg, rgba(255,255,255,0.22) 0%, rgba(255,255,255,0) 55%);
-  border-radius: 14px;
-  pointer-events: none;
-}
-.np-pulse-card:hover {
-  transform: translateY(-6px) scale(1.02);
-  z-index: 2;
-}
-.np-pulse-card-no {
-  font-size: 22px;
-  font-weight: 800;
-  opacity: 0.35;
-  line-height: 1;
-  margin-bottom: 8px;
-}
-.np-pulse-card-title {
-  font-size: 12px;
-  font-weight: 700;
-  line-height: 1.45;
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  flex: 1;
-}
-.np-pulse-card-meta {
-  font-size: 10px;
-  opacity: 0.82;
-  margin-top: 8px;
-}
-.np-pulse-card-arrow {
-  position: absolute;
-  right: 10px;
-  bottom: 8px;
-  font-size: 16px;
-  opacity: 0.6;
+.np-roll-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #06b6d4;
+  box-shadow: 0 0 0 3px rgba(6, 182, 212, 0.18);
+  animation: npBlink 1.4s infinite;
 }
 
-@media (max-width: 1100px) {
-  .np-pulse-cards { grid-template-columns: repeat(3, 1fr); }
-}
-@media (max-width: 860px) {
-  .np-pulse-cards { grid-template-columns: repeat(2, 1fr); }
-  .np-timeline-axis { display: none; }
-}
 
 .np-feed-head {
   display: flex;
@@ -684,8 +704,42 @@ onBeforeUnmount(() => {
 }
 .np-dlg-link:hover { text-decoration: underline; }
 
+/* 筛选行（分类 + 搜索合并） */
+.np-filter-row {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 12px 16px;
+  box-shadow: var(--shadow-card);
+  margin-bottom: 14px;
+}
+.np-fl-label { font-size: 13px; font-weight: 700; color: var(--text-strong); }
+.np-cat-select { width: 220px; }
+.np-search { width: 240px; flex: 1; min-width: 180px; }
+.np-fx-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 7px 14px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #f59e0b, #f97316);
+  color: #fff !important;
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: none;
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.35);
+  transition: transform 0.15s ease;
+  flex-shrink: 0;
+}
+.np-fx-btn:hover { transform: translateY(-1px); }
+.np-fl-hint { font-size: 11.5px; color: var(--text-faint); white-space: nowrap; flex-shrink: 0; }
+
+.np-hot-title { color: color-mix(in srgb, var(--cat) 72%, #1e293b); }
+
 @media (max-width: 860px) {
   .np-body { grid-template-columns: 1fr; }
   .np-hot { max-height: 320px; }
+  .np-fl-hint { margin-left: 0; width: 100%; }
 }
 </style>

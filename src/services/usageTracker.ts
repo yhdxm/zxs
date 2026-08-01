@@ -297,7 +297,7 @@ export function getHourlyTokens(dayOffset = 0): number[] {
   for (const r of list) {
     if (r.ts < dayStart || r.ts >= dayEnd) continue
     const hour = new Date(r.ts).getHours()
-    buckets[hour] += recordTokens(r)
+    buckets[hour] = (buckets[hour] ?? 0) + recordTokens(r)
   }
   return buckets
 }

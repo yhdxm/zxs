@@ -21,6 +21,14 @@ import LearnBooksView from '../views/LearnBooksView.vue'
 import ThirdPartyApiView from '../views/ThirdPartyApiView.vue'
 import { hasPermission, loadPermissionConfig, getSavedUser } from '../services/appDataService'
 
+// 数据看板（同一路由 /dashboard 通过 query.view 区分）的细粒度权限映射
+const DASHBOARD_VIEW_PERM: Record<string, string> = {
+  overview: 'dashboard',
+  todos: 'todos',
+  points: 'points',
+  contents: 'contents'
+}
+
 const router = createRouter({
   history: createWebHashHistory(import.meta.env.BASE_URL),
   routes: [
@@ -77,73 +85,73 @@ const router = createRouter({
       path: '/models',
       name: 'models',
       component: ModelCenterView,
-      meta: { requirePermission: 'ai' }
+      meta: { requirePermission: 'models' }
     },
     {
       path: '/requirements',
       name: 'requirements',
       component: RequirementCollectView,
-      meta: { requirePermission: 'dashboard' }
+      meta: { requirePermission: 'requirements' }
     },
     {
       path: '/weather',
       name: 'weather',
       component: WeatherView,
-      meta: { requirePermission: 'dashboard' }
+      meta: { requirePermission: 'weather' }
     },
     {
       path: '/map',
       name: 'map',
       component: MapView,
-      meta: { requirePermission: 'dashboard' }
+      meta: { requirePermission: 'map' }
     },
     {
       path: '/news',
       name: 'news',
       component: NewsAggregateView,
-      meta: { requirePermission: 'dashboard' }
+      meta: { requirePermission: 'news' }
     },
     {
       path: '/yingcang',
       name: 'yingcang',
       component: YingCangView,
-      meta: { requirePermission: 'dashboard' }
+      meta: { requirePermission: 'yingcang' }
     },
     {
       path: '/xingyu',
       name: 'xingyu',
       component: XingYuView,
-      meta: { requirePermission: 'dashboard' }
+      meta: { requirePermission: 'xingyu' }
     },
     {
       path: '/aimodels',
       name: 'aimodels',
       component: AiModelsView,
-      meta: { requirePermission: 'ai' }
+      meta: { requirePermission: 'aimodels' }
     },
     {
       path: '/learn/english',
       name: 'learn-english',
       component: LearnEnglishView,
-      meta: { requirePermission: 'dashboard' }
+      meta: { requirePermission: 'learn-english' }
     },
     {
       path: '/learn/industry',
       name: 'learn-industry',
       component: LearnIndustryView,
-      meta: { requirePermission: 'dashboard' }
+      meta: { requirePermission: 'learn-industry' }
     },
     {
       path: '/learn/books',
       name: 'learn-books',
       component: LearnBooksView,
-      meta: { requirePermission: 'dashboard' }
+      meta: { requirePermission: 'learn-books' }
     },
     {
       path: '/third-api',
       name: 'third-api',
       component: ThirdPartyApiView,
-      meta: { requirePermission: 'dashboard' }
+      meta: { requirePermission: 'third-api' }
     }
   ]
 })
@@ -169,9 +177,15 @@ router.beforeEach(async (to, _from, next) => {
   // 权限校验（优先于角色校验，支持按 PC/移动端动态判断）
   const requirePermission = to.meta.requirePermission as string | undefined
   if (requirePermission && user) {
+    // 数据看板按 query.view 细分权限（数据看板/待办/点位/内容）
+    let moduleKey = requirePermission
+    if (to.path === '/dashboard') {
+      const view = (to.query.view as string) || 'overview'
+      moduleKey = DASHBOARD_VIEW_PERM[view] || 'dashboard'
+    }
     const platform = typeof window !== 'undefined' && window.innerWidth <= 768 ? 'mobile' : 'pc'
     const config = await loadPermissionConfig()
-    if (!hasPermission(user, requirePermission, platform, config)) {
+    if (!hasPermission(user, moduleKey, platform, config)) {
       next({ name: 'dashboard' })
       return
     }

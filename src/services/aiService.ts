@@ -474,7 +474,7 @@ export async function extractHotspotsFromNews(
 function parseHotspotReply(text: string, topN: number): HotspotResult[] {
   let raw = (text || '').trim()
   const fence = raw.match(/```(?:json)?\s*([\s\S]*?)```/i)
-  if (fence) raw = fence[1].trim()
+  if (fence?.[1]) raw = fence[1].trim()
   try {
     const arr = JSON.parse(raw)
     if (Array.isArray(arr)) {

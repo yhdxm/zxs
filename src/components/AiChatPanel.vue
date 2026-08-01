@@ -20,27 +20,37 @@
         <p>输入你的问题，AI 会直接回复。点击右上角「配置」可切换模型与密钥。</p>
       </div>
       <div v-for="(message, index) in messages" :key="index" class="message-row" :class="message.role">
-        <div class="avatar">{{ message.role === 'user' ? '我' : 'AI' }}</div>
-        <div v-if="message.role === 'assistant'" class="message-bubble">
-          <div class="md" v-html="parts(message.content).bodyHtml"></div>
-          <div v-if="parts(message.content).hasSummary" class="md-summary">
-            <div class="md-summary-head"><el-icon><Memo /></el-icon> 总结</div>
-            <div class="md" v-html="parts(message.content).summaryHtml"></div>
+        <div class="avatar" :class="message.role">{{ message.role === 'user' ? '我' : 'AI' }}</div>
+        <div v-if="message.role === 'assistant'" class="message-bubble" :class="{ thinking: message.content === '正在思考…' }">
+          <div v-if="message.content === '正在思考…'" class="thinking">
+            <span class="tdot"></span><span class="tdot"></span><span class="tdot"></span>
+            <span class="ttext">AI 正在思考，马上就好…</span>
           </div>
-          <div class="msg-actions">
-            <button
-              v-if="isErrorReply(message.content)"
-              class="md-retry"
-              type="button"
-              :disabled="loading"
-              @click="retry(index)"
-            >
-              <el-icon><RefreshRight /></el-icon> 重试
-            </button>
-            <button class="md-copy" type="button" @click="copyText(message.content)">
-              <el-icon><CopyDocument /></el-icon> 复制全文
-            </button>
-          </div>
+          <template v-else>
+            <div v-if="keyPoints(message.content).length" class="keypoints">
+              <div class="kp-head"><el-icon><Opportunity /></el-icon> 重点速览</div>
+              <ul><li v-for="(p, i) in keyPoints(message.content)" :key="i">{{ p }}</li></ul>
+            </div>
+            <div class="md" v-html="parts(message.content).bodyHtml"></div>
+            <div v-if="parts(message.content).hasSummary" class="md-summary">
+              <div class="md-summary-head"><el-icon><Memo /></el-icon> 总结</div>
+              <div class="md" v-html="parts(message.content).summaryHtml"></div>
+            </div>
+            <div class="msg-actions">
+              <button
+                v-if="isErrorReply(message.content)"
+                class="md-retry"
+                type="button"
+                :disabled="loading"
+                @click="retry(index)"
+              >
+                <el-icon><RefreshRight /></el-icon> 重试
+              </button>
+              <button class="md-copy" type="button" @click="copyText(message.content)">
+                <el-icon><CopyDocument /></el-icon> 复制全文
+              </button>
+            </div>
+          </template>
         </div>
         <div v-else class="message-bubble">{{ message.content }}</div>
       </div>
@@ -70,7 +80,7 @@
 <script setup lang="ts">
 import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
-import { MagicStick, Setting, Delete, Promotion, Memo, CopyDocument, RefreshRight } from '@element-plus/icons-vue'
+import { MagicStick, Setting, Delete, Promotion, Memo, CopyDocument, RefreshRight, Loading, Opportunity } from '@element-plus/icons-vue'
 import { callAi, loadAiConfig } from '../services/aiService'
 import { recordUsage } from '../services/usageTracker'
 import { renderMarkdown, splitSummary } from '../lib/markdown'
@@ -161,6 +171,22 @@ const parts = (content: string) => {
     summaryHtml: summary ? renderMarkdown(summary) : '',
     hasSummary: Boolean(summary)
   }
+}
+
+/** 从 AI 回复中提取要点（Markdown 列表项），帮助快速抓重点，最多 6 条 */
+const keyPoints = (content: string): string[] => {
+  if (!content || content === '正在思考…') return []
+  const out: string[] = []
+  for (const raw of content.split('\n')) {
+    const t = raw.trim()
+    let m = t.match(/^[-*]\s+(.*)$/)
+    if (!m) m = t.match(/^\d+[.)]\s+(.*)$/)
+    if (m && m[1]) {
+      out.push(m[1].replace(/\*\*(.+?)\*\*/g, '$1').trim())
+      if (out.length >= 6) break
+    }
+  }
+  return out
 }
 
 const copyText = async (text: string) => {
@@ -332,15 +358,24 @@ onBeforeUnmount(() => {
 .empty-orb :deep(svg) { font-size: 30px; }
 .empty-chat p { font-size: 14px; line-height: 1.7; }
 
-.message-row { display: flex; gap: 10px; align-items: flex-start; min-width: 0; max-width: 100%; width: 100%; }
+.message-row { display: flex; gap: 10px; align-items: flex-start; min-width: 0; max-width: 100%; width: 100%; animation: msgIn .25s ease; }
+@keyframes msgIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 .message-row.user { align-self: flex-end; flex-direction: row-reverse; max-width: min(760px, 100%); width: auto; }
 .avatar {
-  width: 34px; height: 34px; border-radius: 50%;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 12px; font-weight: 700; color: #fff;
+  width: 38px; height: 38px; border-radius: 12px;
+  display: grid; place-items: center;
+  font-size: 13px; font-weight: 800; color: #fff;
   background: linear-gradient(135deg, var(--primary), var(--primary-3));
-  flex-shrink: 0;
+  box-shadow: 0 6px 16px var(--accent-glow);
+  flex-shrink: 0; position: relative; z-index: 0;
 }
+.avatar::after {
+  content: ''; position: absolute; inset: -3px; border-radius: 14px; z-index: -1;
+  background: linear-gradient(135deg, var(--primary), #14b8a6);
+  opacity: .4; filter: blur(7px);
+}
+.message-row.assistant .avatar { background: linear-gradient(135deg, #10b981, #14b8a6); }
+.message-row.assistant .avatar::after { background: linear-gradient(135deg, #10b981, #14b8a6); }
 .message-row.assistant .avatar { background: linear-gradient(135deg, #10b981, #14b8a6); }
 .message-bubble {
   padding: 11px 14px; border-radius: 14px;
@@ -424,6 +459,52 @@ onBeforeUnmount(() => {
 .panel-compact .ai-title-icon { width: 34px; height: 34px; }
 .panel-compact .ai-title h2 { font-size: 16px; }
 .panel-compact .chat-scroll { padding: 16px 16px; }
+
+/* 滚动区域：平滑滚动 + 自定义滚动条 + 高级感渐变底纹 */
+.chat-scroll {
+  scroll-behavior: smooth;
+  background:
+    radial-gradient(circle at 18% 0%, color-mix(in srgb, var(--primary) 7%, transparent), transparent 42%),
+    radial-gradient(circle at 82% 100%, color-mix(in srgb, #14b8a6 7%, transparent), transparent 42%),
+    var(--bg-app);
+}
+.chat-scroll::-webkit-scrollbar { width: 8px; }
+.chat-scroll::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--primary) 32%, transparent); border-radius: 999px; }
+.chat-scroll::-webkit-scrollbar-thumb:hover { background: color-mix(in srgb, var(--primary) 50%, transparent); }
+.chat-scroll::-webkit-scrollbar-track { background: transparent; }
+
+/* 助手气泡左侧强调条，界限更清晰 */
+.message-row.assistant .message-bubble { border-left: 3px solid #14b8a6; }
+
+/* 思考中加载动画 */
+.thinking { display: inline-flex; align-items: center; gap: 7px; padding: 2px 0; }
+.tdot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--primary);
+  animation: tdot 1.2s infinite ease-in-out;
+}
+.tdot:nth-child(2) { animation-delay: .2s; }
+.tdot:nth-child(3) { animation-delay: .4s; }
+@keyframes tdot {
+  0%, 60%, 100% { transform: translateY(0); opacity: .4; }
+  30% { transform: translateY(-5px); opacity: 1; }
+}
+.ttext { font-size: 13px; color: var(--text-muted); }
+.message-bubble.thinking { border-left: 3px solid var(--primary); background: var(--surface-soft); }
+
+/* 重点速览卡片：帮用户快速抓重点 */
+.keypoints {
+  background: linear-gradient(135deg, rgba(99, 102, 241, .07), rgba(20, 184, 166, .07));
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--primary);
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin-bottom: 10px;
+}
+.kp-head { display: flex; align-items: center; gap: 6px; font-weight: 700; color: var(--primary); font-size: 12.5px; margin-bottom: 6px; }
+.kp-head :deep(svg) { font-size: 15px; }
+.keypoints ul { margin: 0; padding-left: 18px; }
+.keypoints li { font-size: 13px; line-height: 1.7; color: var(--text-strong); }
 
 @media (max-width: 640px) {
   .ai-header { padding: 12px 14px; }

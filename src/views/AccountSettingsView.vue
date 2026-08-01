@@ -2,11 +2,16 @@
   <div class="account-page">
     <div class="account-card">
       <header class="account-head">
-        <div class="account-avatar">{{ avatarText }}</div>
-        <div class="account-meta">
-          <h2>{{ currentUser?.nickname || '用户' }}</h2>
-          <p>@{{ currentUser?.username }}</p>
-          <el-tag size="small" :type="roleTagType" effect="light">{{ roleLabel }}</el-tag>
+        <div class="account-brand">
+          <div class="account-avatar">{{ avatarText }}</div>
+          <div class="account-meta">
+            <h2>{{ currentUser?.nickname || '用户' }}</h2>
+            <p>@{{ currentUser?.username }}</p>
+            <el-tag size="small" :type="roleTagType" effect="light">{{ roleLabel }}</el-tag>
+          </div>
+        </div>
+        <div class="account-head-actions">
+          <el-button type="primary" :loading="saving" @click="save">保存修改</el-button>
         </div>
       </header>
 
@@ -23,9 +28,6 @@
           <el-input v-model="form.confirmPassword" type="password" show-password placeholder="再次输入新密码" />
         </el-form-item>
 
-        <div class="account-actions">
-          <el-button type="primary" :loading="saving" @click="save">保存修改</el-button>
-        </div>
       </el-form>
     </div>
   </div>
@@ -111,7 +113,7 @@ onMounted(() => {
 
 <style scoped>
 .account-page {
-  padding: 0 20px 20px;
+  padding: 0 18px 18px;
   max-width: 680px;
   margin: 0 auto;
 }
@@ -125,20 +127,27 @@ onMounted(() => {
 .account-head {
   display: flex;
   align-items: center;
-  gap: 16px;
+  justify-content: space-between;
+  gap: 12px;
   margin-bottom: 24px;
   padding-bottom: 20px;
   border-bottom: 1px solid #f1f5f9;
 }
+.account-brand {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-width: 0;
+}
 .account-avatar {
-  width: 64px;
-  height: 64px;
-  border-radius: 18px;
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
   background: linear-gradient(135deg, #4f46e5, #6366f1);
   color: #fff;
   display: grid;
   place-items: center;
-  font-size: 24px;
+  font-size: 18px;
   font-weight: 800;
   flex-shrink: 0;
 }
@@ -153,14 +162,20 @@ onMounted(() => {
   font-size: 13px;
   color: #64748b;
 }
-.account-actions {
+.account-head-actions {
+  flex-shrink: 0;
   display: flex;
-  justify-content: flex-end;
-  margin-top: 8px;
+  align-items: center;
 }
 
 @media (max-width: 768px) {
   .account-page { padding: 0 12px 12px; }
   .account-card { padding: 20px; }
+  .account-head {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  .account-head-actions { width: 100%; justify-content: flex-end; }
 }
 </style>

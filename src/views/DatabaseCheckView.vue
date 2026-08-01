@@ -1,6 +1,6 @@
 <template>
   <div class="db-check">
-    <PageHeader title="数据库监测中心" subtitle="实时读取 Supabase 数据库现状、存储、数据量与容量预警（当前为免费计划，无需付费）">
+    <PageHeader title="数据库监测中心" subtitle="实时读取 Supabase 数据库现状、存储、数据量与容量预警（当前为免费计划，无需付费）" :icon="Connection">
       <el-button type="primary" :loading="loading" @click="runCheck">
         <el-icon><Refresh /></el-icon> 刷新检测
       </el-button>
@@ -354,15 +354,16 @@ const groupedTables = computed(() => {
     const key = groupKeyOf(t.name)
     ;(buckets[key] ||= []).push(t)
   }
+  const fallbackMeta = { label: '其他表', color: '#64748b' }
   return Object.keys(GROUP_META)
     .filter((k) => buckets[k]?.length)
     .map((k) => {
-      const tables = [...buckets[k]].sort((a, b) =>
+      const tables = [...(buckets[k] ?? [])].sort((a, b) =>
         sortMode.value === 'rows' ? b.rows - a.rows : b.size - a.size
       )
       const totalRows = tables.reduce((s, t) => s + t.rows, 0)
       const totalSize = tables.reduce((s, t) => s + t.size, 0)
-      return { key: k, meta: GROUP_META[k], tables, totalRows, totalSize }
+      return { key: k, meta: GROUP_META[k] ?? fallbackMeta, tables, totalRows, totalSize }
     })
 })
 
@@ -455,8 +456,8 @@ onMounted(runCheck)
 
 <style scoped>
 .db-check {
-  padding: 0 24px 24px;
-  max-width: 1080px;
+  padding: 0 18px 18px;
+  max-width: 1400px;
   margin: 0 auto;
   color: var(--text);
 }
@@ -785,7 +786,7 @@ onMounted(runCheck)
 .db-problem-item.info { background: var(--nav-hover); color: var(--text); }
 
 @media (max-width: 768px) {
-  .db-check { padding: 0 16px 16px; }
+  .db-check { padding: 0 14px 14px; }
   .db-cards { grid-template-columns: repeat(2, 1fr); }
   .db-capacity-time { margin-left: 0; width: 100%; }
   .tbl-row { flex-wrap: wrap; }

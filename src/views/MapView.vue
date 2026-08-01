@@ -1,6 +1,6 @@
 <template>
   <div class="map-page">
-    <PageHeader title="地图定位" subtitle="底图优先使用已配置的天地图 Key；未配置时自动降级为 OpenStreetMap 公开底图。支持行政区下钻、标注测距，全部前端直连，不消耗任何积分。" />
+    <PageHeader title="地图定位" subtitle="底图优先使用已配置的天地图 Key；未配置时自动降级为 OpenStreetMap 公开底图。支持行政区下钻、标注测距，全部前端直连，不消耗任何积分。" :icon="Location" />
     <div class="mp-page-body">
       <MapPanel />
     </div>
@@ -8,14 +8,15 @@
 </template>
 
 <script setup lang="ts">
+import { Location } from '@element-plus/icons-vue'
 import MapPanel from '../components/MapPanel.vue'
 import PageHeader from '../components/PageHeader.vue'
 </script>
 
 <style scoped>
 .map-page {
-  padding: 0 24px 24px;
-  max-width: 1280px;
+  padding: 0 18px 18px;
+  max-width: 1400px;
   margin: 0 auto;
   color: var(--text);
 }
@@ -30,6 +31,6 @@ import PageHeader from '../components/PageHeader.vue'
 
 @media (max-width: 768px) {
   .map-page { padding: 0 16px 16px; }
-  .mp-page-body :deep(.map-panel) { height: calc(100vh - 200px); min-height: 420px; }
+  .mp-page-body :deep(.map-panel) { height: calc(100dvh - 200px); min-height: 420px; }
 }
 </style>

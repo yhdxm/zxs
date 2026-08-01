@@ -10,6 +10,7 @@
     "verify:supabase": "node scripts/verify-supabase.mjs",
     "preview": "vite preview",
     "build-only": "vite build",
+    "build:github": "vite build --base=/ZXS/",
     "type-check": "vue-tsc --build"
   },
   "dependencies": {
