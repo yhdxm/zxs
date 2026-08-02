@@ -67,13 +67,30 @@
         <div v-else-if="active === 'knowledge'" class="xy-card">
           <div class="xy-hrow">
             <h3 class="xy-h">汽车知识（小白可读）</h3>
-            <el-input v-model="kSearch" placeholder="搜索关键词" class="xy-search" />
+            <el-input v-model="kSearch" placeholder="搜索关键词，如 续航 / 保养 / 购置税" class="xy-search" />
+          </div>
+          <div class="xy-kcats">
+            <button
+              v-for="c in knowledgeCats"
+              :key="c"
+              :class="['xy-chip', kCat === c ? 'on' : '']"
+              @click="kCat = c"
+            >{{ c }}</button>
           </div>
           <div class="xy-grid2">
             <div v-for="k in filteredKnowledge" :key="k.title" class="xy-know">
+              <div class="xy-know-cat">{{ k.cat }}</div>
               <div class="xy-know-title">{{ k.title }}</div>
               <div class="xy-know-body">{{ k.content }}</div>
-              <button class="xy-mini" @click="explainKnowledge(k)">AI 帮我讲透</button>
+              <ul v-if="k._open && k.detail && k.detail.length" class="xy-know-detail">
+                <li v-for="(d, i) in k.detail" :key="i">{{ d }}</li>
+              </ul>
+              <div class="xy-know-acts">
+                <button v-if="k.detail && k.detail.length" class="xy-mini" @click="k._open = !k._open">
+                  {{ k._open ? '收起讲解' : '展开详细讲解' }}
+                </button>
+                <button class="xy-mini ghost" @click="explainKnowledge(k)">AI 帮我讲透</button>
+              </div>
               <div v-if="k._explain" class="xy-know-explain">{{ k._explain }}</div>
             </div>
             <p v-if="!filteredKnowledge.length" class="xy-empty">没有匹配的知识，换个关键词试试。</p>
@@ -87,23 +104,42 @@
             <button class="xy-refresh" @click="loadRank" :disabled="loading.rank">{{ loading.rank ? '生成中…' : '重新生成' }}</button>
           </div>
           <div class="xy-macro">
-            <div class="xy-macro-title">行业宏观（{{ macro.source }}）：{{ macro.title }}</div>
+            <div class="xy-macro-title">
+              行业宏观：{{ macro.title || '加载中…' }}
+              <span v-if="macro.source" class="xy-macro-src">数据来源：{{ macro.source }}</span>
+            </div>
             <div v-if="macro.series.length" class="xy-macro-row">
-              <span v-for="p in macro.series.slice(-8)" :key="p.date" class="xy-macro-chip">
-                {{ p.date }}：{{ p.china != null ? '中 ' + fmt(p.china) : '' }}{{ p.usa != null ? ' / 美 ' + fmt(p.usa) : '' }}{{ p.value != null ? fmt(p.value) : '' }}
+              <span v-for="p in macro.series.slice(-10)" :key="p.date" class="xy-macro-chip">
+                <b>{{ p.date }}</b>
+                <template v-if="p.china != null">中 {{ fmt(p.china) }}</template>
+                <template v-if="p.usa != null"> · 美 {{ fmt(p.usa) }}</template>
+                <template v-if="p.value != null"> {{ fmt(p.value) }}万</template>
               </span>
             </div>
-            <p v-else class="xy-empty">宏观数据暂不可用（接口被网络限制）。</p>
+            <p v-else class="xy-macro-empty">宏观数据加载中，若长时间无数据请点右上角「重新生成」。</p>
           </div>
           <p class="xy-note">{{ rank.note }}</p>
-          <table v-if="rank.items.length" class="xy-table">
-            <thead><tr><th>排名</th><th>厂商 / 车型</th><th>销量</th><th>同比</th><th>依据</th></tr></thead>
-            <tbody>
-              <tr v-for="r in rank.items" :key="r.rank">
-                <td>{{ r.rank }}</td><td>{{ r.name }}</td><td>{{ r.sales }}</td><td :class="r.yoy.includes('-') ? 'down' : 'up'">{{ r.yoy }}</td><td class="xy-td-note">{{ r.note }}</td>
-              </tr>
-            </tbody>
-          </table>
+          <div v-if="rank.items.length" class="xy-table-wrap">
+            <table class="xy-table">
+              <thead>
+                <tr><th>#</th><th>厂商 / 车型</th><th>销量</th><th>同比</th><th>报道原文（可点击核查）</th></tr>
+              </thead>
+              <tbody>
+                <tr v-for="r in rank.items" :key="r.rank + r.name">
+                  <td>{{ r.rank }}</td>
+                  <td class="xy-td-name">{{ r.name }}</td>
+                  <td class="xy-td-sales">{{ r.sales }}</td>
+                  <td :class="r.yoy.includes('-') ? 'down' : (r.yoy === '未披露' ? '' : 'up')">{{ r.yoy }}</td>
+                  <td class="xy-td-note">
+                    <span>{{ r.note }}</span>
+                    <a v-if="r.link" :href="r.link" target="_blank" rel="noopener" class="xy-src-link">
+                      查看原文{{ r.source ? '（' + r.source + (r.date ? ' · ' + r.date.slice(5, 16) : '') + '）' : '' }}
+                    </a>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
           <p v-else class="xy-empty">暂无结构化榜单，可查看「汽车热点信息」获取原始销量新闻。</p>
         </div>
 
@@ -233,7 +269,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, onUnmounted, reactive, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Van, ChatDotRound, Bell, Reading, TrendCharts, Discount, Goods, Star } from '@element-plus/icons-vue'
 import PageHeader from '../components/PageHeader.vue'
@@ -343,14 +379,20 @@ async function loadDiscount(): Promise<void> { loading.discount = true; discount
 async function loadNewCar(): Promise<void> { loading.newcar = true; newCarNews.value = await fetchCarNews('新车 上市 发布', 20); loading.newcar = false }
 async function loadBrand(): Promise<void> { loading.brand = true; brandNews.value = await fetchCarNews(brand.value + ' 汽车', 20); loading.brand = false }
 
-/* 知识 */
+/* 知识（支持分类筛选 + 关键词搜索 + 展开详细讲解） */
 const kSearch = ref('')
-const carKnowledge = ref(CAR_KNOWLEDGE.map((k) => ({ ...k, _explain: '' })))
-const filteredKnowledge = ref(carKnowledge.value)
-function searchKnowledge(): void {
+const kCat = ref('全部')
+const carKnowledge = ref(CAR_KNOWLEDGE.map((k) => ({ ...k, _explain: '', _open: false })))
+const knowledgeCats = ['全部', ...Array.from(new Set(CAR_KNOWLEDGE.map((k) => k.cat)))]
+const filteredKnowledge = computed(() => {
   const kw = kSearch.value.trim().toLowerCase()
-  filteredKnowledge.value = kw ? carKnowledge.value.filter((k) => (k.title + k.content).toLowerCase().includes(kw)) : carKnowledge.value
-}
+  return carKnowledge.value.filter((k) => {
+    if (kCat.value !== '全部' && k.cat !== kCat.value) return false
+    if (!kw) return true
+    const hay = (k.title + k.content + (k.detail ?? []).join('')).toLowerCase()
+    return hay.includes(kw)
+  })
+})
 async function explainKnowledge(k: { title: string; _explain: string }): Promise<void> {
   if (!cfg.value) { ElMessage.warning('请先配置 AI 密钥'); return }
   k._explain = 'AI 解读中…'
@@ -425,8 +467,6 @@ async function removeWatch(id: string): Promise<void> { await removeCarWatch(id)
 
 function fmt(n: number): string { return n >= 10000 ? (n / 10000).toFixed(1) + '万' : String(n) }
 
-watch(kSearch, searchKnowledge)
-
 onUnmounted(() => { if (clockTimer) window.clearInterval(clockTimer) })
 </script>
 
@@ -498,20 +538,45 @@ onUnmounted(() => { if (clockTimer) window.clearInterval(clockTimer) })
 .xy-news-title { font-size: 13px; color: var(--text-strong); line-height: 1.5; margin-bottom: 8px; }
 .xy-news-meta { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-faint); }
 .xy-know { padding: 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-soft); }
+.xy-know-cat {
+  display: inline-block; font-size: 11px; color: #0891b2; background: rgba(8,145,178,.1);
+  border-radius: 5px; padding: 1px 7px; margin-bottom: 6px;
+}
 .xy-know-title { font-size: 13px; font-weight: 600; color: var(--text-strong); margin-bottom: 6px; }
 .xy-know-body { font-size: 12px; color: var(--text-muted); line-height: 1.6; }
+.xy-know-detail {
+  margin: 8px 0 0; padding: 8px 0 0 18px; border-top: 1px dashed var(--border);
+  font-size: 12px; color: var(--text); line-height: 1.75;
+}
+.xy-know-detail li { margin-bottom: 4px; }
+.xy-know-acts { display: flex; flex-wrap: wrap; gap: 8px; }
 .xy-know-explain { margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--border); font-size: 12px; color: var(--text); white-space: pre-wrap; line-height: 1.6; }
+.xy-kcats { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
 .xy-mini { margin-top: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--brand, #378add); border-radius: 6px; padding: 3px 10px; font-size: 12px; cursor: pointer; }
+.xy-mini:hover { border-color: var(--brand, #378add); }
+.xy-mini.ghost { color: var(--text-faint); }
+.xy-mini.ghost:hover { color: var(--brand, #378add); }
 .xy-mini.danger { color: #ef4444; }
 .xy-empty { grid-column: 1 / -1; color: var(--text-faint); font-size: 13px; padding: 18px; text-align: center; }
 .xy-macro { background: var(--surface-soft); border-radius: 10px; padding: 12px; margin-bottom: 12px; }
-.xy-macro-title { font-size: 13px; color: var(--text-strong); margin-bottom: 8px; }
+.xy-macro-title { font-size: 13px; color: var(--text-strong); margin-bottom: 8px; display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; }
+.xy-macro-src { font-size: 11px; color: var(--text-faint); font-weight: 400; }
 .xy-macro-row { display: flex; flex-wrap: wrap; gap: 6px; }
-.xy-macro-chip { font-size: 12px; color: var(--text-muted); background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 3px 8px; }
-.xy-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 6px; }
-.xy-table th, .xy-table td { border: 1px solid var(--border); padding: 8px 10px; text-align: left; }
-.xy-table th { background: var(--surface-soft); color: var(--text-muted); font-weight: 600; }
-.xy-td-note { color: var(--text-faint); font-size: 12px; }
+.xy-macro-chip { font-size: 12px; color: var(--text-muted); background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 3px 8px; font-variant-numeric: tabular-nums; }
+.xy-macro-chip b { color: var(--text-strong); font-weight: 600; margin-right: 4px; }
+.xy-macro-empty { font-size: 12px; color: var(--text-faint); margin: 0; }
+.xy-table-wrap { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.xy-table { width: 100%; min-width: 620px; border-collapse: collapse; font-size: 13px; margin-top: 6px; }
+.xy-table th, .xy-table td { border: 1px solid var(--border); padding: 8px 10px; text-align: left; vertical-align: top; }
+.xy-table th { background: var(--surface-soft); color: var(--text-muted); font-weight: 600; white-space: nowrap; }
+.xy-td-name { font-weight: 600; color: var(--text-strong); white-space: nowrap; }
+.xy-td-sales { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.xy-td-note { color: var(--text-faint); font-size: 12px; line-height: 1.6; }
+.xy-src-link {
+  display: inline-block; margin-top: 4px; font-size: 11.5px; color: var(--brand, #378add);
+  text-decoration: none; border-bottom: 1px dashed currentColor;
+}
+.xy-src-link:hover { opacity: .8; }
 .xy-note { font-size: 12px; color: var(--text-faint); margin: 6px 0; }
 .up { color: #ef4444; }
 .down { color: #16a34a; }

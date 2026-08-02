@@ -48,11 +48,49 @@
       <el-empty v-else-if="!loading" description="暂无可展示的指数行情，请点击刷新重试" />
     </section>
 
-    <!-- 全球市场 -->
+    <!-- 贵金属 · 能源 · 大宗商品（黄金 / 白银 / 原油） -->
     <section class="yc-section">
       <div class="yc-section-title">
-        全球市场
-        <span class="yc-hint">黄金 · 白银 · 原油 · 美股 · 港股 · 日经（免费接口）</span>
+        贵金属 · 能源 · 大宗
+        <span class="yc-hint">
+          伦敦金 · 伦敦银 · 纽约金银 · WTI 原油 · 布伦特原油 · 天然气 · 伦铜（腾讯外盘免费源）
+        </span>
+      </div>
+      <div v-if="commodities.length" class="yc-grid">
+        <div v-for="q in commodities" :key="q.code" class="yc-card" :class="trendClass(q)">
+          <!-- 外盘商品无免费 K 线接口，这里展示计价单位而非 K 线按钮，避免打开空弹窗 -->
+          <div class="yc-card-head">
+            <span class="yc-card-name">{{ q.name }}</span>
+            <span class="yc-card-code">{{ unitOf(q.code) }}</span>
+          </div>
+          <div class="yc-card-price">{{ formatNum(q.price, priceDigits(q)) }}</div>
+          <div class="yc-card-sub">
+            <span>{{ q.change >= 0 ? '+' : '' }}{{ formatNum(q.change, priceDigits(q)) }}</span>
+            <span>{{ q.changePercent >= 0 ? '+' : '' }}{{ formatNum(q.changePercent, 2) }}%</span>
+          </div>
+          <div class="yc-card-foot">
+            <span>高 {{ formatNum(q.high, priceDigits(q)) }}</span>
+            <span>低 {{ formatNum(q.low, priceDigits(q)) }}</span>
+          </div>
+          <div class="yc-card-foot">
+            <span>今开 {{ formatNum(q.open, priceDigits(q)) }}</span>
+            <span>昨收 {{ formatNum(q.prevClose, priceDigits(q)) }}</span>
+          </div>
+          <div class="yc-card-time">{{ q.time || '—' }}</div>
+        </div>
+      </div>
+      <el-empty
+        v-else-if="!loading"
+        description="大宗商品行情暂未取到，点击右上角刷新重试（外盘接口偶发限速）"
+        :image-size="60"
+      />
+    </section>
+
+    <!-- 全球股指 -->
+    <section class="yc-section">
+      <div class="yc-section-title">
+        全球股指
+        <span class="yc-hint">道指 · 纳指 · 标普500 · 恒生 · 恒生科技 · 国企指数（免费接口）</span>
       </div>
       <div v-if="globals.length" class="yc-grid">
         <div v-for="q in globals" :key="q.code" class="yc-card" :class="trendClass(q)">
@@ -73,7 +111,7 @@
           <div class="yc-card-time">{{ q.time || '—' }}</div>
         </div>
       </div>
-      <el-empty v-else-if="!loading" description="全球市场行情加载中…" />
+      <el-empty v-else-if="!loading" description="全球股指行情加载中…" />
     </section>
 
     <!-- 热门个股 -->
@@ -138,11 +176,19 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref, watch } from 'vue'
 import { Clock, Refresh } from '@element-plus/icons-vue'
-import { fetchIndices, fetchGlobal, fetchHotStocks, type Quote } from '../../services/tencentFinance'
+import {
+  fetchIndices,
+  fetchGlobal,
+  fetchCommodities,
+  fetchHotStocks,
+  COMMODITY_UNITS,
+  type Quote
+} from '../../services/tencentFinance'
 import KLineDialog from './KLineDialog.vue'
 
 const indices = ref<Quote[]>([])
 const globals = ref<Quote[]>([])
+const commodities = ref<Quote[]>([])
 const stocks = ref<Quote[]>([])
 const loading = ref(false)
 const autoRefresh = ref(true)
@@ -168,6 +214,15 @@ function trendClass(q: Quote): string {
   if (q.change < 0) return 'down'
   return 'flat'
 }
+/** 商品计价单位（美元/盎司、美元/桶…），无则显示代码 */
+function unitOf(code: string): string {
+  return COMMODITY_UNITS[code] || code.replace(/^hf_/, '').toUpperCase()
+}
+/** 低价品种（如天然气 2.79）保留更多小数，避免精度丢失显示不准 */
+function priceDigits(q: Quote): number {
+  if (q.price > 0 && q.price < 10) return 3
+  return 2
+}
 
 // ===== K 线弹窗 =====
 const klineVisible = ref(false)
@@ -184,9 +239,15 @@ function openKline(q: Quote): void {
 async function refresh(): Promise<void> {
   loading.value = true
   try {
-    const [idx, glb, stk] = await Promise.all([fetchIndices(), fetchGlobal(), fetchHotStocks()])
+    const [idx, glb, cmd, stk] = await Promise.all([
+      fetchIndices(),
+      fetchGlobal(),
+      fetchCommodities(),
+      fetchHotStocks()
+    ])
     indices.value = idx
     globals.value = glb
+    if (cmd.length) commodities.value = cmd
     stocks.value = stk
     lastUpdate.value = nowText.value
   } catch (e) {

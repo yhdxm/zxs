@@ -2,7 +2,7 @@
   <div class="le-root">
     <PageHeader
       title="学位英语"
-      subtitle="备考助手 · 数据源：Free Dictionary API + 内置大纲词库 + 古登堡免费书 + 已配置 AI · 依据《成人学士学位英语水平考试大纲（第二版）》"
+      subtitle="备考助手 · 内置知识库（11 模块 / 40+ 讲真实讲解）+ Free Dictionary 查词 + 已配置 AI · 依据《成人学士学位英语水平考试大纲（第二版）》"
       :icon="School"
     >
       <div class="le-clock-box" title="北京时间">
@@ -74,16 +74,117 @@
           </div>
         </div>
 
-        <!-- 知识库（按大纲分类） -->
+        <!-- 知识库：模块导航 + 逐讲精读 -->
         <div v-else-if="active === 'outline'" class="le-card">
-          <h3 class="le-h">学位英语知识库（按大纲分门别类）</h3>
-          <div class="le-grid2">
-            <div v-for="o in outline" :key="o.key" class="le-know">
-              <div class="le-know-title">{{ o.name }}</div>
-              <div class="le-know-body">{{ o.desc }}</div>
-              <ul class="le-kp"><li v-for="(k, i) in o.keyPoints" :key="i">{{ k }}</li></ul>
-              <button class="le-mini" @click="explainOutline(o)">AI 讲透</button>
-              <div v-if="o._explain" class="le-know-explain">{{ o._explain }}</div>
+          <div class="le-kb-head">
+            <div class="le-kb-headtext">
+              <h3 class="le-h">学位英语知识库 · {{ ENGLISH_KB_STATS.modules }} 个模块 / {{ ENGLISH_KB_STATS.lessons }} 讲</h3>
+              <p class="le-sub">每一讲都含讲解正文、对照表、例句与易错点，点开即可学；纯内置内容，断网也能看。</p>
+            </div>
+            <el-input v-model="kbSearch" clearable placeholder="搜索知识点：虚拟语气 / 定语从句 / 婉拒 / 熟词生义…" class="le-kb-search" />
+          </div>
+
+          <!-- 搜索结果 -->
+          <div v-if="kbSearch.trim()" class="le-kb-results">
+            <p class="le-sub">匹配到 {{ searchResults.length }} 讲</p>
+            <button
+              v-for="r in searchResults"
+              :key="r.lesson.id"
+              type="button"
+              class="le-kb-rescard"
+              @click="gotoLesson(r.moduleKey, r.lesson.id)"
+            >
+              <span class="le-kb-resmod">{{ r.moduleName }}</span>
+              <span class="le-kb-restitle">{{ r.lesson.title }}</span>
+              <span class="le-kb-ressum">{{ r.lesson.summary }}</span>
+            </button>
+            <p v-if="!searchResults.length" class="le-empty">没有匹配的知识点，换个关键词试试（如 时态、被动、翻译、作文）。</p>
+          </div>
+
+          <div v-else class="le-kb-main">
+            <!-- 左侧模块导航 -->
+            <aside class="le-kb-nav">
+              <button
+                v-for="m in outline"
+                :key="m.key"
+                type="button"
+                class="le-kb-navi"
+                :class="{ on: curKey === m.key }"
+                @click="selectModule(m.key)"
+              >
+                <span class="le-kb-navname">{{ m.name }}</span>
+                <span class="le-kb-navnum">{{ m.lessons.length }} 讲</span>
+              </button>
+            </aside>
+
+            <!-- 右侧内容 -->
+            <div class="le-kb-content">
+              <div class="le-kb-intro">
+                <div class="le-kb-title">{{ curModule.name }}</div>
+                <p class="le-kb-desc">{{ curModule.desc }}</p>
+                <div class="le-kb-tags"><span v-for="(kp, i) in curModule.keyPoints" :key="i" class="le-kb-tag">{{ kp }}</span></div>
+                <div class="le-row">
+                  <button class="le-mini" @click="expandAll(true)">展开全部</button>
+                  <button class="le-mini" @click="expandAll(false)">收起全部</button>
+                  <button class="le-mini" @click="explainModule(curModule)">AI 讲透本模块</button>
+                </div>
+                <div v-if="moduleAi[curModule.key]" class="le-know-explain">{{ moduleAi[curModule.key] }}</div>
+              </div>
+
+              <article
+                v-for="(l, i) in curModule.lessons"
+                :id="'les-' + l.id"
+                :key="l.id"
+                class="le-lesson"
+                :class="{ open: !!openMap[l.id] }"
+              >
+                <header class="le-lesson-h" @click="toggleLesson(l.id)">
+                  <span class="le-lesson-no">{{ i + 1 }}</span>
+                  <span class="le-lesson-hh">
+                    <span class="le-lesson-t">{{ l.title }}</span>
+                    <span class="le-lesson-s">{{ l.summary }}</span>
+                  </span>
+                  <el-icon class="le-lesson-arrow"><ArrowDown /></el-icon>
+                </header>
+
+                <div v-show="openMap[l.id]" class="le-lesson-b">
+                  <p v-for="(p, pi) in l.body" :key="'p' + pi" class="le-p">{{ p }}</p>
+
+                  <div v-for="(t, ti) in (l.tables || [])" :key="'t' + ti" class="le-tbl-wrap">
+                    <div v-if="t.title" class="le-tbl-title">{{ t.title }}</div>
+                    <div class="le-tbl-scroll">
+                      <table class="le-tbl">
+                        <thead><tr><th v-for="(h, hi) in t.head" :key="hi">{{ h }}</th></tr></thead>
+                        <tbody>
+                          <tr v-for="(r, ri) in t.rows" :key="ri">
+                            <td v-for="(c, ci) in r" :key="ci">{{ c }}</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  <div v-if="l.examples && l.examples.length" class="le-exs">
+                    <div class="le-block-h">例句</div>
+                    <div v-for="(e, ei) in l.examples" :key="'e' + ei" class="le-ex-item">
+                      <div class="le-ex-en">{{ e.en }}</div>
+                      <div class="le-ex-zh">{{ e.zh }}</div>
+                      <div v-if="e.note" class="le-ex-note">提示：{{ e.note }}</div>
+                    </div>
+                  </div>
+
+                  <div v-if="l.traps && l.traps.length" class="le-traps">
+                    <div class="le-block-h warn">易错点 / 考点提醒</div>
+                    <ul><li v-for="(t, ti2) in l.traps" :key="'tr' + ti2">{{ t }}</li></ul>
+                  </div>
+
+                  <div class="le-row">
+                    <button class="le-mini" @click="explainLesson(l)">AI 换种说法再讲一遍</button>
+                    <button class="le-mini" @click="quizLesson(l)">AI 出 3 道练习题</button>
+                  </div>
+                  <div v-if="lessonAi[l.id]" class="le-know-explain">{{ lessonAi[l.id] }}</div>
+                </div>
+              </article>
             </div>
           </div>
         </div>
@@ -158,42 +259,15 @@
           </div>
           <div v-if="qaAnswer" class="le-answer">{{ qaAnswer }}</div>
         </div>
-
-        <!-- 书籍阅读 -->
-        <div v-else-if="active === 'book'" class="le-card">
-          <div class="le-hrow">
-            <h3 class="le-h">书籍查询与阅读（国内公版书）</h3>
-            <el-input v-model="bookKw" placeholder="搜索书名，如 红楼梦 / 论语 / 三国演义" class="le-input" @keyup.enter="searchBooks" />
-            <el-button type="primary" :loading="bookLoading" @click="searchBooks">搜索</el-button>
-          </div>
-          <div v-if="!books.length && bookLoading" class="le-skeleton"><el-skeleton :rows="5" animated /></div>
-          <div v-else class="le-grid">
-            <div v-for="b in books" :key="b.id" class="le-book">
-              <div class="le-book-title">{{ b.title }}</div>
-              <div class="le-book-meta">{{ b.authors.map(a => a.name).join('、') || '佚名' }} · {{ b.download_count >= 99999 ? '公版书' : ('下载 ' + b.download_count) }}</div>
-              <div class="le-row">
-                <button class="le-mini" @click="readBook(b)">在线阅读</button>
-                <a v-if="pickEpubUrl(b)" :href="pickEpubUrl(b)!" target="_blank" class="le-mini">EPUB</a>
-              </div>
-            </div>
-            <p v-if="!books.length && !bookLoading" class="le-empty">搜索公版书，免费在线阅读。</p>
-          </div>
-        </div>
       </section>
     </Transition>
-
-    <!-- 阅读弹框 -->
-    <el-dialog v-model="readVisible" :title="readingBook?.title || '阅读'" width="720px" top="5vh" class="le-read-dlg">
-      <div v-if="bookTextLoading" class="le-skeleton"><el-skeleton :rows="10" animated /></div>
-      <div v-else class="le-read-body">{{ bookText || '暂无正文预览。' }}</div>
-    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { onMounted, onUnmounted, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import { School, Reading, Collection, Calendar, ChatDotRound, Notebook } from '@element-plus/icons-vue'
+import { School, Reading, Collection, Calendar, ChatDotRound, ArrowDown } from '@element-plus/icons-vue'
 import PageHeader from '../components/PageHeader.vue'
 import { loadAiConfig, callAi, type AiConfig } from '../services/aiService'
 import {
@@ -201,14 +275,13 @@ import {
   explainWord,
   explainTopic,
   ENGLISH_OUTLINE,
+  ENGLISH_KB_STATS,
+  ENGLISH_LESSON_INDEX,
   generateStudyPlan,
   parseMaterialFile,
-  fetchBooks,
-  pickTextUrl,
-  pickEpubUrl,
-  fetchBookText,
   type WordDefinition,
-  type GutenbergBook,
+  type EnglishLesson,
+  type EnglishOutlineItem,
   type StudyPlan
 } from '../services/learningService'
 import {
@@ -218,16 +291,14 @@ import {
   listStudyPlans,
   saveStudyPlan,
   removeStudyPlan,
-  upsertReading,
   type LearnBookmark
 } from '../services/learnDb'
 
 const MODULES = [
   { key: 'word', label: '查词收藏', desc: '词典 + 生词本', color: '#0891b2', icon: Reading },
-  { key: 'outline', label: '知识库', desc: '大纲分模块', color: '#7c3aed', icon: Collection },
+  { key: 'outline', label: '知识库', desc: '40+ 讲精读', color: '#7c3aed', icon: Collection },
   { key: 'plan', label: '学习计划', desc: '资料→AI 计划', color: '#e08a00', icon: Calendar },
-  { key: 'ai', label: 'AI 答疑', desc: '语法/备考', color: '#0ea5e9', icon: ChatDotRound },
-  { key: 'book', label: '书籍阅读', desc: '免费公版书', color: '#1f9d55', icon: Notebook }
+  { key: 'ai', label: 'AI 答疑', desc: '语法/备考', color: '#0ea5e9', icon: ChatDotRound }
 ]
 const active = ref('word')
 
@@ -240,16 +311,14 @@ function updateClock(): void {
 }
 
 const cfg = ref<AiConfig | null>(null)
-const outline = ref(ENGLISH_OUTLINE.map((o) => ({ ...o, _explain: '' })))
 
 function switchModule(key: string): void {
   active.value = key
   if (key === 'word' && !words.value.length) void loadWords()
   if (key === 'plan' && !savedPlans.value.length) void loadPlans()
-  if (key === 'book' && !books.value.length && !bookLoading.value) void searchBooks('')
 }
 
-/* 查词 */
+/* ================= 查词 ================= */
 const word = ref('vocabulary')
 const lastWord = ref('')
 const def = ref<WordDefinition | null>(null)
@@ -288,16 +357,88 @@ async function addWord(): Promise<void> {
 }
 async function removeWord(id: string): Promise<void> { await removeLearnBookmark(id); await loadWords() }
 
-/* 知识库 AI 讲透 */
-async function explainOutline(o: { name: string; _explain: string }): Promise<void> {
-  if (!cfg.value) { ElMessage.warning('请先配置 AI 密钥'); return }
-  o._explain = 'AI 解读中…'
-  try {
-    o._explain = await explainTopic(`学位英语「${o.name}」`, cfg.value)
-  } catch (e) { o._explain = '解读失败：' + (e as Error).message }
+/* ================= 知识库 ================= */
+const outline = ENGLISH_OUTLINE
+const curKey = ref(outline[0]?.key || 'dialogue')
+const curModule = computed<EnglishOutlineItem>(
+  () => outline.find((o) => o.key === curKey.value) ?? (outline[0] as EnglishOutlineItem)
+)
+const openMap = reactive<Record<string, boolean>>({})
+const moduleAi = reactive<Record<string, string>>({})
+const lessonAi = reactive<Record<string, string>>({})
+const kbSearch = ref('')
+
+/** 默认展开当前模块第一讲，降低"看起来还是大纲"的观感 */
+function openFirst(): void {
+  const first = curModule.value?.lessons[0]
+  if (first) openMap[first.id] = true
+}
+function selectModule(key: string): void {
+  curKey.value = key
+  openFirst()
+}
+function toggleLesson(id: string): void { openMap[id] = !openMap[id] }
+function expandAll(v: boolean): void {
+  curModule.value.lessons.forEach((l) => { openMap[l.id] = v })
 }
 
-/* 学习计划 */
+const searchResults = computed(() => {
+  const q = kbSearch.value.trim().toLowerCase()
+  if (!q) return []
+  return ENGLISH_LESSON_INDEX.filter(({ moduleName, lesson }) => {
+    const hay = [
+      moduleName,
+      lesson.title,
+      lesson.summary,
+      lesson.body.join(' '),
+      (lesson.traps || []).join(' '),
+      (lesson.examples || []).map((e) => e.en + e.zh).join(' '),
+      (lesson.tables || []).map((t) => (t.title || '') + t.head.join(' ') + t.rows.map((r) => r.join(' ')).join(' ')).join(' ')
+    ].join(' ').toLowerCase()
+    return hay.includes(q)
+  })
+})
+
+function gotoLesson(moduleKey: string, lessonId: string): void {
+  kbSearch.value = ''
+  curKey.value = moduleKey
+  openMap[lessonId] = true
+  void nextTick(() => {
+    document.getElementById('les-' + lessonId)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  })
+}
+
+async function explainModule(m: EnglishOutlineItem): Promise<void> {
+  if (!cfg.value) { ElMessage.warning('请先配置 AI 密钥'); return }
+  moduleAi[m.key] = 'AI 解读中…'
+  try {
+    moduleAi[m.key] = await explainTopic(`学位英语「${m.name}」`, cfg.value)
+  } catch (e) { moduleAi[m.key] = '解读失败：' + (e as Error).message }
+}
+async function explainLesson(l: EnglishLesson): Promise<void> {
+  if (!cfg.value) { ElMessage.warning('请先配置 AI 密钥'); return }
+  lessonAi[l.id] = 'AI 解读中…'
+  try {
+    lessonAi[l.id] = await callAi(
+      cfg.value,
+      '你是学位英语辅导老师。请用更通俗、更口语化的方式重新讲解下面这一讲，配 1 个生活化类比和 2 个新例句（含中文翻译），300 字内，不要编造考试政策。\n' +
+      `标题：${l.title}\n要点：${l.summary}\n原讲解：${l.body.join(' ')}`
+    )
+  } catch (e) { lessonAi[l.id] = '解读失败：' + (e as Error).message }
+}
+async function quizLesson(l: EnglishLesson): Promise<void> {
+  if (!cfg.value) { ElMessage.warning('请先配置 AI 密钥'); return }
+  lessonAi[l.id] = 'AI 出题中…'
+  try {
+    lessonAi[l.id] = await callAi(
+      cfg.value,
+      '请针对下面这一讲的知识点，出 3 道成人学位英语难度的单项选择题（A/B/C/D），每题后紧跟【答案】与一句话解析。只输出题目与解析，不要寒暄。\n' +
+      `知识点：${l.title} —— ${l.summary}\n讲解要点：${l.body.join(' ').slice(0, 800)}`
+    )
+  } catch (e) { lessonAi[l.id] = '出题失败：' + (e as Error).message }
+}
+
+/* ================= 学习计划 ================= */
 const examDate = ref('')
 const planLevel = ref('')
 const planTarget = ref('')
@@ -349,7 +490,7 @@ function loadPlan(p: LearnBookmark): void {
 }
 async function delPlan(id: string): Promise<void> { await removeStudyPlan(id); await loadPlans() }
 
-/* AI 答疑 */
+/* ================= AI 答疑 ================= */
 const qaQuestion = ref('完形填空总错，怎么提高得分？')
 const qaLoading = ref(false)
 const qaAnswer = ref('')
@@ -362,48 +503,14 @@ async function runQa(): Promise<void> {
   finally { qaLoading.value = false }
 }
 
-/* 书籍 */
-const bookKw = ref('')
-const books = ref<GutenbergBook[]>([])
-const bookLoading = ref(false)
-async function searchBooks(q = ''): Promise<void> {
-  bookLoading.value = true
-  const r = await fetchBooks(q || bookKw.value.trim(), 1)
-  books.value = r.results.slice(0, 18)
-  bookLoading.value = false
-}
-const readVisible = ref(false)
-const readingBook = ref<GutenbergBook | null>(null)
-const bookText = ref('')
-const bookTextLoading = ref(false)
-async function readBook(b: GutenbergBook): Promise<void> {
-  const textUrl = pickTextUrl(b)
-  const ext = b.formats['wikisource']
-  if (!textUrl && ext) {
-    window.open(ext, '_blank', 'noopener')
-    ElMessage.success('已在新标签页打开维基文库阅读')
-    try { await upsertReading(b.id, b.title, 1, 0) } catch { /* ignore */ }
-    return
-  }
-  if (!textUrl) { ElMessage.warning('该书无纯文本版本'); return }
-  readVisible.value = true
-  readingBook.value = b
-  bookTextLoading.value = true
-  bookText.value = ''
-  bookText.value = await fetchBookText(textUrl)
-  bookTextLoading.value = false
-  // 记录阅读
-  try { await upsertReading(b.id, b.title, 1, 0) } catch { /* ignore */ }
-}
-
 onMounted(async () => {
   updateClock()
   clockTimer = window.setInterval(updateClock, 1000)
+  openFirst()
   try { cfg.value = await loadAiConfig() } catch { /* ignore */ }
   await loadWords()
   await lookup()
   await loadPlans()
-  await searchBooks('')
 })
 onUnmounted(() => { if (clockTimer) window.clearInterval(clockTimer) })
 </script>
@@ -416,7 +523,7 @@ onUnmounted(() => { if (clockTimer) window.clearInterval(clockTimer) })
 .le-clock { font-variant-numeric: tabular-nums; font-size: 13px; color: var(--text-strong); }
 .le-clock-hint { font-size: 11px; color: var(--text-faint); }
 
-.le-entries { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; margin-bottom: 18px; }
+.le-entries { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 18px; }
 .le-entry {
   position: relative; display: flex; align-items: center; gap: 10px; padding: 12px 14px 12px 16px;
   background: var(--surface); border: 1px solid var(--border); border-radius: 14px; box-shadow: var(--shadow-card);
@@ -436,9 +543,8 @@ onUnmounted(() => { if (clockTimer) window.clearInterval(clockTimer) })
 .le-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 18px; box-shadow: var(--shadow-card); }
 .le-h { font-size: 15px; color: var(--text-strong); margin: 0 0 6px; }
 .le-sub { font-size: 12px; color: var(--text-faint); margin: 0 0 12px; }
-.le-hrow { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
 .le-row { display: flex; align-items: center; gap: 10px; margin-top: 10px; flex-wrap: wrap; }
-.le-input { width: 300px; }
+.le-input { width: 300px; max-width: 100%; }
 .le-warn { font-size: 12px; color: #f59e0b; }
 .le-def { margin-top: 14px; padding: 14px; background: var(--surface-soft); border-radius: 10px; }
 .le-word { font-size: 20px; font-weight: 700; color: var(--text-strong); margin-bottom: 8px; }
@@ -453,14 +559,71 @@ onUnmounted(() => { if (clockTimer) window.clearInterval(clockTimer) })
 .le-empty { grid-column: 1 / -1; color: var(--text-faint); font-size: 13px; padding: 16px; text-align: center; }
 .le-know { padding: 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-soft); }
 .le-know-title { font-size: 13px; font-weight: 600; color: var(--text-strong); margin-bottom: 6px; }
-.le-know-body { font-size: 12px; color: var(--text-muted); line-height: 1.6; }
-.le-kp { margin: 8px 0 0; padding-left: 18px; font-size: 12px; color: var(--text-muted); }
-.le-know-explain { margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--border); font-size: 12px; color: var(--text); white-space: pre-wrap; line-height: 1.6; }
+.le-know-explain { margin-top: 10px; padding: 10px 12px; border: 1px dashed var(--border); border-radius: 8px; background: var(--surface-soft); font-size: 12.5px; color: var(--text); white-space: pre-wrap; line-height: 1.7; }
 .le-mini { border: 1px solid var(--border); background: var(--surface); color: var(--brand, #378add); border-radius: 6px; padding: 3px 10px; font-size: 12px; cursor: pointer; text-decoration: none; display: inline-block; }
+.le-mini:hover { border-color: var(--brand, #378add); }
 .le-mini.danger { color: #ef4444; }
 .le-worditem { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-soft); }
 .le-wordname { font-size: 13px; color: var(--text-strong); text-transform: capitalize; }
-.le-skeleton { padding: 4px 0; }
+
+/* ---------- 知识库 ---------- */
+.le-kb-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; flex-wrap: wrap; }
+.le-kb-headtext { min-width: 0; flex: 1; }
+.le-kb-search { width: 320px; max-width: 100%; }
+
+.le-kb-results { margin-top: 6px; display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 10px; }
+.le-kb-results > .le-sub { grid-column: 1 / -1; margin: 0; }
+.le-kb-rescard { display: flex; flex-direction: column; gap: 4px; text-align: left; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-soft); cursor: pointer; transition: border-color .16s ease, transform .16s ease; }
+.le-kb-rescard:hover { border-color: #7c3aed; transform: translateY(-2px); }
+.le-kb-resmod { font-size: 11px; color: #7c3aed; }
+.le-kb-restitle { font-size: 13px; font-weight: 600; color: var(--text-strong); }
+.le-kb-ressum { font-size: 12px; color: var(--text-muted); line-height: 1.5; }
+
+.le-kb-main { display: grid; grid-template-columns: 210px minmax(0, 1fr); gap: 16px; margin-top: 8px; }
+.le-kb-nav { display: flex; flex-direction: column; gap: 6px; position: sticky; top: 12px; align-self: start; max-height: calc(100vh - 120px); overflow: auto; }
+.le-kb-navi { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 9px 11px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface); cursor: pointer; text-align: left; transition: all .16s ease; }
+.le-kb-navi:hover { border-color: #7c3aed; }
+.le-kb-navi.on { border-color: #7c3aed; background: color-mix(in srgb, #7c3aed 8%, var(--surface)); }
+.le-kb-navname { font-size: 12.5px; color: var(--text-strong); line-height: 1.35; }
+.le-kb-navi.on .le-kb-navname { font-weight: 600; color: #7c3aed; }
+.le-kb-navnum { font-size: 11px; color: var(--text-faint); flex-shrink: 0; }
+
+.le-kb-content { min-width: 0; }
+.le-kb-intro { padding: 14px 16px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-soft); margin-bottom: 12px; }
+.le-kb-title { font-size: 16px; font-weight: 700; color: var(--text-strong); margin-bottom: 6px; }
+.le-kb-desc { font-size: 12.5px; color: var(--text-muted); line-height: 1.7; margin: 0 0 8px; }
+.le-kb-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.le-kb-tag { font-size: 11px; color: #7c3aed; background: color-mix(in srgb, #7c3aed 10%, transparent); border-radius: 999px; padding: 2px 9px; }
+
+.le-lesson { border: 1px solid var(--border); border-radius: 10px; background: var(--surface); margin-bottom: 10px; overflow: hidden; }
+.le-lesson.open { border-color: color-mix(in srgb, #7c3aed 45%, var(--border)); }
+.le-lesson-h { display: flex; align-items: center; gap: 10px; padding: 11px 13px; cursor: pointer; user-select: none; }
+.le-lesson-h:hover { background: var(--surface-soft); }
+.le-lesson-no { flex-shrink: 0; width: 22px; height: 22px; border-radius: 6px; display: grid; place-items: center; font-size: 12px; background: color-mix(in srgb, #7c3aed 12%, transparent); color: #7c3aed; }
+.le-lesson-hh { display: flex; flex-direction: column; min-width: 0; flex: 1; gap: 2px; }
+.le-lesson-t { font-size: 13.5px; font-weight: 600; color: var(--text-strong); line-height: 1.4; }
+.le-lesson-s { font-size: 12px; color: var(--text-faint); line-height: 1.5; }
+.le-lesson-arrow { flex-shrink: 0; color: var(--text-faint); transition: transform .2s ease; }
+.le-lesson.open .le-lesson-arrow { transform: rotate(180deg); }
+.le-lesson-b { padding: 4px 15px 15px; border-top: 1px dashed var(--border); }
+.le-p { font-size: 13px; color: var(--text); line-height: 1.85; margin: 10px 0 0; }
+
+.le-tbl-wrap { margin-top: 12px; }
+.le-tbl-title { font-size: 12.5px; font-weight: 600; color: var(--text-strong); margin-bottom: 6px; }
+.le-tbl-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; border: 1px solid var(--border); border-radius: 8px; }
+.le-tbl { width: 100%; border-collapse: collapse; font-size: 12.5px; min-width: 420px; }
+.le-tbl th { background: var(--surface-soft); color: var(--text-strong); font-weight: 600; text-align: left; padding: 8px 10px; white-space: nowrap; }
+.le-tbl td { padding: 8px 10px; color: var(--text-muted); border-top: 1px solid var(--border); line-height: 1.6; vertical-align: top; }
+.le-tbl tbody tr:hover { background: var(--surface-soft); }
+
+.le-block-h { font-size: 12.5px; font-weight: 600; color: var(--text-strong); margin: 14px 0 6px; }
+.le-block-h.warn { color: #d97706; }
+.le-ex-item { padding: 9px 12px; border-left: 3px solid #0891b2; background: var(--surface-soft); border-radius: 0 8px 8px 0; margin-bottom: 8px; }
+.le-ex-en { font-size: 13px; color: var(--text-strong); line-height: 1.7; white-space: pre-wrap; }
+.le-ex-zh { font-size: 12.5px; color: var(--text-muted); line-height: 1.7; margin-top: 3px; white-space: pre-wrap; }
+.le-ex-note { font-size: 11.5px; color: #0891b2; margin-top: 4px; line-height: 1.6; }
+.le-traps ul { margin: 0; padding-left: 18px; }
+.le-traps li { font-size: 12.5px; color: var(--text-muted); line-height: 1.8; }
 
 .le-plan-form { background: var(--surface-soft); border: 1px solid var(--border); border-radius: 10px; padding: 14px; }
 .le-pf-row { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
@@ -478,22 +641,30 @@ onUnmounted(() => { if (clockTimer) window.clearInterval(clockTimer) })
 .le-phase-block ul, .le-tips ul { margin: 4px 0 0; padding-left: 18px; }
 .le-tips { font-size: 12.5px; color: var(--text-muted); background: var(--surface-soft); border-radius: 8px; padding: 10px 14px; margin-top: 6px; }
 
-.le-book { padding: 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-soft); }
-.le-book-title { font-size: 13px; font-weight: 600; color: var(--text-strong); margin-bottom: 4px; line-height: 1.4; }
-.le-book-meta { font-size: 11px; color: var(--text-faint); margin-bottom: 8px; }
-.le-read-body { max-height: 70vh; overflow: auto; font-size: 13px; line-height: 1.8; white-space: pre-wrap; color: var(--text); }
-
 .le-fade-enter-active, .le-fade-leave-active { transition: opacity .18s ease, transform .18s ease; }
 .le-fade-enter-from { opacity: 0; transform: translateY(6px); }
 .le-fade-leave-to { opacity: 0; transform: translateY(-6px); }
 
-@media (max-width: 1100px) { .le-entries { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 1100px) {
+  .le-entries { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .le-kb-main { grid-template-columns: 1fr; }
+  .le-kb-nav { position: static; max-height: none; flex-direction: row; overflow-x: auto; padding-bottom: 4px; }
+  .le-kb-navi { flex-shrink: 0; }
+  .le-kb-navname { white-space: nowrap; }
+}
 @media (max-width: 760px) {
+  .le-card { padding: 14px; }
   .le-entries { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
   .le-entry { padding: 10px 10px 10px 13px; gap: 8px; }
   .le-icon { width: 30px; height: 30px; border-radius: 9px; }
   .le-label { font-size: 12.5px; }
   .le-desc { display: none; }
+  .le-kb-search { width: 100%; }
+  .le-input { width: 100%; }
+  .le-pf-row { flex-direction: column; align-items: stretch; gap: 6px; }
+  .le-pf-row > label { width: auto; }
+  .le-lesson-b { padding: 4px 12px 13px; }
+  .le-p { font-size: 12.5px; line-height: 1.8; }
 }
 @media (max-width: 460px) { .le-entries { grid-template-columns: 1fr; } }
 </style>

@@ -44,100 +44,20 @@ export async function explainWord(word: string, def: WordDefinition | null, cfg:
 
 /* ===================== 各行业知识 ===================== */
 
-export interface IndustryTopic {
-  name: string
-  desc: string
-  keyPoints: string[]
-}
-
-/** 各行业知识库（零网络依赖，AI 可在此基础上追问；覆盖更全面，避免「显示不全」） */
-export const INDUSTRY_KNOWLEDGE: IndustryTopic[] = [
-  {
-    name: '人工智能',
-    desc: '研究如何让机器模拟人类智能的学科，含机器学习、深度学习、自然语言处理等方向。',
-    keyPoints: ['机器学习：从数据中自动学习规律', '大模型：以 Transformer 为主的生成式 AI', '应用：推荐、风控、客服、创作']
-  },
-  {
-    name: '新能源汽车',
-    desc: '采用新型动力系统的汽车，含纯电、插混、增程，核心在电池与电控。',
-    keyPoints: ['三电：电池/电机/电控', '补能：充电与换电', '趋势：智能化与电动化融合']
-  },
-  {
-    name: '金融理财',
-    desc: '对资产进行规划、投资与风险管理，实现保值增值。',
-    keyPoints: ['复利：时间带来的指数增长', '资产配置：分散风险', '风险与收益成正比']
-  },
-  {
-    name: '医疗健康',
-    desc: '维护与促进健康的科学，含预防、诊断、治疗与康复。',
-    keyPoints: ['三级预防：未病先防', '循证医学：以证据为准', '健康生活方式是基础']
-  },
-  {
-    name: '编程开发',
-    desc: '用编程语言让计算机按预期工作的过程，是现代数字社会的基础技能。',
-    keyPoints: ['算法与数据结构是核心', '版本控制（Git）协作必备', '持续学习新技术']
-  },
-  {
-    name: '法律常识',
-    desc: '规范社会行为的规则体系，了解基础法律可更好保护自身权益。',
-    keyPoints: ['合同法：约定双方权利义务', '民法典：民事关系总典', '证据意识很重要']
-  },
-  {
-    name: '教育培训',
-    desc: '有目的、有计划地传授知识与技能，成人教育与职业培训是终身学习的重要组成。',
-    keyPoints: ['成人教育：工作与学习并行', '在线教育：突破时空限制', '能力本位：以实操为目标']
-  },
-  {
-    name: '电子商务',
-    desc: '通过互联网进行的商品与服务交易，涵盖平台、直播、跨境与供应链。',
-    keyPoints: ['流量与转化：电商核心指标', '直播带货：内容驱动成交', '供应链：履约效率决定体验']
-  },
-  {
-    name: '餐饮食品',
-    desc: '从食材、烹饪到门店运营的服务业态，注重卫生、口味与复购。',
-    keyPoints: ['食品安全：底线要求', '标准化：可复制的关键', '私域：提升复购率']
-  },
-  {
-    name: '房地产建筑',
-    desc: '房屋与基础设施建设行业，含开发、施工、物业与装修。',
-    keyPoints: ['周期性强：受政策影响大', '施工安全：红线不可碰', '物业：长周期服务价值']
-  },
-  {
-    name: '现代农业',
-    desc: '以科技提升农业生产效率，含智慧农业、设施农业与农产品电商。',
-    keyPoints: ['智慧农业：传感器与数据', '冷链：减少损耗', '品牌化：提升附加值']
-  },
-  {
-    name: '能源电力',
-    desc: '支撑社会运转的基础产业，正从化石能源向风、光、储等清洁能源转型。',
-    keyPoints: ['双碳：碳达峰与碳中和', '新型电力系统：源网荷储协同', '储能：平抑波动']
-  },
-  {
-    name: '物流供应链',
-    desc: '商品从产地到消费者的流动网络，含仓储、运输、配送与跨境。',
-    keyPoints: ['仓配一体：提效降本', '数字化：全程可视', '最后一公里：体验关键']
-  },
-  {
-    name: '文化传媒',
-    desc: '内容的生产、传播与消费，含出版、影视、短视频与新媒体运营。',
-    keyPoints: ['内容为王：持续产出价值', '用户运营：社群与互动', '版权：核心资产']
-  },
-  {
-    name: '旅游酒店',
-    desc: '满足人们出行、住宿与体验需求的服务业，与文旅融合趋势明显。',
-    keyPoints: ['体验经济：情绪价值', '淡旺季：精细化运营', '文旅融合：内容+场景']
-  },
-  {
-    name: '人力资源',
-    desc: '组织选、育、用、留人的管理职能，关乎团队效能与文化建设。',
-    keyPoints: ['招聘：人岗匹配', '绩效：目标对齐', '培训：能力成长']
-  },
-  {
-    name: '设计创意',
-    desc: '以视觉与体验解决问题的专业领域，含平面、产品、UI/UX 与品牌。',
-    keyPoints: ['用户中心：从需求出发', '一致性：建立认知', '可用性：先于美观']
-  }
-]
+// 各行业知识库已抽到 industryKnowledge.ts（17 个行业 / 68 讲真实可学内容），
+// 此处再导出，保持原有引用路径不变。
+export {
+  INDUSTRY_KNOWLEDGE_DERIVED as INDUSTRY_KNOWLEDGE,
+  INDUSTRY_KNOWLEDGE_FULL,
+  INDUSTRY_LESSON_INDEX,
+  INDUSTRY_KB_STATS,
+  type IndustryTopic,
+  type IndustryTopicFull,
+  type IndustryLesson,
+  type IndustryTable,
+  type IndustryExample,
+  type IndustryLessonRef
+} from './industryKnowledge'
 
 /** 用已配置 AI 通俗讲解行业/专业知识点（零基础向） */
 export async function explainTopic(topic: string, cfg: AiConfig): Promise<string> {
@@ -157,6 +77,7 @@ export interface GutenbergBook {
   download_count: number
   subjects?: string[]
   languages?: string[]
+  category?: string
 }
 export interface BookSearchResult {
   count: number
@@ -176,50 +97,165 @@ function hashId(s: string): number {
 }
 
 /**
- * 检索国内公版书：优先维基文库中文搜索（免费、国内友好），
- * 失败或为空则降级到内置中国经典书目，保证「只显示国内书籍」且有数据。
+ * 检索国内公版书：
+ * 1) 首选项目内置的中文公版书目，按 书名/作者/分类/主题 本地模糊匹配（离线/国内可达，零报错）；
+ * 2) 命中后再 best-effort 追加维基文库在线检索结果作为补充（失败自动忽略，不影响主结果）；
+ * 3) 按分类筛选、分页返回。
  */
-export async function fetchBooks(query: string, page = 1): Promise<BookSearchResult> {
-  const q = query.trim()
-  if (!q) {
-    return { count: BUILTIN_BOOKS.length, next: null, previous: null, results: BUILTIN_BOOKS }
-  }
-  try {
-    const url = `${WIKI_BASE}?action=query&list=search&srsearch=${encodeURIComponent(q)}&srnamespace=0&srlimit=12&format=json`
-    const data = await fetchCorsJson<{ query?: { search?: { title: string }[] } }>(url)
-    const list = data?.query?.search || []
-    if (list.length) {
-      const results: GutenbergBook[] = list.map((it) => ({
-        id: hashId(it.title),
-        title: it.title,
-        authors: [{ name: '—' }],
-        download_count: 0,
-        languages: ['zh'],
-        subjects: ['公版书'],
-        formats: { wikisource: `https://zh.wikisource.org/wiki/${encodeURIComponent(it.title)}` }
-      }))
-      return { count: results.length, next: null, previous: null, results }
+export const BOOK_CATEGORIES = [
+  '古典小说',
+  '先秦诸子',
+  '史书',
+  '诗词文赋',
+  '蒙学',
+  '现代文学',
+  '佛道经典'
+]
+
+const BOOK_PAGE_SIZE = 12
+
+export async function fetchBooks(
+  query: string,
+  page = 1,
+  category?: string
+): Promise<BookSearchResult> {
+  const q = query.trim().toLowerCase()
+  const cat = (category || '').trim()
+  const matched = BUILTIN_BOOKS.filter((b) => {
+    if (cat && b.category !== cat) return false
+    if (!q) return true
+    return (
+      b.title.toLowerCase().includes(q) ||
+      b.authors.some((a) => a.name.toLowerCase().includes(q)) ||
+      (b.category || '').toLowerCase().includes(q) ||
+      (b.subjects || []).some((s) => s.toLowerCase().includes(q))
+    )
+  })
+  // 在线补充（维基文库），失败不影响主结果
+  if (q || cat) {
+    try {
+      const online = await wikiSearchBooks(q || cat)
+      const seen = new Set(matched.map((b) => b.title))
+      for (const b of online) if (!seen.has(b.title)) { matched.push(b); seen.add(b.title) }
+    } catch {
+      /* 忽略在线补充失败 */
     }
-  } catch {
-    /* 维基文库不可达，降级到内置中国书目 */
   }
-  return { count: BUILTIN_BOOKS.length, next: null, previous: null, results: BUILTIN_BOOKS }
+  const total = matched.length
+  const start = (page - 1) * BOOK_PAGE_SIZE
+  const slice = matched.slice(start, start + BOOK_PAGE_SIZE)
+  return {
+    count: total,
+    next: start + BOOK_PAGE_SIZE < total ? `page=${page + 1}` : null,
+    previous: page > 1 ? `page=${page - 1}` : null,
+    results: slice
+  }
 }
 
-/** 内置中国公版书兜底（维基文库不可达时保证有国内书可读，均为真实书目，维基文库在线阅读） */
+/** 维基文库在线检索（best-effort，调用方已兜底） */
+async function wikiSearchBooks(q: string): Promise<GutenbergBook[]> {
+  const url = `${WIKI_BASE}?action=query&list=search&srsearch=${encodeURIComponent(q)}&srnamespace=0&srlimit=10&format=json`
+  const data = await fetchCorsJson<{ query?: { search?: { title: string }[] } }>(url)
+  const list = data?.query?.search || []
+  return list.slice(0, 10).map((it) => ({
+    id: -hashId(it.title),
+    title: it.title,
+    authors: [{ name: '维基文库' }],
+    download_count: 0,
+    languages: ['zh'],
+    subjects: ['维基文库'],
+    category: '维基文库',
+    formats: { wikisource: `https://zh.wikisource.org/wiki/${encodeURIComponent(it.title)}` }
+  }))
+}
+
+/** 维基文库阅读地址构造：exact 为确切条目名（走精确页），否则用站内搜索兜底（保证可打开） */
+function ws(exact?: string, title?: string): Record<string, string> {
+  const t = title || exact || ''
+  return {
+    wikisource: exact
+      ? `https://zh.wikisource.org/wiki/${encodeURIComponent(exact)}`
+      : `https://zh.wikisource.org/w/index.php?search=${encodeURIComponent(t)}`
+  }
+}
+
+/** 内置中国公版书（覆盖 7 大类、均为真实书目，维基文库可在线阅读；本地优先，离线可达零报错） */
 export const BUILTIN_BOOKS: GutenbergBook[] = [
-  { id: 1, title: '红楼梦', authors: [{ name: '曹雪芹' }], download_count: 99999, languages: ['zh'], subjects: ['古典小说'], formats: { wikisource: 'https://zh.wikisource.org/wiki/紅樓夢' } },
-  { id: 2, title: '三国演义', authors: [{ name: '罗贯中' }], download_count: 99999, languages: ['zh'], subjects: ['古典小说'], formats: { wikisource: 'https://zh.wikisource.org/wiki/三國演義' } },
-  { id: 3, title: '水浒传', authors: [{ name: '施耐庵' }], download_count: 99999, languages: ['zh'], subjects: ['古典小说'], formats: { wikisource: 'https://zh.wikisource.org/wiki/水滸傳' } },
-  { id: 4, title: '西游记', authors: [{ name: '吴承恩' }], download_count: 99999, languages: ['zh'], subjects: ['古典小说'], formats: { wikisource: 'https://zh.wikisource.org/wiki/西遊記' } },
-  { id: 5, title: '论语', authors: [{ name: '孔子' }], download_count: 99999, languages: ['zh'], subjects: ['先秦诸子'], formats: { wikisource: 'https://zh.wikisource.org/wiki/論語' } },
-  { id: 6, title: '道德经', authors: [{ name: '老子' }], download_count: 99999, languages: ['zh'], subjects: ['先秦诸子'], formats: { wikisource: 'https://zh.wikisource.org/wiki/道德經' } },
-  { id: 7, title: '史记', authors: [{ name: '司马迁' }], download_count: 99999, languages: ['zh'], subjects: ['史书'], formats: { wikisource: 'https://zh.wikisource.org/wiki/史記' } },
-  { id: 8, title: '唐诗三百首', authors: [{ name: '蘅塘退士 编' }], download_count: 99999, languages: ['zh'], subjects: ['诗词'], formats: { wikisource: 'https://zh.wikisource.org/wiki/唐詩三百首' } },
-  { id: 9, title: '资治通鉴', authors: [{ name: '司马光' }], download_count: 99999, languages: ['zh'], subjects: ['史书'], formats: { wikisource: 'https://zh.wikisource.org/wiki/資治通鑑' } },
-  { id: 10, title: '儒林外史', authors: [{ name: '吴敬梓' }], download_count: 99999, languages: ['zh'], subjects: ['古典小说'], formats: { wikisource: 'https://zh.wikisource.org/wiki/儒林外史' } },
-  { id: 11, title: '呐喊', authors: [{ name: '鲁迅' }], download_count: 99999, languages: ['zh'], subjects: ['现代文学'], formats: { wikisource: 'https://zh.wikisource.org/wiki/吶喊' } },
-  { id: 12, title: '围城', authors: [{ name: '钱锺书' }], download_count: 99999, languages: ['zh'], subjects: ['现代文学'], formats: { wikisource: 'https://zh.wikisource.org/wiki/圍城' } }
+  // ===== 古典小说 =====
+  { id: 1, title: '红楼梦', authors: [{ name: '曹雪芹' }], category: '古典小说', subjects: ['古典小说'], download_count: 99999, languages: ['zh'], formats: ws('紅樓夢', '红楼梦') },
+  { id: 2, title: '三国演义', authors: [{ name: '罗贯中' }], category: '古典小说', subjects: ['古典小说'], download_count: 99999, languages: ['zh'], formats: ws('三國演義', '三国演义') },
+  { id: 3, title: '水浒传', authors: [{ name: '施耐庵' }], category: '古典小说', subjects: ['古典小说'], download_count: 99999, languages: ['zh'], formats: ws('水滸傳', '水浒传') },
+  { id: 4, title: '西游记', authors: [{ name: '吴承恩' }], category: '古典小说', subjects: ['古典小说'], download_count: 99999, languages: ['zh'], formats: ws('西遊記', '西游记') },
+  { id: 5, title: '儒林外史', authors: [{ name: '吴敬梓' }], category: '古典小说', subjects: ['古典小说'], download_count: 99999, languages: ['zh'], formats: ws('儒林外史', '儒林外史') },
+  { id: 6, title: '聊斋志异', authors: [{ name: '蒲松龄' }], category: '古典小说', subjects: ['古典小说'], download_count: 99999, languages: ['zh'], formats: ws('聊齋志異', '聊斋志异') },
+  { id: 7, title: '镜花缘', authors: [{ name: '李汝珍' }], category: '古典小说', subjects: ['古典小说'], download_count: 99999, languages: ['zh'], formats: ws('鏡花緣', '镜花缘') },
+  { id: 8, title: '老残游记', authors: [{ name: '刘鹗' }], category: '古典小说', subjects: ['古典小说'], download_count: 99999, languages: ['zh'], formats: ws('老殘遊記', '老残游记') },
+  { id: 9, title: '官场现形记', authors: [{ name: '李伯元' }], category: '古典小说', subjects: ['古典小说'], download_count: 99999, languages: ['zh'], formats: ws('官場現形記', '官场现形记') },
+  { id: 10, title: '二十年目睹之怪现状', authors: [{ name: '吴趼人' }], category: '古典小说', subjects: ['古典小说'], download_count: 99999, languages: ['zh'], formats: ws('二十年目睹之怪現狀', '二十年目睹之怪现状') },
+  { id: 11, title: '孽海花', authors: [{ name: '曾朴' }], category: '古典小说', subjects: ['古典小说'], download_count: 99999, languages: ['zh'], formats: ws('孽海花', '孽海花') },
+  { id: 12, title: '封神演义', authors: [{ name: '许仲琳' }], category: '古典小说', subjects: ['古典小说'], download_count: 99999, languages: ['zh'], formats: ws('封神演義', '封神演义') },
+  { id: 13, title: '东周列国志', authors: [{ name: '冯梦龙' }], category: '古典小说', subjects: ['古典小说'], download_count: 99999, languages: ['zh'], formats: ws('東周列國志', '东周列国志') },
+
+  // ===== 先秦诸子 =====
+  { id: 14, title: '论语', authors: [{ name: '孔子' }], category: '先秦诸子', subjects: ['先秦诸子'], download_count: 99999, languages: ['zh'], formats: ws('論語', '论语') },
+  { id: 15, title: '道德经', authors: [{ name: '老子' }], category: '先秦诸子', subjects: ['先秦诸子'], download_count: 99999, languages: ['zh'], formats: ws('道德經', '道德经') },
+  { id: 16, title: '孟子', authors: [{ name: '孟轲' }], category: '先秦诸子', subjects: ['先秦诸子'], download_count: 99999, languages: ['zh'], formats: ws('孟子', '孟子') },
+  { id: 17, title: '庄子', authors: [{ name: '庄周' }], category: '先秦诸子', subjects: ['先秦诸子'], download_count: 99999, languages: ['zh'], formats: ws('莊子', '庄子') },
+  { id: 18, title: '荀子', authors: [{ name: '荀况' }], category: '先秦诸子', subjects: ['先秦诸子'], download_count: 99999, languages: ['zh'], formats: ws('荀子', '荀子') },
+  { id: 19, title: '韩非子', authors: [{ name: '韩非' }], category: '先秦诸子', subjects: ['先秦诸子'], download_count: 99999, languages: ['zh'], formats: ws('韓非子', '韩非子') },
+  { id: 20, title: '墨子', authors: [{ name: '墨翟' }], category: '先秦诸子', subjects: ['先秦诸子'], download_count: 99999, languages: ['zh'], formats: ws('墨子', '墨子') },
+  { id: 21, title: '孙子兵法', authors: [{ name: '孙武' }], category: '先秦诸子', subjects: ['先秦诸子', '兵书'], download_count: 99999, languages: ['zh'], formats: ws('孫子兵法', '孙子兵法') },
+  { id: 22, title: '周易', authors: [{ name: '佚名' }], category: '先秦诸子', subjects: ['先秦诸子', '经部'], download_count: 99999, languages: ['zh'], formats: ws('周易', '周易') },
+  { id: 23, title: '诗经', authors: [{ name: '佚名' }], category: '先秦诸子', subjects: ['诗经'], download_count: 99999, languages: ['zh'], formats: ws('詩經', '诗经') },
+  { id: 24, title: '楚辞', authors: [{ name: '屈原 等' }], category: '先秦诸子', subjects: ['楚辞', '辞赋'], download_count: 99999, languages: ['zh'], formats: ws('楚辭', '楚辞') },
+  { id: 25, title: '尚书', authors: [{ name: '佚名' }], category: '先秦诸子', subjects: ['尚书', '经部'], download_count: 99999, languages: ['zh'], formats: ws('尚書', '尚书') },
+
+  // ===== 史书 =====
+  { id: 26, title: '史记', authors: [{ name: '司马迁' }], category: '史书', subjects: ['史书'], download_count: 99999, languages: ['zh'], formats: ws('史記', '史记') },
+  { id: 27, title: '资治通鉴', authors: [{ name: '司马光' }], category: '史书', subjects: ['史书'], download_count: 99999, languages: ['zh'], formats: ws('資治通鑑', '资治通鉴') },
+  { id: 28, title: '汉书', authors: [{ name: '班固' }], category: '史书', subjects: ['史书'], download_count: 99999, languages: ['zh'], formats: ws('漢書', '汉书') },
+  { id: 29, title: '三国志', authors: [{ name: '陈寿' }], category: '史书', subjects: ['史书'], download_count: 99999, languages: ['zh'], formats: ws('三國志', '三国志') },
+  { id: 30, title: '左传', authors: [{ name: '左丘明' }], category: '史书', subjects: ['史书'], download_count: 99999, languages: ['zh'], formats: ws('左傳', '左传') },
+  { id: 31, title: '战国策', authors: [{ name: '佚名' }], category: '史书', subjects: ['史书'], download_count: 99999, languages: ['zh'], formats: ws('戰國策', '战国策') },
+  { id: 32, title: '世说新语', authors: [{ name: '刘义庆' }], category: '史书', subjects: ['史书', '笔记'], download_count: 99999, languages: ['zh'], formats: ws('世說新語', '世说新语') },
+
+  // ===== 诗词文赋 =====
+  { id: 33, title: '唐诗三百首', authors: [{ name: '蘅塘退士 编' }], category: '诗词文赋', subjects: ['诗词'], download_count: 99999, languages: ['zh'], formats: ws('唐詩三百首', '唐诗三百首') },
+  { id: 34, title: '宋词三百首', authors: [{ name: '上彊村民 编' }], category: '诗词文赋', subjects: ['诗词'], download_count: 99999, languages: ['zh'], formats: ws('宋詞三百首', '宋词三百首') },
+  { id: 35, title: '古文观止', authors: [{ name: '吴楚材 编' }], category: '诗词文赋', subjects: ['古文', '选本'], download_count: 99999, languages: ['zh'], formats: ws('古文觀止', '古文观止') },
+  { id: 36, title: '人间词话', authors: [{ name: '王国维' }], category: '诗词文赋', subjects: ['词话', '文学批评'], download_count: 99999, languages: ['zh'], formats: ws('人間詞話', '人间词话') },
+  { id: 37, title: '乐府诗集', authors: [{ name: '郭茂倩 编' }], category: '诗词文赋', subjects: ['诗词', '乐府'], download_count: 99999, languages: ['zh'], formats: ws('樂府詩集', '乐府诗集') },
+  { id: 38, title: '文心雕龙', authors: [{ name: '刘勰' }], category: '诗词文赋', subjects: ['文论'], download_count: 99999, languages: ['zh'], formats: ws('文心雕龍', '文心雕龙') },
+
+  // ===== 蒙学 =====
+  { id: 39, title: '三字经', authors: [{ name: '王应麟' }], category: '蒙学', subjects: ['蒙学'], download_count: 99999, languages: ['zh'], formats: ws('三字經', '三字经') },
+  { id: 40, title: '百家姓', authors: [{ name: '佚名' }], category: '蒙学', subjects: ['蒙学'], download_count: 99999, languages: ['zh'], formats: ws('百家姓', '百家姓') },
+  { id: 41, title: '千字文', authors: [{ name: '周兴嗣' }], category: '蒙学', subjects: ['蒙学'], download_count: 99999, languages: ['zh'], formats: ws('千字文', '千字文') },
+  { id: 42, title: '弟子规', authors: [{ name: '李毓秀' }], category: '蒙学', subjects: ['蒙学'], download_count: 99999, languages: ['zh'], formats: ws('弟子規', '弟子规') },
+  { id: 43, title: '声律启蒙', authors: [{ name: '车万育' }], category: '蒙学', subjects: ['蒙学', '对韵'], download_count: 99999, languages: ['zh'], formats: ws('聲律啟蒙', '声律启蒙') },
+  { id: 44, title: '增广贤文', authors: [{ name: '佚名' }], category: '蒙学', subjects: ['蒙学'], download_count: 99999, languages: ['zh'], formats: ws('增廣賢文', '增广贤文') },
+
+  // ===== 现代文学（均为 1949 年前出版、国内公版） =====
+  { id: 45, title: '呐喊', authors: [{ name: '鲁迅' }], category: '现代文学', subjects: ['现代文学', '小说集'], download_count: 99999, languages: ['zh'], formats: ws(undefined, '呐喊') },
+  { id: 46, title: '彷徨', authors: [{ name: '鲁迅' }], category: '现代文学', subjects: ['现代文学', '小说集'], download_count: 99999, languages: ['zh'], formats: ws(undefined, '彷徨') },
+  { id: 47, title: '朝花夕拾', authors: [{ name: '鲁迅' }], category: '现代文学', subjects: ['现代文学', '散文集'], download_count: 99999, languages: ['zh'], formats: ws(undefined, '朝花夕拾') },
+  { id: 48, title: '野草', authors: [{ name: '鲁迅' }], category: '现代文学', subjects: ['现代文学', '散文诗集'], download_count: 99999, languages: ['zh'], formats: ws(undefined, '野草') },
+  { id: 49, title: '边城', authors: [{ name: '沈从文' }], category: '现代文学', subjects: ['现代文学', '小说'], download_count: 99999, languages: ['zh'], formats: ws(undefined, '边城') },
+  { id: 50, title: '骆驼祥子', authors: [{ name: '老舍' }], category: '现代文学', subjects: ['现代文学', '小说'], download_count: 99999, languages: ['zh'], formats: ws(undefined, '骆驼祥子') },
+  { id: 51, title: '茶馆', authors: [{ name: '老舍' }], category: '现代文学', subjects: ['现代文学', '话剧'], download_count: 99999, languages: ['zh'], formats: ws(undefined, '茶馆') },
+  { id: 52, title: '雷雨', authors: [{ name: '曹禺' }], category: '现代文学', subjects: ['现代文学', '话剧'], download_count: 99999, languages: ['zh'], formats: ws(undefined, '雷雨') },
+  { id: 53, title: '子夜', authors: [{ name: '茅盾' }], category: '现代文学', subjects: ['现代文学', '小说'], download_count: 99999, languages: ['zh'], formats: ws(undefined, '子夜') },
+  { id: 54, title: '家', authors: [{ name: '巴金' }], category: '现代文学', subjects: ['现代文学', '小说'], download_count: 99999, languages: ['zh'], formats: ws(undefined, '家') },
+  { id: 55, title: '女神', authors: [{ name: '郭沫若' }], category: '现代文学', subjects: ['现代文学', '诗集'], download_count: 99999, languages: ['zh'], formats: ws(undefined, '女神') },
+  { id: 56, title: '背影', authors: [{ name: '朱自清' }], category: '现代文学', subjects: ['现代文学', '散文'], download_count: 99999, languages: ['zh'], formats: ws(undefined, '背影') },
+  { id: 57, title: '春蚕', authors: [{ name: '茅盾' }], category: '现代文学', subjects: ['现代文学', '小说'], download_count: 99999, languages: ['zh'], formats: ws(undefined, '春蚕') },
+  { id: 58, title: '沉沦', authors: [{ name: '郁达夫' }], category: '现代文学', subjects: ['现代文学', '小说集'], download_count: 99999, languages: ['zh'], formats: ws(undefined, '沉沦') },
+
+  // ===== 佛道经典 =====
+  { id: 59, title: '金刚经', authors: [{ name: '鸠摩罗什 译' }], category: '佛道经典', subjects: ['佛经'], download_count: 99999, languages: ['zh'], formats: ws('金剛經', '金刚经') },
+  { id: 60, title: '心经', authors: [{ name: '玄奘 译' }], category: '佛道经典', subjects: ['佛经'], download_count: 99999, languages: ['zh'], formats: ws('心經', '心经') },
+  { id: 61, title: '黄帝内经', authors: [{ name: '佚名' }], category: '佛道经典', subjects: ['医典', '道家'], download_count: 99999, languages: ['zh'], formats: ws('黃帝內經', '黄帝内经') },
+  { id: 62, title: '六祖坛经', authors: [{ name: '惠能' }], category: '佛道经典', subjects: ['佛经'], download_count: 99999, languages: ['zh'], formats: ws('六祖壇經', '六祖坛经') }
 ]
 
 /** 选取适合在线阅读的纯文本 URL */
@@ -244,87 +280,19 @@ export async function fetchBookText(textUrl: string, maxBytes = 80000): Promise<
   return fetchCorsText(textUrl, { maxBytes })
 }
 
-/* ===================== 学位英语：大纲知识库 + 学习计划 ===================== */
+/* ===================== 学位英语：知识库 + 学习计划 ===================== */
 
-export interface EnglishOutlineItem {
-  key: string
-  name: string
-  desc: string
-  keyPoints: string[]
-}
-
-/**
- * 按《成人高等教育本科生学士学位英语水平考试大纲》（高等教育出版社第二版）分门别类。
- * 题型结构：完成对话 / 阅读理解 / 词汇与语法 / 完形填空 / 英译汉 / 写作。
- */
-export const ENGLISH_OUTLINE: EnglishOutlineItem[] = [
-  {
-    key: 'dialogue',
-    name: '会话技能（完成对话）',
-    desc: '从备选选项中选出最符合语境的应答，考查日常交际用语与语用能力。',
-    keyPoints: ['问候、介绍、告别', '邀约、道歉、道谢、请求', '打电话、问路与指路、购物就餐']
-  },
-  {
-    key: 'vocabulary',
-    name: '词汇（词语用法）',
-    desc: '考查词语的辨析、搭配与语境中最恰当用词，约 3000 核心词汇量。',
-    keyPoints: ['近义词/形近词辨析', '固定搭配与短语动词', '一词多义与熟词生义']
-  },
-  {
-    key: 'grammar',
-    name: '语法结构',
-    desc: '考查时态语态、非谓语、从句、虚拟语气、主谓一致等核心语法点。',
-    keyPoints: ['时态与被动语态', '非谓语动词（不定式/分词/动名词）', '定语从句/名词性从句/虚拟语气']
-  },
-  {
-    key: 'reading',
-    name: '阅读理解',
-    desc: '考查快速获取主旨、细节、推理与作者态度，通常 4 篇，约 1000-1200 词。',
-    keyPoints: ['主旨大意与标题', '细节定位与推理判断', '词义猜测与作者态度']
-  },
-  {
-    key: 'cloze',
-    name: '完形填空',
-    desc: '一篇约 200 词短文挖空，综合考查词汇、语法与语篇逻辑。',
-    keyPoints: ['语篇连贯与逻辑', '上下文线索复现', '固定搭配与常识']
-  },
-  {
-    key: 'translation',
-    name: '英译汉（翻译）',
-    desc: '将一段英文（约 100-120 词）译成通顺准确的中文，考查理解与表达。',
-    keyPoints: ['长难句拆分', '定语从句/非谓语的处理', '直译与意译的平衡']
-  },
-  {
-    key: 'writing',
-    name: '写作',
-    desc: '按要求写一篇约 100-120 词的短文（提纲/图画/情景作文），考查组织与表达。',
-    keyPoints: ['三段式结构（引入-展开-结论）', '常用句式与连接词', '书写规范与卷面']
-  },
-  {
-    key: 'vocab-list',
-    name: '高频核心词汇',
-    desc: '学位英语常考核心词与易混词，建议结合生词本循环记忆。',
-    keyPoints: ['academic / certificate / requirement / benefit', 'significant / environment / economy', 'responsibility / opportunity / communication']
-  },
-  {
-    key: 'phrases',
-    name: '常考短语搭配',
-    desc: '完形与写作高频固定搭配，记搭配比记单词更高效。',
-    keyPoints: ['take advantage of / make a difference', 'in terms of / with regard to', 'play a role in / contribute to']
-  },
-  {
-    key: 'templates',
-    name: '写作模板与万能句',
-    desc: '常用开头、衔接、结尾句式，考场上快速成文。',
-    keyPoints: ['开头：When it comes to …, opinions vary.', '衔接：On the one hand …, on the other hand …', '结尾：Only in this way can we …']
-  },
-  {
-    key: 'tips',
-    name: '真题示例与应试技巧',
-    desc: '各题型时间与得分策略，按权重分配精力。',
-    keyPoints: ['阅读 4 篇分值高，先读题干再定位', '完形先看首尾把握主旨', '写作留足 20 分钟，卷面工整']
-  }
-]
+// 知识库正文已抽到 englishKnowledge.ts（11 个模块 / 40+ 讲真实讲解内容），
+// 此处再导出，保持原有引用路径不变。
+export {
+  ENGLISH_OUTLINE,
+  ENGLISH_LESSON_INDEX,
+  ENGLISH_KB_STATS,
+  type EnglishOutlineItem,
+  type EnglishLesson,
+  type EnglishExample,
+  type EnglishTable
+} from './englishKnowledge'
 
 /** 内置学位英语高频词兜底（Free Dictionary API 不可达时使用，保证查词页有数据） */
 export const BUILTIN_WORDS: Record<string, { phonetic: string; pos: string; def: string; example?: string }> = {

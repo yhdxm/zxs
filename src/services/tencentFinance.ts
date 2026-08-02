@@ -49,17 +49,44 @@ export const INDEX_CODES = [
   'sh000905' // 中证500
 ]
 
-// 全球市场：美股 / 港股 / 日经 / 黄金 / 白银 / 原油（免费接口，盘中有延迟属正常）
+// 全球股指：美股 / 港股（代码均已实测可用，免费接口盘中有延迟属正常）
+// 注意：腾讯行情不提供日经 225（r_jpN225 为无效代码，会导致整段数据缺失），故不纳入。
 export const GLOBAL_CODES = [
   'usDJI', // 道琼斯
   'usIXIC', // 纳斯达克
   'usINX', // 标普500
   'r_hkHSI', // 恒生指数
-  'r_jpN225', // 日经225
-  'hf_XAUUSD', // 伦敦金（现货黄金）
-  'hf_XAGUSD', // 伦敦银（现货白银）
-  'hf_CL' // WTI 原油
+  'hkHSTECH', // 恒生科技指数
+  'r_hkHSCEI' // 国企指数
 ]
+
+/**
+ * 大宗商品 / 贵金属 / 能源（腾讯外盘 hf_ 前缀，逗号分隔格式，已逐个实测）。
+ * 之前使用的 hf_XAUUSD / hf_XAGUSD 为无效代码，接口不返回任何数据，
+ * 导致「黄金 / 白银」整块缺失；同时 hf_ 数据是逗号分隔，用 ~ 解析会得到错误数值。
+ */
+export const COMMODITY_CODES = [
+  'hf_XAU', // 伦敦金（现货黄金）
+  'hf_XAG', // 伦敦银（现货白银）
+  'hf_GC', // 纽约黄金（COMEX）
+  'hf_SI', // 纽约白银（COMEX）
+  'hf_CL', // 纽约原油（WTI）
+  'hf_OIL', // 布伦特原油
+  'hf_NG', // 美国天然气
+  'hf_CAD' // 伦铜
+]
+
+/** 商品单位说明（展示用，避免用户误解价格口径） */
+export const COMMODITY_UNITS: Record<string, string> = {
+  hf_XAU: '美元/盎司',
+  hf_XAG: '美元/盎司',
+  hf_GC: '美元/盎司',
+  hf_SI: '美元/盎司',
+  hf_CL: '美元/桶',
+  hf_OIL: '美元/桶',
+  hf_NG: '美元/百万英热',
+  hf_CAD: '美元/吨'
+}
 
 // 热门个股（演示用，可自行替换）
 export const HOT_STOCKS = [
@@ -78,6 +105,9 @@ function toNum(v: string | undefined): number {
 
 function parseTime(raw: string): string {
   const s = (raw || '').trim()
+  if (!s) return ''
+  // 美股 / 港股返回的已是 "2026-07-31 17:22:18" 或 "2026/07/31 18:31:39"，直接归一化
+  if (/[-/:]/.test(s)) return s.replace(/\//g, '-')
   if (s.length < 14) return ''
   const y = s.slice(0, 4)
   const m = s.slice(4, 6)
@@ -111,17 +141,62 @@ function parseBidsAsks(p: string[]): {
   return { bids, asks }
 }
 
+/**
+ * 外盘（hf_ 前缀：贵金属 / 原油 / 有色 / 农产品）解析。
+ * 实测返回为「逗号分隔」，与 A 股 / 美股的 ~ 分隔完全不同，例如：
+ *   v_hf_XAU="4046.42,-1.39,4046.42,4047.11,4111.65,4021.08,04:55:00,4103.42,4103.93,0,0,0,2026-08-01,伦敦金（现货黄金）"
+ * 字段：0 最新价 | 1 涨跌幅% | 2 买价 | 3 卖价 | 4 最高 | 5 最低 | 6 时间
+ *       7 昨收 | 8 今开 | 9 持仓 | 10 买量 | 11 卖量 | 12 日期 | 13 名称
+ */
+function parseForeignQuote(code: string, raw: string, group: Quote['group']): Quote {
+  const p = raw.split(',')
+  const price = toNum(p[0])
+  const changePercent = toNum(p[1])
+  const bid = toNum(p[2])
+  const ask = toNum(p[3])
+  const high = toNum(p[4])
+  const low = toNum(p[5])
+  const hhmmss = (p[6] || '').trim()
+  const prevClose = toNum(p[7])
+  const open = toNum(p[8])
+  const bidVol = toNum(p[10])
+  const askVol = toNum(p[11])
+  const dateStr = (p[12] || '').trim()
+  const name = (p[13] || code).trim()
+  // 涨跌额接口未直接给出，用「最新价 - 昨收」推算（与接口给出的涨跌幅一致）
+  const change = prevClose > 0 ? Number((price - prevClose).toFixed(3)) : 0
+  const timeText = dateStr && hhmmss ? `${dateStr} ${hhmmss}` : dateStr || hhmmss
+  return {
+    code,
+    name,
+    price,
+    prevClose,
+    open,
+    change,
+    changePercent,
+    high,
+    low,
+    rawTime: timeText,
+    time: timeText,
+    bids: [{ price: bid, vol: bidVol }],
+    asks: [{ price: ask, vol: askVol }],
+    group
+  }
+}
+
 /** 将单条 v_<code> 字符串解析为结构化行情（字段索引已按 qt.gtimg.cn 实测确认） */
 export function parseQuote(code: string, raw: string, group: Quote['group'] = 'custom'): Quote {
+  // 外盘商品走独立解析（逗号分隔）
+  if (code.startsWith('hf_')) return parseForeignQuote(code, raw, group)
+
   const p = raw.split('~')
   const price = toNum(p[3])
   const prevClose = toNum(p[4])
   const open = toNum(p[5])
-  const isForex = code.startsWith('hf_')
-  // 外盘（贵金属/原油期货）字段含义略有差异：优先用 [31]/[32]，失败则按现价推算
   let change = toNum(p[31])
   let changePercent = toNum(p[32])
-  if (isForex && Math.abs(change) < 1e-9 && prevClose > 0) {
+  // 个别标的 [31]/[32] 为空，用昨收推算兜底，保证涨跌数据准确
+  if (Math.abs(change) < 1e-9 && prevClose > 0 && Math.abs(price - prevClose) > 1e-9) {
     change = Number((price - prevClose).toFixed(3))
     changePercent = Number(((change / prevClose) * 100).toFixed(2))
   }
@@ -190,6 +265,11 @@ export function fetchIndices(): Promise<Quote[]> {
 
 export function fetchGlobal(): Promise<Quote[]> {
   return fetchQuotes(GLOBAL_CODES, 'global')
+}
+
+/** 大宗商品 / 贵金属 / 能源（黄金、白银、原油等） */
+export function fetchCommodities(): Promise<Quote[]> {
+  return fetchQuotes(COMMODITY_CODES, 'global')
 }
 
 export function fetchHotStocks(): Promise<Quote[]> {

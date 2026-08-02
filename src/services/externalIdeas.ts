@@ -33,7 +33,7 @@ interface FetchedItem {
 }
 
 const LOCAL_KEY = 'external_ideas_cache'
-const FETCH_TIMEOUT = 8000
+const FETCH_TIMEOUT = 6000
 
 function genId(): string {
   return `ext-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
@@ -111,7 +111,13 @@ const SEED_REPOS: Array<{ owner: string; name: string; lang: string; desc: strin
   { owner: 'obsidianmd', name: 'obsidian-releases', lang: 'Unknown', desc: '本地优先的知识管理笔记应用发行仓库。', tag: '效率工具' },
   { owner: 'twentyhq', name: 'twenty', lang: 'TypeScript', desc: '开源 CRM，替代 Salesforce 的现代客户关系管理。', tag: '企业应用' },
   { owner: 'nocodb', name: 'nocodb', lang: 'TypeScript', desc: '开源 Airtable 替代方案，把数据库变成智能表格。', tag: '低代码' },
-  { owner: 'apache', name: 'echarts', lang: 'TypeScript', desc: '强大的开源可视化图表库，覆盖各类数据大屏。', tag: '数据可视化' }
+  { owner: 'apache', name: 'echarts', lang: 'TypeScript', desc: '强大的开源可视化图表库，覆盖各类数据大屏。', tag: '数据可视化' },
+  { owner: 'PKUanonym', name: 'REKCARC-TSC-UHT', lang: 'Unknown', desc: '清华大学计算机系课程攻略，覆盖课程笔记与考试经验。', tag: '学习资源' },
+  { owner: 'CyC2018', name: 'CS-Notes', lang: 'Java', desc: '技术面试必备基础知识（计算机/网络/操作系统/算法）。', tag: '学习资源' },
+  { owner: 'jaywcjlove', name: 'linux-command', lang: 'HTML', desc: 'Linux 命令在线手册，中文检索便捷。', tag: '效率工具' },
+  { owner: 'facebook', name: 'react', lang: 'JavaScript', desc: '用于构建用户界面的声明式 JavaScript 库。', tag: '前端框架' },
+  { owner: 'vercel', name: 'next.js', lang: 'TypeScript', desc: '基于 React 的全栈框架，支持 SSR/SSG。', tag: '前端框架' },
+  { owner: 'microsoft', name: 'TypeScript', lang: 'TypeScript', desc: 'JavaScript 的类型化超集，大型项目首选。', tag: '前端工程化' }
 ]
 
 function buildSeedIdeas(): ExternalIdea[] {
@@ -128,6 +134,14 @@ function buildSeedIdeas(): ExternalIdea[] {
     bookmarked: false,
     related_module: null
   }))
+}
+
+/**
+ * 默认灵感数据（零网络依赖、国内可达，确保需求收集页永不空白）。
+ * 全部为真实高星开源项目，覆盖前端/AI/效率/学习等方向，可作为需求与产品灵感的稳定来源。
+ */
+export function getDefaultIdeas(): ExternalIdea[] {
+  return buildSeedIdeas()
 }
 
 /**

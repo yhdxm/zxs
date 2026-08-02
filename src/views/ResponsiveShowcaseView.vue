@@ -29,6 +29,17 @@
       </p>
     </div>
 
+    <!-- 响应式规范清单（已落地，可对照自检） -->
+    <div class="rc-rules">
+      <h3 class="rc-rules-title">响应式规范（项目已落地，可对照自检）</h3>
+      <div class="rc-rules-grid">
+        <div v-for="(r, i) in rules" :key="i" class="rc-rule" :class="{ 'rc-rule--ok': r.ok }">
+          <el-icon class="rc-rule-icon"><component :is="r.ok ? 'CircleCheckFilled' : 'WarningFilled'" /></el-icon>
+          <span class="rc-rule-text">{{ r.text }}</span>
+        </div>
+      </div>
+    </div>
+
     <!-- 设备预览网格 -->
     <div class="rc-grid">
       <div
@@ -86,7 +97,7 @@
 import { ref, onMounted, onUnmounted, computed } from 'vue'
 import PageHeader from '../components/PageHeader.vue'
 import UiSample from '../components/UiSample.vue'
-import { Monitor } from '@element-plus/icons-vue'
+import { Monitor, CircleCheckFilled, WarningFilled } from '@element-plus/icons-vue'
 
 interface DeviceSpec {
   key: string
@@ -99,6 +110,23 @@ interface DeviceSpec {
   advice: string
   scale?: number
 }
+
+interface RuleItem {
+  ok: boolean
+  text: string
+}
+
+/** 项目已落地的响应式规范清单（与全局铁律一致，可对照自检） */
+const rules: RuleItem[] = [
+  { ok: true, text: '移动优先：以 360px 为最小基准断点验证，所有页面支持到约 320px（PDA 手持终端）。' },
+  { ok: true, text: '栅格与卡片：Element Plus 栅格 + minmax(0,1fr) 自适应卡片网格，不写死列宽、不溢出。' },
+  { ok: true, text: '断点体系：≥1200 多列 / 768–1199 两列 / ≤768 单列 / ≤480 紧凑 / ≤360 极窄 / ≤320 PDA 横屏。' },
+  { ok: true, text: '表格自适应：超宽表格外层 overflow-x:auto 横向滚动，绝不撑破整体布局。' },
+  { ok: true, text: '图表自适应：图表容器用百分比宽 + 监听窗口 resize / ResizeObserver 重绘，不写死像素宽。' },
+  { ok: true, text: '弹窗与抽屉：移动端宽度取 min(720px, 94vw)，按钮与表单项纵向堆叠、可单手操作。' },
+  { ok: true, text: '安全区适配：移动端底部操作区加 env(safe-area-inset-*) 内边距，避免被系统手势条/工具栏遮挡。' },
+  { ok: true, text: '持续巡检：本页设备框 + 顶部真机视口检测用于回归验证，发现横向溢出立即定位修复。' }
+]
 
 const devices: DeviceSpec[] = [
   {
@@ -236,6 +264,33 @@ function scaledSize(d: DeviceSpec) {
 .rc-d-item--state .rc-d-v.is-ok { color: #059669; }
 .rc-d-item--state .rc-d-v.is-bad { color: #dc2626; }
 .rc-d-tip { margin: 10px 0 0; font-size: 12px; color: #6b7280; line-height: 1.6; }
+
+/* 响应式规范清单 */
+.rc-rules {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  padding: 14px 16px;
+  margin-bottom: 16px;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.04);
+}
+.rc-rules-title { margin: 0 0 12px; font-size: 14px; font-weight: 700; color: #1f2937; }
+.rc-rules-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 10px 18px;
+}
+.rc-rule {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 12.5px;
+  color: #4b5563;
+  line-height: 1.6;
+}
+.rc-rule-icon { margin-top: 2px; flex-shrink: 0; font-size: 16px; color: #d1d5db; }
+.rc-rule--ok .rc-rule-icon { color: #10b981; }
+.rc-rule-text { min-width: 0; }
 
 /* 设备网格 */
 .rc-grid {

@@ -1,6 +1,6 @@
 <template>
   <div class="ext-ideas">
-    <PageHeader title="外部灵感聚合" subtitle="免费聚合 GitHub 近期高星开源项目（国内可直连、无需 Key），帮助你捕捉需求与产品灵感（数据仅存浏览器本地 + 云端，不消耗任何积分）" :icon="Collection">
+    <PageHeader title="外部灵感聚合" subtitle="内置真实开源项目灵感库（零网络依赖、国内可达），可点「免费查询 / 刷新」尝试拉取 GitHub 最新高星项目；数据存浏览器本地 + 云端，不消耗任何积分" :icon="Collection">
       <el-button type="primary" :loading="fetching" @click="refresh">
         <el-icon><Refresh /></el-icon> 免费查询 / 刷新
       </el-button>
@@ -101,11 +101,13 @@ import {
   getRetentionDays,
   setRetentionDays,
   cleanupExpiredExternalIdeas,
+  getDefaultIdeas,
   type ExternalIdea,
   type RelatedModule
 } from '../services/externalIdeas'
 import { refreshSavedUser } from '../services/appDataService'
 import PageHeader from '../components/PageHeader.vue'
+import ExternalIdeaCard from '../components/ExternalIdeaCard.vue'
 
 const ideas = ref<ExternalIdea[]>([])
 const loading = ref(false)
@@ -162,6 +164,12 @@ async function load() {
     // Fix #3：进入页面即按保留天数清理过期灵感（Supabase 表未建也不白屏）
     await runCleanup()
     ideas.value = await loadExternalIdeas(userId.value)
+    // 零网络依赖兜底：本地/云端都空时，立即用内置真实开源项目灵感库填充，首屏秒出、永不空白
+    if (ideas.value.length === 0) {
+      const defaults = getDefaultIdeas()
+      ideas.value = defaults
+      await saveExternalIdeas(userId.value, defaults)
+    }
   } finally {
     loading.value = false
   }
@@ -170,11 +178,9 @@ async function load() {
 /** 兜底：若各种原因导致列表为空，立即用真实热门项目种子填充，确保页面永不空白 */
 async function ensureSeeds() {
   if (ideas.value.length > 0) return
-  const seeds = await fetchExternalIdeas()
-  if (seeds.length > 0) {
-    ideas.value = seeds
-    await saveExternalIdeas(userId.value, seeds)
-  }
+  const defaults = getDefaultIdeas()
+  ideas.value = defaults
+  await saveExternalIdeas(userId.value, defaults)
 }
 
 async function refresh() {
@@ -280,13 +286,9 @@ onMounted(async () => {
   try {
     await load()
   } catch (e) {
-    console.warn('[requirement] 初始化读取异常，将使用网络/种子兜底', e)
+    console.warn('[requirement] 初始化读取异常，将使用内置灵感兜底', e)
   }
-  // 进入页面自动抓取（缓存为空时）；若已有缓存则直接展示，无需等待网络
-  if (ideas.value.length === 0) {
-    await refresh()
-  }
-  // 双保险：如果 load + refresh 之后仍为空（例如 Supabase/网络全部异常），直接用种子兜底
+  // 双保险：load 之后仍为空（极端异常）时，直接用零网络依赖的默认灵感库兜底
   if (ideas.value.length === 0) {
     await ensureSeeds()
   }

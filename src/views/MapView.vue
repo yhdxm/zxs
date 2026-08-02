@@ -2,7 +2,7 @@
   <div class="map-page">
     <PageHeader
       title="地图定位"
-      subtitle="底图多源自动兜底：天地图（需免费 Key）→ 高德矢量 / 卫星 → GeoQ 智图 → OpenStreetMap；行政区边界来自阿里云 DataV；地名搜索与逆地址来自 Nominatim，驾车路线来自 OSRM 公开路由服务。全部前端直连免费接口，不消耗任何积分。免费数据源可稳定下钻到省/市/区（县），乡镇/村级信息依赖开放数据覆盖，不保证完整。"
+      subtitle="底图多源自动兜底：天地图（需免费 Key）→ 高德矢量 / 卫星 → GeoQ 智图 → OpenStreetMap；行政区边界来自阿里云 DataV；地名搜索与逆地址主用 Photon（国内可直连），驾车路线用 OSRM（直连不通时自动切免费代理）。全部免费接口，不消耗任何积分。可稳定下钻到省/市/区（县），乡镇/村级依赖开放数据覆盖，不保证完整。"
       :icon="Location"
     />
     <div class="mp-page-body">

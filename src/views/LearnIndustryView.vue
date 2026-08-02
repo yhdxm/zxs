@@ -35,6 +35,7 @@
         <div v-if="active === 'knowledge'" class="li-card">
           <div class="li-hrow">
             <h3 class="li-h">行业知识库（已有内置兜底，永不空白）</h3>
+            <span class="li-kbcount">共 {{ kbStats.industries }} 个行业 · {{ kbStats.lessons }} 讲可学</span>
             <el-input v-model="wikiKw" placeholder="联网补充：输入行业名，如 人工智能" class="li-input" @keyup.enter="wikiSearch" />
             <el-button :loading="wikiLoading" @click="wikiSearch">维基补充</el-button>
           </div>
@@ -44,8 +45,9 @@
             <button class="li-mini" @click="wikiResult = ''">关闭</button>
           </div>
 
+          <p class="li-tip">点击任意行业卡片，进入「逐讲精读」深入学习 ↓</p>
           <div class="li-grid">
-            <div v-for="t in topics" :key="t.name" class="li-topic">
+            <div v-for="t in topics" :key="t.name" class="li-topic" @click="openTopic(t)">
               <div class="li-topic-head">
                 <div>
                   <div class="li-topic-name">{{ t.name }}</div>
@@ -54,12 +56,11 @@
                 <span :class="['li-status', statusOf(t.name)]">{{ statusOf(t.name) === 'done' ? '已掌握' : statusOf(t.name) === 'learning' ? '学习中' : '未学' }}</span>
               </div>
               <ul class="li-points"><li v-for="(p, i) in t.keyPoints" :key="i">{{ p }}</li></ul>
-              <div class="li-actions">
-                <button class="li-mini" @click="explain(t)">AI 讲透</button>
+              <div class="li-actions" @click.stop>
                 <button class="li-mini" :class="{ on: isBooked(t.name) }" @click="toggleBookmark(t)">{{ isBooked(t.name) ? '已收藏' : '收藏' }}</button>
                 <button class="li-mini" @click="markDone(t)">标记已掌握</button>
+                <button class="li-go">进入学习 →</button>
               </div>
-              <div v-if="t._explain" class="li-explain">{{ t._explain }}</div>
             </div>
           </div>
           <p v-if="!cfg" class="li-warn">未检测到 AI 配置，AI 讲解不可用；请先到「AI 助手」配置密钥。</p>
@@ -135,8 +136,64 @@
           </div>
           <div v-if="qaAnswer" class="li-answer">{{ qaAnswer }}</div>
         </div>
-      </section>
-    </Transition>
+  </section>
+</Transition>
+
+    <!-- 逐讲精读抽屉 -->
+    <el-drawer v-model="drawerOpen" :title="curTopic?.name || '学习'" size="min(720px, 94vw)" direction="rtl">
+      <div v-if="curTopic" class="li-drawer">
+        <p class="li-drawer-desc">{{ curTopic.desc }}</p>
+        <div class="li-tags">
+          <el-tag v-for="(p, i) in curTopic.keyPoints" :key="i" size="small" effect="plain" type="info">{{ p }}</el-tag>
+        </div>
+
+        <div class="li-drawer-ai">
+          <button class="li-mini" @click="explainOverview(curTopic)">AI 讲透（概览）</button>
+          <span v-if="!cfg" class="li-warn">未配置 AI</span>
+        </div>
+        <div v-if="topicAi[curTopic.name]" class="li-explain">{{ topicAi[curTopic.name] }}</div>
+
+        <h4 class="li-lessons-h">逐讲精读（{{ curTopic.lessons.length }} 讲）</h4>
+        <div v-for="l in curTopic.lessons" :key="l.id" class="li-lesson">
+          <button class="li-lesson-head" type="button" @click="toggleLesson(l.id)">
+            <span class="li-lesson-dot" :class="{ on: openMap[l.id] }">▸</span>
+            <span class="li-lesson-title">{{ l.title }}</span>
+          </button>
+          <div v-if="openMap[l.id]" class="li-lesson-body">
+            <p class="li-lesson-sum">{{ l.summary }}</p>
+            <p v-for="(para, i) in l.body" :key="i" class="li-lesson-p">{{ para }}</p>
+
+            <table v-for="(tb, ti) in l.tables || []" :key="'t' + ti" class="li-tbl">
+              <caption v-if="tb.title">{{ tb.title }}</caption>
+              <thead><tr><th v-for="h in tb.head" :key="h">{{ h }}</th></tr></thead>
+              <tbody>
+                <tr v-for="(row, ri) in tb.rows" :key="ri">
+                  <td v-for="(c, ci) in row" :key="ci">{{ c }}</td>
+                </tr>
+              </tbody>
+            </table>
+
+            <div v-if="l.examples && l.examples.length" class="li-exs">
+              <div v-for="(ex, ei) in l.examples" :key="ei" class="li-ex">
+                <span class="li-ex-ic">例</span>
+                <span>{{ ex.zh }}<em v-if="ex.note">（{{ ex.note }}）</em></span>
+              </div>
+            </div>
+
+            <div v-if="l.tips && l.tips.length" class="li-traps">
+              <b>⚠ 易错 / 提示</b>
+              <p v-for="(tp, ti) in l.tips" :key="ti">{{ tp }}</p>
+            </div>
+
+            <div class="li-lesson-ai">
+              <button class="li-mini" @click="explainLesson(l)">AI 换种说法讲</button>
+              <button class="li-mini" @click="quizLesson(l)">AI 出 3 道题</button>
+            </div>
+            <div v-if="lessonAi[l.id]" class="li-explain">{{ lessonAi[l.id] }}</div>
+          </div>
+        </div>
+      </div>
+    </el-drawer>
   </div>
 </template>
 
@@ -147,11 +204,14 @@ import { Collection, Calendar, ChatDotRound } from '@element-plus/icons-vue'
 import PageHeader from '../components/PageHeader.vue'
 import { loadAiConfig, callAi, type AiConfig } from '../services/aiService'
 import {
-  INDUSTRY_KNOWLEDGE,
+  INDUSTRY_KNOWLEDGE_FULL,
+  INDUSTRY_KB_STATS,
   explainTopic,
   generateStudyPlan,
   parseMaterialFile,
   type IndustryTopic,
+  type IndustryTopicFull,
+  type IndustryLesson,
   type StudyPlan
 } from '../services/learningService'
 import { fetchCorsJson } from '../services/freeApi'
@@ -184,7 +244,8 @@ function updateClock(): void {
 }
 
 const cfg = ref<AiConfig | null>(null)
-const topics = reactive(INDUSTRY_KNOWLEDGE.map((t) => ({ ...t, _explain: '' })))
+const topics = reactive(INDUSTRY_KNOWLEDGE_FULL.map((t) => ({ ...t, _explain: '' })))
+const kbStats = INDUSTRY_KB_STATS
 const progressMap = ref<Record<string, LearnProgress>>({})
 const bookmarks = ref<LearnBookmark[]>([])
 
@@ -199,11 +260,46 @@ async function loadState(): Promise<void> {
   }
 }
 
-async function explain(t: IndustryTopic & { _explain: string }): Promise<void> {
+/* 逐讲精读抽屉 */
+const drawerOpen = ref(false)
+const curTopic = ref<IndustryTopicFull | null>(null)
+const openMap = reactive<Record<string, boolean>>({})
+const topicAi = reactive<Record<string, string>>({})
+const lessonAi = reactive<Record<string, string>>({})
+
+function openTopic(t: IndustryTopicFull & { _explain: string }): void {
+  curTopic.value = t
+  drawerOpen.value = true
+  if (t.lessons[0]) openMap[t.lessons[0].id] = true
+}
+function toggleLesson(id: string): void { openMap[id] = !openMap[id] }
+
+async function explainOverview(t: { name: string; desc: string }): Promise<void> {
   if (!cfg.value) { ElMessage.warning('请先配置 AI 密钥'); return }
-  t._explain = 'AI 解读中…'
-  try { t._explain = await explainTopic(`${t.name}（${t.desc}）`, cfg.value) }
-  catch (e) { t._explain = '解读失败：' + (e as Error).message }
+  topicAi[t.name] = 'AI 解读中…'
+  try { topicAi[t.name] = await explainTopic(`${t.name}（${t.desc}）`, cfg.value) }
+  catch (e) { topicAi[t.name] = '解读失败：' + (e as Error).message }
+}
+async function explainLesson(l: IndustryLesson): Promise<void> {
+  if (!cfg.value) { ElMessage.warning('请先配置 AI 密钥'); return }
+  lessonAi[l.id] = 'AI 解读中…'
+  const prompt =
+    '你是通识科普老师，面向零基础学习者。请用通俗易懂、口语化的方式重新讲解下面这段行业知识，' +
+    '可以加一个生活化类比帮助理解，控制在 220 字内。\n' +
+    `【${l.title}】\n${l.body.join('\n')}`
+  try { lessonAi[l.id] = await callAi(cfg.value, prompt) }
+  catch (e) { lessonAi[l.id] = '解读失败：' + (e as Error).message }
+}
+async function quizLesson(l: IndustryLesson): Promise<void> {
+  if (!cfg.value) { ElMessage.warning('请先配置 AI 密钥'); return }
+  lessonAi[l.id] = 'AI 出题（3 道）中…'
+  const prompt =
+    '你是通识科普老师。请根据下面这段行业知识出 3 道单选题（每题 4 个选项，仅 1 个正确），' +
+    '并附答案与简短解析。严格按如下格式输出，不要多余文字：\n' +
+    '1. 题目\nA. ...\nB. ...\nC. ...\nD. ...\n答案：X\n解析：...\n（共 3 题）\n\n' +
+    `【${l.title}】\n${l.body.join('\n')}`
+  try { lessonAi[l.id] = await callAi(cfg.value, prompt) }
+  catch (e) { lessonAi[l.id] = '出题失败：' + (e as Error).message }
 }
 async function toggleBookmark(t: IndustryTopic): Promise<void> {
   if (isBooked(t.name)) { const b = bookmarks.value.find((x) => x.ref_id === t.name); if (b) await removeLearnBookmark(b.id) }
@@ -351,6 +447,42 @@ onUnmounted(() => { if (clockTimer) window.clearInterval(clockTimer) })
 .li-mini.on { color: #fff; background: var(--brand, #378add); border-color: var(--brand, #378add); }
 .li-mini.danger { color: #ef4444; }
 .li-explain { padding-top: 8px; border-top: 1px dashed var(--border); font-size: 12px; color: var(--text); white-space: pre-wrap; line-height: 1.6; }
+
+/* 知识库：可点击进入学习 */
+.li-kbcount { font-size: 12px; color: var(--text-faint); margin-left: auto; }
+.li-tip { font-size: 12px; color: var(--text-faint); margin: 0 0 12px; }
+.li-topic { cursor: pointer; transition: transform .16s ease, border-color .16s ease, box-shadow .16s ease; }
+.li-topic:hover { transform: translateY(-3px); border-color: var(--brand, #378add); box-shadow: 0 8px 20px rgba(55,138,221,.14); }
+.li-go { margin-left: auto; border: 1px solid var(--brand, #378add); background: var(--brand, #378add); color: #fff; border-radius: 6px; padding: 3px 10px; font-size: 12px; cursor: pointer; }
+.li-actions { align-items: center; }
+
+/* 抽屉内逐讲精读 */
+.li-drawer { min-height: 100%; }
+.li-drawer-desc { font-size: 13px; color: var(--text-muted); line-height: 1.7; margin: 0 0 10px; }
+.li-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+.li-drawer-ai { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.li-lessons-h { font-size: 14px; color: var(--text-strong); margin: 16px 0 10px; padding-top: 12px; border-top: 1px solid var(--border); }
+.li-lesson { border: 1px solid var(--border); border-radius: 10px; margin-bottom: 10px; overflow: hidden; background: var(--surface-soft); }
+.li-lesson-head { width: 100%; display: flex; align-items: center; gap: 8px; padding: 12px 14px; background: transparent; border: 0; cursor: pointer; text-align: left; }
+.li-lesson-dot { color: var(--brand, #378add); transition: transform .18s ease; font-size: 12px; }
+.li-lesson-dot.on { transform: rotate(90deg); }
+.li-lesson-title { font-size: 13.5px; font-weight: 600; color: var(--text-strong); }
+.li-lesson-body { padding: 0 14px 14px; }
+.li-lesson-sum { font-size: 12.5px; color: var(--brand, #378add); margin: 0 0 8px; }
+.li-lesson-p { font-size: 13px; color: var(--text); line-height: 1.75; margin: 0 0 8px; }
+.li-tbl { width: 100%; border-collapse: collapse; margin: 8px 0; font-size: 12px; background: var(--surface); }
+.li-tbl caption { font-size: 12px; color: var(--text-muted); text-align: left; padding: 4px 0; font-weight: 600; }
+.li-tbl th, .li-tbl td { border: 1px solid var(--border); padding: 6px 8px; text-align: left; color: var(--text); vertical-align: top; word-break: break-word; }
+.li-tbl th { background: var(--surface-soft); color: var(--text-strong); font-weight: 600; }
+.li-tbl tbody tr:nth-child(even) { background: var(--surface-soft); }
+.li-exs { margin: 8px 0; display: flex; flex-direction: column; gap: 6px; }
+.li-ex { display: flex; gap: 8px; font-size: 12.5px; color: var(--text); line-height: 1.6; }
+.li-ex-ic { flex-shrink: 0; width: 18px; height: 18px; border-radius: 5px; background: #eef4fb; color: var(--brand, #378add); font-size: 11px; display: grid; place-items: center; font-weight: 600; }
+.li-ex em { color: var(--text-faint); font-style: normal; }
+.li-traps { background: #fff7ed; border: 1px solid #fed7aa; border-radius: 8px; padding: 8px 12px; margin: 8px 0; font-size: 12px; color: #9a3412; line-height: 1.7; }
+.li-traps b { display: block; margin-bottom: 2px; }
+.li-traps p { margin: 0; }
+.li-lesson-ai { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
 
 .li-plan-form { background: var(--surface-soft); border: 1px solid var(--border); border-radius: 10px; padding: 14px; }
 .li-pf-row { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }

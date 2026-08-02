@@ -385,10 +385,78 @@ export const BUILTIN_PROVINCES: RegionNode[] = [
   { adcode: '820000', name: '中国澳门', center: [113.54909, 22.198951] }
 ]
 
-function timeoutFetch(url: string): Promise<Response> {
+function timeoutFetch(url: string, ms: number = FETCH_TIMEOUT): Promise<Response> {
   const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT)
+  const timer = setTimeout(() => controller.abort(), ms)
   return fetch(url, { signal: controller.signal }).finally(() => clearTimeout(timer))
+}
+
+/**
+ * 免费 CORS 代理（部署在境外，可代访问国内直连不通的 OSM 系服务）。
+ * 实测：国内直连 router.project-osrm.org / nominatim.openstreetmap.org 均不可达，
+ * 经 allorigins 代理后可正常返回，故作为主力通路之一。
+ */
+const CORS_PROXIES = [
+  (u: string) => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
+  (u: string) => `https://api.codetabs.com/v1/proxy/?quest=${encodeURIComponent(u)}`
+]
+
+/** 依次尝试「直连 → 各免费代理」拉取 JSON，任一成功即返回 */
+async function fetchJsonWithProxyFallback<T>(
+  url: string,
+  opts: { directTimeout?: number; proxyTimeout?: number; validate?: (data: T) => boolean } = {}
+): Promise<T> {
+  const directTimeout = opts.directTimeout ?? 4500
+  const proxyTimeout = opts.proxyTimeout ?? 12000
+  const validate = opts.validate ?? ((d: T) => d != null)
+
+  const tries: Array<{ url: string; timeout: number }> = [
+    { url, timeout: directTimeout },
+    ...CORS_PROXIES.map((p) => ({ url: p(url), timeout: proxyTimeout }))
+  ]
+
+  let lastErr: unknown
+  for (const t of tries) {
+    try {
+      const res = await timeoutFetch(t.url, t.timeout)
+      if (!res.ok) continue
+      const text = await res.text()
+      if (!text || text.trimStart().startsWith('<')) continue // 代理错误页多为 HTML
+      const data = JSON.parse(text) as T
+      if (validate(data)) return data
+    } catch (e) {
+      lastErr = e
+    }
+  }
+  throw lastErr instanceof Error ? lastErr : new Error('请求失败：' + url)
+}
+
+/**
+ * 地区名称合规归一化。
+ * OSM 数据中港澳台标注不规范（如「臺灣」「Hong Kong」），
+ * 统一显示为「中国台湾 / 中国香港 / 中国澳门」。
+ */
+function normalizeRegionName(name: string): string {
+  if (!name) return name
+  const map: Array<[RegExp, string]> = [
+    [/^(臺灣|台灣|台湾|Taiwan)$/i, '中国台湾'],
+    [/^(香港|Hong ?Kong|香港特別行政區|香港特别行政区)$/i, '中国香港'],
+    [/^(澳門|澳门|Macao|Macau|澳門特別行政區|澳门特别行政区)$/i, '中国澳门'],
+    [/^(中国|中國|China|People's Republic of China)$/i, '中国']
+  ]
+  for (const [re, val] of map) {
+    if (re.test(name.trim())) return val
+  }
+  return name
+}
+
+/** 对一整段地址文本做港澳台表述归一化 */
+function normalizeAddressText(text: string): string {
+  if (!text) return text
+  return text
+    .replace(/(^|[,，\s])(臺灣|台灣|台湾)([,，\s]|$)/g, '$1中国台湾$3')
+    .replace(/(^|[,，\s])(香港特別行政區|香港特别行政区|香港)([,，\s]|$)/g, '$1中国香港$3')
+    .replace(/(^|[,，\s])(澳門特別行政區|澳门特别行政区|澳門|澳门)([,，\s]|$)/g, '$1中国澳门$3')
 }
 
 /** 加载行政区划边界 GeoJSON（DataV）。adcode 不带后缀取当前区域边界。 */
@@ -466,9 +534,18 @@ export interface OsrmRouteResult {
   geometry: GeoJSON.LineString
 }
 
+interface OsrmResponse {
+  code?: string
+  routes?: Array<{ distance: number; duration: number; geometry: GeoJSON.LineString }>
+}
+
 /**
- * 调用 OSRM 公开演示服务查询驾车路线（免费、无 Key）。
+ * 调用 OSRM 公开路由服务查询驾车路线（免费、无 Key）。
  * start/end 为 WGS84 [经度, 纬度]。
+ *
+ * ⚠️ 实测：router.project-osrm.org 在国内网络下直连不可达（连接被重置），
+ * 这是「路线规划无任何数据」的根因。现改为「直连（短超时快速失败）→ 免费 CORS 代理」，
+ * 代理位于境外可正常访问 OSRM，实测北京→上海可返回 1208.9km 的真实路线。
  */
 export async function osrmRoute(
   start: [number, number],
@@ -477,15 +554,20 @@ export async function osrmRoute(
   const url =
     `https://router.project-osrm.org/route/v1/driving/` +
     `${start[0]},${start[1]};${end[0]},${end[1]}?overview=full&geometries=geojson&steps=false`
-  const res = await timeoutFetch(url)
-  if (!res.ok) throw new Error('路线规划服务请求失败')
-  const data = (await res.json()) as {
-    code: string
-    routes?: Array<{ distance: number; duration: number; geometry: GeoJSON.LineString }>
+
+  let data: OsrmResponse
+  try {
+    data = await fetchJsonWithProxyFallback<OsrmResponse>(url, {
+      directTimeout: 4000,
+      proxyTimeout: 15000,
+      validate: (d) => d?.code === 'Ok' && Array.isArray(d.routes) && d.routes.length > 0
+    })
+  } catch {
+    throw new Error('路线规划服务暂时不可达（已尝试直连与免费代理），请稍后重试')
   }
-  if (data.code !== 'Ok' || !data.routes?.length) throw new Error('未找到可用路线，可能两点之间无道路连通')
-  const r = data.routes[0]
-  if (!r) throw new Error('未找到可用路线')
+
+  const r = data.routes?.[0]
+  if (!r) throw new Error('未找到可用路线，可能两点之间无道路连通')
   return {
     distanceKm: r.distance / 1000,
     durationMin: Math.round(r.duration / 60),
@@ -524,56 +606,190 @@ export interface NominatimReverseResult {
   address: NominatimAddress
 }
 
+/* ---------- Photon（OSM 生态、免 KEY、国内可直连，Nominatim 的替代主源） ---------- */
+
+/** 中国范围 bbox，避免搜到境外同名地点 */
+const CN_BBOX = '73.5,18.0,135.1,53.6'
+
+interface PhotonFeature {
+  geometry?: { coordinates?: [number, number] }
+  properties?: {
+    osm_id?: number
+    name?: string
+    street?: string
+    housenumber?: string
+    district?: string
+    city?: string
+    county?: string
+    state?: string
+    country?: string
+    countrycode?: string
+    type?: string
+    extent?: number[]
+  }
+}
+
+/** 由 Photon 属性拼出可读的中文地址串 */
+function photonDisplayName(p: NonNullable<PhotonFeature['properties']>): string {
+  const parts = [
+    normalizeRegionName(p.country ?? ''),
+    normalizeRegionName(p.state ?? ''),
+    p.city,
+    p.county,
+    p.district,
+    p.street,
+    p.housenumber,
+    p.name
+  ]
+    .filter((s): s is string => Boolean(s && s.trim()))
+    // 去掉相邻重复（如 city 与 state 同为「北京市」）
+    .filter((s, i, arr) => i === 0 || s !== arr[i - 1])
+  return normalizeAddressText(parts.join(' '))
+}
+
+async function photonSearch(query: string, limit: number): Promise<NominatimResult[]> {
+  const url =
+    `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}` +
+    `&limit=${limit}&lang=default&bbox=${CN_BBOX}`
+  const data = await fetchJsonWithProxyFallback<{ features?: PhotonFeature[] }>(url, {
+    directTimeout: 8000,
+    validate: (d) => Array.isArray(d?.features)
+  })
+  const seen = new Set<string>()
+  const out: NominatimResult[] = []
+  for (const f of data.features ?? []) {
+    const p = f.properties
+    const c = f.geometry?.coordinates
+    if (!p || !Array.isArray(c) || c.length < 2) continue
+    const lon = Number(c[0])
+    const lat = Number(c[1])
+    if (!Number.isFinite(lon) || !Number.isFinite(lat)) continue
+    const key = `${p.name ?? ''}@${lon.toFixed(4)},${lat.toFixed(4)}`
+    if (seen.has(key)) continue
+    seen.add(key)
+    // Photon extent = [minLon, maxLat, maxLon, minLat]，转成 Nominatim 的 [minLat, maxLat, minLon, maxLon]
+    const e = p.extent
+    const bbox: [number, number, number, number] =
+      Array.isArray(e) && e.length === 4
+        ? [Number(e[3]), Number(e[1]), Number(e[0]), Number(e[2])]
+        : [lat, lat, lon, lon]
+    out.push({
+      placeId: p.osm_id ?? out.length,
+      name: normalizeRegionName(p.name ?? ''),
+      displayName: photonDisplayName(p),
+      lat,
+      lon,
+      boundingbox: bbox
+    })
+  }
+  return out
+}
+
 /**
- * Nominatim 地名搜索（OpenStreetMap，免费、无 Key）。
- * 限定中国（countrycodes=cn），遵守其使用政策（约 1 req/s，需有效 User-Agent）。
+ * 地名搜索（免费、无 Key）。
+ *
+ * ⚠️ 实测：nominatim.openstreetmap.org 在国内直连超时、经免费代理也返回 500，
+ * 这是「地名搜索无数据」的根因。现主源改为 Photon（同为 OSM 数据、
+ * 带 Access-Control-Allow-Origin: *、国内可直连、支持中文），Nominatim 降为备源。
+ * 港澳台名称统一归一化为「中国台湾 / 中国香港 / 中国澳门」。
  */
 export async function nominatimSearch(q: string, limit = 5): Promise<NominatimResult[]> {
   const query = q.trim()
   if (!query) return []
+
+  // 1) 主源：Photon（国内可直连）
+  try {
+    const list = await photonSearch(query, limit)
+    if (list.length) return list
+  } catch {
+    /* 主源失败，走备源 */
+  }
+
+  // 2) 备源：Nominatim（有梯子时可用）
   const url =
     `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}` +
     `&format=json&limit=${limit}&countrycodes=cn&accept-language=zh-CN`
-  const res = await timeoutFetch(url)
-  if (!res.ok) throw new Error('地名搜索服务请求失败')
-  const data = (await res.json()) as Array<{
-    place_id: number
-    name?: string
-    display_name?: string
-    lat?: string
-    lon?: string
-    boundingbox?: string[]
-  }>
-  return data.map((item) => ({
-    placeId: item.place_id,
-    name: item.name || '',
-    displayName: item.display_name || '',
-    lat: Number(item.lat || 0),
-    lon: Number(item.lon || 0),
-    boundingbox: (item.boundingbox || []).map(Number) as [number, number, number, number]
-  }))
+  try {
+    const data = await fetchJsonWithProxyFallback<
+      Array<{
+        place_id: number
+        name?: string
+        display_name?: string
+        lat?: string
+        lon?: string
+        boundingbox?: string[]
+      }>
+    >(url, { directTimeout: 4000, validate: (d) => Array.isArray(d) })
+    return data.map((item) => ({
+      placeId: item.place_id,
+      name: normalizeRegionName(item.name || ''),
+      displayName: normalizeAddressText(item.display_name || ''),
+      lat: Number(item.lat || 0),
+      lon: Number(item.lon || 0),
+      boundingbox: (item.boundingbox || []).map(Number) as [number, number, number, number]
+    }))
+  } catch {
+    return []
+  }
 }
 
-/** Nominatim 逆地址解析（坐标 → 省/市/区/街道/村等层级，数据覆盖决定精度） */
+/**
+ * 逆地址解析（坐标 → 省/市/区/街道等层级，免费无 Key）。
+ * 主源 Photon reverse（国内可直连），备源 Nominatim reverse。
+ */
 export async function nominatimReverse(
   lat: number,
   lon: number
 ): Promise<NominatimReverseResult> {
+  // 1) 主源：Photon reverse
+  try {
+    const url = `https://photon.komoot.io/reverse?lat=${lat}&lon=${lon}&lang=default`
+    const data = await fetchJsonWithProxyFallback<{ features?: PhotonFeature[] }>(url, {
+      directTimeout: 8000,
+      validate: (d) => Array.isArray(d?.features)
+    })
+    const p = data.features?.[0]?.properties
+    if (p) {
+      return {
+        displayName: photonDisplayName(p),
+        lat,
+        lon,
+        address: {
+          country: normalizeRegionName(p.country ?? ''),
+          state: normalizeRegionName(p.state ?? ''),
+          city: p.city,
+          district: p.district,
+          county: p.county
+        }
+      }
+    }
+  } catch {
+    /* 主源失败，走备源 */
+  }
+
+  // 2) 备源：Nominatim reverse
   const url =
     `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}` +
     `&format=json&accept-language=zh-CN`
-  const res = await timeoutFetch(url)
-  if (!res.ok) throw new Error('逆地址解析服务请求失败')
-  const data = (await res.json()) as {
-    display_name?: string
-    lat?: string | number
-    lon?: string | number
-    address?: NominatimAddress
-  }
-  return {
-    displayName: data.display_name || '',
-    lat: Number(data.lat || lat),
-    lon: Number(data.lon || lon),
-    address: data.address || {}
+  try {
+    const data = await fetchJsonWithProxyFallback<{
+      display_name?: string
+      lat?: string | number
+      lon?: string | number
+      address?: NominatimAddress
+    }>(url, { directTimeout: 4000, validate: (d) => d != null })
+    const addr = data.address || {}
+    return {
+      displayName: normalizeAddressText(data.display_name || ''),
+      lat: Number(data.lat || lat),
+      lon: Number(data.lon || lon),
+      address: {
+        ...addr,
+        country: normalizeRegionName(addr.country ?? ''),
+        state: normalizeRegionName(addr.state ?? '')
+      }
+    }
+  } catch {
+    throw new Error('逆地址解析服务暂时不可达，请稍后重试')
   }
 }

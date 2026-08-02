@@ -34,13 +34,26 @@
         <!-- 搜索 + 阅读 -->
         <div v-if="active === 'search'" class="lb-card">
           <div class="lb-row">
-            <el-input v-model="query" placeholder="搜索书名，如 红楼梦 / 论语 / 三国演义" class="lb-input" @keyup.enter="search" />
-            <el-button type="primary" :loading="loading" @click="search">搜索</el-button>
+            <el-input v-model="query" placeholder="搜索书名 / 作者，如 红楼梦 / 鲁迅 / 三国" class="lb-input" @keyup.enter="onSearchClick" />
+            <el-button type="primary" :loading="loading" @click="onSearchClick">搜索</el-button>
           </div>
-          <p v-if="usedFallback" class="lb-fallback">在线书库暂不可达，已用内置中国经典兜底（均为真实书目，可在维基文库在线阅读）。</p>
+          <div class="lb-cats">
+            <button class="lb-cat" :class="{ on: !catFilter }" @click="setCat('')">全部</button>
+            <button
+              v-for="c in categories"
+              :key="c"
+              class="lb-cat"
+              :class="{ on: catFilter === c }"
+              @click="setCat(c)"
+            >{{ c }}</button>
+          </div>
+          <p class="lb-count">共找到 <b>{{ bookResult.count }}</b> 本国内公版书（本地检索，离线可用；维基文库在线补充已开启）</p>
           <div class="lb-grid">
             <div v-for="b in books" :key="b.id" class="lb-book">
-              <div class="lb-book-title">{{ b.title }}</div>
+              <div class="lb-book-top">
+                <div class="lb-book-title">{{ b.title }}</div>
+                <span v-if="b.category" class="lb-cat-chip">{{ b.category }}</span>
+              </div>
               <div class="lb-book-author">{{ b.authors.map((a) => a.name).join(', ') || '佚名' }}</div>
               <div class="lb-book-meta">{{ b.download_count >= 99999 ? '公版书' : ('下载量 ' + b.download_count) }} · {{ (b.languages || []).join('/') || '—' }}</div>
               <div class="lb-book-actions">
@@ -183,6 +196,7 @@ import {
   fetchBookText,
   generateStudyPlan,
   parseMaterialFile,
+  BOOK_CATEGORIES,
   type GutenbergBook,
   type BookSearchResult,
   type StudyPlan
@@ -223,18 +237,28 @@ const cfg = ref<AiConfig | null>(null)
 const query = ref('')
 const page = ref(1)
 const pageSize = 12
+const catFilter = ref('')
+const categories = BOOK_CATEGORIES
 const bookResult = ref<BookSearchResult>({ count: 0, next: null, previous: null, results: [] })
 const books = ref<GutenbergBook[]>([])
 const loading = ref(false)
-const usedFallback = ref(false)
 async function search(): Promise<void> {
   loading.value = true
-  usedFallback.value = false
-  const r = await fetchBooks(query.value, page.value)
+  const r = await fetchBooks(query.value, page.value, catFilter.value)
   books.value = r.results
   bookResult.value = r
-  if ((r.results[0]?.download_count ?? 0) >= 99999) usedFallback.value = true
   loading.value = false
+}
+/** 文本搜索（回车/按钮）：重置到第一页 */
+function onSearchClick(): void {
+  page.value = 1
+  void search()
+}
+/** 分类筛选：重置到第一页 */
+function setCat(c: string): void {
+  catFilter.value = catFilter.value === c ? '' : c
+  page.value = 1
+  void search()
 }
 const reading = ref<GutenbergBook | null>(null)
 const bookText = ref('')
@@ -386,6 +410,14 @@ onUnmounted(() => { if (clockTimer) window.clearInterval(clockTimer) })
 .lb-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 .lb-input { width: 320px; }
 .lb-warn { font-size: 12px; color: #f59e0b; }
+.lb-cats { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.lb-cat { border: 1px solid var(--border); background: var(--surface); color: var(--text-muted); border-radius: 999px; padding: 4px 14px; font-size: 12.5px; cursor: pointer; transition: all .15s ease; }
+.lb-cat:hover { border-color: var(--brand, #378add); color: var(--brand, #378add); }
+.lb-cat.on { background: var(--brand, #378add); border-color: var(--brand, #378add); color: #fff; }
+.lb-count { font-size: 12.5px; color: var(--text-muted); margin: 10px 0 0; }
+.lb-count b { color: var(--text-strong); }
+.lb-book-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.lb-cat-chip { flex-shrink: 0; font-size: 10.5px; color: var(--brand, #378add); background: color-mix(in srgb, var(--brand, #378add) 10%, transparent); border-radius: 6px; padding: 1px 6px; white-space: nowrap; }
 .lb-fallback { font-size: 12px; color: #16a34a; background: var(--surface-soft); border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; margin-bottom: 10px; }
 .lb-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; margin-top: 12px; }
 .lb-grid2 { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
