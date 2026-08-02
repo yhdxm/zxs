@@ -304,13 +304,17 @@ export async function savePermissionConfig(config: PermissionConfig): Promise<bo
   }
 }
 
-/** 权限展开结果缓存（菜单渲染会高频调用 hasPermission，避免重复计算） */
+/** 权限集合缓存（菜单渲染会高频调用 hasPermission，避免重复计算）
+ *  注意：这里不再做 v1→v2 的 legacy expansion。权限迁移只在配置加载时
+ *  由 normalizeConfig 做一次；运行时如果再展开，会导致「勾了 AI 助手就
+ *  自动拥有 AI模型知识」这类权限泄漏。
+ */
 const effectivePermCache = new Map<string, Set<string>>()
 function effectivePermSet(perms: string[]): Set<string> {
   const cacheKey = perms.join('|')
   let set = effectivePermCache.get(cacheKey)
   if (!set) {
-    set = new Set(migratePermissionList(perms))
+    set = new Set(perms)
     if (effectivePermCache.size > 50) effectivePermCache.clear()
     effectivePermCache.set(cacheKey, set)
   }
@@ -336,7 +340,8 @@ export function hasPermission(
   if (!KNOWN_BASE_KEYS.has(moduleKey)) return true
   const key = `${moduleKey}.${platform}`
   const raw = user.permissions && user.permissions.length > 0 ? user.permissions : getRolePermissions(user.role, config)
-  // 账号上可能存着 v1 粗粒度权限，这里同样做一次展开，避免老账号升级后被锁在门外
+  // v1→v2 迁移已在 normalizeConfig / getSavedUser 中完成，运行时直接按精确 key 匹配，
+  // 避免把 ai.pc 重新展开成 aimodels.pc 导致权限泄漏。
   const perms = effectivePermSet(raw)
   if (perms.has(key)) return true
   // 父模块兜底：如 system 没有 system.pc/mobile 叶子节点，
