@@ -2,7 +2,7 @@
   <div class="lb-root">
     <PageHeader
       title="书籍阅读"
-      subtitle="免费公版书 · 数据源：古登堡计划 gutendex API + 内置公版书兜底 + 已配置 AI · 全部免费公开源"
+      subtitle="国内公版书 · 数据源：维基文库中文 + 内置中国经典兜底 + 已配置 AI · 全部免费公开源"
       :icon="Notebook"
     >
       <div class="lb-clock-box" title="北京时间">
@@ -34,15 +34,15 @@
         <!-- 搜索 + 阅读 -->
         <div v-if="active === 'search'" class="lb-card">
           <div class="lb-row">
-            <el-input v-model="query" placeholder="搜索书名 / 作者，如 pride and prejudice / 科学" class="lb-input" @keyup.enter="search" />
+            <el-input v-model="query" placeholder="搜索书名，如 红楼梦 / 论语 / 三国演义" class="lb-input" @keyup.enter="search" />
             <el-button type="primary" :loading="loading" @click="search">搜索</el-button>
           </div>
-          <p v-if="usedFallback" class="lb-fallback">古登堡接口暂不可达，已用内置公版书兜底（均为真实书目，可在线阅读）。</p>
+          <p v-if="usedFallback" class="lb-fallback">在线书库暂不可达，已用内置中国经典兜底（均为真实书目，可在维基文库在线阅读）。</p>
           <div class="lb-grid">
             <div v-for="b in books" :key="b.id" class="lb-book">
               <div class="lb-book-title">{{ b.title }}</div>
               <div class="lb-book-author">{{ b.authors.map((a) => a.name).join(', ') || '佚名' }}</div>
-              <div class="lb-book-meta">下载量 {{ b.download_count }} · {{ (b.languages || []).join('/') || '—' }}</div>
+              <div class="lb-book-meta">{{ b.download_count >= 99999 ? '公版书' : ('下载量 ' + b.download_count) }} · {{ (b.languages || []).join('/') || '—' }}</div>
               <div class="lb-book-actions">
                 <button class="lb-mini" @click="openBook(b)">在线阅读</button>
                 <a v-if="pickEpubUrl(b)" :href="pickEpubUrl(b)!" target="_blank" class="lb-mini">EPUB</a>
@@ -240,11 +240,20 @@ const reading = ref<GutenbergBook | null>(null)
 const bookText = ref('')
 const textLoading = ref(false)
 async function openBook(b: GutenbergBook): Promise<void> {
-  const url = pickTextUrl(b)
-  if (!url) { reading.value = b; bookText.value = '该书未提供纯文本格式，请使用 EPUB 链接下载阅读。'; return }
+  const textUrl = pickTextUrl(b)
+  const ext = b.formats['wikisource']
+  if (!textUrl && ext) {
+    reading.value = b
+    bookText.value = '正在新标签页打开维基文库在线阅读…'
+    window.open(ext, '_blank', 'noopener')
+    await upsertReading(b.id, b.title, 1, 0)
+    await loadReading()
+    return
+  }
+  if (!textUrl) { reading.value = b; bookText.value = '该书未提供纯文本格式，请使用阅读链接。'; return }
   reading.value = b; textLoading.value = true; bookText.value = ''
-  try { bookText.value = await fetchBookText(url) }
-  catch { bookText.value = '正文加载失败（可能受网络限制），请稍后重试或使用 EPUB 链接。' }
+  try { bookText.value = await fetchBookText(textUrl) }
+  catch { bookText.value = '正文加载失败（可能受网络限制），请稍后重试或使用阅读链接。' }
   finally { textLoading.value = false }
   await upsertReading(b.id, b.title, 1, 0)
   await loadReading()

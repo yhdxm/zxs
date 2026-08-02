@@ -131,9 +131,9 @@
           </div>
         </div>
 
-        <!-- 信息流：所选分类的其他新闻（随分类变化） -->
+        <!-- 信息流：所选分类的其他新闻；不足时展示其他分类相关推荐 -->
         <div class="np-feed-head">
-          <span class="np-feed-title">📰 {{ currentCat.label }} · 其他头条</span>
+          <span class="np-feed-title">📰 {{ tail.length ? currentCat.label + ' · 其他头条' : '相关推荐（其他分类）' }}</span>
           <span class="np-feed-count">已显示 {{ feed.length }} / {{ tailTotal }} 条</span>
         </div>
 
@@ -238,13 +238,17 @@ function tickBeijing() {
   beijingTime.value = `${p(bj.getHours())}:${p(bj.getMinutes())}:${p(bj.getSeconds())}`
 }
 
-/* ---------- 实时脉搏曲线：75 个领域各自的热搜第一 ---------- */
+/* ---------- 实时脉搏曲线：各分类的热搜第一 ---------- */
 const WINDOW = 14 // 曲线同屏展示的领域数量，超出则自动轮播
 const PULSE_W = 320
 const PULSE_H = 150
 const PULSE_PAD = 8
+// 进入页面后自动预加载这些主要分类，保证实时脉搏和右侧推荐都有数据
+const PULSE_KEYS = ['top', 'nation', 'world', 'business', 'tech', 'ent', 'sports', 'health']
 
 const domainFirsts = ref<Record<string, { label: string; value: number }>>({})
+// 缓存各分类完整新闻列表，用于「当前分类无更多时」展示相关推荐
+const categoryData = ref<Record<string, NewsItem[]>>({})
 const carouselIdx = ref(0)
 let rollTimer: ReturnType<typeof setInterval> | null = null
 
@@ -323,9 +327,32 @@ const pulseCaption = computed(() => {
   return `共 ${total} 个领域 · 自动轮播展示`
 })
 
-const tailTotal = computed(() => tail.value.length)
-const feed = computed(() => tail.value.slice(0, feedCount.value))
-const hasMore = computed(() => feedCount.value < tail.value.length)
+/** 推荐数据源总条数（当前分类 tail + 其他分类缓存） */
+const relatedTotal = computed(() => {
+  let sum = tail.value.length
+  for (const [key, list] of Object.entries(categoryData.value)) {
+    if (key !== selectedCat.value) sum += list.length
+  }
+  return sum
+})
+const tailTotal = computed(() => tail.value.length || relatedTotal.value)
+const feed = computed(() => {
+  if (tail.value.length) return tail.value.slice(0, feedCount.value)
+  // 当前分类只有 TOP10，从其他已加载分类取数据作为「相关推荐」
+  const others: NewsItem[] = []
+  const seen = new Set<string>()
+  for (const [key, list] of Object.entries(categoryData.value)) {
+    if (key === selectedCat.value) continue
+    for (const it of list) {
+      if (seen.has(it.id)) continue
+      seen.add(it.id)
+      others.push(it)
+    }
+  }
+  others.sort((a, b) => b.pubTimestamp - a.pubTimestamp)
+  return others.slice(0, feedCount.value)
+})
+const hasMore = computed(() => feedCount.value < tailTotal.value)
 
 function firstChar(t: string): string {
   return (t || '新').trim().charAt(0)
@@ -342,6 +369,8 @@ async function loadAll() {
     const all = await fetchNewsAll({ category: selectedCat.value, keyword: keyword.value })
     allCount.value = all.length
     hot.value = all.slice(0, 10)
+    // 缓存当前分类完整数据，供相关推荐复用
+    categoryData.value[selectedCat.value] = all
     // 累积当前领域热搜第一（用于实时脉搏曲线）
     const firstNews = all[0]
     if (firstNews) {
@@ -355,12 +384,38 @@ async function loadAll() {
     }
     tail.value = all.slice(10)
     feedCount.value = 40
+    // 后台静默预加载主要分类，充实实时脉搏与相关推荐
+    void preloadPulseDomains()
   } catch (e) {
     errorMsg.value = '加载失败，请稍后刷新（代理可能限流）'
     allCount.value = 0
   } finally {
     loading.value = false
   }
+}
+
+/** 后台预加载 PULSE_KEYS 分类，填充实时脉搏曲线和相关推荐池 */
+async function preloadPulseDomains() {
+  const jobs = PULSE_KEYS.filter((k) => k !== selectedCat.value && !categoryData.value[k]?.length)
+  await Promise.all(
+    jobs.map(async (key) => {
+      try {
+        const all = await fetchNewsAll({ category: key })
+        if (!all.length) return
+        categoryData.value[key] = all
+        const cat = findCategory(key)
+        const first = all[0]
+        if (first) {
+          domainFirsts.value = {
+            ...domainFirsts.value,
+            [key]: { label: cat.label, value: freshnessValue(first.pubTimestamp) }
+          }
+        }
+      } catch {
+        // 单个分类预加载失败不影响主流程
+      }
+    })
+  )
 }
 
 async function loadMore() {

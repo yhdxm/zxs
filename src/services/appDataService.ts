@@ -1022,6 +1022,7 @@ export async function getSavedUser(): Promise<AppUser | null> {
     try {
       const roleConfig = await loadPermissionConfig()
       cached.permissions = getRolePermissions(cached.role, roleConfig)
+      setStoredUser(cached) // 写回缓存，避免新标签页/下次读取仍拿旧权限
     } catch {
       // 读取失败则沿用缓存中的权限，不阻断登录
     }

@@ -1,6 +1,6 @@
 <template>
-  <div class="ai-chat-panel" :class="{ 'panel-compact': compact }">
-    <header class="ai-header">
+  <div class="ai-chat-panel" :class="{ 'panel-compact': compact, 'no-header': hideHeader }">
+    <header v-if="!hideHeader" class="ai-header">
       <div class="ai-title">
         <span class="ai-title-icon"><el-icon><MagicStick /></el-icon></span>
         <div class="ai-title-text">
@@ -95,10 +95,12 @@ const props = withDefaults(defineProps<{
   title?: string
   subtitle?: string
   compact?: boolean
+  hideHeader?: boolean
 }>(), {
   title: 'AI 助手',
   subtitle: '配置一次即可长期使用，密钥自动加密隐藏显示。',
-  compact: false
+  compact: false,
+  hideHeader: false
 })
 
 const prompt = ref('')
@@ -266,6 +268,9 @@ const clearChat = () => {
   syncHistory()
   ElMessage.success('对话已清空')
 }
+const openConfig = () => { configVisible.value = true }
+
+defineExpose({ clearChat, openConfig })
 
 watch(messages, () => syncHistory(), { deep: true })
 

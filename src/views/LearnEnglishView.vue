@@ -162,15 +162,15 @@
         <!-- 书籍阅读 -->
         <div v-else-if="active === 'book'" class="le-card">
           <div class="le-hrow">
-            <h3 class="le-h">书籍查询与阅读（古登堡免费公版书）</h3>
-            <el-input v-model="bookKw" placeholder="搜索书名/作者，如 pride and prejudice" class="le-input" @keyup.enter="searchBooks" />
+            <h3 class="le-h">书籍查询与阅读（国内公版书）</h3>
+            <el-input v-model="bookKw" placeholder="搜索书名，如 红楼梦 / 论语 / 三国演义" class="le-input" @keyup.enter="searchBooks" />
             <el-button type="primary" :loading="bookLoading" @click="searchBooks">搜索</el-button>
           </div>
           <div v-if="!books.length && bookLoading" class="le-skeleton"><el-skeleton :rows="5" animated /></div>
           <div v-else class="le-grid">
             <div v-for="b in books" :key="b.id" class="le-book">
               <div class="le-book-title">{{ b.title }}</div>
-              <div class="le-book-meta">{{ b.authors.map(a => a.name).join('、') || '佚名' }} · 下载 {{ b.download_count }}</div>
+              <div class="le-book-meta">{{ b.authors.map(a => a.name).join('、') || '佚名' }} · {{ b.download_count >= 99999 ? '公版书' : ('下载 ' + b.download_count) }}</div>
               <div class="le-row">
                 <button class="le-mini" @click="readBook(b)">在线阅读</button>
                 <a v-if="pickEpubUrl(b)" :href="pickEpubUrl(b)!" target="_blank" class="le-mini">EPUB</a>
@@ -246,7 +246,7 @@ function switchModule(key: string): void {
   active.value = key
   if (key === 'word' && !words.value.length) void loadWords()
   if (key === 'plan' && !savedPlans.value.length) void loadPlans()
-  if (key === 'book' && !books.value.length && !bookLoading.value) void searchBooks('pride')
+  if (key === 'book' && !books.value.length && !bookLoading.value) void searchBooks('')
 }
 
 /* 查词 */
@@ -377,13 +377,20 @@ const readingBook = ref<GutenbergBook | null>(null)
 const bookText = ref('')
 const bookTextLoading = ref(false)
 async function readBook(b: GutenbergBook): Promise<void> {
-  const url = pickTextUrl(b)
-  if (!url) { ElMessage.warning('该书无纯文本版本'); return }
+  const textUrl = pickTextUrl(b)
+  const ext = b.formats['wikisource']
+  if (!textUrl && ext) {
+    window.open(ext, '_blank', 'noopener')
+    ElMessage.success('已在新标签页打开维基文库阅读')
+    try { await upsertReading(b.id, b.title, 1, 0) } catch { /* ignore */ }
+    return
+  }
+  if (!textUrl) { ElMessage.warning('该书无纯文本版本'); return }
   readVisible.value = true
   readingBook.value = b
   bookTextLoading.value = true
   bookText.value = ''
-  bookText.value = await fetchBookText(url)
+  bookText.value = await fetchBookText(textUrl)
   bookTextLoading.value = false
   // 记录阅读
   try { await upsertReading(b.id, b.title, 1, 0) } catch { /* ignore */ }
@@ -396,7 +403,7 @@ onMounted(async () => {
   await loadWords()
   await lookup()
   await loadPlans()
-  await searchBooks('pride')
+  await searchBooks('')
 })
 onUnmounted(() => { if (clockTimer) window.clearInterval(clockTimer) })
 </script>

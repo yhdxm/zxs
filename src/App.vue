@@ -482,9 +482,9 @@ onMounted(async () => {
   applyTheme(theme.value)
   updatePlatform()
   window.addEventListener('resize', updatePlatform)
-  // 角色权限变更后实时刷新侧边栏权限（与权限管理页联动）
+  // 角色权限变更后实时刷新侧边栏权限与当前用户权限（与权限管理页联动）
   window.addEventListener('permission-config-updated', () => {
-    loadPermissionConfig().then((c) => (permissionConfig.value = c))
+    refreshUser().catch((err) => console.error('[App] permission refresh failed:', err))
   })
   try {
     await refreshUser()

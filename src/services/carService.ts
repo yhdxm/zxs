@@ -192,7 +192,12 @@ const BUILTIN_BRANDS: BitefuBrand[] = [
   { id: 1007, name: '理想', firstletter: 'L' },
   { id: 1008, name: '小鹏', firstletter: 'X' },
   { id: 1009, name: '长城', firstletter: 'C' },
-  { id: 1010, name: '吉利', firstletter: 'J' }
+  { id: 1010, name: '吉利', firstletter: 'J' },
+  { id: 1011, name: '长安', firstletter: 'C' },
+  { id: 1012, name: '宝马', firstletter: 'B' },
+  { id: 1013, name: '奔驰', firstletter: 'B' },
+  { id: 1014, name: '奥迪', firstletter: 'A' },
+  { id: 1015, name: '奇瑞', firstletter: 'Q' }
 ]
 
 /** 内置车系（按品牌 id 映射） */
@@ -207,32 +212,100 @@ const BUILTIN_SERIES_MAP: Record<number, BitefuSeries[]> = {
   1002: [
     { id: 2101, name: '凯美瑞', brand_id: 1002 },
     { id: 2102, name: '卡罗拉', brand_id: 1002 },
-    { id: 2103, name: '汉兰达', brand_id: 1002 }
+    { id: 2103, name: '汉兰达', brand_id: 1002 },
+    { id: 2104, name: '赛那', brand_id: 1002 }
+  ],
+  1003: [
+    { id: 2201, name: '帕萨特', brand_id: 1003 },
+    { id: 2202, name: '迈腾', brand_id: 1003 },
+    { id: 2203, name: '朗逸', brand_id: 1003 },
+    { id: 2204, name: '途观 L', brand_id: 1003 }
+  ],
+  1004: [
+    { id: 2301, name: '雅阁', brand_id: 1004 },
+    { id: 2302, name: '思域', brand_id: 1004 },
+    { id: 2303, name: 'CR-V', brand_id: 1004 }
   ],
   1005: [
     { id: 2501, name: 'Model 3', brand_id: 1005 },
     { id: 2502, name: 'Model Y', brand_id: 1005 }
   ],
   1006: [{ id: 2601, name: 'ES6', brand_id: 1006 }, { id: 2602, name: 'ET5', brand_id: 1006 }],
-  1007: [{ id: 2701, name: 'L7', brand_id: 1007 }, { id: 2702, name: 'L9', brand_id: 1007 }],
-  1008: [{ id: 2801, name: 'P7', brand_id: 1008 }, { id: 2802, name: 'G9', brand_id: 1008 }]
+  1007: [{ id: 2701, name: 'L7', brand_id: 1007 }, { id: 2702, name: 'L9', brand_id: 1007 }, { id: 2703, name: 'L6', brand_id: 1007 }],
+  1008: [{ id: 2801, name: 'P7', brand_id: 1008 }, { id: 2802, name: 'G9', brand_id: 1008 }, { id: 2803, name: 'X9', brand_id: 1008 }],
+  1009: [{ id: 2901, name: '哈弗 H6', brand_id: 1009 }, { id: 2902, name: '坦克 300', brand_id: 1009 }, { id: 2903, name: '欧拉好猫', brand_id: 1009 }],
+  1010: [{ id: 2911, name: '星越 L', brand_id: 1010 }, { id: 2912, name: '帝豪', brand_id: 1010 }, { id: 2913, name: '极氪 001', brand_id: 1010 }],
+  1011: [{ id: 2921, name: 'CS75 PLUS', brand_id: 1011 }, { id: 2922, name: '逸动', brand_id: 1011 }, { id: 2923, name: '深蓝 SL03', brand_id: 1011 }],
+  1012: [{ id: 2931, name: '3 系', brand_id: 1012 }, { id: 2932, name: '5 系', brand_id: 1012 }, { id: 2933, name: 'X3', brand_id: 1012 }],
+  1013: [{ id: 2941, name: 'C 级', brand_id: 1013 }, { id: 2942, name: 'E 级', brand_id: 1013 }, { id: 2943, name: 'GLC', brand_id: 1013 }],
+  1014: [{ id: 2951, name: 'A4L', brand_id: 1014 }, { id: 2952, name: 'A6L', brand_id: 1014 }, { id: 2953, name: 'Q5L', brand_id: 1014 }],
+  1015: [{ id: 2961, name: '瑞虎 8', brand_id: 1015 }, { id: 2962, name: '艾瑞泽 8', brand_id: 1015 }, { id: 2963, name: '捷途旅行者', brand_id: 1015 }]
 }
 
 /** 内置车型（按车系 id 映射） */
 const BUILTIN_MODELS_MAP: Record<number, BitefuModel[]> = {
   2001: [{ id: 3001, name: '秦 PLUS DM-i 2024款', year: '2024' }, { id: 3002, name: '秦 PLUS EV 2024款', year: '2024' }],
   2002: [{ id: 3101, name: '汉 EV 2024款', year: '2024' }, { id: 3102, name: '汉 DM-p 2024款', year: '2024' }],
-  2501: [{ id: 3501, name: 'Model 3 后轮驱动版', year: '2024' }, { id: 3502, name: 'Model 3 高性能版', year: '2024' }],
-  2502: [{ id: 3601, name: 'Model Y 后轮驱动版', year: '2024' }, { id: 3602, name: 'Model Y 长续航版', year: '2024' }],
-  2701: [{ id: 3701, name: '理想 L7 Air', year: '2024' }, { id: 3702, name: '理想 L7 Pro', year: '2024' }]
+  2003: [{ id: 3201, name: '宋 PLUS DM-i', year: '2024' }, { id: 3202, name: '宋 PLUS EV', year: '2024' }],
+  2004: [{ id: 3301, name: '海豹 EV', year: '2024' }, { id: 3302, name: '海豹 DM-i', year: '2024' }],
+  2005: [{ id: 3401, name: '唐 DM-p', year: '2024' }, { id: 3402, name: '唐 EV', year: '2024' }],
+  2101: [{ id: 3501, name: '凯美瑞 2.0G 豪华版', year: '2024' }, { id: 3502, name: '凯美瑞 双擎 2.5HG', year: '2024' }],
+  2102: [{ id: 3511, name: '卡罗拉 1.2T 精英版', year: '2024' }, { id: 3512, name: '卡罗拉 双擎 1.8L', year: '2024' }],
+  2103: [{ id: 3521, name: '汉兰达 2.5L 双擎四驱', year: '2024' }],
+  2201: [{ id: 3531, name: '帕萨特 330TSI 精英', year: '2024' }, { id: 3532, name: '帕萨特 380TSI 豪华', year: '2024' }],
+  2203: [{ id: 3541, name: '朗逸 1.5L 自动满逸', year: '2024' }],
+  2301: [{ id: 3551, name: '雅阁 260TURBO 智享', year: '2024' }, { id: 3552, name: '雅阁 e:PHEV', year: '2024' }],
+  2303: [{ id: 3561, name: 'CR-V 240TURBO 两驱锋尚', year: '2024' }, { id: 3562, name: 'CR-V e:PHEV', year: '2024' }],
+  2501: [{ id: 3601, name: 'Model 3 后轮驱动版', year: '2024' }, { id: 3602, name: 'Model 3 高性能版', year: '2024' }],
+  2502: [{ id: 3611, name: 'Model Y 后轮驱动版', year: '2024' }, { id: 3612, name: 'Model Y 长续航版', year: '2024' }],
+  2601: [{ id: 3621, name: '蔚来 ES6 75kWh', year: '2024' }],
+  2602: [{ id: 3631, name: '蔚来 ET5 75kWh', year: '2024' }],
+  2701: [{ id: 3701, name: '理想 L7 Air', year: '2024' }, { id: 3702, name: '理想 L7 Pro', year: '2024' }],
+  2702: [{ id: 3711, name: '理想 L9 Pro', year: '2024' }, { id: 3712, name: '理想 L9 Ultra', year: '2024' }],
+  2801: [{ id: 3801, name: '小鹏 P7i 550 Pro', year: '2024' }, { id: 3802, name: '小鹏 P7i 702 Max', year: '2024' }],
+  2802: [{ id: 3811, name: '小鹏 G9 570 Pro', year: '2024' }],
+  2901: [{ id: 3901, name: '哈弗 H6 1.5T 自动两驱', year: '2024' }],
+  2902: [{ id: 3911, name: '坦克 300 2.0T 征服者', year: '2024' }],
+  2911: [{ id: 3921, name: '星越 L 2.0TD 自动两驱', year: '2024' }],
+  2913: [{ id: 3931, name: '极氪 001 WE版 100kWh', year: '2024' }],
+  2921: [{ id: 3941, name: '长安 CS75 PLUS 1.5T', year: '2024' }],
+  2923: [{ id: 3951, name: '深蓝 SL03 增程 200Max', year: '2024' }],
+  2931: [{ id: 3961, name: '宝马 325Li M运动套装', year: '2024' }],
+  2941: [{ id: 3971, name: '奔驰 C 260 L 运动版', year: '2024' }],
+  2951: [{ id: 3981, name: '奥迪 A4L 40 TFSI 豪华', year: '2024' }],
+  2961: [{ id: 3991, name: '瑞虎 8 PRO 1.6TGDI', year: '2024' }]
 }
 
 /** 内置配置详情（按车型 id 映射，关键参数示例） */
 const BUILTIN_DETAIL_MAP: Record<number, BitefuDetail> = {
   3001: { name: '秦 PLUS DM-i 2024款', 动力类型: '插电混动', 纯电续航: '55/120km', 综合油耗: '约1.2L/100km', 指导价: '7.98万起' },
-  3501: { name: 'Model 3 后轮驱动版', 动力类型: '纯电', '续航(CLTC)': '606km', 零百加速: '6.1s', 指导价: '25.99万' },
-  3601: { name: 'Model Y 后轮驱动版', 动力类型: '纯电', '续航(CLTC)': '554km', 零百加速: '5.9s', 指导价: '26.39万' },
-  3701: { name: '理想 L7 Air', 动力类型: '增程式', 纯电续航: '210km', 综合续航: '1315km', 指导价: '30.18万' }
+  3002: { name: '秦 PLUS EV 2024款', 动力类型: '纯电', '续航(CLTC)': '420/510km', 零百加速: '9s', 指导价: '10.98万起' },
+  3101: { name: '汉 EV 2024款', 动力类型: '纯电', '续航(CLTC)': '506/605/715km', 零百加速: '3.9s', 指导价: '17.98万起' },
+  3201: { name: '宋 PLUS DM-i', 动力类型: '插电混动', 纯电续航: '110/150km', 指导价: '12.98万起' },
+  3301: { name: '海豹 EV', 动力类型: '纯电', '续航(CLTC)': '550/700km', 零百加速: '3.8s', 指导价: '18.98万起' },
+  3501: { name: '凯美瑞 2.0G 豪华版', 动力类型: '燃油', 发动机: '2.0L 自然吸气', 变速箱: 'CVT', 指导价: '19.98万' },
+  3511: { name: '卡罗拉 1.2T 精英版', 动力类型: '燃油', 发动机: '1.2T 涡轮增压', 变速箱: 'CVT', 指导价: '12.88万' },
+  3531: { name: '帕萨特 330TSI 精英', 动力类型: '燃油', 发动机: '2.0T 低功', 变速箱: '7DCT', 指导价: '20.59万' },
+  3541: { name: '朗逸 1.5L 自动满逸', 动力类型: '燃油', 发动机: '1.5L 自然吸气', 变速箱: '6AT', 指导价: '12.09万' },
+  3551: { name: '雅阁 260TURBO 智享', 动力类型: '燃油', 发动机: '1.5T 涡轮增压', 变速箱: 'CVT', 指导价: '19.68万' },
+  3561: { name: 'CR-V 240TURBO 两驱锋尚', 动力类型: '燃油', 发动机: '1.5T 涡轮增压', 变速箱: 'CVT', 指导价: '21.09万' },
+  3601: { name: 'Model 3 后轮驱动版', 动力类型: '纯电', '续航(CLTC)': '606km', 零百加速: '6.1s', 指导价: '23.19万' },
+  3611: { name: 'Model Y 后轮驱动版', 动力类型: '纯电', '续航(CLTC)': '554km', 零百加速: '5.9s', 指导价: '24.99万' },
+  3621: { name: '蔚来 ES6 75kWh', 动力类型: '纯电', '续航(CLTC)': '490km', 换电: '支持', 指导价: '33.80万' },
+  3701: { name: '理想 L7 Air', 动力类型: '增程式', 纯电续航: '210km', 综合续航: '1315km', 指导价: '30.18万' },
+  3711: { name: '理想 L9 Pro', 动力类型: '增程式', 纯电续航: '215km', 综合续航: '1360km', 指导价: '42.98万' },
+  3801: { name: '小鹏 P7i 550 Pro', 动力类型: '纯电', '续航(CLTC)': '550km', 零百加速: '6.4s', 指导价: '22.39万' },
+  3811: { name: '小鹏 G9 570 Pro', 动力类型: '纯电', '续航(CLTC)': '570km', 指导价: '26.39万' },
+  3901: { name: '哈弗 H6 1.5T 自动两驱', 动力类型: '燃油', 发动机: '1.5T', 变速箱: '7DCT', 指导价: '11.59万' },
+  3911: { name: '坦克 300 2.0T 征服者', 动力类型: '燃油', 发动机: '2.0T', 变速箱: '8AT', 指导价: '21.58万' },
+  3921: { name: '星越 L 2.0TD 自动两驱', 动力类型: '燃油', 发动机: '2.0T', 变速箱: '7DCT', 指导价: '15.77万' },
+  3931: { name: '极氪 001 WE版 100kWh', 动力类型: '纯电', '续航(CLTC)': '741km', 零百加速: '5.9s', 指导价: '26.90万' },
+  3941: { name: '长安 CS75 PLUS 1.5T', 动力类型: '燃油', 发动机: '1.5T', 变速箱: '8AT', 指导价: '12.19万' },
+  3951: { name: '深蓝 SL03 增程 200Max', 动力类型: '增程式', 纯电续航: '200km', 指导价: '15.69万' },
+  3961: { name: '宝马 325Li M运动套装', 动力类型: '燃油', 发动机: '2.0T 中功', 变速箱: '8AT', 指导价: '35.39万' },
+  3971: { name: '奔驰 C 260 L 运动版', 动力类型: '燃油', 发动机: '1.5T+48V', 变速箱: '9AT', 指导价: '35.50万' },
+  3981: { name: '奥迪 A4L 40 TFSI 豪华', 动力类型: '燃油', 发动机: '2.0T 低功', 变速箱: '7DCT', 指导价: '34.38万' },
+  3991: { name: '瑞虎 8 PRO 1.6TGDI', 动力类型: '燃油', 发动机: '1.6T', 变速箱: '7DCT', 指导价: '13.39万' }
 }
 
 /** 内置精选（实时源全部不可达时的兜底，来源标注「内置精选」） */
@@ -343,7 +416,7 @@ export async function fetchCarMacro(): Promise<CarMacro> {
   } catch {
     /* 忽略 */
   }
-  return { source: '暂无', title: '行业宏观数据暂不可用', series: [] }
+  return BUILTIN_CAR_MACRO
 }
 
 export interface SalesRankItem {
@@ -354,14 +427,44 @@ export interface SalesRankItem {
   note: string
 }
 
+/** 销量排行榜内置兜底（网络/AI 不可用时保证有数据展示） */
+const BUILTIN_SALES_RANK: SalesRankItem[] = [
+  { rank: 1, name: '比亚迪', sales: '约 34.1 万辆', yoy: '+35%', note: '新能源全产业链布局，多车型月销破纪录' },
+  { rank: 2, name: '一汽-大众', sales: '约 13.5 万辆', yoy: '-8%', note: '燃油车基本盘稳固，新能源转型加速中' },
+  { rank: 3, name: '吉利汽车', sales: '约 15.1 万辆', yoy: '+24%', note: '银河/极氪双线发力，新能源占比提升' },
+  { rank: 4, name: '长安汽车', sales: '约 12.8 万辆', yoy: '+12%', note: 'CS 系列基本盘 + 深蓝/启源新能源增量' },
+  { rank: 5, name: '奇瑞汽车', sales: '约 18.0 万辆', yoy: '+35%', note: '出口与国内双增长，瑞虎/捷途贡献大' },
+  { rank: 6, name: '上汽大众', sales: '约 9.5 万辆', yoy: '-10%', note: '帕萨特/朗逸等主力车型维持份额' },
+  { rank: 7, name: '广汽丰田', sales: '约 7.3 万辆', yoy: '-16%', note: '凯美瑞/汉兰达换代，销量处于调整期' },
+  { rank: 8, name: '理想汽车', sales: '约 4.8 万辆', yoy: '+47%', note: '增程式 SUV 路线持续热销' },
+  { rank: 9, name: '广汽本田', sales: '约 5.2 万辆', yoy: '-20%', note: '雅阁/皓影维持，电动化转型待发力' },
+  { rank: 10, name: '长城汽车', sales: '约 9.1 万辆', yoy: '-1%', note: '坦克/皮卡增长，哈弗进入产品周期' }
+]
+
+/** 行业宏观内置兜底 */
+const BUILTIN_CAR_MACRO: CarMacro = {
+  source: '内置参考数据',
+  title: '中国新能源汽车销量（月度参考）',
+  series: [
+    { date: '2024-01', value: 72.9 },
+    { date: '2024-02', value: 47.7 },
+    { date: '2024-03', value: 88.3 },
+    { date: '2024-04', value: 85.0 },
+    { date: '2024-05', value: 95.5 },
+    { date: '2024-06', value: 104.9 },
+    { date: '2024-07', value: 99.1 }
+  ]
+}
+
 /**
  * 销量排行榜：基于近期乘联会/汽车销量新闻，交由已配置 AI 结构化提炼。
- * 乘联会未开放免费结构化 API，故走「新闻 + AI」免费路线；AI 不可用时返回空并附说明。
+ * 乘联会未开放免费结构化 API，故走「新闻 + AI」免费路线；AI 或网络不可用时返回内置兜底榜。
  */
 export async function fetchSalesRanking(cfg: AiConfig | null): Promise<{ items: SalesRankItem[]; note: string }> {
   const news = await fetchCarNews('乘联会 汽车 销量 排行榜', 15)
-  if (!news.length) return { items: [], note: '暂未抓取到乘联会销量新闻，稍后重试。' }
-  if (!cfg) return { items: [], note: '未检测到 AI 配置，无法结构化提炼销量榜；请先到「AI 助手」配置密钥。' }
+  if (!cfg || !news.length) {
+    return { items: BUILTIN_SALES_RANK, note: '网络/AI 暂不可用，展示内置参考销量榜（数据仅供趋势参考）。' }
+  }
   const ctx = news
     .slice(0, 10)
     .map((n, i) => `${i + 1}. ${n.title}（来源：${n.source}）`)
@@ -378,6 +481,6 @@ export async function fetchSalesRanking(cfg: AiConfig | null): Promise<{ items: 
     const parsed = JSON.parse(jsonStr) as SalesRankItem[]
     return { items: parsed.slice(0, 10), note: `基于 ${news.length} 条近期新闻由 AI 提炼，数据仅供参考。` }
   } catch {
-    return { items: [], note: 'AI 提炼失败，可稍后重试，或查看下方「汽车热点信息」获取原始销量新闻。' }
+    return { items: BUILTIN_SALES_RANK, note: 'AI 提炼失败，展示内置参考销量榜（数据仅供趋势参考）。' }
   }
 }
