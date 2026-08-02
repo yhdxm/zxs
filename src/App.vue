@@ -117,6 +117,23 @@
       </main>
     </div>
 
+    <!-- 移动端底部导航（高频场景原生 Tab 模式，替代悬浮菜单按钮） -->
+    <nav class="mobile-bottom-nav" v-if="isMobile">
+      <button
+        v-for="b in mobileBottomNav"
+        :key="b.key"
+        class="mbn-item"
+        :class="{ active: b.active }"
+        @click="onBottomNav(b)"
+      >
+        <span class="mbn-icon">
+          <el-icon v-if="b.iconComp"><component :is="b.iconComp" /></el-icon>
+          <span v-else class="mbn-emoji">{{ b.iconText }}</span>
+        </span>
+        <span class="mbn-label">{{ b.label }}</span>
+      </button>
+    </nav>
+
     <!-- 已登录：移动端抽屉 -->
     <el-drawer v-model="mobileNavVisible" direction="ltr" size="280px" :with-header="false" class="mobile-drawer">
       <div class="drawer-brand">
@@ -249,6 +266,23 @@
         </router-view>
       </main>
     </div>
+
+    <!-- 移动端底部导航（未登录访客版） -->
+    <nav class="mobile-bottom-nav" v-if="isMobile">
+      <button
+        v-for="b in mobileBottomNavGuest"
+        :key="b.key"
+        class="mbn-item"
+        :class="{ active: b.active }"
+        @click="onBottomNav(b)"
+      >
+        <span class="mbn-icon">
+          <el-icon v-if="b.iconComp"><component :is="b.iconComp" /></el-icon>
+          <span v-else class="mbn-emoji">{{ b.iconText }}</span>
+        </span>
+        <span class="mbn-label">{{ b.label }}</span>
+      </button>
+    </nav>
   </div>
 </template>
 
@@ -407,6 +441,66 @@ const goMenu = (item: SideItem) => {
   if (!item.to) return
   mobileNavVisible.value = false
   router.push(item.to)
+}
+
+/* ===== 移动端底部导航（高频场景原生 Tab 模式，替代悬浮菜单按钮） ===== */
+interface BottomNavItem {
+  key: string
+  label: string
+  iconComp?: Component
+  iconText?: string
+  to?: string | { path: string; query: Record<string, string> }
+  isMore?: boolean
+  active?: boolean
+}
+function findMenuItem(key: string, items: SideItem[] = filteredSideMenu.value): SideItem | undefined {
+  for (const it of items) {
+    if (it.key === key) return it
+    if (it.children && it.children.length) {
+      const f = findMenuItem(key, it.children)
+      if (f) return f
+    }
+  }
+  return undefined
+}
+// 高频核心入口：首页 / 工作数据看板 / AI 助手 / 新闻聚合 / 个人设置，末位「更多」打开全量抽屉
+const MOBILE_NAV_PRIORITY = ['welcome', 'overview', 'ai', 'news', 'account']
+const mobileBottomNav = computed<BottomNavItem[]>(() => {
+  const items: BottomNavItem[] = []
+  for (const k of MOBILE_NAV_PRIORITY) {
+    const found = findMenuItem(k)
+    if (found) {
+      items.push({
+        key: found.key,
+        label: found.label,
+        iconComp: found.icon,
+        to: found.to,
+        active: isMenuActive(found.key)
+      })
+    }
+  }
+  items.push({ key: 'more', label: '更多', iconComp: Menu, isMore: true })
+  return items
+})
+const mobileBottomNavGuest = computed<BottomNavItem[]>(() => [
+  { key: 'dashboard', label: '工作数据看板', iconText: '📊', to: '/dashboard?view=overview' },
+  { key: 'ai', label: 'AI 助手', iconText: '🤖', to: '/ai' },
+  { key: 'more', label: '更多', iconComp: Menu, isMore: true }
+])
+function onBottomNav(item: BottomNavItem) {
+  if (item.isMore) {
+    if (isLoggedIn.value) mobileNavVisible.value = true
+    else drawerVisible.value = true
+    return
+  }
+  if (isLoggedIn.value) {
+    if (item.to) {
+      mobileNavVisible.value = false
+      router.push(item.to)
+    }
+  } else if (typeof item.to === 'string') {
+    navigate(item.to)
+  }
 }
 
 // 页面标题由各视图自身渲染（单一标题铁律），顶部 topbar 不再重复展示
@@ -1047,6 +1141,52 @@ onMounted(async () => {
 .mobile-menu-fab:active { transform: scale(0.94); }
 .mobile-menu-fab :deep(svg) { font-size: 22px; }
 
+/* 移动端底部导航：原生 Tab 模式，替代悬浮菜单按钮（高频场景） */
+.mobile-bottom-nav {
+  display: none;
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 45;
+  height: calc(58px + env(safe-area-inset-bottom));
+  padding-bottom: env(safe-area-inset-bottom);
+  background: var(--surface);
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  backdrop-filter: saturate(160%) blur(14px);
+  -webkit-backdrop-filter: saturate(160%) blur(14px);
+  border-top: 1px solid var(--border);
+  box-shadow: 0 -4px 18px rgba(15, 23, 42, 0.06);
+}
+.mobile-bottom-nav .mbn-item {
+  flex: 1 1 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  min-height: 48px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 4px 2px;
+  transition: color 0.15s ease, transform 0.12s ease;
+}
+.mobile-bottom-nav .mbn-item.active { color: var(--primary); }
+.mobile-bottom-nav .mbn-item:active { transform: scale(0.93); }
+.mobile-bottom-nav .mbn-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 21px;
+  line-height: 1;
+}
+.mobile-bottom-nav .mbn-emoji { font-size: 19px; }
+.mobile-bottom-nav .mbn-icon :deep(svg) { font-size: 21px; }
+.mobile-bottom-nav .mbn-label { font-size: 11px; font-weight: 600; line-height: 1.1; }
+.mobile-bottom-nav .mbn-item.active .mbn-label { font-weight: 700; }
+
 /* ===== 响应式切换 ===== */
 /* 中屏（1024~1280）：侧栏收窄，用户卡片同步紧凑 */
 @media (max-width: 1180px) {
@@ -1061,7 +1201,8 @@ onMounted(async () => {
   .app-sidebar { display: none; }
   .sidebar { display: none; }
   .mobile-topbar { display: flex; }
-  .mobile-menu-fab { display: flex; }
+  .mobile-bottom-nav { display: flex; }
+  .mobile-menu-fab { display: none; }
   .app-shell.is-authed .app-main {
     height: 100vh;
     height: 100dvh;
