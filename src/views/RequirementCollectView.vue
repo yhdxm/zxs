@@ -1,6 +1,6 @@
 <template>
   <div class="ext-ideas">
-    <PageHeader title="外部灵感聚合" subtitle="内置真实开源项目灵感库（零网络依赖、国内可达），可点「免费查询 / 刷新」尝试拉取 GitHub 最新高星项目；数据存浏览器本地 + 云端，不消耗任何积分" :icon="Collection">
+    <PageHeader title="外部灵感聚合" subtitle="内置真实开源项目灵感库（零网络依赖、国内可达），覆盖国内 / 国外项目并标注「中文理解」与「行业分类」；可点「免费查询 / 刷新」尝试拉取 GitHub 最新高星项目；数据存浏览器本地 + 云端，不消耗任何积分" :icon="Collection">
       <el-button type="primary" :loading="fetching" @click="refresh">
         <el-icon><Refresh /></el-icon> 免费查询 / 刷新
       </el-button>
@@ -20,6 +20,16 @@
       <el-select v-model="sourceFilter" class="ei-source" placeholder="全部来源" clearable>
         <el-option label="全部来源" value="" />
         <el-option v-for="s in sources" :key="s" :label="s" :value="s" />
+      </el-select>
+
+      <el-select v-model="regionFilter" class="ei-region" placeholder="全部地区" clearable>
+        <el-option label="全部地区" value="" />
+        <el-option v-for="r in regions" :key="r" :label="`${r}`" :value="r" />
+      </el-select>
+
+      <el-select v-model="industryFilter" class="ei-industry" placeholder="全部行业" clearable>
+        <el-option label="全部行业" value="" />
+        <el-option v-for="i in industries" :key="i" :label="`${i}`" :value="i" />
       </el-select>
 
       <el-select v-model="tagFilter" class="ei-tag" placeholder="全部标签" clearable>
@@ -116,6 +126,8 @@ const clearing = ref(false)
 
 const searchText = ref('')
 const sourceFilter = ref('')
+const regionFilter = ref('')
+const industryFilter = ref('')
 const tagFilter = ref('')
 const onlyBookmarked = ref(false)
 
@@ -123,6 +135,8 @@ const retentionDays = ref(30)
 const userId = ref('')
 
 const sources = computed(() => Array.from(new Set(ideas.value.map((i) => i.source))).sort())
+const regions = computed(() => Array.from(new Set(ideas.value.map((i) => i.region).filter(Boolean))).sort() as string[])
+const industries = computed(() => Array.from(new Set(ideas.value.map((i) => i.industry).filter(Boolean))).sort() as string[])
 const allTags = computed(() => Array.from(new Set(ideas.value.flatMap((i) => i.tags || []))).sort())
 const bookmarkedCount = computed(() => ideas.value.filter((i) => i.bookmarked).length)
 const associatedCount = computed(() => ideas.value.filter((i) => i.related_module).length)
@@ -131,10 +145,12 @@ const filteredIdeas = computed<ExternalIdea[]>(() => {
   const kw = searchText.value.trim().toLowerCase()
   return ideas.value.filter((it) => {
     if (sourceFilter.value && it.source !== sourceFilter.value) return false
+    if (regionFilter.value && it.region !== regionFilter.value) return false
+    if (industryFilter.value && it.industry !== industryFilter.value) return false
     if (tagFilter.value && !(it.tags || []).includes(tagFilter.value)) return false
     if (onlyBookmarked.value && !it.bookmarked) return false
     if (kw) {
-      const hay = `${it.title} ${it.summary} ${(it.tags || []).join(' ')}`.toLowerCase()
+      const hay = `${it.title} ${it.summary} ${it.cnMeaning || ''} ${(it.tags || []).join(' ')}`.toLowerCase()
       if (!hay.includes(kw)) return false
     }
     return true
@@ -297,9 +313,9 @@ onMounted(async () => {
 
 <style scoped>
 .ext-ideas {
-  padding: 0 18px 18px;
-  max-width: 1400px;
-  margin: 0 auto;
+  padding: 0 0 18px;
+  max-width: none;
+  margin: 0;
   color: var(--text);
 }
 .ei-toolbar {
@@ -310,8 +326,10 @@ onMounted(async () => {
   margin-bottom: 12px;
 }
 .ei-search { flex: 1; min-width: 220px; max-width: 360px; }
-.ei-source { width: 160px; }
-.ei-tag { width: 150px; }
+.ei-source { width: 150px; }
+.ei-region { width: 130px; }
+.ei-industry { width: 150px; }
+.ei-tag { width: 140px; }
 
 .ei-stats {
   display: flex;
@@ -356,7 +374,7 @@ onMounted(async () => {
 @media (max-width: 768px) {
   .ext-ideas { padding: 0 16px 16px; }
   .ei-search { max-width: 100%; }
-  .ei-source, .ei-tag { flex: 1; width: auto; }
+  .ei-source, .ei-region, .ei-industry, .ei-tag { flex: 1; width: auto; }
   .ei-cache-row { flex-direction: column; align-items: stretch; }
   .ei-clear-all { margin-left: 0; width: 100%; }
 }

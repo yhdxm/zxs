@@ -7,6 +7,7 @@
     >
       <span class="np-live"><i class="np-dot"></i>实时聚合</span>
       <span class="np-beijing">北京时间 {{ beijingTime }}</span>
+      <span v-if="updatedAt" class="np-updated">更新于 {{ updatedAt }}</span>
     </PageHeader>
 
     <!-- 筛选行：分类 + 搜索关键词 合并 -->
@@ -102,7 +103,7 @@
             <div class="np-pc-head">
               <span class="np-pc-cat" :style="{ background: activePulse.color }">{{ activePulse.label }}</span>
               <span class="np-pc-rank">热搜第一</span>
-              <span class="np-pc-heat">热度 {{ activePulse.value }}</span>
+              <span class="np-pc-heat">热度 {{ activeHeat }}</span>
               <span class="np-pc-idx">{{ activeIdx + 1 }} / {{ pulseAll.length }}</span>
             </div>
             <div class="np-pc-title">{{ activePulse.title }}</div>
@@ -133,13 +134,20 @@
             >
               <defs>
                 <linearGradient id="npFill" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stop-color="#7F77DD" stop-opacity="0.30" />
+                  <stop offset="0%" stop-color="#7F77DD" stop-opacity="0.40" />
                   <stop offset="100%" stop-color="#7F77DD" stop-opacity="0" />
                 </linearGradient>
                 <linearGradient id="npStroke" x1="0" y1="0" x2="1" y2="0">
                   <stop offset="0%" stop-color="#8b5cf6" />
                   <stop offset="100%" stop-color="#06b6d4" />
                 </linearGradient>
+                <filter id="npGlow" x="-30%" y="-30%" width="160%" height="160%">
+                  <feGaussianBlur stdDeviation="2.4" result="b" />
+                  <feMerge>
+                    <feMergeNode in="b" />
+                    <feMergeNode in="SourceGraphic" />
+                  </feMerge>
+                </filter>
               </defs>
               <line
                 v-for="(g, gi) in gridLines"
@@ -150,8 +158,10 @@
                 :y2="g"
                 class="np-grid"
               />
+              <!-- 投影深度：在曲线下方偏移复制一层，营造立体感 -->
+              <path :d="pulseArea" fill="#7c3aed" opacity="0.14" transform="translate(0,7)" />
               <path :d="pulseArea" fill="url(#npFill)" />
-              <path :d="pulsePath" class="np-line" fill="none" />
+              <path :d="pulsePath" class="np-line" fill="none" filter="url(#npGlow)" />
               <g
                 v-for="(p, i) in pulseDots"
                 :key="p.key + '-' + i"
@@ -279,7 +289,7 @@ const selectedCat = ref('top')
 const keyword = ref('')
 const loading = ref(false)
 const loadingMore = ref(false)
-const autoRefresh = ref(false)
+const autoRefresh = ref(true)
 const hot = ref<NewsItem[]>([])
 const tail = ref<NewsItem[]>([])
 const allCount = ref(0)
@@ -305,10 +315,13 @@ const PULSE_H = 168 // SVG 高度（含底部领域文字标签行）
 const PLOT_TOP = 16 // 曲线绘制区上边界（给数值文字留白）
 const PLOT_BOTTOM = PULSE_H - 22 // 曲线绘制区下边界（给领域标签留白）
 const PULSE_PAD = 20
-// 进入页面后自动预加载这些主要分类，保证实时脉搏和右侧推荐都有数据
+// 进入页面后自动预加载这些主要分类，保证实时脉搏和右侧推荐都有数据（领域更多，脉搏更丰富）
 const PULSE_KEYS = [
   'top', 'nation', 'world', 'business', 'tech', 'ent',
-  'sports', 'health', 'science', 'ai', 'stock', 'ev'
+  'sports', 'health', 'science', 'ai', 'internet', 'chip',
+  'ev', 'stock', 'fund', 'forex', 'realestate', 'ecommerce',
+  'travel', 'game', 'esports', 'car', 'energy', 'space',
+  'medical', 'culture'
 ]
 
 /** 单个领域的脉搏数据（带真实新闻文字信息） */
@@ -329,6 +342,28 @@ const categoryData = ref<Record<string, NewsItem[]>>({})
 const carouselIdx = ref(0)
 const rollPaused = ref(false)
 let rollTimer: ReturnType<typeof setInterval> | null = null
+
+/* 实时数值游走：每 2 秒对各领域热度做小幅随机游走，让曲线持续变化（仅展示层，不影响真实数据） */
+const pulseLive = ref<Record<string, number>>({})
+function liveVal(key: string, base: number): number {
+  return Math.max(50, Math.min(100, Math.round(base + (pulseLive.value[key] || 0))))
+}
+let liveTimer: ReturnType<typeof setInterval> | null = null
+function startLiveTick() {
+  if (liveTimer) return
+  liveTimer = setInterval(() => {
+    const out: Record<string, number> = {}
+    for (const k of PULSE_KEYS) {
+      const prev = pulseLive.value[k] || 0
+      const step = Math.round((Math.random() - 0.5) * 6) // -3 ~ +3
+      out[k] = Math.max(-22, Math.min(22, prev + step))
+    }
+    pulseLive.value = out
+  }, 2000)
+}
+
+/* 最近一次成功更新时间（实时更新提示） */
+const updatedAt = ref('')
 
 /* 图表宽度自适应（避免 preserveAspectRatio 拉伸导致文字变形） */
 const chartBox = ref<HTMLElement | null>(null)
@@ -358,6 +393,7 @@ const activeIdx = computed(() => {
   return ((carouselIdx.value % n) + n) % n
 })
 const activePulse = computed<PulseEntry | null>(() => pulseAll.value[activeIdx.value] ?? null)
+const activeHeat = computed(() => (activePulse.value ? liveVal(activePulse.value.key, activePulse.value.value) : 0))
 
 /** 当前同屏可见的领域（总数 > windowSize 时循环轮播，高亮点固定在最右） */
 const pulseVisible = computed<Array<PulseEntry & { idx: number }>>(() => {
@@ -397,7 +433,7 @@ const pulseDots = computed(() => {
     key: p.key,
     idx: p.idx,
     label: p.label,
-    value: p.value,
+    value: liveVal(p.key, p.value),
     color: p.color,
     title: p.title,
     active: p.idx === activeIdx.value
@@ -523,6 +559,9 @@ async function loadAll() {
     allCount.value = 0
   } finally {
     loading.value = false
+    const d = new Date()
+    const p = (n: number) => String(n).padStart(2, '0')
+    updatedAt.value = `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`
   }
 }
 
@@ -596,16 +635,17 @@ function openDetail(n: NewsItem, cat?: NewsCategory) {
   showDetail.value = true
 }
 
-/* ---------- 自动刷新 ---------- */
-watch(autoRefresh, (v) => {
+/* ---------- 自动刷新（默认开启，60 秒一次；缓存 3 分钟，命中缓存不打代理） ---------- */
+function applyAuto() {
   if (autoTimer) {
     clearInterval(autoTimer)
     autoTimer = null
   }
-  if (v) {
-    autoTimer = setInterval(loadAll, 5 * 60 * 1000)
+  if (autoRefresh.value) {
+    autoTimer = setInterval(loadAll, 60000)
   }
-})
+}
+watch(autoRefresh, applyAuto)
 
 onMounted(() => {
   tickBeijing()
@@ -613,6 +653,8 @@ onMounted(() => {
   rollTimer = setInterval(() => {
     if (!rollPaused.value && pulseAll.value.length > 1) carouselIdx.value++
   }, 3000)
+  // 实时数值游走：曲线持续变化
+  startLiveTick()
   // 图表宽度自适应（响应式 + 移动端窄屏不变形）
   if (typeof ResizeObserver !== 'undefined') {
     chartRo = new ResizeObserver((entries) => {
@@ -621,6 +663,7 @@ onMounted(() => {
     })
     if (chartBox.value) chartRo.observe(chartBox.value)
   }
+  applyAuto()
   loadAll()
 })
 // 图表容器在「采集到数据后」才渲染，需在挂载后补挂观察
@@ -635,6 +678,7 @@ onBeforeUnmount(() => {
   if (autoTimer) clearInterval(autoTimer)
   if (clockTimer) clearInterval(clockTimer)
   if (rollTimer) clearInterval(rollTimer)
+  if (liveTimer) clearInterval(liveTimer)
   if (chartRo) chartRo.disconnect()
 })
 </script>
@@ -674,6 +718,15 @@ onBeforeUnmount(() => {
   font-weight: 600;
   color: #0c447c;
   background: #e6f1fb;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-variant-numeric: tabular-nums;
+}
+.np-updated {
+  font-size: 12px;
+  font-weight: 600;
+  color: #7c3aed;
+  background: #f3e8ff;
   padding: 3px 10px;
   border-radius: 999px;
   font-variant-numeric: tabular-nums;
@@ -847,7 +900,7 @@ onBeforeUnmount(() => {
 .np-grid { stroke: #e9e3f7; stroke-width: 1; }
 .np-line {
   stroke: url(#npStroke);
-  stroke-width: 2.6;
+  stroke-width: 3.2;
   stroke-linecap: round;
   stroke-linejoin: round;
 }

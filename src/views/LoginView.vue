@@ -50,7 +50,7 @@
       <!-- 右侧登录卡片 -->
       <section class="login-form-wrap">
         <AuthCard />
-        <p class="mobile-brand">Smart Dashboard · 你的智能工作台</p>
+        <p class="mobile-brand">智习罗盘 · 你的智能工作台</p>
       </section>
     </div>
   </div>
@@ -59,6 +59,7 @@
 <script setup lang="ts">
 import { DataBoard, MagicStick, Lock } from '@element-plus/icons-vue'
 import AuthCard from '../components/AuthCard.vue'
+import CompassLogo from '../components/CompassLogo.vue'
 </script>
 
 <style scoped>
@@ -140,12 +141,12 @@ import AuthCard from '../components/AuthCard.vue'
   margin-bottom: 36px;
 }
 .brand-logo-img {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
   object-fit: contain;
   background: rgba(255, 255, 255, 0.12);
-  padding: 4px;
+  padding: 3px;
   box-sizing: border-box;
   filter: drop-shadow(0 0 10px rgba(255, 255, 255, 0.25));
 }

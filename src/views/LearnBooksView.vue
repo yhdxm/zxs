@@ -384,7 +384,8 @@ onUnmounted(() => { if (clockTimer) window.clearInterval(clockTimer) })
 </script>
 
 <style scoped>
-.lb-root { min-height: 100%; }
+.lb-root { min-height: 100%; padding: 0 20px; }
+@media (max-width: 768px) { .lb-root { padding: 0 14px; } }
 .lb-clock-box { display: inline-flex; align-items: center; gap: 6px; }
 .lb-dot { width: 8px; height: 8px; border-radius: 50%; background: #22c55e; box-shadow: 0 0 0 3px rgba(34,197,94,.2); animation: lbBlink 2s ease-in-out infinite; }
 @keyframes lbBlink { 0%,100% { opacity: 1; } 50% { opacity: .45; } }

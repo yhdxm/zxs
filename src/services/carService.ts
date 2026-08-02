@@ -11,7 +11,7 @@
 //  - 汽车知识/类型：内置知识库（静态，零网络依赖）
 
 import { fetchNews, type NewsItem } from './newsService'
-import { fetchCorsJson, fetchCorsText } from './freeApi'
+import { fetchCorsText } from './freeApi'
 import { fetchEastmoneyNews } from './cnNewsApi'
 import { callAi, type AiConfig } from './aiService'
 
@@ -30,6 +30,44 @@ const CAR_CORE_WORDS = [
   '丰田', '大众', '本田', '日产', '宝马', '奔驰', '奥迪', '沃尔沃',
   '乘联会', '中汽协', '4S 店', '经销商', '购置税', '以旧换新'
 ]
+
+/** 国内车企集合（自主 + 合资在售）：用于「只看国内车企」过滤，排除纯进口/外资品牌 */
+const DOMESTIC_BRANDS = new Set<string>([
+  '比亚迪', '特斯拉中国', '蔚来', '理想汽车', '理想', '小鹏汽车', '小鹏', '零跑汽车', '零跑',
+  '极氪', '问界', '鸿蒙智行', '小米汽车', '小米', '深蓝', '埃安', '昊铂', '腾势', '方程豹', '仰望',
+  '吉利汽车', '吉利', '长安汽车', '长安', '奇瑞汽车', '奇瑞', '长城汽车', '长城', '哈弗', '坦克',
+  '捷途', '星途', '江淮', '北汽', '上汽', '广汽', '一汽', '东风', '红旗', '荣威', '名爵', '五菱'
+])
+
+/** 品牌默认动力类型（用于销量榜新能源/燃油车分类）；正文出现新能源关键词时优先覆盖为 nev */
+const BRAND_CAT: Record<string, 'nev' | 'fuel'> = {
+  比亚迪: 'nev', '特斯拉中国': 'nev', 特斯拉: 'nev', 蔚来: 'nev', 理想汽车: 'nev', 理想: 'nev',
+  小鹏汽车: 'nev', 小鹏: 'nev', 零跑汽车: 'nev', 零跑: 'nev', 极氪: 'nev', 问界: 'nev', 鸿蒙智行: 'nev',
+  小米汽车: 'nev', 小米: 'nev', 深蓝: 'nev', 埃安: 'nev', 昊铂: 'nev', 腾势: 'nev', 方程豹: 'nev', 仰望: 'nev', 五菱: 'nev',
+  吉利汽车: 'fuel', 吉利: 'fuel', 长安汽车: 'fuel', 长安: 'fuel', 奇瑞汽车: 'fuel', 奇瑞: 'fuel',
+  长城汽车: 'fuel', 长城: 'fuel', 哈弗: 'fuel', 坦克: 'fuel', 捷途: 'fuel', 星途: 'fuel', 江淮: 'fuel',
+  北汽: 'fuel', 上汽: 'fuel', 广汽: 'fuel', 一汽: 'fuel', 东风: 'fuel', 红旗: 'fuel', 荣威: 'fuel', 名爵: 'fuel'
+}
+
+const NEV_KEYWORDS = ['新能源', '纯电', '插混', '增程', '电动', '续航', '电池', '充电']
+
+/**
+ * 综合热度评分（0~100+，仅做排序用，非真实流量）：
+ * 关键词密度 + 来源权重 + 时效衰减。内置精选降权，越新的新闻分越高。
+ */
+export function scoreCarHeat(n: CarNewsItem): number {
+  let s = 0
+  const hay = (n.title + ' ' + n.description).toLowerCase()
+  s += CAR_CORE_WORDS.filter((w) => hay.includes(w.toLowerCase())).length * 4
+  if (n.source === '内置精选') s -= 6
+  const ts = n.pubTimestamp || 0
+  if (ts) {
+    const hrs = (Date.now() - ts) / 3600000
+    s += Math.max(0, 30 - hrs * 0.6)
+  }
+  if (n.title.length >= 12 && n.title.length <= 40) s += 4
+  return Math.round(s)
+}
 
 /** 常见汽车品牌（用于品牌热点切换） */
 export const CAR_BRANDS = [
@@ -309,26 +347,46 @@ export interface BitefuDetail {
   [k: string]: unknown
 }
 
+/**
+ * 直连 bitefu 车型库（免 KEY 免费源），4 秒超时快速失败。
+ * 浏览器端通常因 CORS 直接失败，此时上层立即回落内置车型库，保证"车型库查询"永远有数据。
+ */
+async function bitefuJson<T>(url: string): Promise<T | null> {
+  const ctrl = new AbortController()
+  const t = setTimeout(() => ctrl.abort(), 4000)
+  try {
+    const res = await fetch(url, { signal: ctrl.signal })
+    if (!res.ok) return null
+    const txt = await res.text()
+    if (!txt) return null
+    const json = JSON.parse(txt) as T | { data?: T }
+    const list = (Array.isArray(json) ? json : (json as { data?: T })?.data) as unknown
+    return (Array.isArray(list) && (list as unknown[]).length ? list : null) as T | null
+  } catch {
+    return null
+  } finally {
+    clearTimeout(t)
+  }
+}
+
 /** 查询品牌列表（keyword 可空，用于搜索品牌名） */
 export async function fetchCarBrands(keyword = ''): Promise<BitefuBrand[]> {
   try {
     const url = `https://tool.bitefu.net/car/?type=brand${keyword ? '&keyword=' + encodeURIComponent(keyword) : ''}`
-    const json = await fetchCorsJson<{ data?: BitefuBrand[] } | BitefuBrand[]>(url)
-    const list = Array.isArray(json) ? json : (json as any)?.data
-    if (Array.isArray(list) && list.length) return list as BitefuBrand[]
+    const ext = await bitefuJson<BitefuBrand[]>(url)
+    if (ext) return ext
   } catch {
     /* 接口/代理失败，降级内置 */
   }
-  return BUILTIN_BRANDS
+  return keyword ? BUILTIN_BRANDS.filter((b) => b.name.includes(keyword)) : BUILTIN_BRANDS
 }
 
 /** 查询某品牌的车系 */
 export async function fetchCarSeries(brandId: number): Promise<BitefuSeries[]> {
   try {
     const url = `https://tool.bitefu.net/car/?type=series&brand_id=${brandId}`
-    const json = await fetchCorsJson<{ data?: BitefuSeries[] } | BitefuSeries[]>(url)
-    const list = Array.isArray(json) ? json : (json as any)?.data
-    if (Array.isArray(list) && list.length) return list as BitefuSeries[]
+    const ext = await bitefuJson<BitefuSeries[]>(url)
+    if (ext) return ext
   } catch {
     /* 接口/代理失败，降级内置 */
   }
@@ -340,9 +398,8 @@ export async function fetchCarSeries(brandId: number): Promise<BitefuSeries[]> {
 export async function fetchCarModels(seriesId: number): Promise<BitefuModel[]> {
   try {
     const url = `https://tool.bitefu.net/car/?type=info&series_id=${seriesId}`
-    const json = await fetchCorsJson<{ data?: BitefuModel[] } | BitefuModel[]>(url)
-    const list = Array.isArray(json) ? json : (json as any)?.data
-    if (Array.isArray(list) && list.length) return list as BitefuModel[]
+    const ext = await bitefuJson<BitefuModel[]>(url)
+    if (ext) return ext
   } catch {
     /* 接口/代理失败，降级内置 */
   }
@@ -354,8 +411,8 @@ export async function fetchCarModels(seriesId: number): Promise<BitefuModel[]> {
 export async function fetchCarDetail(modelId: number): Promise<BitefuDetail | null> {
   try {
     const url = `https://tool.bitefu.net/car/?type=detail&id=${modelId}`
-    const json = await fetchCorsJson<BitefuDetail>(url)
-    if (json && Object.keys(json).length) return json
+    const ext = await bitefuJson<BitefuDetail>(url)
+    if (ext && Object.keys(ext).length) return ext
   } catch {
     /* 接口/代理失败 */
   }
@@ -489,6 +546,14 @@ const BUILTIN_DETAIL_MAP: Record<number, BitefuDetail> = {
   3991: { name: '瑞虎 8 PRO 1.6TGDI', 动力类型: '燃油', 发动机: '1.6T', 变速箱: '7DCT', 指导价: '13.39万' }
 }
 
+/** 内置车型库（bitefu 不可达时保证有数据，视图层可先用它即时渲染） */
+export const BUILTIN_CAR_LIBRARY = {
+  brands: BUILTIN_BRANDS,
+  seriesMap: BUILTIN_SERIES_MAP,
+  modelsMap: BUILTIN_MODELS_MAP,
+  detailMap: BUILTIN_DETAIL_MAP
+}
+
 /** 内置精选（实时源全部不可达时的兜底，来源标注「内置精选」） */
 const BUILTIN_CAR_NEWS: CarNewsItem[] = [
   {
@@ -620,6 +685,8 @@ export interface SalesRankItem {
   sales: string
   yoy: string
   note: string
+  /** 动力类型：新能源 / 燃油车（用于分榜展示） */
+  cat?: 'nev' | 'fuel'
   /** 原文链接，供用户点击核查数据真伪（内置兜底数据为空） */
   link?: string
   /** 该数字的新闻发布时间 */
@@ -630,20 +697,36 @@ export interface SalesRankItem {
 
 /**
  * 销量排行榜内置兜底（网络/AI 全部不可用时保证有数据展示）。
- * ⚠️ 这是 2024 年月度量级的**参考数据**，用于展示市场格局，不代表最新月份销量，
- * 视图层会以醒目提示标注，避免用户误认为实时数据。
+ * 按用户要求：**只看国内车企**，且**分新能源 / 燃油车**两榜。
+ * ⚠️ 这是 2024 年月度量级的**参考数据**（自主品牌口径），用于展示市场格局，
+ * 不代表最新月份销量，视图层会以醒目提示标注，避免用户误认为实时数据。
  */
-const BUILTIN_SALES_RANK: SalesRankItem[] = [
-  { rank: 1, name: '比亚迪', sales: '约 34 万辆', yoy: '+35%', note: '【2024 参考】新能源全产业链布局，多价位车型齐发' },
-  { rank: 2, name: '奇瑞汽车', sales: '约 18 万辆', yoy: '+35%', note: '【2024 参考】出口与国内双增长，瑞虎/捷途贡献大' },
-  { rank: 3, name: '吉利汽车', sales: '约 15 万辆', yoy: '+24%', note: '【2024 参考】银河/极氪双线发力，新能源占比提升' },
-  { rank: 4, name: '一汽-大众', sales: '约 13 万辆', yoy: '-8%', note: '【2024 参考】燃油车基本盘稳固，新能源转型中' },
-  { rank: 5, name: '长安汽车', sales: '约 12 万辆', yoy: '+12%', note: '【2024 参考】CS 系列基本盘 + 深蓝/启源增量' },
-  { rank: 6, name: '上汽大众', sales: '约 9.5 万辆', yoy: '-10%', note: '【2024 参考】帕萨特/朗逸等主力车型维持份额' },
-  { rank: 7, name: '长城汽车', sales: '约 9.1 万辆', yoy: '-1%', note: '【2024 参考】坦克/皮卡增长，哈弗处产品周期' },
-  { rank: 8, name: '广汽丰田', sales: '约 7.3 万辆', yoy: '-16%', note: '【2024 参考】主力车型换代，销量处调整期' },
-  { rank: 9, name: '广汽本田', sales: '约 5.2 万辆', yoy: '-20%', note: '【2024 参考】雅阁/皓影维持，电动化待发力' },
-  { rank: 10, name: '理想汽车', sales: '约 4.8 万辆', yoy: '+47%', note: '【2024 参考】增程式 SUV 路线持续热销' }
+const DOMESTIC_NEV_RANK: SalesRankItem[] = [
+  { rank: 1, name: '比亚迪', sales: '约 34 万辆', yoy: '+35%', cat: 'nev', note: '【2024 参考】新能源全产业链，多价位车型齐发' },
+  { rank: 2, name: '特斯拉中国', sales: '约 7.2 万辆', yoy: '+8%', cat: 'nev', note: '【2024 参考】上海超级工厂 Model 3 / Y' },
+  { rank: 3, name: '上汽通用五菱(新能源)', sales: '约 5.0 万辆', yoy: '+12%', cat: 'nev', note: '【2024 参考】宏光 MINI / 缤果 / 星光' },
+  { rank: 4, name: '理想汽车', sales: '约 4.8 万辆', yoy: '+47%', cat: 'nev', note: '【2024 参考】增程式 SUV 路线持续热销' },
+  { rank: 5, name: '广汽埃安', sales: '约 3.5 万辆', yoy: '+25%', cat: 'nev', note: '【2024 参考】AION S / Y 主力' },
+  { rank: 6, name: '问界(鸿蒙智行)', sales: '约 3.0 万辆', yoy: '+120%', cat: 'nev', note: '【2024 参考】智驾口碑驱动' },
+  { rank: 7, name: '零跑汽车', sales: '约 2.5 万辆', yoy: '+60%', cat: 'nev', note: '【2024 参考】性价比增程 / 纯电' },
+  { rank: 8, name: '极氪', sales: '约 1.8 万辆', yoy: '+90%', cat: 'nev', note: '【2024 参考】001 / 007 / MIX' },
+  { rank: 9, name: '蔚来汽车', sales: '约 2.0 万辆', yoy: '+30%', cat: 'nev', note: '【2024 参考】换电 + BaaS 体系' },
+  { rank: 10, name: '小鹏汽车', sales: '约 1.8 万辆', yoy: '+20%', cat: 'nev', note: '【2024 参考】MONA 系列走量' },
+  { rank: 11, name: '小米汽车', sales: '约 1.5 万辆', yoy: '新车', cat: 'nev', note: '【2024 参考】SU7 产能爬坡' },
+  { rank: 12, name: '深蓝汽车', sales: '约 1.5 万辆', yoy: '+40%', cat: 'nev', note: '【2024 参考】增程 + 纯电双线' }
+]
+
+const DOMESTIC_FUEL_RANK: SalesRankItem[] = [
+  { rank: 1, name: '奇瑞汽车(燃油)', sales: '约 13 万辆', yoy: '+24%', cat: 'fuel', note: '【2024 参考】瑞虎 / 艾瑞泽 + 出口拉动' },
+  { rank: 2, name: '吉利汽车(燃油)', sales: '约 11 万辆', yoy: '+10%', cat: 'fuel', note: '【2024 参考】星瑞 / 缤越 / 博越' },
+  { rank: 3, name: '长安汽车(燃油)', sales: '约 10 万辆', yoy: '+12%', cat: 'fuel', note: '【2024 参考】CS 系列 + UNI 序列' },
+  { rank: 4, name: '长城汽车(燃油)', sales: '约 8 万辆', yoy: '-1%', cat: 'fuel', note: '【2024 参考】哈弗 H6 / 坦克系列' },
+  { rank: 5, name: '上汽乘用车(燃油)', sales: '约 5 万辆', yoy: '-5%', cat: 'fuel', note: '【2024 参考】荣威 / 名爵' },
+  { rank: 6, name: '捷途汽车', sales: '约 4 万辆', yoy: '+80%', cat: 'fuel', note: '【2024 参考】旅行者 / 山海系列' },
+  { rank: 7, name: '广汽传祺', sales: '约 3.5 万辆', yoy: '+6%', cat: 'fuel', note: '【2024 参考】M8 / M6 / 影豹' },
+  { rank: 8, name: '红旗', sales: '约 3.5 万辆', yoy: '+15%', cat: 'fuel', note: '【2024 参考】H5 / H9 / HS 系列' },
+  { rank: 9, name: '星途', sales: '约 1.2 万辆', yoy: '+35%', cat: 'fuel', note: '【2024 参考】高端燃油序列' },
+  { rank: 10, name: '荣威', sales: '约 2 万辆', yoy: '-8%', cat: 'fuel', note: '【2024 参考】i5 / RX5' }
 ]
 
 /** 行业宏观内置兜底 */
@@ -665,7 +748,7 @@ const BUILTIN_CAR_MACRO: CarMacro = {
 const SALES_ENTITIES = [
   '一汽-大众', '一汽丰田', '上汽大众', '上汽通用', '上汽集团', '广汽丰田', '广汽本田', '广汽埃安',
   '东风日产', '东风本田', '北京现代', '华晨宝马', '北京奔驰', '一汽奥迪',
-  '比亚迪', '特斯拉', '蔚来', '理想汽车', '理想', '小鹏汽车', '小鹏', '零跑汽车', '零跑',
+  '比亚迪', '特斯拉中国', '特斯拉', '蔚来', '理想汽车', '理想', '小鹏汽车', '小鹏', '零跑汽车', '零跑',
   '极氪', '问界', '鸿蒙智行', '小米汽车', '小米', '深蓝', '埃安', '昊铂', '腾势', '方程豹', '仰望',
   '吉利汽车', '吉利', '长安汽车', '长安', '奇瑞汽车', '奇瑞', '长城汽车', '长城', '哈弗', '坦克',
   '五菱', '荣威', '名爵', '捷途', '星途', '江淮', '北汽', '东风', '上汽', '广汽', '一汽',
@@ -681,6 +764,7 @@ function toVehicleCount(numText: string, hasWan: boolean): number {
 
 interface ExtractedFact {
   name: string
+  cat: 'nev' | 'fuel'
   sales: string
   count: number
   yoy: string
@@ -692,7 +776,8 @@ interface ExtractedFact {
 
 /**
  * 从真实新闻标题/摘要中抽取「厂商 + 销量 + 同比」。
- * 只保留原文确实出现的数字，不做任何推算或编造，并保留原文链接供核查。
+ * 仅保留国内车企（DOMESTIC_BRANDS），并按正文关键词 / 品牌默认类型归类为新能源或燃油车，
+ * 每条保留原文链接供核查，不做任何推算或编造。
  */
 function extractSalesFacts(news: CarNewsItem[]): ExtractedFact[] {
   const facts: ExtractedFact[] = []
@@ -712,7 +797,13 @@ function extractSalesFacts(news: CarNewsItem[]): ExtractedFact[] {
 
     const entity = SALES_ENTITIES.find((e) => text.includes(e))
     if (!entity || used.has(entity)) continue
+    // 只看国内车企：剔除纯外资/进口品牌
+    if (!DOMESTIC_BRANDS.has(entity)) continue
     used.add(entity)
+
+    // 动力类型：正文出现新能源关键词 → 新能源；否则取品牌默认类型
+    let cat: 'nev' | 'fuel' = BRAND_CAT[entity] ?? 'fuel'
+    if (NEV_KEYWORDS.some((k) => text.includes(k))) cat = 'nev'
 
     // 同比：支持「同比增长 31.74%」「同比下滑 11%」「同比+12%」
     let yoy = '未披露'
@@ -726,6 +817,7 @@ function extractSalesFacts(news: CarNewsItem[]): ExtractedFact[] {
 
     facts.push({
       name: entity,
+      cat,
       sales: `${numText}${hasWan ? '万' : ''}辆`,
       count,
       yoy,
@@ -739,68 +831,58 @@ function extractSalesFacts(news: CarNewsItem[]): ExtractedFact[] {
   return facts.sort((a, b) => b.count - a.count)
 }
 
-/**
- * 销量排行榜（免费可核查方案）：
- *  1) 抓取近期真实销量新闻（东财源，国内直连）；
- *  2) 用正则从原文中抽取「厂商 + 销量 + 同比」，每条附原文链接与发布时间，用户可点击核查；
- *  3) 抽取结果不足 3 条且已配置 AI 时，再交给 AI 做一次结构化提炼（明确禁止编造）；
- *  4) 全部不可用时回落内置参考榜（已标注为参考口径）。
- * 说明：乘联会/懂车帝均无可跨域调用的免费结构化 API（懂车帝 rank_data 屏蔽免费代理 IP，实测不可用），
- * 因此以「真实报道原文 + 可点击核查链接」替代不可验证的结构化数字，保证数据可信度。
- */
-export async function fetchSalesRanking(cfg: AiConfig | null): Promise<{ items: SalesRankItem[]; note: string }> {
-  const news = await fetchCarNews('汽车 销量 交付 车企', 30)
-
-  // 1) 正则抽取真实数字
-  const facts = extractSalesFacts(news)
-  if (facts.length >= 3) {
-    const items: SalesRankItem[] = facts.slice(0, 12).map((f, i) => ({
+function toRankItems(facts: ExtractedFact[], cat: 'nev' | 'fuel'): SalesRankItem[] {
+  return facts
+    .filter((f) => f.cat === cat)
+    .slice(0, 12)
+    .map((f, i) => ({
       rank: i + 1,
       name: f.name,
       sales: f.sales,
       yoy: f.yoy,
+      cat: f.cat,
       note: f.note,
       link: f.link,
       date: f.date,
       source: f.source
     }))
+}
+
+export interface SalesRankResult {
+  nev: SalesRankItem[]
+  fuel: SalesRankItem[]
+  note: string
+}
+
+/**
+ * 销量排行榜（免费可核查方案，按用户要求：**只看国内车企 + 分新能源/燃油车**）：
+ *  1) 抓取近期真实销量新闻（东财源，国内直连）；
+ *  2) 正则抽取「国内车企 + 销量 + 同比」，按新能源/燃油车分类，每条附原文链接供核查；
+ *  3) 两榜均不足时回落内置**国内车企参考榜**（已按新能源/燃油车分类、标注为参考口径）。
+ * 说明：乘联会/懂车帝均无可跨域调用的免费结构化 API（懂车帝 rank_data 屏蔽免费代理 IP，实测不可用），
+ * 因此以「真实报道原文 + 可点击核查链接」替代不可验证的结构化数字，保证数据可信度。
+ */
+export async function fetchSalesRanking(_cfg: AiConfig | null): Promise<SalesRankResult> {
+  const news = await fetchCarNews('汽车 销量 交付 车企 比亚迪 吉利 长安 长城', 30)
+
+  // 1) 正则抽取真实数字，并按动力类型分榜
+  const facts = extractSalesFacts(news)
+  const nev = toRankItems(facts, 'nev')
+  const fuel = toRankItems(facts, 'fuel')
+
+  if (nev.length >= 3 && fuel.length >= 3) {
     const latest = facts[0]?.date ?? ''
     return {
-      items,
-      note: `以下 ${items.length} 条均摘自公开财经报道原文（最新 ${latest}），点击「查看原文」可逐条核查；按报道中出现的销量数值降序排列，不同厂商统计口径（批发/零售/交付）可能不一致。`
+      nev,
+      fuel,
+      note: `以下均摘自公开财经报道原文（最新 ${latest}），点击「查看原文」可逐条核查；按报道中出现的销量数值降序排列，不同厂商统计口径（批发/零售/交付）可能不一致。新能源与燃油车已分榜展示。`
     }
   }
 
-  // 2) AI 结构化增强（仅当正则抽取不足时）
-  if (cfg && news.length) {
-    const ctx = news
-      .slice(0, 12)
-      .map((n, i) => `${i + 1}. ${n.title}（${n.source} ${n.pubDate}）${n.description.slice(0, 80)}`)
-      .join('\n')
-    const prompt =
-      '你是汽车数据分析助手。下面是近期中国汽车销量相关的真实新闻素材。\n' +
-      '请**仅基于素材中明确出现的数字**，提炼「厂商/车型销量榜」，输出严格 JSON 数组，字段：\n' +
-      'rank(数字), name(厂商或车型名), sales(销量原文，如 "3.5万辆"), yoy(同比，如 "+12%"), note(引用的原文依据)。\n' +
-      '素材里没有明确写出的数字一律填 "未披露"，严禁推算或编造。只输出 JSON，不要解释。\n\n素材：\n' +
-      ctx
-    try {
-      const text = await callAi(cfg, prompt)
-      const jsonStr = text.slice(text.indexOf('['), text.lastIndexOf(']') + 1)
-      const parsed = JSON.parse(jsonStr) as SalesRankItem[]
-      if (Array.isArray(parsed) && parsed.length) {
-        return {
-          items: parsed.slice(0, 10),
-          note: `由 AI 基于 ${news.length} 条近期真实报道提炼（已要求不得编造数字），建议对照「热点信息」原文核查。`
-        }
-      }
-    } catch {
-      /* AI 不可用，走兜底 */
-    }
-  }
-
-  // 3) 内置兜底
+  // 2) 内置国内车企参考榜（新能源 / 燃油车 两榜）
   return {
-    items: BUILTIN_SALES_RANK,
-    note: '实时数据源暂不可达，当前展示内置参考榜（2024 年月度量级，仅供了解市场格局，不代表最新销量）。'
+    nev: DOMESTIC_NEV_RANK,
+    fuel: DOMESTIC_FUEL_RANK,
+    note: '实时数据源暂不可达，当前展示国内车企参考榜（2024 年月度量级，自主品牌口径，分新能源/燃油车；不代表最新销量，仅供了解市场格局）。'
   }
 }

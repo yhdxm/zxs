@@ -140,7 +140,7 @@ const submit = async () => {
       await registerUser(form.username, form.password, form.nickname.trim())
       ElMessage.success('注册成功，已自动登录')
     }
-    router.replace('/dashboard')
+    router.replace('/welcome')
   } catch (error) {
     ElMessage.error(error instanceof Error ? error.message : '操作失败')
   } finally {

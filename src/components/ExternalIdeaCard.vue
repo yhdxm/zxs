@@ -16,7 +16,11 @@
 
     <p v-if="idea.summary" class="idea-summary">{{ idea.summary }}</p>
 
+    <p v-if="idea.cnMeaning" class="idea-cn">{{ idea.cnMeaning }}</p>
+
     <div class="idea-tags">
+      <span v-if="idea.region" class="idea-tag idea-region" :class="regionClassOf(idea.region)">{{ idea.region }}</span>
+      <span v-if="idea.industry" class="idea-tag idea-industry">{{ idea.industry }}</span>
       <span v-for="(t, i) in idea.tags" :key="i" class="idea-tag">{{ t }}</span>
     </div>
 
@@ -48,6 +52,15 @@ defineEmits<{
   (e: 'set-related', idea: ExternalIdea, mod: RelatedModule): void
   (e: 'delete', idea: ExternalIdea): void
 }>()
+
+const regionClassMap: Record<string, string> = {
+  国内: 'domestic',
+  国外: 'overseas',
+  通用: 'common'
+}
+function regionClassOf(region?: string): string {
+  return (region && regionClassMap[region]) || 'common'
+}
 
 function fmtTime(iso: string): string {
   if (!iso) return ''
@@ -103,11 +116,23 @@ function fmtTime(iso: string): string {
   overflow: hidden;
 }
 
+.idea-cn {
+  margin: 0; font-size: 12.5px; color: var(--text, #334155);
+  line-height: 1.7; background: var(--surface-soft, #f8fafc);
+  border-left: 3px solid rgba(99, 102, 241, 0.45);
+  border-radius: 0 8px 8px 0; padding: 7px 10px;
+}
+
 .idea-tags { display: flex; flex-wrap: wrap; gap: 6px; }
 .idea-tag {
   font-size: 11px; color: var(--primary, #6366f1);
   background: rgba(99, 102, 241, 0.08); padding: 1px 8px; border-radius: 999px;
 }
+.idea-region { font-weight: 600; }
+.idea-region.domestic { color: #15803d; background: rgba(34, 197, 94, 0.12); }
+.idea-region.overseas { color: #1d4ed8; background: rgba(59, 130, 246, 0.12); }
+.idea-region.common { color: var(--text-faint, #94a3b8); background: rgba(148, 163, 184, 0.14); }
+.idea-industry { color: #b45309; background: rgba(245, 158, 11, 0.12); }
 
 .idea-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 2px; }
 .idea-relate { width: 120px; }

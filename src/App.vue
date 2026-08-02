@@ -14,17 +14,9 @@
   <div v-else-if="isLoggedIn" class="app-shell is-authed" :class="{ collapsed: sidebarCollapsed }">
     <aside class="app-sidebar">
       <div class="side-brand">
-        <svg class="brand-logo-img" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Smart Dashboard">
-          <rect x="6" y="6" width="52" height="52" rx="14" fill="#6366f1" />
-          <g fill="#ffffff">
-            <rect x="16" y="36" width="8" height="12" rx="2" />
-            <rect x="28" y="28" width="8" height="20" rx="2" />
-            <rect x="40" y="20" width="8" height="28" rx="2" />
-          </g>
-        </svg>
+        <CompassLogo :size="38" class="brand-logo-img" label="智习罗盘" />
         <div class="brand-text">
-          <span class="brand-name">Smart</span>
-          <span class="brand-suffix">Dashboard</span>
+          <span class="brand-name">智习罗盘</span>
         </div>
       </div>
 
@@ -128,17 +120,9 @@
     <!-- 已登录：移动端抽屉 -->
     <el-drawer v-model="mobileNavVisible" direction="ltr" size="280px" :with-header="false" class="mobile-drawer">
       <div class="drawer-brand">
-        <svg class="brand-logo-img" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Smart Dashboard">
-          <rect x="6" y="6" width="52" height="52" rx="14" fill="#6366f1" />
-          <g fill="#ffffff">
-            <rect x="16" y="36" width="8" height="12" rx="2" />
-            <rect x="28" y="28" width="8" height="20" rx="2" />
-            <rect x="40" y="20" width="8" height="28" rx="2" />
-          </g>
-        </svg>
+        <CompassLogo :size="38" class="brand-logo-img" label="智习罗盘" />
         <div class="brand-text">
-          <span class="brand-name">Smart</span>
-          <span class="brand-suffix">Dashboard</span>
+          <span class="brand-name">智习罗盘</span>
         </div>
       </div>
       <div class="drawer-search">
@@ -209,12 +193,12 @@
       <el-button text class="menu-btn" @click="drawerVisible = true">
         <span class="menu-icon">☰</span>
       </el-button>
-      <div class="brand">Smart Dashboard</div>
+      <div class="brand">智习罗盘</div>
       <div class="topbar-user">{{ currentUser?.nickname || '' }}</div>
     </header>
 
     <el-drawer v-model="drawerVisible" direction="ltr" size="230px" :with-header="false">
-      <div class="drawer-brand">Smart Dashboard</div>
+      <div class="drawer-brand">智习罗盘</div>
       <nav class="side-menu">
         <button
           v-for="item in menuItems"
@@ -235,7 +219,7 @@
 
     <div class="layout">
       <aside class="sidebar">
-        <div class="sidebar-brand">Smart Dashboard</div>
+        <div class="sidebar-brand">智习罗盘</div>
         <nav class="side-menu">
           <button
             v-for="item in menuItems"
@@ -289,6 +273,7 @@ import {
   type AppUser
 } from './services/appDataService'
 import { APP_MENU, canManageSystem, type SideItem } from './config/appMenu'
+import CompassLogo from './components/CompassLogo.vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -649,10 +634,10 @@ onMounted(async () => {
 .brand-logo-img {
   width: 38px;
   height: 38px;
-  border-radius: 50%;
+  border-radius: 12px;
   object-fit: contain;
   background: var(--nav-hover);
-  padding: 4px;
+  padding: 3px;
   box-sizing: border-box;
   filter: drop-shadow(0 0 14px var(--accent-glow));
   position: relative;

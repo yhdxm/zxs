@@ -2,7 +2,7 @@
   <div class="xy-root">
     <PageHeader
       title="星舆识途"
-      subtitle="汽车资讯 · 知识 · AI 答疑 · 数据源：Google News RSS + 汽车之家车型库(bitefu 免KEY) + 国内兜底 · 全部免费公开源、不消耗额度"
+      subtitle="汽车资讯 · 知识 · AI 答疑 · 数据源：东方财富资讯搜索 + 汽车之家车型库(bitefu 免KEY) + 国内兜底 · 全部免费公开源、不消耗额度"
       :icon="Van"
     >
       <div class="xy-clock-box" title="北京时间">
@@ -47,15 +47,19 @@
           <div v-if="qaAnswer" class="xy-answer">{{ qaAnswer }}</div>
         </div>
 
-        <!-- 热点信息 -->
+        <!-- 热点信息（按热度排名） -->
         <div v-else-if="active === 'hot'" class="xy-card">
           <div class="xy-hrow">
-            <h3 class="xy-h">汽车热点信息</h3>
+            <h3 class="xy-h">汽车热点信息 · 按热度排名</h3>
             <button class="xy-refresh" @click="loadHot" :disabled="loading.hot">{{ loading.hot ? '加载中…' : '刷新' }}</button>
           </div>
           <div v-if="!hotNews.length && loading.hot" class="xy-skeleton"><el-skeleton :rows="6" animated /></div>
           <div v-else class="xy-grid">
-            <a v-for="n in hotNews" :key="n.link" :href="n.link" target="_blank" class="xy-news">
+            <a v-for="(n, i) in byHeat(hotNews)" :key="n.link" :href="n.link" target="_blank" class="xy-news">
+              <div class="xy-news-top">
+                <span class="xy-news-rank" :class="'rk' + (i < 3 ? i + 1 : 0)">#{{ i + 1 }}</span>
+                <span class="xy-news-heat">🔥 {{ scoreCarHeat(n) }}</span>
+              </div>
               <div class="xy-news-title">{{ n.title }}</div>
               <div class="xy-news-meta"><span>{{ n.source }}</span><span>{{ n.pubDate }}</span></div>
             </a>
@@ -63,7 +67,7 @@
           </div>
         </div>
 
-        <!-- 汽车知识 -->
+        <!-- 汽车知识（分类配色 + 鲜艳立体） -->
         <div v-else-if="active === 'knowledge'" class="xy-card">
           <div class="xy-hrow">
             <h3 class="xy-h">汽车知识（小白可读）</h3>
@@ -78,7 +82,7 @@
             >{{ c }}</button>
           </div>
           <div class="xy-grid2">
-            <div v-for="k in filteredKnowledge" :key="k.title" class="xy-know">
+            <div v-for="k in filteredKnowledge" :key="k.title" class="xy-know" :style="{ '--kc': catColor(k.cat) }">
               <div class="xy-know-cat">{{ k.cat }}</div>
               <div class="xy-know-title">{{ k.title }}</div>
               <div class="xy-know-body">{{ k.content }}</div>
@@ -97,10 +101,10 @@
           </div>
         </div>
 
-        <!-- 销量排行 -->
+        <!-- 销量排行（国内车企 · 分新能源 / 燃油车） -->
         <div v-else-if="active === 'rank'" class="xy-card">
           <div class="xy-hrow">
-            <h3 class="xy-h">每月销量排行榜 / 行业宏观</h3>
+            <h3 class="xy-h">国内车企销量排行榜</h3>
             <button class="xy-refresh" @click="loadRank" :disabled="loading.rank">{{ loading.rank ? '生成中…' : '重新生成' }}</button>
           </div>
           <div class="xy-macro">
@@ -118,29 +122,55 @@
             </div>
             <p v-else class="xy-macro-empty">宏观数据加载中，若长时间无数据请点右上角「重新生成」。</p>
           </div>
-          <p class="xy-note">{{ rank.note }}</p>
-          <div v-if="rank.items.length" class="xy-table-wrap">
-            <table class="xy-table">
-              <thead>
-                <tr><th>#</th><th>厂商 / 车型</th><th>销量</th><th>同比</th><th>报道原文（可点击核查）</th></tr>
-              </thead>
-              <tbody>
-                <tr v-for="r in rank.items" :key="r.rank + r.name">
-                  <td>{{ r.rank }}</td>
-                  <td class="xy-td-name">{{ r.name }}</td>
-                  <td class="xy-td-sales">{{ r.sales }}</td>
-                  <td :class="r.yoy.includes('-') ? 'down' : (r.yoy === '未披露' ? '' : 'up')">{{ r.yoy }}</td>
-                  <td class="xy-td-note">
-                    <span>{{ r.note }}</span>
-                    <a v-if="r.link" :href="r.link" target="_blank" rel="noopener" class="xy-src-link">
-                      查看原文{{ r.source ? '（' + r.source + (r.date ? ' · ' + r.date.slice(5, 16) : '') + '）' : '' }}
-                    </a>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+
+          <div class="xy-boards">
+            <!-- 新能源榜 -->
+            <div class="xy-board nev">
+              <div class="xy-board-head">
+                <span class="xy-board-ico">⚡</span>
+                <span class="xy-board-title">新能源销量榜</span>
+                <span class="xy-board-tag">国内车企</span>
+              </div>
+              <ol class="xy-rank">
+                <li v-for="r in rank.nev" :key="'nev' + r.rank" class="xy-rank-row" :class="'top' + Math.min(r.rank, 3)">
+                  <span class="xy-rank-no">{{ r.rank }}</span>
+                  <div class="xy-rank-main">
+                    <div class="xy-rank-name">{{ r.name }}</div>
+                    <div class="xy-rank-note">{{ r.note }}</div>
+                  </div>
+                  <div class="xy-rank-num">
+                    <span class="xy-rank-sales">{{ r.sales }}</span>
+                    <span class="xy-rank-yoy" :class="yoyClass(r.yoy)">{{ r.yoy }}</span>
+                  </div>
+                </li>
+              </ol>
+              <p v-if="!rank.nev.length" class="xy-empty">暂无新能源榜单数据</p>
+            </div>
+
+            <!-- 燃油车榜 -->
+            <div class="xy-board fuel">
+              <div class="xy-board-head">
+                <span class="xy-board-ico">🔥</span>
+                <span class="xy-board-title">燃油车销量榜</span>
+                <span class="xy-board-tag">国内车企</span>
+              </div>
+              <ol class="xy-rank">
+                <li v-for="r in rank.fuel" :key="'fuel' + r.rank" class="xy-rank-row" :class="'top' + Math.min(r.rank, 3)">
+                  <span class="xy-rank-no">{{ r.rank }}</span>
+                  <div class="xy-rank-main">
+                    <div class="xy-rank-name">{{ r.name }}</div>
+                    <div class="xy-rank-note">{{ r.note }}</div>
+                  </div>
+                  <div class="xy-rank-num">
+                    <span class="xy-rank-sales">{{ r.sales }}</span>
+                    <span class="xy-rank-yoy" :class="yoyClass(r.yoy)">{{ r.yoy }}</span>
+                  </div>
+                </li>
+              </ol>
+              <p v-if="!rank.fuel.length" class="xy-empty">暂无燃油车榜单数据</p>
+            </div>
           </div>
-          <p v-else class="xy-empty">暂无结构化榜单，可查看「汽车热点信息」获取原始销量新闻。</p>
+          <p v-if="rank.note" class="xy-rank-note-big">{{ rank.note }}</p>
         </div>
 
         <!-- 汽车类型 -->
@@ -154,7 +184,7 @@
           </div>
         </div>
 
-        <!-- 车型库查询（bitefu / 汽车之家免 KEY） -->
+        <!-- 车型库查询（bitefu / 汽车之家免 KEY，内置库兜底，保证有数据） -->
         <div v-else-if="active === 'cartype'" class="xy-card">
           <div class="xy-hrow">
             <h3 class="xy-h">车型库查询（汽车之家数据 · 免 KEY）</h3>
@@ -207,7 +237,11 @@
           </div>
           <div v-if="!discountNews.length && loading.discount" class="xy-skeleton"><el-skeleton :rows="6" animated /></div>
           <div v-else class="xy-grid">
-            <a v-for="n in discountNews" :key="n.link" :href="n.link" target="_blank" class="xy-news">
+            <a v-for="(n, i) in byHeat(discountNews)" :key="n.link" :href="n.link" target="_blank" class="xy-news">
+              <div class="xy-news-top">
+                <span class="xy-news-rank" :class="'rk' + (i < 3 ? i + 1 : 0)">#{{ i + 1 }}</span>
+                <span class="xy-news-heat">🔥 {{ scoreCarHeat(n) }}</span>
+              </div>
               <div class="xy-news-title">{{ n.title }}</div>
               <div class="xy-news-meta"><span>{{ n.source }}</span><span>{{ n.pubDate }}</span></div>
             </a>
@@ -223,7 +257,11 @@
           </div>
           <div v-if="!newCarNews.length && loading.newcar" class="xy-skeleton"><el-skeleton :rows="6" animated /></div>
           <div v-else class="xy-grid">
-            <a v-for="n in newCarNews" :key="n.link" :href="n.link" target="_blank" class="xy-news">
+            <a v-for="(n, i) in byHeat(newCarNews)" :key="n.link" :href="n.link" target="_blank" class="xy-news">
+              <div class="xy-news-top">
+                <span class="xy-news-rank" :class="'rk' + (i < 3 ? i + 1 : 0)">#{{ i + 1 }}</span>
+                <span class="xy-news-heat">🔥 {{ scoreCarHeat(n) }}</span>
+              </div>
               <div class="xy-news-title">{{ n.title }}</div>
               <div class="xy-news-meta"><span>{{ n.source }}</span><span>{{ n.pubDate }}</span></div>
             </a>
@@ -242,7 +280,11 @@
           </div>
           <div v-if="!brandNews.length && loading.brand" class="xy-skeleton"><el-skeleton :rows="6" animated /></div>
           <div v-else class="xy-grid">
-            <a v-for="n in brandNews" :key="n.link" :href="n.link" target="_blank" class="xy-news">
+            <a v-for="(n, i) in byHeat(brandNews)" :key="n.link" :href="n.link" target="_blank" class="xy-news">
+              <div class="xy-news-top">
+                <span class="xy-news-rank" :class="'rk' + (i < 3 ? i + 1 : 0)">#{{ i + 1 }}</span>
+                <span class="xy-news-heat">🔥 {{ scoreCarHeat(n) }}</span>
+              </div>
               <div class="xy-news-title">{{ n.title }}</div>
               <div class="xy-news-meta"><span>{{ n.source }}</span><span>{{ n.pubDate }}</span></div>
             </a>
@@ -282,12 +324,13 @@ import {
   fetchCarSeries,
   fetchCarModels,
   fetchCarDetail,
+  scoreCarHeat,
+  BUILTIN_CAR_LIBRARY,
   CAR_KNOWLEDGE,
   CAR_TYPES,
   CAR_BRANDS,
   type CarNewsItem,
   type CarMacro,
-  type SalesRankItem,
   type BitefuBrand,
   type BitefuSeries,
   type BitefuModel,
@@ -300,7 +343,7 @@ const MODULES = [
   { key: 'ai', label: '调用 AI', desc: '选车用车 AI 答疑', color: '#7c3aed', icon: ChatDotRound },
   { key: 'hot', label: '热点信息', desc: '汽车实时热点', color: '#e23b3b', icon: Bell },
   { key: 'knowledge', label: '汽车知识', desc: '小白通识百科', color: '#0ea5e9', icon: Reading },
-  { key: 'rank', label: '销量排行', desc: '榜单 + 行业宏观', color: '#1f9d55', icon: TrendCharts },
+  { key: 'rank', label: '销量排行', desc: '国内车企 · 新能源/燃油', color: '#1f9d55', icon: TrendCharts },
   { key: 'types', label: '汽车类型', desc: '全品类速览', color: '#7c5cff', icon: Van },
   { key: 'cartype', label: '车型库查询', desc: '品牌/车系/配置', color: '#0891b2', icon: Van },
   { key: 'discount', label: '终端优惠', desc: '降价行情', color: '#e08a00', icon: Discount },
@@ -325,6 +368,7 @@ onMounted(async () => {
   loadWatch()
   // 进入默认模块即加载数据
   await loadHot()
+  await loadRank()
 })
 
 /* 进入模块时自动加载（数据为空才拉），保证有内容 */
@@ -334,7 +378,7 @@ function switchModule(key: string): void {
   if (key === 'discount' && !discountNews.value.length && !loading.discount) void loadDiscount()
   if (key === 'newcar' && !newCarNews.value.length && !loading.newcar) void loadNewCar()
   if (key === 'brand' && !brandNews.value.length && !loading.brand) void loadBrand()
-  if (key === 'rank' && !rank.value.items.length && !loading.rank) void loadRank()
+  if (key === 'rank' && !rank.value.nev.length && !rank.value.fuel.length && !loading.rank) void loadRank()
   if (key === 'cartype' && !carBrands.value.length && !loadingCartype.brands) void loadCarBrands()
 }
 
@@ -344,13 +388,24 @@ function countOf(key: string): string {
     case 'knowledge': return String(CAR_KNOWLEDGE.length)
     case 'types': return String(CAR_TYPES.length)
     case 'hot': return hotNews.value.length ? String(hotNews.value.length) : (loading.hot ? '…' : '—')
-    case 'rank': return rank.value.items.length ? String(rank.value.items.length) : (loading.rank ? '…' : '—')
+    case 'rank': return rank.value.nev.length + rank.value.fuel.length ? String(rank.value.nev.length + rank.value.fuel.length) : (loading.rank ? '…' : '—')
     case 'discount': return discountNews.value.length ? String(discountNews.value.length) : (loading.discount ? '…' : '—')
     case 'newcar': return newCarNews.value.length ? String(newCarNews.value.length) : (loading.newcar ? '…' : '—')
     case 'brand': return brandNews.value.length ? String(brandNews.value.length) : (loading.brand ? '…' : '—')
-    case 'cartype': return carSeries.value.length ? String(carBrands.value.length) + '品牌' : (loadingCartype.brands ? '…' : '—')
+    case 'cartype': return carBrands.value.length ? String(carBrands.value.length) + '品牌' : (loadingCartype.brands ? '…' : '—')
   }
   return '—'
+}
+
+/* 综合热度排序（用于热点/优惠/新品/品牌，按热度排名展示） */
+function byHeat(list: CarNewsItem[]): CarNewsItem[] {
+  return [...list].sort((a, b) => scoreCarHeat(b) - scoreCarHeat(a))
+}
+
+/* 销量同比样式类 */
+function yoyClass(yoy: string): string {
+  if (yoy === '未披露') return ''
+  return yoy.includes('-') ? 'down' : 'up'
 }
 
 /* AI 答疑 */
@@ -393,6 +448,16 @@ const filteredKnowledge = computed(() => {
     return hay.includes(kw)
   })
 })
+/** 知识分类 → 鲜艳主题色 */
+const CAT_COLORS: Record<string, string> = {
+  '三电与技术': '#10b981',
+  '买车决策': '#f59e0b',
+  '智能驾驶': '#6366f1',
+  '用车养车': '#0ea5e9',
+  '看懂数据': '#ec4899',
+  '安全常识': '#ef4444'
+}
+function catColor(c: string): string { return CAT_COLORS[c] || '#7c3aed' }
 async function explainKnowledge(k: { title: string; _explain: string }): Promise<void> {
   if (!cfg.value) { ElMessage.warning('请先配置 AI 密钥'); return }
   k._explain = 'AI 解读中…'
@@ -403,7 +468,7 @@ async function explainKnowledge(k: { title: string; _explain: string }): Promise
 const carTypes = CAR_TYPES
 const brands = CAR_BRANDS
 
-/* 车型库查询（bitefu / 汽车之家免 KEY） */
+/* 车型库查询（bitefu / 汽车之家免 KEY，内置库兜底，保证有数据） */
 const loadingCartype = reactive({ brands: false, series: false, models: false, detail: false })
 const carKw = ref('')
 const carBrands = ref<BitefuBrand[]>([])
@@ -416,34 +481,37 @@ const carSelModel = ref<number | null>(null)
 
 async function loadCarBrands(): Promise<void> {
   loadingCartype.brands = true
+  // 先用内置库即时渲染，避免 bitefu 不可达时长时间空白
+  carBrands.value = BUILTIN_CAR_LIBRARY.brands
   carSelBrand.value = null; carSelSeries.value = null; carSelModel.value = null; carSeries.value = []; carModels.value = []; carDetail.value = null
-  carBrands.value = await fetchCarBrands(carKw.value.trim())
+  const ext = await fetchCarBrands(carKw.value.trim())
+  if (ext.length) carBrands.value = ext
   loadingCartype.brands = false
 }
 async function onSelectBrand(b: BitefuBrand): Promise<void> {
   carSelBrand.value = b.id
-  loadingCartype.series = true
+  carSeries.value = BUILTIN_CAR_LIBRARY.seriesMap[b.id] || []
   carSelSeries.value = null; carSelModel.value = null; carModels.value = []; carDetail.value = null
-  carSeries.value = await fetchCarSeries(b.id)
-  loadingCartype.series = false
+  const ext = await fetchCarSeries(b.id)
+  if (ext.length) carSeries.value = ext
 }
 async function onSelectSeries(s: BitefuSeries): Promise<void> {
   carSelSeries.value = s.id
-  loadingCartype.models = true
+  carModels.value = BUILTIN_CAR_LIBRARY.modelsMap[s.id] || []
   carSelModel.value = null; carDetail.value = null
-  carModels.value = await fetchCarModels(s.id)
-  loadingCartype.models = false
+  const ext = await fetchCarModels(s.id)
+  if (ext.length) carModels.value = ext
 }
 async function onSelectModel(m: BitefuModel): Promise<void> {
   carSelModel.value = m.id
-  loadingCartype.detail = true
-  carDetail.value = await fetchCarDetail(m.id)
-  loadingCartype.detail = false
+  carDetail.value = BUILTIN_CAR_LIBRARY.detailMap[m.id] || null
+  const ext = await fetchCarDetail(m.id)
+  if (ext && Object.keys(ext).length) carDetail.value = ext
 }
 
-/* 销量排行 + 宏观 */
+/* 销量排行 + 宏观（国内车企 · 新能源/燃油车 分榜） */
 const macro = ref<CarMacro>({ source: '', title: '', series: [] })
-const rank = ref<{ items: SalesRankItem[]; note: string }>({ items: [], note: '' })
+const rank = ref<{ nev: { rank: number; name: string; sales: string; yoy: string; note: string }[]; fuel: { rank: number; name: string; sales: string; yoy: string; note: string }[]; note: string }>({ nev: [], fuel: [], note: '' })
 async function loadRank(): Promise<void> {
   loading.rank = true
   const [m, r] = await Promise.all([fetchCarMacro(), fetchSalesRanking(cfg.value)])
@@ -478,7 +546,7 @@ onUnmounted(() => { if (clockTimer) window.clearInterval(clockTimer) })
 .xy-clock { font-variant-numeric: tabular-nums; font-size: 13px; color: var(--text-strong); }
 .xy-clock-hint { font-size: 11px; color: var(--text-faint); }
 
-/* 八模块入口卡片（复用 AI 知识模型的视觉语言） */
+/* 八模块入口卡片 */
 .xy-entries {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -501,13 +569,13 @@ onUnmounted(() => { if (clockTimer) window.clearInterval(clockTimer) })
   overflow: hidden;
   transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease, background .18s ease;
 }
-.xy-entry:hover { transform: translateY(-2px); border-color: var(--c); }
-.xy-entry.on { border-color: var(--c); background: color-mix(in srgb, var(--c) 7%, var(--surface)); }
+.xy-entry:hover { transform: translateY(-2px); border-color: var(--c); box-shadow: 0 10px 24px rgba(15,23,42,.10); }
+.xy-entry.on { border-color: var(--c); background: color-mix(in srgb, var(--c) 8%, var(--surface)); }
 .xe-bar { position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--c); opacity: 0; transition: opacity .18s ease; }
 .xy-entry.on .xe-bar { opacity: 1; }
 .xe-icon {
   width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center;
-  flex-shrink: 0; background: color-mix(in srgb, var(--c) 12%, transparent); color: var(--c);
+  flex-shrink: 0; background: color-mix(in srgb, var(--c) 14%, transparent); color: var(--c);
 }
 .xe-icon :deep(svg) { font-size: 17px; }
 .xe-text { display: flex; flex-direction: column; min-width: 0; flex: 1; line-height: 1.3; }
@@ -531,16 +599,48 @@ onUnmounted(() => { if (clockTimer) window.clearInterval(clockTimer) })
 .xy-refresh { border: 1px solid var(--border); background: var(--surface); color: var(--text-muted); border-radius: 8px; padding: 5px 12px; cursor: pointer; font-size: 12px; }
 .xy-refresh:hover { color: var(--brand, #378add); border-color: var(--brand, #378add); }
 .xy-skeleton { padding: 4px 0; }
+
+/* 新闻网格：鲜艳立体卡片 + 热度排名 */
 .xy-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
 .xy-grid2 { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
-.xy-news { display: block; padding: 12px; border: 1px solid var(--border); border-radius: 10px; text-decoration: none; color: inherit; background: var(--surface-soft); transition: .15s; }
-.xy-news:hover { border-color: var(--brand, #378add); transform: translateY(-2px); }
+.xy-news {
+  position: relative;
+  display: block;
+  padding: 14px 14px 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  text-decoration: none;
+  color: inherit;
+  background: linear-gradient(180deg, var(--surface) 0%, var(--surface-soft) 100%);
+  overflow: hidden;
+  transition: transform .16s ease, box-shadow .16s ease, border-color .16s ease;
+}
+.xy-news::before {
+  content: '';
+  position: absolute; left: 0; top: 0; right: 0; height: 3px;
+  background: linear-gradient(90deg, #ef4444, #f59e0b, #eab308);
+  opacity: .85;
+}
+.xy-news:hover { transform: translateY(-3px); box-shadow: 0 12px 26px rgba(239,68,68,.16); border-color: #fca5a5; }
+.xy-news-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.xy-news-rank {
+  font-size: 12px; font-weight: 800; color: #fff; min-width: 30px; height: 20px; padding: 0 8px;
+  border-radius: 999px; display: inline-grid; place-items: center; font-variant-numeric: tabular-nums;
+  background: linear-gradient(135deg, #94a3b8, #64748b);
+}
+.xy-news-rank.rk1 { background: linear-gradient(135deg, #f59e0b, #d97706); box-shadow: 0 4px 10px rgba(217,119,6,.35); }
+.xy-news-rank.rk2 { background: linear-gradient(135deg, #cbd5e1, #94a3b8); box-shadow: 0 4px 10px rgba(148,163,184,.35); }
+.xy-news-rank.rk3 { background: linear-gradient(135deg, #fdba74, #ea580c); box-shadow: 0 4px 10px rgba(234,92,12,.35); }
+.xy-news-heat { font-size: 11px; font-weight: 700; color: #ef4444; background: rgba(239,68,68,.10); border-radius: 999px; padding: 2px 8px; font-variant-numeric: tabular-nums; }
 .xy-news-title { font-size: 13px; color: var(--text-strong); line-height: 1.5; margin-bottom: 8px; }
 .xy-news-meta { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-faint); }
-.xy-know { padding: 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-soft); }
+
+/* 知识卡：分类配色 + 立体感 */
+.xy-know { position: relative; padding: 12px 14px 12px 16px; border: 1px solid var(--border); border-left: 4px solid var(--kc); border-radius: 10px; background: var(--surface-soft); transition: transform .16s ease, box-shadow .16s ease; }
+.xy-know:hover { transform: translateY(-2px); box-shadow: 0 10px 22px color-mix(in srgb, var(--kc) 22%, transparent); }
 .xy-know-cat {
-  display: inline-block; font-size: 11px; color: #0891b2; background: rgba(8,145,178,.1);
-  border-radius: 5px; padding: 1px 7px; margin-bottom: 6px;
+  display: inline-block; font-size: 11px; font-weight: 700; color: #fff;
+  background: var(--kc); border-radius: 5px; padding: 2px 8px; margin-bottom: 6px;
 }
 .xy-know-title { font-size: 13px; font-weight: 600; color: var(--text-strong); margin-bottom: 6px; }
 .xy-know-body { font-size: 12px; color: var(--text-muted); line-height: 1.6; }
@@ -558,28 +658,54 @@ onUnmounted(() => { if (clockTimer) window.clearInterval(clockTimer) })
 .xy-mini.ghost:hover { color: var(--brand, #378add); }
 .xy-mini.danger { color: #ef4444; }
 .xy-empty { grid-column: 1 / -1; color: var(--text-faint); font-size: 13px; padding: 18px; text-align: center; }
-.xy-macro { background: var(--surface-soft); border-radius: 10px; padding: 12px; margin-bottom: 12px; }
+
+/* 销量榜：双榜（新能源/燃油车）鲜艳立体 */
+.xy-macro { background: var(--surface-soft); border-radius: 10px; padding: 12px; margin-bottom: 14px; }
 .xy-macro-title { font-size: 13px; color: var(--text-strong); margin-bottom: 8px; display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; }
 .xy-macro-src { font-size: 11px; color: var(--text-faint); font-weight: 400; }
 .xy-macro-row { display: flex; flex-wrap: wrap; gap: 6px; }
 .xy-macro-chip { font-size: 12px; color: var(--text-muted); background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 3px 8px; font-variant-numeric: tabular-nums; }
 .xy-macro-chip b { color: var(--text-strong); font-weight: 600; margin-right: 4px; }
 .xy-macro-empty { font-size: 12px; color: var(--text-faint); margin: 0; }
-.xy-table-wrap { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
-.xy-table { width: 100%; min-width: 620px; border-collapse: collapse; font-size: 13px; margin-top: 6px; }
-.xy-table th, .xy-table td { border: 1px solid var(--border); padding: 8px 10px; text-align: left; vertical-align: top; }
-.xy-table th { background: var(--surface-soft); color: var(--text-muted); font-weight: 600; white-space: nowrap; }
-.xy-td-name { font-weight: 600; color: var(--text-strong); white-space: nowrap; }
-.xy-td-sales { font-variant-numeric: tabular-nums; white-space: nowrap; }
-.xy-td-note { color: var(--text-faint); font-size: 12px; line-height: 1.6; }
-.xy-src-link {
-  display: inline-block; margin-top: 4px; font-size: 11.5px; color: var(--brand, #378add);
-  text-decoration: none; border-bottom: 1px dashed currentColor;
+
+.xy-boards { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.xy-board { border-radius: 14px; padding: 14px; border: 1px solid var(--border); background: var(--surface); box-shadow: var(--shadow-card); }
+.xy-board.nev { background: linear-gradient(180deg, color-mix(in srgb, #10b981 8%, var(--surface)) 0%, var(--surface) 60%); border-color: color-mix(in srgb, #10b981 30%, var(--border)); }
+.xy-board.fuel { background: linear-gradient(180deg, color-mix(in srgb, #f97316 8%, var(--surface)) 0%, var(--surface) 60%); border-color: color-mix(in srgb, #f97316 30%, var(--border)); }
+.xy-board-head { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+.xy-board-ico { font-size: 18px; }
+.xy-board-title { font-size: 14px; font-weight: 700; color: var(--text-strong); }
+.xy-board.nev .xy-board-title { color: #047857; }
+.xy-board.fuel .xy-board-title { color: #c2410c; }
+.xy-board-tag { margin-left: auto; font-size: 11px; font-weight: 700; color: #fff; background: var(--text-faint); border-radius: 999px; padding: 2px 9px; }
+.xy-board.nev .xy-board-tag { background: #10b981; }
+.xy-board.fuel .xy-board-tag { background: #f97316; }
+
+.xy-rank { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.xy-rank-row {
+  display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 10px;
+  background: var(--surface-soft); border: 1px solid var(--border);
+  transition: transform .15s ease, box-shadow .15s ease;
 }
-.xy-src-link:hover { opacity: .8; }
-.xy-note { font-size: 12px; color: var(--text-faint); margin: 6px 0; }
-.up { color: #ef4444; }
-.down { color: #16a34a; }
+.xy-rank-row:hover { transform: translateX(2px); box-shadow: 0 6px 16px rgba(15,23,42,.08); }
+.xy-rank-no {
+  flex-shrink: 0; width: 26px; height: 26px; border-radius: 8px; display: grid; place-items: center;
+  font-size: 13px; font-weight: 800; color: #fff; background: linear-gradient(135deg, #64748b, #475569); font-variant-numeric: tabular-nums;
+}
+.xy-rank-row.top1 .xy-rank-no { background: linear-gradient(135deg, #fbbf24, #d97706); box-shadow: 0 4px 10px rgba(217,119,6,.4); }
+.xy-rank-row.top2 .xy-rank-no { background: linear-gradient(135deg, #e2e8f0, #94a3b8); box-shadow: 0 4px 10px rgba(148,163,184,.4); }
+.xy-rank-row.top3 .xy-rank-no { background: linear-gradient(135deg, #fdba74, #ea580c); box-shadow: 0 4px 10px rgba(234,92,12,.4); }
+.xy-rank-main { flex: 1; min-width: 0; }
+.xy-rank-name { font-size: 13px; font-weight: 700; color: var(--text-strong); }
+.xy-rank-note { font-size: 11px; color: var(--text-faint); line-height: 1.45; margin-top: 2px; }
+.xy-rank-num { flex-shrink: 0; text-align: right; display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+.xy-rank-sales { font-size: 14px; font-weight: 800; color: var(--text-strong); font-variant-numeric: tabular-nums; }
+.xy-rank-yoy { font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.xy-rank-yoy.up { color: #ef4444; }
+.xy-rank-yoy.down { color: #16a34a; }
+.xy-rank-note-big { font-size: 12px; color: var(--text-faint); margin: 14px 0 0; line-height: 1.7; background: var(--surface-soft); border-radius: 8px; padding: 10px 12px; border: 1px dashed var(--border); }
+
+/* 品牌热点 + 自选车 */
 .xy-brand-sel { display: flex; flex-wrap: wrap; gap: 6px; flex: 1; }
 .xy-chip { border: 1px solid var(--border); background: var(--surface); color: var(--text-muted); border-radius: 16px; padding: 3px 12px; font-size: 12px; cursor: pointer; }
 .xy-chip.on { color: #fff; background: var(--brand, #378add); border-color: var(--brand, #378add); }
@@ -610,12 +736,16 @@ onUnmounted(() => { if (clockTimer) window.clearInterval(clockTimer) })
 @media (max-width: 1100px) {
   .xy-entries { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
+@media (max-width: 900px) {
+  .xy-boards { grid-template-columns: 1fr; }
+}
 @media (max-width: 760px) {
   .xy-entries { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
   .xy-entry { padding: 10px 10px 10px 13px; gap: 8px; }
   .xe-icon { width: 30px; height: 30px; border-radius: 9px; }
   .xe-label { font-size: 12.5px; }
   .xe-desc { display: none; }
+  .xy-card { padding: 14px; }
 }
 @media (max-width: 460px) {
   .xy-entries { grid-template-columns: 1fr; }

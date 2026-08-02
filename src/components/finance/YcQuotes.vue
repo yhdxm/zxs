@@ -1,25 +1,5 @@
 <template>
   <div class="yc-page">
-    <header class="yc-head">
-      <div class="yc-title">
-        <h2>影仓智核</h2>
-        <p>
-          腾讯财经·实时行情（免费接口直连，无需 Key，含 A 股核心指数、全球市场与热门个股）。
-          数据仅供参考，不构成任何投资建议。
-        </p>
-      </div>
-      <div class="yc-controls">
-        <span class="yc-clock" :title="`本地北京时间 · 数据更新于 ${lastUpdate}`">
-          <el-icon><Clock /></el-icon>
-          <span>{{ nowText }}</span>
-        </span>
-        <el-switch v-model="autoRefresh" active-text="自动刷新(3秒)" />
-        <el-button type="primary" :loading="loading" @click="refresh">
-          <el-icon><Refresh /></el-icon> 刷新
-        </el-button>
-      </div>
-    </header>
-
     <!-- 核心指数 -->
     <section class="yc-section">
       <div class="yc-section-title">
@@ -31,7 +11,6 @@
           <div class="yc-card-head">
             <span class="yc-card-name">{{ q.name }}</span>
             <span class="yc-card-code">{{ q.code.toUpperCase() }}</span>
-            <button class="yc-kbtn" @click="openKline(q)">K线</button>
           </div>
           <div class="yc-card-price">{{ formatNum(q.price, 2) }}</div>
           <div class="yc-card-sub">
@@ -97,7 +76,6 @@
           <div class="yc-card-head">
             <span class="yc-card-name">{{ q.name }}</span>
             <span class="yc-card-code">{{ q.code.toUpperCase() }}</span>
-            <button class="yc-kbtn" @click="openKline(q)">K线</button>
           </div>
           <div class="yc-card-price">{{ formatNum(q.price, 2) }}</div>
           <div class="yc-card-sub">
@@ -154,28 +132,17 @@
           <template #default="{ row }">{{ row.time || '—' }}</template>
         </el-table-column>
       </el-table>
-      <div class="yc-foot" style="margin-top:6px;">
-        <button v-for="s in stocks.slice(0, 5)" :key="s.code" class="yc-kbtn" @click="openKline(s)">查看 {{ s.name }} K 线</button>
-      </div>
     </section>
 
     <p class="yc-foot">
       数据来源：腾讯财经公开行情接口 <code>qt.gtimg.cn</code>（免费、实时，盘中有延迟属正常现象）。
       接口直连、不消耗任何积分与额度；加载失败多为当前网络对腾讯域名限速，稍后重试即可。
     </p>
-
-    <KLineDialog
-      :visible="klineVisible"
-      :code="klineCode"
-      :name="klineName"
-      :quote="klineQuote"
-    />
   </div>
 </template>
 
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref, watch } from 'vue'
-import { Clock, Refresh } from '@element-plus/icons-vue'
 import {
   fetchIndices,
   fetchGlobal,
@@ -184,16 +151,21 @@ import {
   COMMODITY_UNITS,
   type Quote
 } from '../../services/tencentFinance'
-import KLineDialog from './KLineDialog.vue'
+
+/** 由父级（影仓智核页顶部）控制的刷新与展示状态 */
+const props = defineProps<{
+  autoRefresh?: boolean
+  refreshNonce?: number
+  lastUpdate?: string
+}>()
+const emit = defineEmits<{ updated: [string] }>()
 
 const indices = ref<Quote[]>([])
 const globals = ref<Quote[]>([])
 const commodities = ref<Quote[]>([])
 const stocks = ref<Quote[]>([])
 const loading = ref(false)
-const autoRefresh = ref(true)
 const nowText = ref('')
-const lastUpdate = ref('')
 let refreshTimer: number | undefined
 let clockTimer: number | undefined
 
@@ -224,18 +196,6 @@ function priceDigits(q: Quote): number {
   return 2
 }
 
-// ===== K 线弹窗 =====
-const klineVisible = ref(false)
-const klineCode = ref('')
-const klineName = ref('')
-const klineQuote = ref<Quote | null>(null)
-function openKline(q: Quote): void {
-  klineVisible.value = true
-  klineCode.value = q.code
-  klineName.value = q.name
-  klineQuote.value = q
-}
-
 async function refresh(): Promise<void> {
   loading.value = true
   try {
@@ -249,7 +209,7 @@ async function refresh(): Promise<void> {
     globals.value = glb
     if (cmd.length) commodities.value = cmd
     stocks.value = stk
-    lastUpdate.value = nowText.value
+    emit('updated', nowText.value)
   } catch (e) {
     console.error('[影仓智核] 行情加载失败', e)
   } finally {
@@ -268,16 +228,25 @@ function stopAuto(): void {
   }
 }
 
-watch(autoRefresh, (v) => {
-  if (v) startAuto()
-  else stopAuto()
-})
+watch(
+  () => props.autoRefresh,
+  (v) => {
+    if (v) startAuto()
+    else stopAuto()
+  },
+  { immediate: true }
+)
+// 父级刷新按钮 / 自动刷新 nonce 变化时，重新拉取行情
+watch(
+  () => props.refreshNonce,
+  () => void refresh()
+)
 
 onMounted(() => {
   updateClock()
   clockTimer = window.setInterval(updateClock, 1000)
   void refresh()
-  if (autoRefresh.value) startAuto()
+  if (props.autoRefresh) startAuto()
 })
 onUnmounted(() => {
   stopAuto()
@@ -292,44 +261,6 @@ onUnmounted(() => {
   max-width: 1180px;
   margin: 0 auto;
   color: var(--text);
-}
-.yc-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 20px;
-  flex-wrap: wrap;
-}
-.yc-title h2 {
-  margin: 0 0 6px;
-  font-size: 22px;
-  color: var(--text-strong);
-}
-.yc-title p {
-  margin: 0;
-  font-size: 13px;
-  color: var(--text-muted);
-  line-height: 1.6;
-  max-width: 720px;
-}
-.yc-controls {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-shrink: 0;
-}
-.yc-clock {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 13px;
-  font-variant-numeric: tabular-nums;
-  color: var(--text-muted);
-  background: var(--surface-soft);
-  border: 1px solid var(--border);
-  padding: 6px 10px;
-  border-radius: 10px;
 }
 .yc-section {
   margin-bottom: 26px;
@@ -428,19 +359,6 @@ onUnmounted(() => {
 .yc-card.flat .yc-card-price,
 .yc-card.flat .yc-card-sub {
   color: var(--text);
-}
-.yc-kbtn {
-  font-size: 11px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 3px 7px;
-  background: var(--surface-soft);
-  color: var(--text-muted);
-  cursor: pointer;
-}
-.yc-kbtn:hover {
-  border-color: var(--brand, #378ADD);
-  color: var(--brand, #378ADD);
 }
 .yc-table {
   border-radius: 12px;
