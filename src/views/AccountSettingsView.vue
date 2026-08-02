@@ -1,34 +1,56 @@
 <template>
   <div class="account-page">
-    <div class="account-card">
-      <header class="account-head">
-        <div class="account-brand">
+    <PageHeader
+      title="个人设置"
+      subtitle="管理你的昵称与登录密码，修改后立即生效。"
+      :icon="User"
+    >
+      <el-button type="primary" :loading="saving" @click="save">保存修改</el-button>
+    </PageHeader>
+
+    <div class="account-cards">
+      <!-- 基本资料 -->
+      <section class="account-card">
+        <header class="ac-head">
+          <span class="ac-ico"><el-icon><User /></el-icon></span>
+          <div class="ac-head-txt">
+            <h3>基本资料</h3>
+            <p>头像与昵称展示</p>
+          </div>
+        </header>
+        <div class="ac-profile">
           <div class="account-avatar">{{ avatarText }}</div>
-          <div class="account-meta">
-            <h2>{{ currentUser?.nickname || '用户' }}</h2>
-            <p>@{{ currentUser?.username }}</p>
+          <div class="ac-profile-meta">
+            <div class="ac-nick">{{ currentUser?.nickname || '用户' }}</div>
+            <div class="ac-uname">@{{ currentUser?.username }}</div>
             <el-tag size="small" :type="roleTagType" effect="light">{{ roleLabel }}</el-tag>
           </div>
         </div>
-        <div class="account-head-actions">
-          <el-button type="primary" :loading="saving" @click="save">保存修改</el-button>
-        </div>
-      </header>
+        <el-form label-position="top">
+          <el-form-item label="昵称">
+            <el-input v-model="form.nickname" placeholder="请输入昵称" maxlength="32" show-word-limit />
+          </el-form-item>
+        </el-form>
+      </section>
 
-      <el-form label-position="top" class="account-form">
-        <el-form-item label="昵称">
-          <el-input v-model="form.nickname" placeholder="请输入昵称" maxlength="32" show-word-limit />
-        </el-form-item>
-
-        <el-form-item label="新密码（留空则不修改）">
-          <el-input v-model="form.password" type="password" show-password placeholder="6-32 位密码" />
-        </el-form-item>
-
-        <el-form-item label="确认新密码">
-          <el-input v-model="form.confirmPassword" type="password" show-password placeholder="再次输入新密码" />
-        </el-form-item>
-
-      </el-form>
+      <!-- 安全设置 -->
+      <section class="account-card">
+        <header class="ac-head">
+          <span class="ac-ico"><el-icon><Lock /></el-icon></span>
+          <div class="ac-head-txt">
+            <h3>安全设置</h3>
+            <p>修改登录密码</p>
+          </div>
+        </header>
+        <el-form label-position="top">
+          <el-form-item label="新密码（留空则不修改）">
+            <el-input v-model="form.password" type="password" show-password placeholder="6-32 位密码" />
+          </el-form-item>
+          <el-form-item label="确认新密码">
+            <el-input v-model="form.confirmPassword" type="password" show-password placeholder="再次输入新密码" />
+          </el-form-item>
+        </el-form>
+      </section>
     </div>
   </div>
 </template>
@@ -36,6 +58,7 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
+import { User, Lock } from '@element-plus/icons-vue'
 import {
   getSavedUser,
   updateAccount,
@@ -43,6 +66,7 @@ import {
   refreshSavedUser,
   type AppUser
 } from '../services/appDataService'
+import PageHeader from '../components/PageHeader.vue'
 
 const currentUser = ref<AppUser | null>(null)
 const saving = ref(false)
@@ -114,30 +138,63 @@ onMounted(() => {
 <style scoped>
 .account-page {
   padding: 0 18px 18px;
-  max-width: 680px;
+  max-width: 920px;
   margin: 0 auto;
+}
+.account-cards {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  align-items: stretch;
 }
 .account-card {
   background: #fff;
   border: 1px solid #eef0f4;
   border-radius: 18px;
-  padding: 28px;
+  padding: 22px;
   box-shadow: 0 8px 24px rgba(15, 23, 42, 0.05);
+  display: flex;
+  flex-direction: column;
 }
-.account-head {
+.ac-head {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 12px;
-  margin-bottom: 24px;
-  padding-bottom: 20px;
+  margin-bottom: 18px;
+  padding-bottom: 14px;
   border-bottom: 1px solid #f1f5f9;
 }
-.account-brand {
+.ac-ico {
+  width: 38px;
+  height: 38px;
+  border-radius: 11px;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  flex-shrink: 0;
+  background: linear-gradient(135deg, #4f46e5, #6366f1);
+}
+.ac-ico :deep(svg) { font-size: 18px; }
+.ac-head-txt h3 {
+  margin: 0 0 2px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-strong);
+}
+.ac-head-txt p {
+  margin: 0;
+  font-size: 12px;
+  color: #64748b;
+}
+.ac-profile {
   display: flex;
   align-items: center;
-  gap: 16px;
-  min-width: 0;
+  gap: 14px;
+  padding: 12px 14px;
+  margin-bottom: 16px;
+  background: #f8fafc;
+  border: 1px solid #eef0f4;
+  border-radius: 12px;
 }
 .account-avatar {
   width: 48px;
@@ -151,31 +208,13 @@ onMounted(() => {
   font-weight: 800;
   flex-shrink: 0;
 }
-.account-meta h2 {
-  margin: 0 0 4px;
-  font-size: 18px;
-  font-weight: 600;
-  color: var(--text-strong);
-}
-.account-meta p {
-  margin: 0 0 8px;
-  font-size: 13px;
-  color: #64748b;
-}
-.account-head-actions {
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-}
+.ac-profile-meta { min-width: 0; }
+.ac-nick { font-size: 15px; font-weight: 600; color: var(--text-strong); }
+.ac-uname { font-size: 12px; color: #64748b; margin: 2px 0 6px; }
 
 @media (max-width: 768px) {
   .account-page { padding: 0 12px 12px; }
-  .account-card { padding: 20px; }
-  .account-head {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 12px;
-  }
-  .account-head-actions { width: 100%; justify-content: flex-end; }
+  .account-cards { grid-template-columns: 1fr; }
+  .account-card { padding: 18px; }
 }
 </style>

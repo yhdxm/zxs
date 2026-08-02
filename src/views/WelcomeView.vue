@@ -33,7 +33,7 @@
     <div class="welcome-center">
       <CompassLogo :size="104" animated glow class="wl-logo" />
       <h1 class="wl-title">智习罗盘欢迎你</h1>
-      <router-link to="/dashboard" class="wl-enter">进入工作台 →</router-link>
+      <p class="wl-hint">从左上角菜单进入各功能模块</p>
     </div>
   </div>
 </template>
@@ -52,9 +52,9 @@ const fireworks = [
 
 <style scoped>
 .welcome-shell {
-  position: fixed;
-  inset: 0;
-  z-index: 50;
+  position: relative;
+  width: 100%;
+  min-height: 100%;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -132,28 +132,18 @@ const fireworks = [
   100% { background-position: 0% 220%; }
 }
 
-.wl-enter {
-  margin-top: 6px;
-  font-size: 15px;
-  font-weight: 600;
-  color: #6366f1;
-  text-decoration: none;
-  padding: 9px 20px;
-  border-radius: 999px;
-  border: 1px solid rgba(99, 102, 241, 0.3);
-  background: rgba(255, 255, 255, 0.6);
-  transition: all 0.2s ease;
-}
-.wl-enter:hover {
-  background: #6366f1;
-  color: #fff;
-  box-shadow: 0 6px 18px rgba(99, 102, 241, 0.4);
+.wl-hint {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 500;
+  color: #8b8fb5;
+  letter-spacing: 0.5px;
 }
 
 /* 移动端适配 */
 @media (max-width: 768px) {
   .welcome-center { gap: 18px; }
-  .wl-enter { font-size: 14px; padding: 8px 16px; }
+  .wl-hint { font-size: 13px; }
 }
 @media (max-width: 380px) {
   .welcome-center { gap: 14px; }

@@ -4,6 +4,7 @@ import type { Component } from 'vue'
 import type { AppUser } from '../services/appDataService'
 import {
   Coin,
+  HomeFilled,
   MagicStick,
   DataAnalysis,
   Compass,
@@ -42,6 +43,12 @@ export const canManageSystem = (u: AppUser | null): boolean =>
   u?.role === 'superadmin' || u?.role === 'admin'
 
 export const APP_MENU: SideItem[] = [
+  {
+    key: 'welcome',
+    label: '首页',
+    icon: HomeFilled,
+    to: '/welcome'
+  },
   {
     key: 'database',
     label: '数据库监测',
@@ -102,7 +109,7 @@ export const APP_MENU: SideItem[] = [
     expanded: true,
     permissionKey: 'worktasks',
     children: [
-      { key: 'overview', label: '数据看板', icon: DataBoard, permissionKey: 'dashboard', to: { path: '/dashboard', query: { view: 'overview' } } },
+      { key: 'overview', label: '工作数据看板', icon: DataBoard, permissionKey: 'dashboard', to: { path: '/dashboard', query: { view: 'overview' } } },
       { key: 'todos', label: '待办', icon: List, permissionKey: 'todos', to: { path: '/dashboard', query: { view: 'todos' } } },
       { key: 'points', label: '点位', icon: Location, permissionKey: 'points', to: { path: '/dashboard', query: { view: 'points' } } },
       { key: 'contents', label: '内容', icon: Document, permissionKey: 'contents', to: { path: '/dashboard', query: { view: 'contents' } } }

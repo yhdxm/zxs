@@ -238,7 +238,9 @@ export function migratePermissionList(perms: string[]): string[] {
 /**
  * 归一化配置：
  * 1. 老版本（无 version 或 < 2）配置自动做 v1→v2 权限迁移，避免升级后菜单消失；
- * 2. 超级管理员始终拥有全部权限，避免配置漂移导致锁死。
+ * 2. 超级管理员始终拥有全部权限，避免配置漂移导致锁死；
+ * 3. 不再强制为普通用户/管理员注入默认权限，管理员在权限页保存什么就是什么，
+ *    登录后的默认落地页 /welcome 与 /account 本就不受权限树控制，不会出现死循环。
  */
 function normalizeConfig(cfg: PermissionConfig): PermissionConfig {
   if ((cfg.version ?? 1) < PERMISSION_SCHEMA_VERSION) {
@@ -249,20 +251,6 @@ function normalizeConfig(cfg: PermissionConfig): PermissionConfig {
   }
   const sa = cfg.roles.find((r) => r.key === 'superadmin')
   if (sa) sa.permissions = [...ALL_PERMISSION_KEYS]
-  // 防止配置漂移把普通用户锁在门外：普通用户（及管理员）必须始终持有
-  // 个人数据主页（dashboard 及 todos/points/contents、各个人模块）权限，
-  // 否则登录后会因路由守卫权限校验不通过而陷入重定向死循环（白屏/无反应）。
-  const ensureBases = (roleKey: string, bases: Set<string>) => {
-    const r = cfg.roles.find((x) => x.key === roleKey)
-    if (!r) return
-    const set = new Set(r.permissions)
-    ALL_PERMISSION_KEYS.forEach((k) => {
-      if (bases.has(baseKeyOf(k))) set.add(k)
-    })
-    r.permissions = [...set]
-  }
-  ensureBases('user', USER_ALLOWED_BASES)
-  ensureBases('admin', USER_ALLOWED_BASES)
   return cfg
 }
 

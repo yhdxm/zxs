@@ -371,6 +371,7 @@ const toggleGroup = (key: string) => {
 }
 
 const isMenuActive = (key: string) => {
+  if (key === 'welcome') return route.path === '/welcome'
   if (key === 'database') return route.path === '/database'
   if (key === 'lianzhicang') return route.path === '/ai' || route.path === '/models' || route.path === '/aimodels'
   if (key === 'ai') return route.path === '/ai'
@@ -412,7 +413,7 @@ const goMenu = (item: SideItem) => {
 
 /* ===== 未登录：全局侧边栏菜单 ===== */
 const menuItems = computed(() => [
-  { path: '/dashboard?view=overview', label: '数据看板', icon: '📊' },
+  { path: '/dashboard?view=overview', label: '工作数据看板', icon: '📊' },
   { path: '/ai', label: 'AI 助手', icon: '🤖' }
 ])
 

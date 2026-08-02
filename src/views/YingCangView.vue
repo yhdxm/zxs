@@ -3,6 +3,7 @@
     <!-- 顶部：与新闻聚合一致的 PageHeader（左侧模块名+免责声明，右侧时钟+自动刷新+刷新按钮） -->
     <PageHeader title="影仓智核" :subtitle="disclaimer" :icon="Money">
       <template #actions>
+        <span class="yc-live"><i class="yc-live-dot"></i>实时</span>
         <span class="yc-clock-box" :title="'北京时间 · 数据更新于 ' + lastUpdate">
           <span class="yc-dot"></span>
           <span class="yc-clock">{{ nowText }}</span>
@@ -110,6 +111,8 @@ onUnmounted(() => {
 <style scoped>
 .yc-root {
   min-height: 100%;
+  padding: 0 20px;
+  box-sizing: border-box;
 }
 
 /* 功能 Tab 条（位于顶部 PageHeader 下方） */
@@ -117,7 +120,7 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 10px 18px 0;
+  padding: 10px 0 0;
   flex-wrap: wrap;
 }
 .yc-tabs {
@@ -162,6 +165,31 @@ onUnmounted(() => {
   flex: 1;
   min-width: 0;
 }
+.yc-live {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #16a34a;
+  background: #dcfce7;
+  border: 1px solid #bbf7d0;
+  padding: 5px 10px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.yc-live-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #22c55e;
+  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.2);
+  animation: ycPulse 1.4s infinite;
+}
+@keyframes ycPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
 .yc-clock-box {
   display: inline-flex;
   align-items: center;
@@ -188,7 +216,8 @@ onUnmounted(() => {
   .yc-clock-hint {
     display: none;
   }
-  .yc-tabbar { padding: 10px 14px 0; }
+  .yc-root { padding: 0 14px; }
+  .yc-tabbar { padding: 10px 0 0; }
   .yc-tab-hint { width: 100%; flex: none; }
 }
 </style>

@@ -313,7 +313,7 @@ onMounted(async () => {
 
 <style scoped>
 .ext-ideas {
-  padding: 0 0 18px;
+  padding: 0 20px 18px;
   max-width: none;
   margin: 0;
   color: var(--text);
@@ -372,7 +372,7 @@ onMounted(async () => {
 }
 
 @media (max-width: 768px) {
-  .ext-ideas { padding: 0 16px 16px; }
+  .ext-ideas { padding: 0 14px 16px; }
   .ei-search { max-width: 100%; }
   .ei-source, .ei-region, .ei-industry, .ei-tag { flex: 1; width: auto; }
   .ei-cache-row { flex-direction: column; align-items: stretch; }

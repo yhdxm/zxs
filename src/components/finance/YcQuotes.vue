@@ -257,7 +257,7 @@ onUnmounted(() => {
 <style scoped>
 /* 此处样式与原 YingCangView 保持一致 */
 .yc-page {
-  padding: 24px;
+  padding: 4px 0 0;
   max-width: 1180px;
   margin: 0 auto;
   color: var(--text);

@@ -539,7 +539,7 @@ onUnmounted(() => { if (clockTimer) window.clearInterval(clockTimer) })
 </script>
 
 <style scoped>
-.xy-root { min-height: 100%; }
+.xy-root { min-height: 100%; padding: 0 20px; box-sizing: border-box; }
 .xy-clock-box { display: inline-flex; align-items: center; gap: 6px; }
 .xy-dot { width: 8px; height: 8px; border-radius: 50%; background: #22c55e; box-shadow: 0 0 0 3px rgba(34,197,94,.2); animation: xyBlink 2s ease-in-out infinite; }
 @keyframes xyBlink { 0%,100% { opacity: 1; } 50% { opacity: .45; } }
@@ -740,6 +740,7 @@ onUnmounted(() => { if (clockTimer) window.clearInterval(clockTimer) })
   .xy-boards { grid-template-columns: 1fr; }
 }
 @media (max-width: 760px) {
+  .xy-root { padding: 0 14px; }
   .xy-entries { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
   .xy-entry { padding: 10px 10px 10px 13px; gap: 8px; }
   .xe-icon { width: 30px; height: 30px; border-radius: 9px; }

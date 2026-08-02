@@ -1,11 +1,11 @@
 <template>
   <div class="board">
-    <!-- ===== 头部 + 视图切换 ===== -->
-    <section class="board-head">
-      <div>
-        <h2>数据看板</h2>
-        <p>实时统计你的待办、点位与内容，支持按日期查看趋势。</p>
-      </div>
+    <!-- ===== 头部（与 AI 助手顶部 PageHeader 风格一致） + 视图切换 ===== -->
+    <PageHeader
+      title="工作数据看板"
+      subtitle="实时统计你的待办、点位与内容，支持按日期查看趋势。"
+      :icon="DataBoard"
+    >
       <div class="board-switch">
         <button class="switch-btn" :class="{ active: viewMode === 'cards' }" @click="viewMode = 'cards'">
           <el-icon><Grid /></el-icon><span>卡片</span>
@@ -17,7 +17,7 @@
           <el-icon><Document /></el-icon><span>报表</span>
         </button>
       </div>
-    </section>
+    </PageHeader>
 
     <!-- ===== 卡片视图 ===== -->
     <section v-show="viewMode === 'cards'" class="viz-grid">
@@ -127,8 +127,9 @@
 import { computed, ref } from 'vue'
 import type { EChartsOption } from 'echarts'
 import {
-  List, Location, Document, DataLine, Grid, TrendCharts
+  List, Location, Document, DataLine, Grid, TrendCharts, DataBoard
 } from '@element-plus/icons-vue'
+import PageHeader from './PageHeader.vue'
 import { type AppDashboardData, type TodoItem, type PointItem, type ContentItem, computeDashboardCounts, type DashboardCounts } from '../services/appDataService'
 import EChart from './EChart.vue'
 
@@ -331,10 +332,6 @@ const reportRows = computed<Array<Record<string, any>>>(() => {
   max-width: 1440px;
   margin: 0 auto;
 }
-.board-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; padding: 4px 0 4px; }
-.board-head h2 { margin: 0 0 4px; font-size: 18px; font-weight: 600; color: var(--text-strong); }
-.board-head p { margin: 0; color: #64748b; font-size: 14px; }
-
 .board-switch {
   display: inline-flex;
   background: rgba(255, 255, 255, 0.9);
@@ -440,7 +437,6 @@ const reportRows = computed<Array<Record<string, any>>>(() => {
 @media (max-width: 640px) {
   .viz-grid { grid-template-columns: 1fr 1fr; }
   .chart-wide { grid-column: span 2; min-height: 300px; }
-  .board-head { flex-direction: column; align-items: stretch; }
   .board-switch { width: 100%; justify-content: space-between; }
   .switch-btn { flex: 1; justify-content: center; }
   .report-toolbar { gap: 8px; }

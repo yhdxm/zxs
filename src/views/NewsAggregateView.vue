@@ -141,6 +141,12 @@
                   <stop offset="0%" stop-color="#8b5cf6" />
                   <stop offset="100%" stop-color="#06b6d4" />
                 </linearGradient>
+                <!-- 3D 立体波段填充：上亮下暗，营造厚度 -->
+                <linearGradient id="npRibbon" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stop-color="#a78bfa" stop-opacity="0.95" />
+                  <stop offset="60%" stop-color="#7c3aed" stop-opacity="0.80" />
+                  <stop offset="100%" stop-color="#4c1d95" stop-opacity="0.55" />
+                </linearGradient>
                 <filter id="npGlow" x="-30%" y="-30%" width="160%" height="160%">
                   <feGaussianBlur stdDeviation="2.4" result="b" />
                   <feMerge>
@@ -158,9 +164,30 @@
                 :y2="g"
                 class="np-grid"
               />
-              <!-- 投影深度：在曲线下方偏移复制一层，营造立体感 -->
-              <path :d="pulseArea" fill="#7c3aed" opacity="0.14" transform="translate(0,7)" />
-              <path :d="pulseArea" fill="url(#npFill)" />
+              <!-- 底部氛围面积（柔和渐变） -->
+              <path :d="pulseArea" fill="url(#npFill)" opacity="0.55" />
+              <!-- 3D 立体波段：上下折线闭合的带状体 -->
+              <path
+                :d="bandPath(pulseDots, PULSE_DEPTH)"
+                fill="url(#npRibbon)"
+                opacity="0.82"
+              />
+              <!-- 热度竖线：每个领域到折线点的高度，增强波动感 -->
+              <line
+                v-for="(p, i) in pulseDots"
+                :key="'bar-' + p.key + '-' + i"
+                class="np-bar"
+                :class="{ 'is-active': p.active }"
+                :x1="p.x"
+                :y1="PLOT_BOTTOM"
+                :x2="p.x"
+                :y2="p.y + PULSE_DEPTH / 2"
+                :stroke="p.active ? p.color : '#a78bfa'"
+                stroke-width="2"
+                stroke-linecap="round"
+                opacity="0.35"
+              />
+              <!-- 顶部高光线 -->
               <path :d="pulsePath" class="np-line" fill="none" filter="url(#npGlow)" />
               <g
                 v-for="(p, i) in pulseDots"
@@ -315,6 +342,8 @@ const PULSE_H = 168 // SVG 高度（含底部领域文字标签行）
 const PLOT_TOP = 16 // 曲线绘制区上边界（给数值文字留白）
 const PLOT_BOTTOM = PULSE_H - 22 // 曲线绘制区下边界（给领域标签留白）
 const PULSE_PAD = 20
+/** 立体波段厚度（顶部折线向下偏移的像素，用于构成 3D 带状体） */
+const PULSE_DEPTH = 14
 // 进入页面后自动预加载这些主要分类，保证实时脉搏和右侧推荐都有数据（领域更多，脉搏更丰富）
 const PULSE_KEYS = [
   'top', 'nation', 'world', 'business', 'tech', 'ent',
@@ -471,6 +500,18 @@ function smoothPath(pts: { x: number; y: number }[]): string {
     d += ` C${cp1x.toFixed(1)},${cp1y.toFixed(1)} ${cp2x.toFixed(1)},${cp2y.toFixed(1)} ${p2.x.toFixed(1)},${p2.y.toFixed(1)}`
   }
   return d
+}
+
+/** 立体波段：由顶部折线 + 下移 DEPTH 的折线构成一条带状区域（ribbon），营造 3D 厚度 */
+function bandPath(pts: { x: number; y: number }[], depth: number): string {
+  const top = smoothPath(pts)
+  if (!top || pts.length < 2) return ''
+  const botPts = [...pts].reverse().map((p) => ({ x: p.x, y: p.y + depth }))
+  const bot = smoothPath(botPts) // 起点为最后一个点的底部（即下移后的位置）
+  const lastTop = pts[pts.length - 1]!
+  const lastBot = { x: lastTop.x, y: lastTop.y + depth }
+  const botTail = bot.startsWith('M') ? bot.slice(1) : bot
+  return `${top} L${lastBot.x.toFixed(1)},${lastBot.y.toFixed(1)} ${botTail} Z`
 }
 
 const pulsePath = computed(() => smoothPath(pulseDots.value))
@@ -905,6 +946,11 @@ onBeforeUnmount(() => {
   stroke-linejoin: round;
 }
 .np-pt-g { cursor: pointer; }
+.np-bar {
+  transition: opacity 0.25s ease, stroke 0.25s ease;
+  pointer-events: none;
+}
+.np-bar.is-active { opacity: 0.75; stroke-width: 3; }
 .np-pt {
   stroke: #fff;
   stroke-width: 1.5;
@@ -912,6 +958,7 @@ onBeforeUnmount(() => {
 }
 .np-pt.is-active {
   stroke-width: 2.2;
+  filter: drop-shadow(0 0 5px rgba(124, 58, 237, 0.55));
   animation: npDotPulse 1.6s ease-in-out infinite;
 }
 .np-pt-val {

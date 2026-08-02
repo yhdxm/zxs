@@ -10,8 +10,8 @@
       <!-- 左侧品牌故事区（PC 展示，移动端隐藏） -->
       <aside class="login-aside">
         <div class="brand">
-          <img class="brand-logo-img" src="/company-logo.png" alt="logo" />
-          <span class="brand-name">Smart Dashboard</span>
+          <CompassLogo :size="42" animated glow class="brand-logo" />
+          <span class="brand-name">智习罗盘</span>
         </div>
 
         <h1 class="aside-title">
@@ -140,15 +140,11 @@ import CompassLogo from '../components/CompassLogo.vue'
   gap: 10px;
   margin-bottom: 36px;
 }
-.brand-logo-img {
-  width: 40px;
-  height: 40px;
-  border-radius: 12px;
-  object-fit: contain;
-  background: rgba(255, 255, 255, 0.12);
-  padding: 3px;
-  box-sizing: border-box;
-  filter: drop-shadow(0 0 10px rgba(255, 255, 255, 0.25));
+.brand-logo {
+  width: 42px;
+  height: 42px;
+  flex-shrink: 0;
+  filter: drop-shadow(0 0 12px rgba(255, 255, 255, 0.35));
 }
 .brand-name {
   font-size: 17px;
