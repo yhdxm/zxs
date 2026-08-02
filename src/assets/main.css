@@ -54,9 +54,80 @@ select {
   width: 100%;
 }
 
+/* ============================================================
+   移动端全局基线（手机最高频使用场景，统一增强）
+   - 防横向溢出：html/body/#app 锁死 x 轴
+   - 触摸友好：按钮/输入最小高度，避免误触
+   - 安全区：适配刘海/底部手势条（env(safe-area-inset-*)）
+   - 输入框聚焦防 iOS 自动放大（字号为 16px，仍允许双指缩放）
+   - 超宽表格/代码块在卡片内横向滚动，绝不撑破布局
+   ============================================================ */
 @media (max-width: 768px) {
+  html,
   body {
     padding: 0;
+    overflow-x: hidden;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+  #app {
+    overflow-x: hidden;
+    width: 100%;
+  }
+
+  /* 触摸目标最小尺寸，单手可点 */
+  button,
+  .el-button,
+  .van-button,
+  .el-radio,
+  .el-checkbox,
+  .el-dropdown,
+  .el-select {
+    min-height: 36px;
+  }
+  .el-button--small {
+    min-height: 32px;
+  }
+
+  /* 输入框聚焦时 iOS 不会因字号过小而放大视口（仍允许双指缩放） */
+  input,
+  textarea,
+  select,
+  .el-input__inner,
+  .van-field__control {
+    font-size: 16px !important;
+  }
+
+  /* 超宽内容在容器内横向滚动，避免撑破整体 */
+  table,
+  pre,
+  code,
+  .el-table,
+  .markdown-body pre {
+    max-width: 100%;
+  }
+  .el-table {
+    overflow-x: auto;
+  }
+
+  /* 卡片内边距在窄屏稍收紧，保持留白但不浪费空间 */
+  .el-card__body,
+  .rc-card,
+  .xy-card {
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+}
+
+/* 极窄屏 / PDA（≤360）再收紧一档 */
+@media (max-width: 360px) {
+  body {
+    font-size: 14px;
+  }
+  button,
+  .el-button,
+  .van-button {
+    min-height: 40px;
   }
 }
 

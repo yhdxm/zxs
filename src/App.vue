@@ -1028,8 +1028,8 @@ onMounted(async () => {
 .mobile-menu-fab {
   display: none;
   position: fixed;
-  left: 14px;
-  bottom: 18px;
+  left: calc(14px + env(safe-area-inset-left));
+  bottom: calc(18px + env(safe-area-inset-bottom));
   z-index: 40;
   width: 48px;
   height: 48px;
@@ -1068,6 +1068,17 @@ onMounted(async () => {
     width: 100%;
     flex: 1 1 auto;
     min-width: 0;
+  }
+  /* 主内容底部留白：避开悬浮菜单按钮 + 系统手势条，避免内容被遮挡 */
+  .main-content.authed-main {
+    padding-bottom: calc(84px + env(safe-area-inset-bottom));
+  }
+  .main-content {
+    padding-bottom: calc(84px + env(safe-area-inset-bottom));
+  }
+  /* 未登录顶栏避让刘海/状态栏安全区 */
+  .mobile-topbar {
+    padding-top: calc(10px + env(safe-area-inset-top));
   }
   /* 抽屉内用户卡片：手机上放宽显示，昵称仍截断避免撑破 */
   .drawer-footer .side-user { padding: 9px 10px; }
