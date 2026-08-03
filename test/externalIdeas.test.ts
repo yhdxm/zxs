@@ -1,14 +1,13 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, afterEach } from 'vitest'
 import { fetchExternalIdeas, normalizeExternalIdea } from '../src/services/externalIdeas'
 
-// ---- mock fetch：按 URL 返回各源的桩数据 ----
-function makeFetch(handlers: Record<string, () => unknown>) {
+// ---- mock fetch：按 URL 返回 GitHub Search 桩数据 ----
+function makeFetch(handlers: Record<string, (url: string) => unknown>) {
   return vi.fn(async (url: string | URL) => {
     const u = String(url)
     for (const [key, fn] of Object.entries(handlers)) {
       if (u.includes(key)) {
-        const body = fn()
-        // 返回既支持 .json() 又支持 .text() 的响应
+        const body = fn(u)
         return {
           ok: true,
           status: 200,
@@ -21,101 +20,86 @@ function makeFetch(handlers: Record<string, () => unknown>) {
   })
 }
 
-describe('M5 外部灵感字段归一化（HN/Dev.to/Reddit/PH）', () => {
+describe('M5 外部灵感字段归一化（GitHub 公开 Search API）', () => {
   afterEach(() => {
     vi.unstubAllGlobals()
   })
 
-  it('四源均归一化为完整 ExternalIdea 结构', async () => {
+  it('GitHub 高星仓库归一化为完整 ExternalIdea 结构', async () => {
     const fetchMock = makeFetch({
-      'hn.algolia.com': () => ({
-        hits: [{ title: 'HN 标题', url: 'https://hn.example/1', story_text: 'HN 正文摘要' }],
+      'api.github.com': () => ({
+        items: [
+          {
+            owner: { login: 'vuejs' },
+            name: 'vue',
+            language: 'TypeScript',
+            description: '渐进式框架',
+            html_url: 'https://github.com/vuejs/vue',
+          },
+        ],
       }),
-      'dev.to': () => [
-        { title: 'Dev 标题', url: 'https://dev.example/1', description: 'Dev 描述', tag_list: ['js', 'vue'] },
-      ],
-      'reddit.com': () => ({
-        data: { children: [{ data: { title: 'R 标题', url: 'https://reddit.example/1', selftext: 'R 正文' } }] },
-      }),
-      'producthunt': () =>
-        '<rss><channel><item><title>PH 标题</title><link>https://ph.example/1</link><description>PH 描述</description></item></channel></rss>',
     })
     vi.stubGlobal('fetch', fetchMock)
 
     const ideas = await fetchExternalIdeas()
 
-    expect(ideas.length).toBe(4)
-    const sources = ideas.map((i) => i.source).sort()
-    expect(sources).toEqual(['Dev.to', 'Hacker News', 'Product Hunt', 'Reddit'])
-
-    for (const it of ideas) {
-      expect(typeof it.id).toBe('string')
-      expect(it.id.length).toBeGreaterThan(0)
-      expect(it.user_id).toBe('')
-      expect(typeof it.title).toBe('string')
-      expect(it.title.length).toBeGreaterThan(0)
-      expect(typeof it.url).toBe('string')
-      expect(Array.isArray(it.tags)).toBe(true)
-      expect(typeof it.summary).toBe('string')
-      expect(it.bookmarked).toBe(false)
-      expect(it.related_module).toBeNull()
-      // fetched_at 应为当前时刻附近的有效 ISO
-      const t = new Date(it.fetched_at).getTime()
-      expect(Number.isNaN(t)).toBe(false)
-      expect(Math.abs(t - Date.now())).toBeLessThan(10000)
-    }
-
-    const hn = ideas.find((i) => i.source === 'Hacker News')!
-    expect(hn.title).toBe('HN 标题')
-    expect(hn.url).toBe('https://hn.example/1')
-    expect(hn.tags).toEqual(['技术', '创业'])
-
-    const dev = ideas.find((i) => i.source === 'Dev.to')!
-    expect(dev.url).toBe('https://dev.example/1')
-    expect(dev.tags).toEqual(['js', 'vue'])
+    expect(ideas.length).toBeGreaterThan(0)
+    const it0 = ideas[0]!
+    expect(it0.source).toBe('GitHub')
+    expect(it0.user_id).toBe('')
+    expect(typeof it0.id).toBe('string')
+    expect(it0.id.length).toBeGreaterThan(0)
+    expect(it0.title).toBe('vuejs/vue')
+    expect(it0.url).toBe('https://github.com/vuejs/vue')
+    expect(Array.isArray(it0.tags)).toBe(true)
+    expect(it0.tags).toContain('TypeScript')
+    expect(it0.bookmarked).toBe(false)
+    expect(it0.related_module).toBeNull()
+    expect(typeof it0.fetched_at).toBe('string')
+    expect(Number.isNaN(new Date(it0.fetched_at).getTime())).toBe(false)
+    // 默认从国外开源仓库抓取
+    expect(it0.region).toBe('国外')
   })
 
-  it('缺失字段有兜底：无标题/无链接/无标签/无摘要 不崩溃', async () => {
+  it('缺失字段兜底：无 owner/无 name/无语言/无描述 不崩溃', async () => {
     const fetchMock = makeFetch({
-      'hn.algolia.com': () => ({ hits: [{ objectID: 'abc123' }] }), // 无 title/url
-      'dev.to': () => [{ title: 'D2', url: 'https://dev.example/2' }], // 无 tag_list / 无 description
-      'reddit.com': () => ({
-        data: { children: [{ data: { title: 'R2', permalink: '/r/x/2' } }] }, // 无 url，有 permalink
-      }),
-      'producthunt': () => '<rss><channel><item><title>P2</title></item></channel></rss>', // 无 link
+      'api.github.com': (u: string) => {
+        if (u.includes('topic:ai')) {
+          // 第二路查询：无 description 的条目，topicTag 为「AI / 大模型」
+          return { items: [{ owner: { login: 'x' }, name: 'y', language: 'Go' }] }
+        }
+        // 第一路查询：无 owner / 无 name 的条目
+        return { items: [{ name: 'repo-only' }, { owner: { login: 'only' } }] }
+      },
     })
     vi.stubGlobal('fetch', fetchMock)
 
     const ideas = await fetchExternalIdeas()
-    const bySource = Object.fromEntries(ideas.map((i) => [i.source, i]))
+    const byTitle = Object.fromEntries(ideas.map((i) => [i.title, i]))
 
-    // HN：无标题 → '无标题'；无 url → 用 objectID 兜底
-    expect(bySource['Hacker News'].title).toBe('无标题')
-    expect(bySource['Hacker News'].url).toContain('abc123')
-
-    // Dev.to：无 tag_list → 默认 ['开发']；无 description → summary 回退到 title（源码：description || title）
-    expect(bySource['Dev.to'].tags).toEqual(['开发'])
-    expect(bySource['Dev.to'].summary).toBe('D2')
-
-    // Reddit：无 url 但有 permalink → 路径兜底
-    expect(bySource['Reddit'].url).toBe('https://reddit.com/r/x/2')
-
-    // PH：无 link → url 空串（不抛错）
-    expect(bySource['Product Hunt'].url).toBe('')
-    expect(bySource['Product Hunt'].title).toBe('P2')
+    // 无 owner → 兜底 github
+    expect(byTitle['github/repo-only'].url).toBe('https://github.com/github/repo-only')
+    // 无 name → 兜底 repo
+    expect(byTitle['only/repo'].url).toBe('https://github.com/only/repo')
+    // 无 description → summary 空串
+    expect(byTitle['x/y'].summary).toBe('')
+    // 有语言 → tags 含 [语言, topicTag]
+    expect(byTitle['x/y'].tags).toEqual(['Go', 'AI / 大模型'])
   })
 
   it('去重：同 url 只保留首条', async () => {
     const fetchMock = makeFetch({
-      'hn.algolia.com': () => ({
-        hits: [
-          { title: 'A', url: 'https://dup.example', objectID: '1' },
-          { title: 'B', url: 'https://dup.example', objectID: '2' },
-        ],
-      }),
-      'dev.to': () => [{ title: 'C', url: 'https://unique.example' }],
-      'reddit.com': () => ({ data: { children: [] } }),
-      'producthunt': () => '<rss><channel></channel></rss>',
+      'api.github.com': (u: string) => {
+        if (u.includes('topic:ai')) {
+          return {
+            items: [
+              { owner: { login: 'a' }, name: 'dup', language: 'Go', description: 'd', html_url: 'https://dup.example' },
+              { owner: { login: 'b' }, name: 'uniq', language: 'Python', description: 'u', html_url: 'https://unique.example' },
+            ],
+          }
+        }
+        return { items: [{ owner: { login: 'c' }, name: 'dup', language: 'Go', description: 'd', html_url: 'https://dup.example' }] }
+      },
     })
     vi.stubGlobal('fetch', fetchMock)
 
@@ -123,5 +107,30 @@ describe('M5 外部灵感字段归一化（HN/Dev.to/Reddit/PH）', () => {
     const urls = ideas.map((i) => i.url)
     expect(urls.filter((u) => u === 'https://dup.example').length).toBe(1)
     expect(ideas.length).toBe(2) // 1 dup + 1 unique
+  })
+
+  it('GitHub 抓取失败（404/限流）→ 返回种子兜底，需求收集页永不空白', async () => {
+    const fetchMock = makeFetch({}) // 命中 404 分支
+    vi.stubGlobal('fetch', fetchMock)
+
+    const ideas = await fetchExternalIdeas()
+    expect(ideas.length).toBeGreaterThan(0)
+    expect(ideas.every((i) => i.source === '热门推荐')).toBe(true)
+    expect(ideas.every((i) => i.url.startsWith('https://github.com/'))).toBe(true)
+    expect(ideas.every((i) => typeof i.cnMeaning === 'string' && i.cnMeaning!.length > 0)).toBe(true)
+  })
+
+  it('normalizeExternalIdea：兼容 Supabase 原生数组 / JSON 字符串 tags', () => {
+    const a = normalizeExternalIdea({ id: '1', title: 't', source: 's', tags: '{a,b}', url: 'u' })
+    expect(a.tags).toEqual(['a', 'b'])
+
+    const b = normalizeExternalIdea({ id: '2', title: 't', source: 's', tags: ['x', 'y'], url: 'u' })
+    expect(b.tags).toEqual(['x', 'y'])
+
+    const c = normalizeExternalIdea({ title: '无标题', tags: '', url: '' })
+    expect(c.title).toBe('无标题')
+    expect(c.id).toBeTruthy()
+    expect(c.bookmarked).toBe(false)
+    expect(c.related_module).toBeNull()
   })
 })

@@ -45,19 +45,19 @@ describe('M9 免费 API Key 本地读写（天地图/天行）', () => {
     window.localStorage.clear()
   })
 
-  it('readFreeApiKey 从 localStorage 的 zxs_free_apis 读取对应 provider', () => {
+  it('readFreeApiKey 从 localStorage 的 zxs_free_apis 读取对应 provider', async () => {
     window.localStorage.setItem(
       'zxs_free_apis',
       JSON.stringify({ tianditu: 'TDT-KEY', tianxing: 'TX-KEY' })
     )
-    expect(readFreeApiKey('tianditu')).toBe('TDT-KEY')
-    expect(readFreeApiKey('tianxing')).toBe('TX-KEY')
+    expect(await readFreeApiKey('tianditu')).toBe('TDT-KEY')
+    expect(await readFreeApiKey('tianxing')).toBe('TX-KEY')
   })
 
-  it('readFreeApiKey 缺失/解析失败返回空串', () => {
-    expect(readFreeApiKey('tianditu')).toBe('')
+  it('readFreeApiKey 缺失/解析失败返回空串', async () => {
+    expect(await readFreeApiKey('tianditu')).toBe('')
     window.localStorage.setItem('zxs_free_apis', 'not-json')
-    expect(readFreeApiKey('tianxing')).toBe('')
+    expect(await readFreeApiKey('tianxing')).toBe('')
   })
 
   it('writeFreeApiKey 合并写入，不覆盖其它 provider', () => {

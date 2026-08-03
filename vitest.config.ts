@@ -17,5 +17,11 @@ export default defineConfig({
     include: ['test/**/*.test.ts'],
     clearMocks: true,
     restoreMocks: true,
+    // 单测环境注入占位 Supabase 变量：仅为满足 createClient 的非空校验，
+    // 不会发出真实请求（客户端在 setup.ts 中已整体桩化）。
+    env: {
+      VITE_SUPABASE_URL: 'http://localhost:54321',
+      VITE_SUPABASE_ANON_KEY: 'test-anon-key',
+    },
   },
 })

@@ -1,84 +1,136 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { fetchNews, hasTianapiKey } from '../src/services/newsService'
+import { fetchNews, fetchNewsAll, NEWS_CATEGORIES, findCategory } from '../src/services/newsService'
 
-const TIANDITU_KEY_STORE = 'zxs_free_apis'
-
-describe('M9 免费新闻降级选择（天行 Key 存在走天行，缺失降级 RSS）', () => {
-  let fetchedUrls: string[]
-
+describe('M9c 免费新闻聚合（Google News RSS + 多级代理兜底）', () => {
   beforeEach(() => {
     window.localStorage.clear()
-    fetchedUrls = []
   })
   afterEach(() => {
     vi.unstubAllGlobals()
   })
 
-  function installFetch() {
+  /** 按 URL 返回桩响应：优先 json、其次 text；ok=false 时抛错触发降级 */
+  function installFetch(handler: (url: string) => { ok: boolean; json?: () => unknown; text?: () => string }) {
     const fn = vi.fn(async (url: string | URL) => {
-      const u = String(url)
-      fetchedUrls.push(u)
-      if (u.includes('api.tianapi.com')) {
-        return {
-          ok: true,
-          status: 200,
-          json: async () => ({
-            code: 200,
-            newslist: [
-              // 不提供 source，验证回退默认值；title/url/pubDate 均提供
-              { title: '天行新闻A', url: 'https://tx.example/1', pubDate: '2024-01-01 10:00' },
-            ],
-          }),
-          text: async () => '',
-        } as unknown as Response
-      }
-      if (u.includes('allorigins.win')) {
-        return {
-          ok: true,
-          status: 200,
-          json: async () => ({}),
-          text: async () =>
-            '<rss><channel><item><title>RSS新闻A</title><link>https://rss.example/1</link><pubDate>2024-01-01 08:30</pubDate></item></channel></rss>',
-        } as unknown as Response
-      }
-      return { ok: false, status: 500, json: async () => ({}), text: async () => '' } as unknown as Response
+      const res = handler(String(url))
+      return {
+        ok: res.ok,
+        status: res.ok ? 200 : 500,
+        json: async () => (res.json ? res.json() : {}),
+        text: async () => (res.text ? res.text() : ''),
+      } as unknown as Response
     })
     vi.stubGlobal('fetch', fn)
+    return fn
   }
 
-  it('hasTianapiKey：有天行 Key 返回 true，缺失返回 false', () => {
-    expect(hasTianapiKey()).toBe(false)
-    window.localStorage.setItem(TIANDITU_KEY_STORE, JSON.stringify({ tianxing: 'TX-KEY' }))
-    expect(hasTianapiKey()).toBe(true)
+  it('rss2json 代理成功 → 解析标题/来源/去 HTML 摘要', async () => {
+    installFetch((u) => {
+      if (u.includes('rss2json')) {
+        return {
+          ok: true,
+          json: () => ({
+            status: 'ok',
+            items: [
+              {
+                title: '重磅新闻 - 量子位',
+                author: '量子位',
+                link: 'https://news.example/1',
+                pubDate: '2024-01-01T10:00:00Z',
+                description: '<p>这是<b>摘要</b></p>',
+              },
+            ],
+          }),
+        }
+      }
+      return { ok: false }
+    })
+    const items = await fetchNews({ category: 'tech', limit: 10 })
+    expect(items.length).toBe(1)
+    expect(items[0]!.source).toBe('量子位')
+    expect(items[0]!.title).toBe('重磅新闻')
+    expect(items[0]!.description).toBe('这是摘要')
+    expect(items[0]!.link).toBe('https://news.example/1')
   })
 
-  it('天行 Key 存在 → 走天行数据，不触发 RSS 降级', async () => {
-    window.localStorage.setItem(TIANDITU_KEY_STORE, JSON.stringify({ tianxing: 'TX-KEY' }))
-    installFetch()
-
-    const items = await fetchNews({ limit: 10 })
-
-    expect(items.length).toBeGreaterThan(0)
-    expect(items[0]!.source).toBe('天行数据')
-    expect(items[0]!.title).toBe('天行新闻A')
-    // 关键分支：既已拿到天行数据，就不再请求 RSS 代理
-    expect(fetchedUrls.some((u) => u.includes('allorigins.win'))).toBe(false)
+  it('rss2json 失败 → 降级 allorigins（XML 解析）', async () => {
+    installFetch((u) => {
+      if (u.includes('rss2json')) return { ok: false }
+      if (u.includes('allorigins')) {
+        return {
+          ok: true,
+          text: () =>
+            '<rss><channel><item><title>XML新闻 - 36氪</title><link>https://xml.example/1</link><pubDate>2024-01-01 08:30</pubDate><description>描述</description></item></channel></rss>',
+        }
+      }
+      return { ok: false }
+    })
+    const items = await fetchNews({ category: 'tech', limit: 10 })
+    expect(items.length).toBe(1)
+    expect(items[0]!.title).toBe('XML新闻')
+    expect(items[0]!.source).toBe('36氪')
   })
 
-  it('天行 Key 缺失 → 降级到 RSS', async () => {
-    installFetch() // 不写 tianxing key
-
-    const items = await fetchNews({ limit: 10 })
-
-    expect(fetchedUrls.some((u) => u.includes('allorigins.win'))).toBe(true)
+  it('三级代理全失败 → 降级分类免费 RSS 兜底（36氪/少数派）', async () => {
+    installFetch((u) => {
+      if (u.includes('rss2json')) return { ok: false }
+      if (u.includes('codetabs')) return { ok: false }
+      if (u.includes('allorigins')) {
+        if (u.includes('news.google.com')) return { ok: false }
+        // 兜底 RSS（36kr / sspai 等）
+        return {
+          ok: true,
+          text: () =>
+            '<rss><channel><item><title>兜底新闻 - 36氪</title><link>https://fb.example/1</link><pubDate>2024-01-01 09:00</pubDate><description>d</description></item></channel></rss>',
+        }
+      }
+      return { ok: false }
+    })
+    const items = await fetchNews({ category: 'top', limit: 10 })
     expect(items.length).toBeGreaterThan(0)
-    expect(items[0]!.title).toBe('RSS新闻A')
-    expect(['少数派', 'IT之家', '36氪', '知乎日报']).toContain(items[0]!.source)
+    expect(items[0]!.title).toBe('兜底新闻')
   })
 
   it('pubDate 被规范化为 YYYY-MM-DD HH:mm', async () => {
-    installFetch()
-    const items = await fetchNews({ limit: 10 })
+    installFetch((u) => {
+      if (u.includes('rss2json')) return { ok: false }
+      if (u.includes('allorigins')) {
+        return {
+          ok: true,
+          text: () =>
+            '<rss><channel><item><title>时间新闻 - 来源</title><link>https://t.example/1</link><pubDate>2024-01-01 08:30</pubDate><description>d</description></item></channel></rss>',
+        }
+      }
+      return { ok: false }
+    })
+    const items = await fetchNews({ category: 'tech', limit: 10 })
     expect(items[0]!.pubDate).toBe('2024-01-01 08:30')
+  })
+
+  it('keyword 过滤生效', async () => {
+    installFetch((u) => {
+      if (u.includes('rss2json')) {
+        return {
+          ok: true,
+          json: () => ({
+            status: 'ok',
+            items: [
+              { title: 'A - 源', author: '源', link: 'https://a', pubDate: '2024-01-01T10:00:00Z', description: 'd' },
+              { title: 'B - 源', author: '源', link: 'https://b', pubDate: '2024-01-01T10:00:00Z', description: 'd' },
+            ],
+          }),
+        }
+      }
+      return { ok: false }
+    })
+    const items = await fetchNews({ category: 'tech', limit: 10, keyword: 'B' })
+    expect(items.length).toBe(1)
+    expect(items[0]!.title).toBe('B')
+  })
+
+  it('NEWS_CATEGORIES 非空且 findCategory 兜底到头条', () => {
+    expect(NEWS_CATEGORIES.length).toBeGreaterThan(0)
+    expect(findCategory('not-exist').key).toBe('top')
+    expect(fetchNewsAll).toBeTypeOf('function')
   })
 })
