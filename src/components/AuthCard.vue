@@ -40,6 +40,9 @@
 
 <script setup lang="ts">
 import { onBeforeUnmount, reactive, ref } from 'vue'
+import { useKeyboardAvoid } from '../composables/useKeyboardAvoid'
+
+useKeyboardAvoid()
 import { useRouter } from 'vue-router'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
 import { loginUser, registerUser, bootstrapAdminIfNeeded } from '../services/appDataService'

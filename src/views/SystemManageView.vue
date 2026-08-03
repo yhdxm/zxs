@@ -156,6 +156,9 @@
 </template>
 
 <script setup lang="ts">
+import { useKeyboardAvoid } from '../composables/useKeyboardAvoid'
+
+useKeyboardAvoid()
 import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox, ElTree, type FormInstance, type FormRules } from 'element-plus'

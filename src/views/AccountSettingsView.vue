@@ -56,6 +56,9 @@
 </template>
 
 <script setup lang="ts">
+import { useKeyboardAvoid } from '../composables/useKeyboardAvoid'
+
+useKeyboardAvoid()
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { User, Lock } from '@element-plus/icons-vue'

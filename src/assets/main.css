@@ -75,7 +75,7 @@ select {
     width: 100%;
   }
 
-  /* 触摸目标最小尺寸，单手可点 */
+  /* 触摸目标最小尺寸，单手可点（达标 44px 规范） */
   button,
   .el-button,
   .van-button,
@@ -83,10 +83,10 @@ select {
   .el-checkbox,
   .el-dropdown,
   .el-select {
-    min-height: 36px;
+    min-height: 44px;
   }
   .el-button--small {
-    min-height: 32px;
+    min-height: 40px;
   }
 
   /* 输入框聚焦时 iOS 不会因字号过小而放大视口（仍允许双指缩放） */
@@ -108,6 +108,27 @@ select {
   }
   .el-table {
     overflow-x: auto;
+  }
+
+  /* 弹窗在窄屏限宽，避免被裁切/溢出（多数 el-dialog 写死 720/880px） */
+  .el-dialog {
+    width: 92vw !important;
+    max-width: 92vw !important;
+    margin: 0 auto !important;
+  }
+  .el-dialog__body {
+    max-height: 78vh;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* 去除点击灰块 + 去除双击缩放延迟 */
+  html {
+    -webkit-tap-highlight-color: transparent;
+  }
+  a, button, .el-button, .van-button, .el-radio, .el-checkbox, .el-dropdown, .el-select, [role="button"] {
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
   }
 
   /* 卡片内边距在窄屏稍收紧，保持留白但不浪费空间 */

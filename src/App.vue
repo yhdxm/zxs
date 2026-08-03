@@ -608,6 +608,7 @@ onMounted(async () => {
 
 .app-shell {
   min-height: 100vh;
+  min-height: 100dvh;
   background: var(--bg-app);
 }
 
@@ -637,6 +638,7 @@ onMounted(async () => {
   position: sticky;
   top: 0;
   height: 100vh;
+  height: 100dvh;
   color: var(--text);
   box-shadow: var(--shadow-sidebar);
   overflow: hidden;
@@ -1031,6 +1033,7 @@ onMounted(async () => {
   display: flex;
   flex-direction: column;
   height: 100vh;
+  height: 100dvh;
   overflow: hidden;
   background: var(--bg-main-grad);
 }
@@ -1058,7 +1061,7 @@ onMounted(async () => {
 .full { width: 100%; }
 
 /* ===== 未登录：侧边栏 + 移动端 ===== */
-.layout { display: flex; min-height: 100vh; }
+.layout { display: flex; min-height: 100vh; min-height: 100dvh; }
 .sidebar {
   width: 220px;
   flex-shrink: 0;
@@ -1069,6 +1072,7 @@ onMounted(async () => {
   position: sticky;
   top: 0;
   height: 100vh;
+  height: 100dvh;
 }
 .sidebar-brand { font-size: 18px; font-weight: 700; color: var(--primary); padding: 20px 18px 14px; }
 .side-menu { display: flex; flex-direction: column; gap: 4px; padding: 8px 10px; flex: 1; }

@@ -416,7 +416,8 @@ const reportRows = computed<Array<Record<string, any>>>(() => {
   border: 1px solid rgba(99, 102, 241, 0.08);
   border-radius: 18px;
   box-shadow: 0 8px 24px rgba(15, 23, 42, 0.05);
-  overflow: hidden;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 .report-table { width: 100%; border-collapse: collapse; font-size: 14px; }
 .report-table thead th {

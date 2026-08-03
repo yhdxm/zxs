@@ -214,6 +214,9 @@
 </template>
 
 <script setup lang="ts">
+import { useKeyboardAvoid } from '../composables/useKeyboardAvoid'
+
+useKeyboardAvoid()
 import { computed, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
