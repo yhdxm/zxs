@@ -254,35 +254,56 @@ function normalizeConfig(cfg: PermissionConfig): PermissionConfig {
   return cfg
 }
 
+let permissionConfigCache: { config: PermissionConfig; expiredAt: number } | null = null
+const PERMISSION_CACHE_TTL_MS = 30_000
+
 /** 读取全局角色权限配置（优先 app_settings 表，其次 admin profile，最后默认） */
 export async function loadPermissionConfig(): Promise<PermissionConfig> {
+  if (permissionConfigCache && permissionConfigCache.expiredAt > Date.now()) {
+    return permissionConfigCache.config
+  }
+
+  let cfg: PermissionConfig | null = null
   try {
     const { data, error } = await supabase.from('app_settings').select('value').eq('key', 'role_config').maybeSingle()
     if (!error && data?.value) {
-      const cfg = data.value as PermissionConfig
-      if (Array.isArray(cfg.roles)) return normalizeConfig(cfg)
+      const parsed = data.value as PermissionConfig
+      if (Array.isArray(parsed.roles)) cfg = normalizeConfig(parsed)
     }
   } catch {
     // ignore
   }
 
-  try {
-    const { data, error } = await supabase.from('profiles').select('role_config').eq('user_id', 'admin-default').maybeSingle()
-    if (!error && data?.role_config) {
-      const cfg = data.role_config as PermissionConfig
-      if (Array.isArray(cfg.roles)) return normalizeConfig(cfg)
+  if (!cfg) {
+    try {
+      const { data, error } = await supabase.from('profiles').select('role_config').eq('user_id', 'admin-default').maybeSingle()
+      if (!error && data?.role_config) {
+        const parsed = data.role_config as PermissionConfig
+        if (Array.isArray(parsed.roles)) cfg = normalizeConfig(parsed)
+      }
+    } catch {
+      // ignore
     }
-  } catch {
-    // ignore
   }
 
-  return JSON.parse(JSON.stringify(DEFAULT_ROLE_CONFIG)) as PermissionConfig
+  if (!cfg) {
+    cfg = JSON.parse(JSON.stringify(DEFAULT_ROLE_CONFIG)) as PermissionConfig
+  }
+
+  permissionConfigCache = { config: cfg, expiredAt: Date.now() + PERMISSION_CACHE_TTL_MS }
+  return cfg
+}
+
+/** 使权限配置缓存立即失效（保存后调用） */
+export function invalidatePermissionConfigCache(): void {
+  permissionConfigCache = null
 }
 
 /** 保存全局角色权限配置（优先 app_settings 表，失败则写入 admin profile） */
 export async function savePermissionConfig(config: PermissionConfig): Promise<boolean> {
   // 标记为当前权限方案版本，避免下次加载时被重复迁移（尊重管理员手动取消的权限）
   config.version = PERMISSION_SCHEMA_VERSION
+  invalidatePermissionConfigCache()
   try {
     const { error } = await supabase.from('app_settings').upsert(
       { key: 'role_config', value: config as unknown as Record<string, unknown>, updated_at: new Date().toISOString() },
@@ -844,7 +865,10 @@ export async function loginUser(username: string, password: string): Promise<App
     throw new Error('登录失败：未获取到用户')
   }
 
-  const account = await getAccountByAuthId(uid)
+  const [account, profile] = await Promise.all([
+    getAccountByAuthId(uid),
+    fetchProfile(uid)
+  ])
   if (!account) {
     throw new Error('账号不存在，请联系管理员')
   }
@@ -852,7 +876,6 @@ export async function loginUser(username: string, password: string): Promise<App
     throw new Error('账号已被禁用，请联系管理员')
   }
 
-  const profile = await fetchProfile(uid)
   const user = toAppUser(account, profile?.nickname)
   // 加载角色权限配置并缓存到用户对象
   const roleConfig = await loadPermissionConfig()
@@ -987,11 +1010,13 @@ export function subscribeDashboardChanges(
 async function buildUserFromSession(session: { user: { id: string } }): Promise<AppUser | null> {
   const uid = session.user.id
   try {
-    const account = await getAccountByAuthId(uid)
+    const [account, profile] = await Promise.all([
+      getAccountByAuthId(uid),
+      fetchProfile(uid)
+    ])
     if (!account) {
       return null
     }
-    const profile = await fetchProfile(uid)
     const user = toAppUser(account, profile?.nickname)
     const roleConfig = await loadPermissionConfig()
     user.permissions = getRolePermissions(user.role, roleConfig)
