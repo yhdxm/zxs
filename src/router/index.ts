@@ -22,6 +22,7 @@ import ThirdPartyApiView from '../views/ThirdPartyApiView.vue'
 import FeedbackView from '../views/FeedbackView.vue'
 import FeedbackAdminView from '../views/FeedbackAdminView.vue'
 import ResponsiveShowcaseView from '../views/ResponsiveShowcaseView.vue'
+import WelcomeView from '../views/WelcomeView.vue'
 import { hasPermission, loadPermissionConfig, getSavedUser } from '../services/appDataService'
 
 // 数据看板（同一路由 /dashboard 通过 query.view 区分）的细粒度权限映射
@@ -37,7 +38,7 @@ const router = createRouter({
   routes: [
     {
       path: '/',
-      redirect: '/dashboard'
+      redirect: '/welcome'
     },
     {
       path: '/ai',
@@ -172,6 +173,11 @@ const router = createRouter({
       path: '/responsive',
       name: 'responsive',
       component: ResponsiveShowcaseView
+    },
+    {
+      path: '/welcome',
+      name: 'welcome',
+      component: WelcomeView
     }
   ]
 })
@@ -190,7 +196,7 @@ router.beforeEach(async (to, _from, next) => {
   }
 
   if (isAuthenticated && to.name === 'login') {
-    next({ name: 'dashboard' })
+    next({ name: 'welcome' })
     return
   }
 

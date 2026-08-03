@@ -405,7 +405,7 @@ const toggleGroup = (key: string) => {
 }
 
 const isMenuActive = (key: string) => {
-  if (key === 'welcome') return route.path === '/dashboard' && (route.query.view || 'overview') === 'overview'
+  if (key === 'welcome') return route.path === '/welcome'
   if (key === 'database') return route.path === '/database'
   if (key === 'lianzhicang') return route.path === '/ai' || route.path === '/models' || route.path === '/aimodels'
   if (key === 'ai') return route.path === '/ai'
