@@ -240,7 +240,7 @@ export function migratePermissionList(perms: string[]): string[] {
  * 1. 老版本（无 version 或 < 2）配置自动做 v1→v2 权限迁移，避免升级后菜单消失；
  * 2. 超级管理员始终拥有全部权限，避免配置漂移导致锁死；
  * 3. 不再强制为普通用户/管理员注入默认权限，管理员在权限页保存什么就是什么，
- *    登录后的默认落地页 /welcome 与 /account 本就不受权限树控制，不会出现死循环。
+ *    登录后的默认落地页 /dashboard 与 /account 本就不受权限树控制，不会出现死循环。
  */
 function normalizeConfig(cfg: PermissionConfig): PermissionConfig {
   if ((cfg.version ?? 1) < PERMISSION_SCHEMA_VERSION) {
@@ -254,35 +254,61 @@ function normalizeConfig(cfg: PermissionConfig): PermissionConfig {
   return cfg
 }
 
+// 权限配置内存缓存：登录、路由守卫、菜单渲染会高频读取，30s TTL 避免重复请求 Supabase
+let permissionConfigCache: PermissionConfig | null = null
+let permissionConfigCacheAt = 0
+const PERMISSION_CONFIG_TTL_MS = 30_000
+
 /** 读取全局角色权限配置（优先 app_settings 表，其次 admin profile，最后默认） */
 export async function loadPermissionConfig(): Promise<PermissionConfig> {
+  if (permissionConfigCache && Date.now() - permissionConfigCacheAt < PERMISSION_CONFIG_TTL_MS) {
+    return permissionConfigCache
+  }
+
+  let cfg: PermissionConfig | null = null
   try {
     const { data, error } = await supabase.from('app_settings').select('value').eq('key', 'role_config').maybeSingle()
     if (!error && data?.value) {
-      const cfg = data.value as PermissionConfig
-      if (Array.isArray(cfg.roles)) return normalizeConfig(cfg)
+      const loaded = data.value as PermissionConfig
+      if (Array.isArray(loaded.roles)) cfg = normalizeConfig(loaded)
     }
   } catch {
     // ignore
   }
 
-  try {
-    const { data, error } = await supabase.from('profiles').select('role_config').eq('user_id', 'admin-default').maybeSingle()
-    if (!error && data?.role_config) {
-      const cfg = data.role_config as PermissionConfig
-      if (Array.isArray(cfg.roles)) return normalizeConfig(cfg)
+  if (!cfg) {
+    try {
+      const { data, error } = await supabase.from('profiles').select('role_config').eq('user_id', 'admin-default').maybeSingle()
+      if (!error && data?.role_config) {
+        const loaded = data.role_config as PermissionConfig
+        if (Array.isArray(loaded.roles)) cfg = normalizeConfig(loaded)
+      }
+    } catch {
+      // ignore
     }
-  } catch {
-    // ignore
   }
 
-  return JSON.parse(JSON.stringify(DEFAULT_ROLE_CONFIG)) as PermissionConfig
+  if (!cfg) {
+    cfg = JSON.parse(JSON.stringify(DEFAULT_ROLE_CONFIG)) as PermissionConfig
+  }
+
+  permissionConfigCache = cfg
+  permissionConfigCacheAt = Date.now()
+  return cfg
+}
+
+/** 清除权限配置缓存，保存新配置后立即生效 */
+export function clearPermissionConfigCache(): void {
+  permissionConfigCache = null
+  permissionConfigCacheAt = 0
 }
 
 /** 保存全局角色权限配置（优先 app_settings 表，失败则写入 admin profile） */
 export async function savePermissionConfig(config: PermissionConfig): Promise<boolean> {
   // 标记为当前权限方案版本，避免下次加载时被重复迁移（尊重管理员手动取消的权限）
   config.version = PERMISSION_SCHEMA_VERSION
+  // 清除缓存，保证保存后下一次读取立即拿到最新配置
+  clearPermissionConfigCache()
   try {
     const { error } = await supabase.from('app_settings').upsert(
       { key: 'role_config', value: config as unknown as Record<string, unknown>, updated_at: new Date().toISOString() },
@@ -844,7 +870,11 @@ export async function loginUser(username: string, password: string): Promise<App
     throw new Error('登录失败：未获取到用户')
   }
 
-  const account = await getAccountByAuthId(uid)
+  // 账号与 profile 独立查询，并行执行减少登录耗时
+  const [account, profile] = await Promise.all([
+    getAccountByAuthId(uid),
+    fetchProfile(uid)
+  ])
   if (!account) {
     throw new Error('账号不存在，请联系管理员')
   }
@@ -852,9 +882,8 @@ export async function loginUser(username: string, password: string): Promise<App
     throw new Error('账号已被禁用，请联系管理员')
   }
 
-  const profile = await fetchProfile(uid)
   const user = toAppUser(account, profile?.nickname)
-  // 加载角色权限配置并缓存到用户对象
+  // 加载角色权限配置并缓存到用户对象（loadPermissionConfig 带内存缓存）
   const roleConfig = await loadPermissionConfig()
   user.permissions = getRolePermissions(user.role, roleConfig)
   setStoredUser(user)
@@ -987,11 +1016,13 @@ export function subscribeDashboardChanges(
 async function buildUserFromSession(session: { user: { id: string } }): Promise<AppUser | null> {
   const uid = session.user.id
   try {
-    const account = await getAccountByAuthId(uid)
+    const [account, profile] = await Promise.all([
+      getAccountByAuthId(uid),
+      fetchProfile(uid)
+    ])
     if (!account) {
       return null
     }
-    const profile = await fetchProfile(uid)
     const user = toAppUser(account, profile?.nickname)
     const roleConfig = await loadPermissionConfig()
     user.permissions = getRolePermissions(user.role, roleConfig)

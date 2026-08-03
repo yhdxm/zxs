@@ -47,7 +47,7 @@ export const APP_MENU: SideItem[] = [
     key: 'welcome',
     label: '首页',
     icon: HomeFilled,
-    to: '/welcome'
+    to: '/dashboard'
   },
   {
     key: 'database',
