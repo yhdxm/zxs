@@ -227,7 +227,7 @@ const TABLE_DESC: Record<string, string> = {
   cet4_prep_practice: '四六级备考台·刷题记录表：听力/阅读/写作/翻译的做题数与正确数',
   cet4_prep_mistakes: '四六级备考台·错题本表：题型/错因/正确思路与 1/3/7/15/30 天复习计划',
   cet4_prep_checkins: '四六级备考台·打卡表：按日期聚合的背词/刷题次数',
-  cet4_prep_settings: '四六级备考台·设置表：每日新词数、考试日、关联目标'
+  cet4_prep_settings: '四六级备考台·设置表：每日新词数、考试日、手动连续天数、关联目标'
 }
 
 /** Supabase 平台托管的系统表（多建在 public 模式下但由平台管理、默认不开 RLS），不纳入「业务表未开 RLS」告警，避免误报 */

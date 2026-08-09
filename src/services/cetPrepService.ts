@@ -47,6 +47,7 @@ export interface CheckinRec {
 export interface PrepSettings {
   newPerDay: number
   examDate: string | null
+  manualStreak: number | null
   linkedGoal: string | null
 }
 
@@ -188,6 +189,7 @@ export async function loadAll(): Promise<PrepState> {
   const settings: PrepSettings = {
     newPerDay: (s.data && s.data.new_per_day) || 10,
     examDate: (s.data && s.data.exam_date) || null,
+    manualStreak: (s.data && s.data.manual_streak != null) ? Number(s.data.manual_streak) : null,
     linkedGoal: (s.data && s.data.linked_goal) || null
   }
   return { words, practice, mistakes, checkins, settings }
@@ -275,16 +277,21 @@ export async function persistCheckin(date: string, c: CheckinRec): Promise<void>
 
 export async function persistSettings(s: PrepSettings): Promise<void> {
   const userId = await getUserIdOrThrow()
-  const { error } = await supabase.from('cet4_prep_settings').upsert(
-    {
-      user_id: userId,
-      new_per_day: s.newPerDay || 10,
-      exam_date: s.examDate ?? null,
-      linked_goal: s.linkedGoal ?? null,
-      updated_at: new Date().toISOString()
-    },
-    { onConflict: 'user_id' }
-  )
+  const payload: any = {
+    user_id: userId,
+    new_per_day: s.newPerDay || 10,
+    exam_date: s.examDate ?? null,
+    manual_streak: s.manualStreak ?? null,
+    linked_goal: s.linkedGoal ?? null,
+    updated_at: new Date().toISOString()
+  }
+  let { error } = await supabase.from('cet4_prep_settings').upsert(payload, { onConflict: 'user_id' })
+  // 兼容：旧表没有 manual_streak 列时，回退到只保存基础字段，不阻断用户保存
+  if (error && /manual_streak|column.*does not exist|Could not find|未知的列/i.test(String(error.message || error))) {
+    delete payload.manual_streak
+    const res2 = await supabase.from('cet4_prep_settings').upsert(payload, { onConflict: 'user_id' })
+    error = res2.error
+  }
   if (error) throw error
 }
 

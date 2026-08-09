@@ -73,13 +73,14 @@ create table if not exists public.cet4_prep_checkins (
   primary key (user_id, date)
 );
 
--- ---------- 6. 用户设置（每日新词数 / 考试日 / 关联目标） ----------
+-- ---------- 6. 用户设置（每日新词数 / 考试日 / 手动连续天数 / 关联目标） ----------
 create table if not exists public.cet4_prep_settings (
-  user_id      text        primary key,
-  new_per_day  int         not null default 10,
-  exam_date    date,
-  linked_goal  text,
-  updated_at   timestamptz not null default now()
+  user_id       text        primary key,
+  new_per_day   int         not null default 10,
+  exam_date     date,
+  manual_streak int,                        -- 用户手动校准的连续背词天数；null 时按打卡记录自动计算
+  linked_goal   text,
+  updated_at    timestamptz not null default now()
 );
 
 -- ============================================================

@@ -54,7 +54,7 @@ const emptyState = () => ({
   practice: [],
   mistakes: [],
   checkins: {},
-  settings: { newPerDay: 10, examDate: null, linkedGoal: null }
+  settings: { newPerDay: 10, examDate: null, manualStreak: null, linkedGoal: null }
 })
 
 const storage: PrepStorage = {

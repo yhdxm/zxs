@@ -58,6 +58,7 @@ let MASTER: PrepWord[] = []
 interface PrepS {
   newPerDay: number
   examDate: string
+  manualStreak: number | null
   words: Record<string, WordProgress>
   practice: PracticeRec[]
   mistakes: MistakeRec[]
@@ -76,6 +77,7 @@ function defaults() {
   return {
     newPerDay: 10,
     examDate: thirdSatOfNov(y),
+    manualStreak: null,
     words: {},
     practice: [],
     mistakes: [],
@@ -86,7 +88,7 @@ function defaults() {
   }
 }
 function settings(): PrepSettings {
-  return { newPerDay: S.newPerDay, examDate: S.examDate, linkedGoal: S.linkedGoal }
+  return { newPerDay: S.newPerDay, examDate: S.examDate, manualStreak: S.manualStreak, linkedGoal: S.linkedGoal }
 }
 function buildFullState() {
   return {
@@ -187,6 +189,8 @@ function todayReviewed() {
   return c ? c.words : 0
 }
 function streak() {
+  // 用户手动校准过连续天数时，优先使用手动值
+  if (S.manualStreak != null && S.manualStreak >= 0) return S.manualStreak
   let n = 0
   let d = todayStr()
   let c = S.checkins[d]
@@ -274,7 +278,8 @@ const ICON = {
   plus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>',
   warn: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l9 16H3z"/><path d="M12 10v4M12 17v.5"/></svg>',
   flag: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 21V4h12l-2 4 2 4H5"/></svg>',
-  link: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7 0l2-2a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-2 2a5 5 0 0 0 7 7l1-1"/></svg>'
+  link: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7 0l2-2a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-2 2a5 5 0 0 0 7 7l1-1"/></svg>',
+  gear: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>'
 }
 
 /* ===================== 工具 ===================== */
@@ -376,8 +381,13 @@ function renderToday() {
   ${totalRecords() >= 20 ? backupBanner() : ''}
   ${vocabBanner}
   <div class="page-head">
-    <h1 class="page-title">今日备考</h1>
-    <p class="page-sub">距考试 ${daysLeft >= 0 ? daysLeft + ' 天' : '已过期'} · 连续背词 ${streak()} 天 · 词库共 ${MASTER.length} 词</p>
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+      <div>
+        <h1 class="page-title">今日备考</h1>
+        <p class="page-sub">距考试 ${daysLeft >= 0 ? daysLeft + ' 天' : '已过期'} · 连续背词 ${streak()} 天 · 词库共 ${MASTER.length} 词</p>
+      </div>
+      <button class="btn btn-sm" data-act="gotoSettings" title="修改考试日期、每日新词数、连续天数">${ICON.gear}设置</button>
+    </div>
   </div>
 
   <div class="handle">
@@ -596,6 +606,7 @@ function renderMine() {
     </div>`
     : ''
 
+  const currentStreak = streak()
   return `
   <div class="page-head">
     <h1 class="page-title">我的</h1>
@@ -605,6 +616,24 @@ function renderMine() {
   ${totalRecords() >= 20 ? backupBanner() : ''}
 
   ${adminNote}
+
+  <div class="card" id="prepSettingsCard">
+    <div class="sec-title">${ICON.gear}备考设置</div>
+    <div class="field">
+      <label>考试日期</label>
+      <input class="input" type="date" id="settingExamDate" value="${S.examDate}">
+    </div>
+    <div class="field">
+      <label>每日新词数</label>
+      <input class="input" type="number" id="settingNewPerDay" min="1" max="200" value="${S.newPerDay}">
+    </div>
+    <div class="field">
+      <label>连续背词天数</label>
+      <input class="input" type="number" id="settingManualStreak" min="0" max="9999" placeholder="留空则按打卡记录自动计算（当前 ${currentStreak} 天）" value="${S.manualStreak ?? ''}">
+    </div>
+    <p class="muted" style="margin:0 0 12px;">修改后点击保存会立即写入云端数据库，刷新或换设备仍生效。</p>
+    <button class="btn btn-primary" data-act="saveSettings">${ICON.check}保存设置</button>
+  </div>
 
   <div class="card">
     <div class="sec-title">${ICON.download}导出 / 导入</div>
@@ -833,6 +862,13 @@ function onAct(e: Event) {
   } else if (act === 'clearSamples') clearSamples()
   else if (act === 'clearAll') clearAll()
   else if (act === 'linkGoal') linkGoal()
+  else if (act === 'gotoSettings') {
+    setView('mine')
+    setTimeout(() => {
+      const el = document.querySelector('#prepSettingsCard')
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }, 50)
+  } else if (act === 'saveSettings') saveSettings()
 }
 function handleImportFile(e: Event) {
   const f = (e.target as HTMLInputElement).files?.[0]
@@ -1101,6 +1137,7 @@ function buildS(st: PrepState) {
   return {
     newPerDay: st.settings.newPerDay,
     examDate: st.settings.examDate || thirdSatOfNov(new Date().getFullYear()),
+    manualStreak: st.settings.manualStreak ?? null,
     words: st.words,
     practice: st.practice,
     mistakes: st.mistakes,
@@ -1117,7 +1154,7 @@ function buildFullStateFromDefaults() {
     practice: d.practice,
     mistakes: d.mistakes,
     checkins: d.checkins,
-    settings: { newPerDay: d.newPerDay, examDate: d.examDate, linkedGoal: d.linkedGoal }
+    settings: { newPerDay: d.newPerDay, examDate: d.examDate, manualStreak: d.manualStreak, linkedGoal: d.linkedGoal }
   }
 }
 
@@ -1127,6 +1164,37 @@ function linkGoal() {
   S.linkedGoal = goalName
   p(storage.persistSettings(settings()))
   alert('已在备考设置中记录关联目标「' + goalName + '」。可在系统学习目标模块手动建立对应目标。')
+}
+
+function saveSettings() {
+  const examDateEl = document.querySelector('#settingExamDate') as HTMLInputElement | null
+  const newPerDayEl = document.querySelector('#settingNewPerDay') as HTMLInputElement | null
+  const manualStreakEl = document.querySelector('#settingManualStreak') as HTMLInputElement | null
+
+  const newPerDay = parseInt(newPerDayEl?.value || '10', 10)
+  if (!Number.isFinite(newPerDay) || newPerDay < 1 || newPerDay > 200) {
+    alert('每日新词数请填写 1-200 之间的数字。')
+    return
+  }
+
+  const examDate = examDateEl?.value?.trim() || todayStr()
+  const manualStreakRaw = manualStreakEl?.value?.trim() || ''
+  const manualStreak = manualStreakRaw === '' ? null : parseInt(manualStreakRaw, 10)
+  if (manualStreak !== null && (!Number.isFinite(manualStreak) || manualStreak < 0 || manualStreak > 9999)) {
+    alert('连续背词天数请填写 0-9999 之间的数字，或留空自动计算。')
+    return
+  }
+
+  S.newPerDay = newPerDay
+  S.examDate = examDate
+  S.manualStreak = manualStreak
+  storage
+    .persistSettings(settings())
+    .then(() => {
+      alert('设置已保存。')
+      render()
+    })
+    .catch((err: any) => alert('保存失败：' + (err?.message || err)))
 }
 
 /* ===================== 今日战绩 PNG ===================== */
