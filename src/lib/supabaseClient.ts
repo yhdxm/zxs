@@ -12,4 +12,22 @@ if (!supabaseUrl || !supabaseKey) {
   )
 }
 
-export const supabase = createClient(supabaseUrl ?? '', supabaseKey ?? '')
+/**
+ * 带超时的 fetch 包装：Supabase 默认 fetch 无超时，移动端弱网/被墙时请求会永久 pending，
+ * 导致加载中遮罩永远不消失。这里统一限制单次请求最长 8 秒，超时后 AbortController 触发 abort，
+ * 让上层 try/catch 能走降级逻辑。
+ */
+function createTimeoutFetch(timeoutMs: number): typeof fetch {
+  return (input: RequestInfo | URL, init?: RequestInit) => {
+    const controller = new AbortController()
+    const id = setTimeout(() => controller.abort(), timeoutMs)
+    return fetch(input, { ...(init || {}), signal: controller.signal })
+      .finally(() => clearTimeout(id))
+  }
+}
+
+export const supabase = createClient(
+  supabaseUrl ?? '',
+  supabaseKey ?? '',
+  { global: { fetch: createTimeoutFetch(8000) } }
+)

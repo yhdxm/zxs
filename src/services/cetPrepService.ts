@@ -63,6 +63,14 @@ function uid(): string {
   return Math.random().toString(36).slice(2, 9)
 }
 
+/** 判定错误是否因为目标表尚未创建（执行 scripts/cet4_prep.sql 前常见） */
+export function isMissingTableError(err: unknown): boolean {
+  if (!err) return false
+  const e = err as { message?: string; code?: string; details?: string }
+  const msg = String(e.message || e.code || e.details || err)
+  return /schema cache|table.*does not exist|relation.*does not exist|PGRST204|PGRST116|not find the table/i.test(msg)
+}
+
 async function getUid(): Promise<string | null> {
   const u = await getSavedUser()
   return u?.id ?? null

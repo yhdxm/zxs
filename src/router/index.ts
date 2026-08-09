@@ -1,30 +1,26 @@
 import { createRouter, createWebHashHistory } from 'vue-router'
-import LandingView from '../views/LandingView.vue'
-import LoginView from '../views/LoginView.vue'
-import DashboardView from '../views/DashboardView.vue'
-import AiAssistantView from '../views/AiAssistantView.vue'
-import SystemManageView from '../views/SystemManageView.vue'
-import AccountSettingsView from '../views/AccountSettingsView.vue'
-import DatabaseCheckView from '../views/DatabaseCheckView.vue'
-import AutomationInfoView from '../views/AutomationInfoView.vue'
-import ModelCenterView from '../views/ModelCenterView.vue'
-import RequirementCollectView from '../views/RequirementCollectView.vue'
-import WeatherView from '../views/WeatherView.vue'
-import MapView from '../views/MapView.vue'
-import NewsAggregateView from '../views/NewsAggregateView.vue'
-import YingCangView from '../views/YingCangView.vue'
-import XingYuView from '../views/XingYuView.vue'
-import AiModelsView from '../views/AiModelsView.vue'
-import LearnEnglishView from '../views/LearnEnglishView.vue'
-import LearnIndustryView from '../views/LearnIndustryView.vue'
-import LearnBooksView from '../views/LearnBooksView.vue'
-import LearningGoalsView from '../views/LearningGoalsView.vue'
-import CetPrepView from '../views/CetPrepView.vue'
-import ThirdPartyApiView from '../views/ThirdPartyApiView.vue'
-import FeedbackView from '../views/FeedbackView.vue'
-import FeedbackAdminView from '../views/FeedbackAdminView.vue'
-import WelcomeView from '../views/WelcomeView.vue'
-import { hasPermission, loadPermissionConfig, getSavedUser } from '../services/appDataService'
+import { hasPermission, loadPermissionConfig, getSavedUser, type AppUser } from '../services/appDataService'
+
+// 路由守卫高频调用 getSavedUser，加短周期内存缓存避免每次导航都请求 Supabase
+//（ especially 移动端弱网/被墙时，supabase.auth.getSession 可能触发网络刷新）。
+let cachedUser: AppUser | null | undefined
+let cachedUserAt = 0
+const USER_CACHE_TTL_MS = 3000
+
+export function clearRouterUserCache(): void {
+  cachedUser = undefined
+  cachedUserAt = 0
+}
+
+async function getCachedSavedUser(): Promise<AppUser | null> {
+  if (cachedUser !== undefined && Date.now() - cachedUserAt < USER_CACHE_TTL_MS) {
+    return cachedUser
+  }
+  const user = await getSavedUser()
+  cachedUser = user
+  cachedUserAt = Date.now()
+  return user
+}
 
 // 数据看板（同一路由 /dashboard 通过 query.view 区分）的细粒度权限映射
 const DASHBOARD_VIEW_PERM: Record<string, string> = {
@@ -44,146 +40,146 @@ const router = createRouter({
     {
       path: '/ai',
       name: 'ai',
-      component: AiAssistantView,
+      component: () => import('../views/AiAssistantView.vue'),
       meta: { requirePermission: 'ai' }
     },
     {
       path: '/landing',
       name: 'landing',
-      component: LandingView
+      component: () => import('../views/LandingView.vue')
     },
     {
       path: '/login',
       name: 'login',
-      component: LoginView
+      component: () => import('../views/LoginView.vue')
     },
     {
       path: '/dashboard',
       name: 'dashboard',
-      component: DashboardView,
+      component: () => import('../views/DashboardView.vue'),
       meta: { requirePermission: 'dashboard' }
     },
     {
       path: '/system',
       name: 'system',
-      component: SystemManageView,
+      component: () => import('../views/SystemManageView.vue'),
       meta: { requirePermission: 'system' }
     },
     {
       path: '/account',
       name: 'account',
-      component: AccountSettingsView
+      component: () => import('../views/AccountSettingsView.vue')
     },
     {
       path: '/database',
       name: 'database',
-      component: DatabaseCheckView,
+      component: () => import('../views/DatabaseCheckView.vue'),
       meta: { requirePermission: 'database' }
     },
     {
       path: '/automation',
       name: 'automation',
-      component: AutomationInfoView,
+      component: () => import('../views/AutomationInfoView.vue'),
       meta: { requirePermission: 'automation' }
     },
     {
       path: '/models',
       name: 'models',
-      component: ModelCenterView,
+      component: () => import('../views/ModelCenterView.vue'),
       meta: { requirePermission: 'models' }
     },
     {
       path: '/requirements',
       name: 'requirements',
-      component: RequirementCollectView,
+      component: () => import('../views/RequirementCollectView.vue'),
       meta: { requirePermission: 'requirements' }
     },
     {
       path: '/weather',
       name: 'weather',
-      component: WeatherView,
+      component: () => import('../views/WeatherView.vue'),
       meta: { requirePermission: 'weather' }
     },
     {
       path: '/map',
       name: 'map',
-      component: MapView,
+      component: () => import('../views/MapView.vue'),
       meta: { requirePermission: 'map' }
     },
     {
       path: '/news',
       name: 'news',
-      component: NewsAggregateView,
+      component: () => import('../views/NewsAggregateView.vue'),
       meta: { requirePermission: 'news' }
     },
     {
       path: '/yingcang',
       name: 'yingcang',
-      component: YingCangView,
+      component: () => import('../views/YingCangView.vue'),
       meta: { requirePermission: 'yingcang' }
     },
     {
       path: '/xingyu',
       name: 'xingyu',
-      component: XingYuView,
+      component: () => import('../views/XingYuView.vue'),
       meta: { requirePermission: 'xingyu' }
     },
     {
       path: '/aimodels',
       name: 'aimodels',
-      component: AiModelsView,
+      component: () => import('../views/AiModelsView.vue'),
       meta: { requirePermission: 'aimodels' }
     },
     {
       path: '/learn/english',
       name: 'learn-english',
-      component: LearnEnglishView,
+      component: () => import('../views/LearnEnglishView.vue'),
       meta: { requirePermission: 'learn-english' }
     },
     {
       path: '/learn/industry',
       name: 'learn-industry',
-      component: LearnIndustryView,
+      component: () => import('../views/LearnIndustryView.vue'),
       meta: { requirePermission: 'learn-industry' }
     },
     {
       path: '/learn/books',
       name: 'learn-books',
-      component: LearnBooksView,
+      component: () => import('../views/LearnBooksView.vue'),
       meta: { requirePermission: 'learn-books' }
     },
     {
       path: '/learn/goals',
       name: 'learn-goals',
-      component: LearningGoalsView
+      component: () => import('../views/LearningGoalsView.vue')
     },
     {
       path: '/learn/cet-prep',
       name: 'cet-prep',
-      component: CetPrepView
+      component: () => import('../views/CetPrepView.vue')
     },
     {
       path: '/third-api',
       name: 'third-api',
-      component: ThirdPartyApiView,
+      component: () => import('../views/ThirdPartyApiView.vue'),
       meta: { requirePermission: 'third-api' }
     },
     {
       path: '/feedback',
       name: 'feedback',
-      component: FeedbackView,
+      component: () => import('../views/FeedbackView.vue'),
       meta: { requirePermission: 'feedback' }
     },
     {
       path: '/feedback-admin',
       name: 'feedback-admin',
-      component: FeedbackAdminView,
+      component: () => import('../views/FeedbackAdminView.vue'),
       meta: { requirePermission: 'feedback.admin' }
     },
     {
       path: '/welcome',
       name: 'welcome',
-      component: WelcomeView
+      component: () => import('../views/WelcomeView.vue')
     }
   ]
 })
@@ -193,7 +189,7 @@ const router = createRouter({
 // 已登录访问 /login 则直接进入工作台（登录后默认落地页，实现“工作台前移”）。
 // 注意：这里必须真实验证 Supabase 会话，不能只看 localStorage，否则 token 过期后仍会进入内部页。
 router.beforeEach(async (to, _from, next) => {
-  const user = await getSavedUser()
+  const user = await getCachedSavedUser()
   const isAuthenticated = Boolean(user)
 
   if (!isAuthenticated && to.name !== 'login') {

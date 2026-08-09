@@ -15,6 +15,18 @@ const memoryStorage = () => {
   }
 }
 
+/**
+ * 带超时的 fetch 包装：与 supabaseClient.ts 保持一致，避免后台管理请求在弱网/被墙时永久挂起。
+ */
+function createTimeoutFetch(timeoutMs: number): typeof fetch {
+  return (input: RequestInfo | URL, init?: RequestInit) => {
+    const controller = new AbortController()
+    const id = setTimeout(() => controller.abort(), timeoutMs)
+    return fetch(input, { ...(init || {}), signal: controller.signal })
+      .finally(() => clearTimeout(id))
+  }
+}
+
 export const isolatedSupabase = createClient(
   import.meta.env.VITE_SUPABASE_URL ?? '',
   import.meta.env.VITE_SUPABASE_ANON_KEY ?? '',
@@ -25,6 +37,7 @@ export const isolatedSupabase = createClient(
       persistSession: false,
       autoRefreshToken: false,
       detectSessionInUrl: false
-    }
+    },
+    global: { fetch: createTimeoutFetch(8000) }
   }
 )

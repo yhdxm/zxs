@@ -1081,14 +1081,47 @@ const importFile = (event: Event) => {
 
 /* 移动端适配 */
 @media (max-width: 768px) {
-  .mm-topbar { flex-direction: column; align-items: stretch; gap: 12px; }
-  .mm-toolbar { flex-direction: column; align-items: stretch; }
-  .mm-toolbar .mm-search,
-  .mm-toolbar .mm-date-range,
-  .mm-toolbar .mm-filter,
-  .mm-toolbar .mm-more,
-  .mm-toolbar .mm-add-btn { width: 100%; }
-  .mm-toolbar .mm-add-btn { justify-content: center; }
+  .mm-shell { gap: 14px; }
+  .mm-topbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+    padding: 14px;
+    border-radius: 16px;
+  }
+  .mm-topbar-title { gap: 10px; }
+  .mm-title-icon { width: 40px; height: 40px; font-size: 18px; }
+  .mm-topbar-title h2 { font-size: 16px; }
+
+  .mm-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+  .mm-toolbar > * {
+    width: 100% !important;
+    min-width: 0 !important;
+    margin: 0 !important;
+  }
+  /* 强制 Element Plus 内部控件在移动端真正撑满，避免日期/选择器外溢 */
+  .mm-toolbar :deep(.el-input),
+  .mm-toolbar :deep(.el-select),
+  .mm-toolbar :deep(.el-date-editor),
+  .mm-toolbar :deep(.el-input__wrapper),
+  .mm-toolbar :deep(.el-select .el-input__wrapper),
+  .mm-toolbar :deep(.el-date-editor .el-input__wrapper) {
+    width: 100% !important;
+  }
+  .mm-toolbar :deep(.el-range-editor.el-input__wrapper) {
+    box-sizing: border-box;
+  }
+  .mm-toolbar .mm-more .el-button,
+  .mm-toolbar .mm-add-btn {
+    width: 100%;
+    min-height: 40px;
+    justify-content: center;
+  }
+
   .mm-item { flex-direction: column; align-items: stretch; gap: 10px; padding-left: 16px; }
   .mm-item::before { top: 0; bottom: auto; width: 100%; height: 3px; border-radius: 0 0 4px 4px; }
   .mm-item-main { flex-direction: column; align-items: flex-start; gap: 6px; }

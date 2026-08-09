@@ -308,6 +308,7 @@ import {
 } from './services/appDataService'
 import { APP_MENU, canManageSystem, type SideItem } from './config/appMenu'
 import CompassLogo from './components/CompassLogo.vue'
+import { clearRouterUserCache } from './router'
 
 const router = useRouter()
 const route = useRoute()
@@ -560,6 +561,7 @@ const updatePlatform = () => {
 
 const handleLogout = async () => {
   await logoutUser()
+  clearRouterUserCache()
   currentUser.value = null
   drawerVisible.value = false
   mobileNavVisible.value = false
@@ -576,10 +578,22 @@ onMounted(async () => {
   window.addEventListener('permission-config-updated', () => {
     refreshUser().catch((err) => console.error('[App] permission refresh failed:', err))
   })
+
+  /**
+   * 启动初始化：最多等待 3 秒。
+   * 若 Supabase 网络极慢/被墙导致 refreshUser 挂起，超时后强制关闭加载遮罩，
+   * 避免用户永远看到"加载中"。超时时 currentUser 可能为 null，router 守卫会引导到登录页。
+   */
+  const INIT_TIMEOUT_MS = 3000
   try {
-    await refreshUser()
+    await Promise.race([
+      refreshUser(),
+      new Promise<void>((_, reject) => {
+        setTimeout(() => reject(new Error('init timeout')), INIT_TIMEOUT_MS)
+      })
+    ])
   } catch (err) {
-    console.error('[App] refresh user failed:', err)
+    console.error('[App] init failed or timeout:', err)
     currentUser.value = null
   } finally {
     initializing.value = false

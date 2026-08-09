@@ -1,6 +1,9 @@
 <template>
   <div class="cet-prep-root" ref="root">
     <nav class="topnav" id="topNav"></nav>
+    <div v-if="missingTable" class="prep-missing-banner">
+      备考词库表（cet4_words）尚未创建，当前使用内置演示词库。请管理员在 Supabase SQL Editor 中执行项目根目录的 <code>scripts/cet4_prep.sql</code> 以创建完整词库表。
+    </div>
     <div class="content" id="content"></div>
     <nav class="bottom-nav" id="bottomNav"></nav>
 
@@ -35,13 +38,23 @@ import {
   replaceAll,
   clearSampleData,
   isAdmin,
-  seedMasterWords
+  seedMasterWords,
+  isMissingTableError
 } from '../services/cetPrepService'
 
 const root = ref<HTMLElement | null>(null)
 const loading = ref(true)
 const error = ref('')
+const missingTable = ref(false)
 let cleanup: (() => void) | null = null
+
+const emptyState = () => ({
+  words: {},
+  practice: [],
+  mistakes: [],
+  checkins: {},
+  settings: { newPerDay: 10, examDate: null, linkedGoal: null }
+})
 
 const storage: PrepStorage = {
   fetchMasterWords,
@@ -64,7 +77,23 @@ onMounted(async () => {
   try {
     cleanup = await initPrep(root.value, storage)
   } catch (e: any) {
-    error.value = '备考数据加载失败：' + (e?.message || e)
+    // 表尚未创建时降级为内存演示数据，避免直接红字报错卡死
+    if (isMissingTableError(e)) {
+      missingTable.value = true
+      error.value = ''
+      const fallbackStorage: PrepStorage = {
+        ...storage,
+        fetchMasterWords: async () => [],
+        loadAll: async () => emptyState()
+      }
+      try {
+        cleanup = await initPrep(root.value, fallbackStorage)
+      } catch (e2: any) {
+        error.value = '备考数据加载失败：' + (e2?.message || e2)
+      }
+    } else {
+      error.value = '备考数据加载失败：' + (e?.message || e)
+    }
   } finally {
     loading.value = false
   }
@@ -287,6 +316,23 @@ onUnmounted(() => {
 /* loading / error */
 .cet-prep-root .prep-state { text-align: center; color: var(--ink-soft); padding: 40px 10px; font-size: 14px; }
 .cet-prep-root .prep-error { color: var(--red); }
+
+.cet-prep-root .prep-missing-banner {
+  background: #FFF7E8;
+  border-bottom: 1px solid var(--orange-soft);
+  color: var(--ink);
+  padding: 12px 16px;
+  font-size: 13px;
+  line-height: 1.6;
+  text-align: center;
+}
+.cet-prep-root .prep-missing-banner code {
+  background: #fff;
+  padding: 2px 6px;
+  border-radius: 6px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  color: var(--orange);
+}
 
 /* ===== Responsive ===== */
 @media (max-width: 768px) {
