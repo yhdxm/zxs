@@ -148,7 +148,8 @@ function wstate(w: string): WordProgress {
   return S.words[w]!
 }
 
-/* 构建今日队列：新词(可改数量)+到期复习旧词。昨日未完成新词自动滚入（firstIssued<今日仍为new） */
+/* 构建今日队列：新词(可改数量)+到期复习旧词。昨日未完成新词自动滚入（firstIssued<今日仍为new）。
+   注意：本函数为纯计算，不修改 firstIssued，避免 render/stats 等只读调用误发词。 */
 function buildQueue() {
   const t = todayStr()
   const reviews: string[] = []
@@ -168,14 +169,24 @@ function buildQueue() {
   }
   const quota = Math.max(0, S.newPerDay - newToday)
   const take = fresh.slice(0, quota)
-  take.forEach((w) => {
-    wstate(w).firstIssued = t
-  })
   const q: { w: string; kind: string }[] = []
   take.forEach((w) => q.push({ w, kind: 'new' }))
   rolled.forEach((w) => q.push({ w, kind: 'new' }))
   reviews.forEach((w) => q.push({ w, kind: 'review' }))
   return q
+}
+
+/* 真正把队列中的新词标记为今日已发放，并持久化到数据库。仅在用户点击"开始背词"时调用。 */
+function issueQueueWords(queue: { w: string; kind: string }[]) {
+  const t = todayStr()
+  for (const item of queue) {
+    if (item.kind !== 'new') continue
+    const st = wstate(item.w)
+    if (!st.firstIssued) {
+      st.firstIssued = t
+      p(storage.persistProgress(item.w, st))
+    }
+  }
 }
 
 /* ===================== 打卡 / 连续天数 / 热力 ===================== */
@@ -992,6 +1003,7 @@ let queueArr: { w: string; kind: string }[] = []
 let current: { w: string; kind: string } | null = null
 function startFocus() {
   queueArr = buildQueue()
+  issueQueueWords(queueArr)
   if (queueArr.length === 0) {
     if (MASTER.length < 200) {
       alert('演示词库已用完。请管理员在「我的」页导入完整四级词库（CSV/JSON），或执行 scripts/cet4_prep.sql 后导入词表。')
