@@ -11,6 +11,7 @@ import {
   type PrepState,
   newId
 } from '../services/cetPrepService'
+import { MASTER_WORDS_BUNDLE } from './masterWordsBundle'
 
 export interface PrepStorage {
   fetchMasterWords(): Promise<PrepWord[]>
@@ -49,107 +50,9 @@ const TYPES = [
   { key: 'translate', label: '翻译' }
 ]
 
-// 主词表来自数据库；库为空时回退到内置 97 词，保证 UI 在尚未导入全量词表前仍可用。
+// 主词表来自数据库；库为空/拉取失败时回退到内置全量词库（src/prep/masterWordsBundle.ts，4544 词）。
+// 确保任何部署/设备都至少有完整四级词库，绝不再退回 97 个演示词。用户学习进度仍存 Supabase 数据库。
 let MASTER: PrepWord[] = []
-export const FALLBACK_MASTER: PrepWord[] = [
-  ['abandon', '/əˈbændən/', 'v.', '抛弃，放弃', 'abandon oneself to 沉溺于'],
-  ['abroad', '/əˈbrɔːd/', 'ad.', '在国外，到国外', 'go abroad 出国'],
-  ['absent', '/ˈæbsənt/', 'a.', '缺席的，不在的', 'be absent from 缺席'],
-  ['absorb', '/əbˈsɔːb/', 'v.', '吸收，使专心', 'be absorbed in 专心于'],
-  ['abstract', '/ˈæbstrækt/', 'a.', '抽象的', 'in the abstract 抽象地'],
-  ['abundant', '/əˈbʌndənt/', 'a.', '丰富的，充裕的', 'be abundant in 富于'],
-  ['academic', '/ˌækəˈdemɪk/', 'a.', '学术的，学院的', 'academic performance 学业表现'],
-  ['accelerate', '/əkˈseləreɪt/', 'v.', '加速，促进', 'accelerate growth 加速增长'],
-  ['access', '/ˈækses/', 'n./v.', '接近，进入；使用权', 'have access to 有机会使用'],
-  ['accommodate', '/əˈkɒmədeɪt/', 'v.', '容纳，适应', 'accommodate to 适应'],
-  ['accompany', '/əˈkʌmpəni/', 'v.', '陪伴，伴随', 'accompany sb. 陪伴某人'],
-  ['accomplish', '/əˈkʌmplɪʃ/', 'v.', '完成，实现', 'accomplish a task 完成任务'],
-  ['account', '/əˈkaʊnt/', 'n.', '账户；描述', 'take into account 考虑到'],
-  ['accurate', '/ˈækjərət/', 'a.', '准确的，精确的', 'accurate information 准确信息'],
-  ['accuse', '/əˈkjuːz/', 'v.', '指控，控告', 'accuse sb. of 指控某人'],
-  ['achieve', '/əˈtʃiːv/', 'v.', '实现，达到', 'achieve success 取得成功'],
-  ['acquire', '/əˈkwaɪə/', 'v.', '获得，习得', 'acquire knowledge 获取知识'],
-  ['adapt', '/əˈdæpt/', 'v.', '适应，改编', 'adapt to 适应'],
-  ['adequate', '/ˈædɪkwət/', 'a.', '充足的，适当的', 'adequate supply 充足供应'],
-  ['adjust', '/əˈdʒʌst/', 'v.', '调整，调节', 'adjust to 适应'],
-  ['admire', '/ədˈmaɪə/', 'v.', '钦佩，赞赏', 'admire sb. for 因…钦佩'],
-  ['adopt', '/əˈdɒpt/', 'v.', '采用，收养', 'adopt a policy 采用政策'],
-  ['advance', '/ədˈvɑːns/', 'v./n.', '前进，进步', 'in advance 提前'],
-  ['advantage', '/ədˈvɑːntɪdʒ/', 'n.', '优势，好处', 'take advantage of 利用'],
-  ['adventure', '/ədˈventʃə/', 'n.', '冒险，奇遇', 'an adventure 一次冒险'],
-  ['advice', '/ədˈvaɪs/', 'n.', '建议，忠告', 'give advice on 就…给建议'],
-  ['affect', '/əˈfekt/', 'v.', '影响', 'affect the result 影响结果'],
-  ['afford', '/əˈfɔːd/', 'v.', '负担得起', 'afford to do 负担得起做'],
-  ['agent', '/ˈeɪdʒənt/', 'n.', '代理人，代理商', 'travel agent 旅行代理'],
-  ['aggressive', '/əˈɡresɪv/', 'a.', '侵略性的；进取的', 'aggressive behavior 攻击性行为'],
-  ['alarm', '/əˈlɑːm/', 'n.', '警报，惊恐', 'fire alarm 火警'],
-  ['ambition', '/æmˈbɪʃən/', 'n.', '抱负，野心', 'have ambition 有抱负'],
-  ['analyze', '/ˈænəlaɪz/', 'v.', '分析', 'analyze data 分析数据'],
-  ['ancient', '/ˈeɪnʃənt/', 'a.', '古代的', 'ancient history 古代史'],
-  ['announce', '/əˈnaʊns/', 'v.', '宣布，宣告', 'announce a plan 宣布计划'],
-  ['anxious', '/ˈæŋkʃəs/', 'a.', '焦虑的，渴望的', 'be anxious about 为…焦虑'],
-  ['apologize', '/əˈpɒlədʒaɪz/', 'v.', '道歉', 'apologize to sb. 向…道歉'],
-  ['apparent', '/əˈpærənt/', 'a.', '明显的', 'It is apparent that 显然'],
-  ['appeal', '/əˈpiːl/', 'v.', '呼吁，吸引', 'appeal to 吸引；呼吁'],
-  ['appear', '/əˈpɪə/', 'v.', '出现，似乎', 'appear in 出现在'],
-  ['appreciate', '/əˈpriːʃieɪt/', 'v.', '欣赏，感激', 'appreciate help 感激帮助'],
-  ['approach', '/əˈprəʊtʃ/', 'v./n.', '接近；方法', 'approach to …的方法'],
-  ['appropriate', '/əˈprəʊpriət/', 'a.', '适当的', 'appropriate time 合适时间'],
-  ['approve', '/əˈpruːv/', 'v.', '批准，同意', 'approve of 赞成'],
-  ['argue', '/ˈɑːɡjuː/', 'v.', '争论，主张', 'argue that 主张'],
-  ['arise', '/əˈraɪz/', 'v.', '出现，升起', 'arise from 由…引起'],
-  ['aspect', '/ˈæspekt/', 'n.', '方面', 'in this aspect 在这方面'],
-  ['assess', '/əˈses/', 'v.', '评估，评定', 'assess risk 评估风险'],
-  ['assign', '/əˈsaɪn/', 'v.', '分配，指派', 'assign a task 分配任务'],
-  ['assist', '/əˈsɪst/', 'v.', '协助，帮助', 'assist in 协助'],
-  ['assume', '/əˈsjuːm/', 'v.', '假设，承担', 'assume responsibility 承担责任'],
-  ['assure', '/əˈʃʊə/', 'v.', '保证，使确信', 'assure sb. 向…保证'],
-  ['attach', '/əˈtætʃ/', 'v.', '附上，系', 'attach to 附在…上'],
-  ['attain', '/əˈteɪn/', 'v.', '达到，获得', 'attain a goal 达到目标'],
-  ['attitude', '/ˈætɪtjuːd/', 'n.', '态度', 'attitude towards 对…态度'],
-  ['attract', '/əˈtrækt/', 'v.', '吸引', 'attract attention 吸引注意'],
-  ['available', '/əˈveɪləbl/', 'a.', '可用的，可得到的', 'be available for 可用于'],
-  ['average', '/ˈævərɪdʒ/', 'a./n.', '平均的；平均数', 'on average 平均'],
-  ['avoid', '/əˈvɔɪd/', 'v.', '避免', 'avoid doing 避免做'],
-  ['aware', '/əˈweə/', 'a.', '意识到的', 'be aware of 意识到'],
-  ['bargain', '/ˈbɑːɡɪn/', 'n./v.', '便宜货；讨价还价', 'bargain with 与…讨价'],
-  ['barrier', '/ˈbærɪə/', 'n.', '障碍，屏障', 'language barrier 语言障碍'],
-  ['basic', '/ˈbeɪsɪk/', 'a.', '基本的', 'basic skills 基本技能'],
-  ['behave', '/bɪˈheɪv/', 'v.', '表现，举止', 'behave well 表现好'],
-  ['belief', '/bɪˈliːf/', 'n.', '信念，相信', 'have belief in 相信'],
-  ['benefit', '/ˈbenɪfɪt/', 'n./v.', '利益；受益', 'benefit from 从…受益'],
-  ['blame', '/bleɪm/', 'v.', '责备', 'blame sb. for 因…责备'],
-  ['bound', '/baʊnd/', 'a.', '必定的，受约束的', 'be bound to 必定'],
-  ['brief', '/briːf/', 'a.', '简短的', 'in brief 简言之'],
-  ['broad', '/brɔːd/', 'a.', '宽阔的', 'broad mind 开阔心胸'],
-  ['budget', '/ˈbʌdʒɪt/', 'n.', '预算', 'on a budget 预算有限'],
-  ['burden', '/ˈbɜːdn/', 'n.', '负担', 'bear a burden 承担负担'],
-  ['calculate', '/ˈkælkjuleɪt/', 'v.', '计算', 'calculate the cost 计算成本'],
-  ['campaign', '/kæmˈpeɪn/', 'n.', '运动，活动', 'an ad campaign 广告活动'],
-  ['candidate', '/ˈkændɪdət/', 'n.', '候选人', 'a candidate 候选人'],
-  ['capable', '/ˈkeɪpəbl/', 'a.', '有能力的', 'be capable of 能够'],
-  ['capture', '/ˈkæptʃə/', 'v.', '捕获，捕捉', 'capture the moment 捕捉瞬间'],
-  ['career', '/kəˈrɪə/', 'n.', '职业，事业', 'career path 职业道路'],
-  ['casual', '/ˈkæʒjʊəl/', 'a.', '随意的，偶然的', 'casual clothes 休闲装'],
-  ['celebrate', '/ˈselɪbreɪt/', 'v.', '庆祝', 'celebrate success 庆祝成功'],
-  ['challenge', '/ˈtʃælɪndʒ/', 'n./v.', '挑战', 'face a challenge 面对挑战'],
-  ['channel', '/ˈtʃænl/', 'n.', '频道，渠道', 'through channels 通过渠道'],
-  ['character', '/ˈkærəktə/', 'n.', '性格，角色', 'in character 符合性格'],
-  ['charge', '/tʃɑːdʒ/', 'v./n.', '收费；负责', 'in charge of 负责'],
-  ['chase', '/tʃeɪs/', 'v.', '追逐', 'chase a dream 追逐梦想'],
-  ['circumstance', '/ˈsɜːkəmstəns/', 'n.', '环境，情况', 'under the circumstances 在这种情况下'],
-  ['cite', '/saɪt/', 'v.', '引用，引证', 'cite an example 举例'],
-  ['civil', '/ˈsɪvl/', 'a.', '公民的，民用的', 'civil rights 公民权利'],
-  ['claim', '/kleɪm/', 'v.', '声称，要求', 'claim that 声称'],
-  ['clarify', '/ˈklærɪfaɪ/', 'v.', '澄清，阐明', 'clarify the point 澄清要点'],
-  ['classic', '/ˈklæsɪk/', 'a./n.', '经典的；名著', 'a classic 经典之作'],
-  ['climate', '/ˈklaɪmɪt/', 'n.', '气候', 'climate change 气候变化'],
-  ['colleague', '/ˈkɒliːɡ/', 'n.', '同事', 'a colleague 一位同事'],
-  ['combat', '/ˈkɒmbæt/', 'v.', '战斗，对抗', 'combat crime 打击犯罪'],
-  ['combine', '/kəmˈbaɪn/', 'v.', '结合，联合', 'combine with 与…结合'],
-  ['comfort', '/ˈkʌmfət/', 'n./v.', '舒适；安慰', 'in comfort 舒适地'],
-  ['comment', '/ˈkɒment/', 'n./v.', '评论', 'comment on 评论']
-]
 
 /* ===================== 状态 ===================== */
 interface PrepS {
@@ -973,7 +876,7 @@ function handleWordFile(e: Event) {
           if (msg) msg.textContent = `成功导入 ${n} 个词条到主词表。`
           // 重新拉取主词表（含新词）
           storage.fetchMasterWords().then((mw) => {
-            MASTER = mw.length ? mw : FALLBACK_MASTER
+            MASTER = mw.length ? mw : MASTER_WORDS_BUNDLE
             render()
           })
         })
@@ -1363,7 +1266,7 @@ function ensureDay() {
 async function init() {
   MASTER = await storage.fetchMasterWords()
   USING_FALLBACK_MASTER = !MASTER.length
-  if (!MASTER.length) MASTER = FALLBACK_MASTER
+  if (!MASTER.length) MASTER = MASTER_WORDS_BUNDLE
   IS_ADMIN = await storage.isAdmin()
   const st = await storage.loadAll()
   S = buildS(st)

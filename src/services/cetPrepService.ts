@@ -82,20 +82,32 @@ async function getUserIdOrThrow(): Promise<string> {
   return id
 }
 
-/** 读取主词表（全量四级词），按 id 升序 */
+/** 读取主词表（全量四级词），按 id 升序。
+ * 注意：Supabase 对匿名角色默认单次最多返回 1000 行，必须分页拉取才能拿到全部 4544 词。 */
 export async function fetchMasterWords(): Promise<PrepWord[]> {
-  const { data, error } = await supabase
-    .from('cet4_words')
-    .select('word, phonetic, pos, definition, collocation')
-    .order('id', { ascending: true })
-  if (error) throw error
-  return (data || []).map((r: any) => [
-    r.word,
-    r.phonetic ?? '',
-    r.pos ?? '',
-    r.definition ?? '',
-    r.collocation ?? ''
-  ])
+  const PAGE = 1000
+  const out: PrepWord[] = []
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await supabase
+      .from('cet4_words')
+      .select('word, phonetic, pos, definition, collocation')
+      .order('id', { ascending: true })
+      .range(from, from + PAGE - 1)
+    if (error) throw error
+    const rows = (data || []) as any[]
+    if (rows.length === 0) break
+    out.push(
+      ...(rows.map((r: any) => [
+        r.word,
+        r.phonetic ?? '',
+        r.pos ?? '',
+        r.definition ?? '',
+        r.collocation ?? ''
+      ]) as PrepWord[])
+    )
+    if (rows.length < PAGE) break
+  }
+  return out
 }
 
 /** 批量写入主词表（管理员导入）。按 word 去重 upsert。返回写入条数。 */

@@ -2,7 +2,7 @@
   <div class="cet-prep-root" ref="root">
     <nav class="topnav" id="topNav"></nav>
     <div v-if="missingTable" class="prep-missing-banner">
-      备考词库表（cet4_words）尚未创建，当前使用内置演示词库。请管理员在 Supabase SQL Editor 中执行项目根目录的 <code>scripts/cet4_prep.sql</code> 以创建完整词库表。
+      备考词库表（cet4_words）尚未创建或网络连接失败，当前使用内置完整四级词库（4544 词）。联网并在 Supabase 中执行 <code>scripts/cet4_prep.sql</code> 后，可自动同步云端进度与词表。
     </div>
     <div class="content" id="content"></div>
     <nav class="bottom-nav" id="bottomNav"></nav>
@@ -24,7 +24,8 @@
 
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref } from 'vue'
-import { initPrep, type PrepStorage, FALLBACK_MASTER } from '../prep/prepApp'
+import { initPrep, type PrepStorage } from '../prep/prepApp'
+import { MASTER_WORDS_BUNDLE } from '../prep/masterWordsBundle'
 import {
   fetchMasterWords,
   loadAll,
@@ -83,7 +84,7 @@ onMounted(async () => {
       error.value = ''
       const fallbackStorage: PrepStorage = {
         ...storage,
-        fetchMasterWords: async () => FALLBACK_MASTER,
+        fetchMasterWords: async () => MASTER_WORDS_BUNDLE,
         loadAll: async () => emptyState()
       }
       try {
