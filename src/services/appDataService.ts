@@ -478,7 +478,13 @@ export async function getDatabaseStats(): Promise<DatabaseStats> {
         'api_grants',
         'api_usage_logs',
         'feedbacks',
-        'feedback_replies'
+        'feedback_replies',
+        'cet4_words',
+        'cet4_prep_progress',
+        'cet4_prep_practice',
+        'cet4_prep_mistakes',
+        'cet4_prep_checkins',
+        'cet4_prep_settings'
       ]
       for (const name of tables) {
         try {

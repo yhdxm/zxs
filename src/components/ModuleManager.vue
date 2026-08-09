@@ -1092,7 +1092,20 @@ const importFile = (event: Event) => {
   .mm-item { flex-direction: column; align-items: stretch; gap: 10px; padding-left: 16px; }
   .mm-item::before { top: 0; bottom: auto; width: 100%; height: 3px; border-radius: 0 0 4px 4px; }
   .mm-item-main { flex-direction: column; align-items: flex-start; gap: 6px; }
-  .mm-item-actions { justify-content: flex-end; }
+  /* 移动端操作按钮：均分整行、加大触控区，避免文字挤压/出屏 */
+  .mm-item-actions {
+    justify-content: stretch;
+    flex-wrap: wrap;
+    gap: 8px;
+    width: 100%;
+  }
+  .mm-item-actions .el-button {
+    flex: 1 1 auto;
+    justify-content: center;
+    min-height: 38px;
+    padding: 8px 6px;
+  }
+  .mm-item-actions .el-button span { margin-left: 4px; }
   .mm-form-grid { grid-template-columns: 1fr; }
   .mm-form-grid > .full { grid-column: span 1; }
   .inline-fields { flex-direction: column; gap: 0; }

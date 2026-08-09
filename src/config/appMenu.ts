@@ -23,7 +23,7 @@ import {
   User,
   Cpu,
   ChatLineSquare,
-  Monitor
+  Notebook
 } from '@element-plus/icons-vue'
 
 export interface SideItem {
@@ -31,6 +31,8 @@ export interface SideItem {
   label: string
   icon?: Component
   to?: string | { path: string; query: Record<string, string> }
+  /** 外部独立页面（单文件 HTML）。点击在新标签打开，不走 SPA 路由 */
+  href?: string
   /** 可见性判断（返回 true 才显示）。仅权限管理类菜单使用 */
   visible?: (user: AppUser | null) => boolean
   /** 细粒度权限模块 key（用于菜单可见性与路由门禁，对应权限树叶子节点的基础 key） */
@@ -94,7 +96,8 @@ export const APP_MENU: SideItem[] = [
       { key: 'learn-english', label: '学位英语', icon: Document, permissionKey: 'learn-english', to: '/learn/english' },
       { key: 'learn-industry', label: '各行业知识', icon: DataBoard, permissionKey: 'learn-industry', to: '/learn/industry' },
       { key: 'learn-books', label: '书籍阅读', icon: Reading, permissionKey: 'learn-books', to: '/learn/books' },
-      { key: 'learn-goals', label: '学习目标', icon: Aim, to: '/learn/goals' }
+      { key: 'learn-goals', label: '学习目标', icon: Aim, to: '/learn/goals' },
+      { key: 'cet-prep', label: '四六级备考台', icon: Notebook, to: '/learn/cet-prep' }
     ]
   },
   {
@@ -123,12 +126,6 @@ export const APP_MENU: SideItem[] = [
     icon: ChatLineSquare,
     permissionKey: 'feedback',
     to: '/feedback'
-  },
-  {
-    key: 'responsive',
-    label: '自适应展示',
-    icon: Monitor,
-    to: '/responsive'
   },
   {
     key: 'system',

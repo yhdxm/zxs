@@ -433,12 +433,21 @@ const isMenuActive = (key: string) => {
   if (key === 'feedback') return route.path === '/feedback'
   if (key === 'feedback-admin') return route.path === '/feedback-admin'
   if (key === 'account') return route.path === '/account'
-  if (key === 'responsive') return route.path === '/responsive'
   if (key === 'overview') return route.path === '/dashboard' && (route.query.view || 'overview') === 'overview'
   return route.path === '/dashboard' && route.query.view === key
 }
 
 const goMenu = (item: SideItem) => {
+  // 外部独立页面（单文件 HTML）：在新标签打开，按部署 base 解析绝对路径
+  if (item.href) {
+    const base = import.meta.env.BASE_URL || '/'
+    const url = item.href.startsWith('http') || item.href.startsWith('/')
+      ? item.href
+      : base.replace(/\/$/, '') + '/' + item.href
+    window.open(url, '_blank', 'noopener')
+    mobileNavVisible.value = false
+    return
+  }
   if (!item.to) return
   mobileNavVisible.value = false
   router.push(item.to)

@@ -221,7 +221,13 @@ const TABLE_DESC: Record<string, string> = {
   api_grants: '第三方 API 授权表：超级管理员授权哪些账号可使用第三方 API 调用',
   api_usage_logs: '第三方 API 调用日志表：记录每次高德等第三方接口调用，用于实时统计、配额保护与用量分析',
   feedbacks: '意见反馈主表：子账号提交的反馈（标题/分类/优先级/正文/附件/匿名），含状态流与关闭原因（关闭原因仅管理端可见）',
-  feedback_replies: '意见反馈回复表：管理员公开回复与内部备注（internal 仅管理端可见），按 feedback_id 级联删除'
+  feedback_replies: '意见反馈回复表：管理员公开回复与内部备注（internal 仅管理端可见），按 feedback_id 级联删除',
+  cet4_words: '四六级备考台·主词表：全量四级词（单词/音标/词性/释义/常考搭配），公开只读，仅管理员导入',
+  cet4_prep_progress: '四六级备考台·单词进度表：每用户每词的艾宾浩斯复习状态（status/level/due/weak）',
+  cet4_prep_practice: '四六级备考台·刷题记录表：听力/阅读/写作/翻译的做题数与正确数',
+  cet4_prep_mistakes: '四六级备考台·错题本表：题型/错因/正确思路与 1/3/7/15/30 天复习计划',
+  cet4_prep_checkins: '四六级备考台·打卡表：按日期聚合的背词/刷题次数',
+  cet4_prep_settings: '四六级备考台·设置表：每日新词数、考试日、关联目标'
 }
 
 /** Supabase 平台托管的系统表（多建在 public 模式下但由平台管理、默认不开 RLS），不纳入「业务表未开 RLS」告警，避免误报 */

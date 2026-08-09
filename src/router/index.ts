@@ -19,10 +19,10 @@ import LearnEnglishView from '../views/LearnEnglishView.vue'
 import LearnIndustryView from '../views/LearnIndustryView.vue'
 import LearnBooksView from '../views/LearnBooksView.vue'
 import LearningGoalsView from '../views/LearningGoalsView.vue'
+import CetPrepView from '../views/CetPrepView.vue'
 import ThirdPartyApiView from '../views/ThirdPartyApiView.vue'
 import FeedbackView from '../views/FeedbackView.vue'
 import FeedbackAdminView from '../views/FeedbackAdminView.vue'
-import ResponsiveShowcaseView from '../views/ResponsiveShowcaseView.vue'
 import WelcomeView from '../views/WelcomeView.vue'
 import { hasPermission, loadPermissionConfig, getSavedUser } from '../services/appDataService'
 
@@ -158,6 +158,11 @@ const router = createRouter({
       component: LearningGoalsView
     },
     {
+      path: '/learn/cet-prep',
+      name: 'cet-prep',
+      component: CetPrepView
+    },
+    {
       path: '/third-api',
       name: 'third-api',
       component: ThirdPartyApiView,
@@ -174,11 +179,6 @@ const router = createRouter({
       name: 'feedback-admin',
       component: FeedbackAdminView,
       meta: { requirePermission: 'feedback.admin' }
-    },
-    {
-      path: '/responsive',
-      name: 'responsive',
-      component: ResponsiveShowcaseView
     },
     {
       path: '/welcome',

@@ -20,7 +20,7 @@
 | `README.md` | 文档 | 项目简介。 |
 | `deploy.bat` / `deploy-ssh.bat` / `deploy_watch.ps1` / `sync.bat` | 脚本 | 部署/同步脚本（本地构建 + 上传 GitHub Pages 或 SSH；`deploy_watch` 监听热更）。用户自己上线，AI 不自动 push。 |
 | `AGENTS.md` | 文档 | 给 AI Agent 的仓库说明（架构、约定、命令）。 |
-| `public/` | 静态 | 静态资源（如 `logo.svg` 等，构建时原样拷贝）。 |
+| `public/` | 静态 | 静态资源（如 `logo.svg` 等，构建时原样拷贝）。`public/cet-prep.html` 为旧的「四六级备考台」离线单文件版（纯 localStorage），已被 SPA 数据库版取代、不再被菜单引用，可删除。 |
 | `scripts/` | 脚本 | SQL / 初始化脚本。含 `supabase_stats.sql`（`get_database_stats()` RPC，供「数据库监测中心」枚举各表行数，已对 anon 授权）。 |
 | `test/` | 测试 | 测试文件。 |
 | `dist/` `dist_*` | 产物 | 构建输出（`dist_*` 为验证用临时目录，已加 .gitignore，需清理误提交的 57 个产物）。 |
@@ -82,6 +82,9 @@
 | `modelService.ts` / `modelCatalog.ts` / `bailianModels.generated.ts` / `freeModels.ts` | 模型中心 / 模型目录 / 百炼模型（生成）/ 免费模型清单。 |
 | `weatherService.ts` / `geoService.ts` | 天气（Open-Meteo 免费）/ 地理编码（OSM 免费）。 |
 | `learningService.ts` / `learnDb.ts` | 学习中心数据读写（Supabase + 本地降级）。 |
+| `services/cetPrepService.ts` | 四六级备考台数据服务：主词表 `cet4_words`（全量词，管理员导入）+ 用户进度/刷题/错题/打卡/设置 5 张表，均按 `user_id` 隔离（自建账号）。表结构见 `scripts/cet4_prep.sql`。 |
+| `prep/prepApp.ts` | 四六级备考台核心逻辑（艾宾浩斯队列/专注背词/折线图/PNG 战报等），存储层由外部注入的 Supabase 适配器提供；`CetPrepView.vue` 在 `onMounted` 挂载并清理。 |
+| `views/CetPrepView.vue` | 四六级备考台 SPA 页面（路由 `/learn/cet-prep`），样式以 `.cet-prep-root` 命名空间隔离，避免污染主站全局类名。 |
 | `englishKnowledge.ts` / `industryKnowledge.ts` | 学位英语 / 行业英语知识库（按大纲第二版，静态）。 |
 | `feedbackService.ts` | 反馈意见读写。 |
 | `usageTracker.ts` | 使用量统计。 |

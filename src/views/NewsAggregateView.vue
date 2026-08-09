@@ -1141,8 +1141,16 @@ onBeforeUnmount(() => {
 .np-hot-title { color: color-mix(in srgb, var(--cat) 72%, #1e293b); }
 
 @media (max-width: 860px) {
-  .np-body { grid-template-columns: 1fr; }
-  .np-hot { max-height: 320px; }
+  /* 移动端改为整页自然滚动，去掉内部固定高度 + 内层滚动，避免底部新闻被固定导航遮挡 */
+  .news-page { height: auto; }
+  .np-body {
+    grid-template-columns: 1fr;
+    display: block;
+    flex: none;
+    min-height: 0;
+  }
+  .np-hot { max-height: none; }
+  .np-feed { overflow-y: visible; }
   .np-fl-hint { margin-left: 0; width: 100%; }
   /* 筛选栏：窄屏下分类与搜索框各占整行，避免固定宽度拥挤/出屏幕 */
   .np-cat-select,
