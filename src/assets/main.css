@@ -138,6 +138,16 @@ select {
     padding-left: 14px;
     padding-right: 14px;
   }
+  /* 移动端：固定宽度的搜索/筛选控件改为自适应占满整行，彻底杜绝搜索框/选择栏出屏幕
+     （RequirementCollect 等自带移动端处理的页面不在此覆盖，保留其并排 wrap 布局） */
+  .db-search,
+  .db-sort,
+  .mc-qm-search,
+  .mc-qm-sort {
+    flex: 1 1 100% !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
 }
 
 /* 极窄屏 / PDA（≤360）再收紧一档 */

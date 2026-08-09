@@ -1564,5 +1564,10 @@ const onWindowBlur = () => {
   .mc-shell { padding: 0 14px 14px; }
   .mc-shell :deep(.ph-actions) { width: 100%; justify-content: space-between; }
   .mc-call-stats { grid-template-columns: repeat(2, 1fr); }
+  /* 配额卡：总量/已用/剩余 5 列网格在窄屏过度拥挤，改为 3 列紧凑布局并隐藏分隔符 */
+  .mc-qm-card-nums { grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .mc-qm-num-div { display: none; }
+  /* 工具栏内搜索/排序控件占满整行，避免出屏幕 */
+  .mc-qm-search, .mc-qm-sort { width: 100%; flex: 1 1 100%; }
 }
 </style>

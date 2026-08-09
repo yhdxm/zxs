@@ -11,7 +11,7 @@
       <aside class="login-aside">
         <div class="brand">
           <CompassLogo :size="42" animated glow class="brand-logo" />
-          <span class="brand-name">智习罗盘</span>
+          <span class="brand-name">智习</span>
         </div>
 
         <h1 class="aside-title">
@@ -50,7 +50,7 @@
       <!-- 右侧登录卡片 -->
       <section class="login-form-wrap">
         <AuthCard />
-        <p class="mobile-brand">智习罗盘 · 你的智能工作台</p>
+        <p class="mobile-brand">智习 · 你的智能工作台</p>
       </section>
     </div>
   </div>

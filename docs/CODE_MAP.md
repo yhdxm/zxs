@@ -1,4 +1,4 @@
-# 智习罗盘（ZXS）代码地图 · 每个文件是做什么的
+# 智习（ZXS）代码地图 · 每个文件是做什么的
 
 > 适用版本：2026-08-02 代码快照。技术栈：Vue 3 + Vite + TypeScript + Element Plus（PC 端 UI）+ Vant4（移动端 UI）+ Supabase（后端/自建账号表）。
 > 本文按目录分组，逐文件说明「路径 / 类型 / 职责 / 关键导出或主要组件」。
@@ -9,7 +9,7 @@
 
 | 文件 | 类型 | 职责 |
 |---|---|---|
-| `index.html` | HTML | 应用外壳。设置 `viewport`（移动端 `width=device-width, initial-scale=1.0` 允许缩放）、`favicon`（`./logo.svg`）、标题「智习罗盘」；在首屏渲染前读取 `localStorage` 的 `zxs-theme` 先给 `<html>` 加 `dark`/`light` 类，避免主题闪烁；挂载 `#app` 并加载 `/src/main.ts`。 |
+| `index.html` | HTML | 应用外壳。设置 `viewport`（移动端 `width=device-width, initial-scale=1.0` 允许缩放）、`favicon`（`./logo.svg`）、标题「智习」；在首屏渲染前读取 `localStorage` 的 `zxs-theme` 先给 `<html>` 加 `dark`/`light` 类，避免主题闪烁；挂载 `#app` 并加载 `/src/main.ts`。 |
 | `vite.config.ts` | 配置 | Vite 构建配置：`base` 为相对路径 `./`（GitHub Pages 根/子路径都不白屏）；`@` 别名指向 `src`；插件含 vue + 类型检查；`build.rollupOptions` 拆包。 |
 | `package.json` | 配置 | 依赖与脚本。`dev`/`build`/`build:github`/`preview` 等；`build` = `run-p type-check build-only`（并行，注意类型错误会被 vite 输出覆盖，需单独 `npx vue-tsc --build --force` 验证）。 |
 | `tsconfig.json` / `tsconfig.app.json` / `tsconfig.node.json` | 配置 | TS 类型工程配置，含 `paths` 别名、`strict` 等。 |
@@ -87,6 +87,7 @@
 | `usageTracker.ts` | 使用量统计。 |
 | `freeApi.ts` | 免费第三方 API 封装（新闻/地图/天气直连，不耗积分）。 |
 | `balanceService.ts` | 余额/积分服务。 |
+| `learningGoalService.ts` | **学习目标管理台**纯前端数据层（localStorage，不连外部接口）。定义目标/记录/周报数据模型与 CRUD；计算完成率、剩余量、今日建议量（剩余÷剩余天数）、连续打卡天数（含每周一自动 1 个休息日：首次漏打不中断、第二次才断）、近 7 天平均速度推算预计完成日（样本不足返回"暂无推算"）、昨日漏打卡判定（休息日/中断）、逾期判定、周报汇总与环比、近 14 天分目标投入分钟、JSON 导出/导入/旧版迁移/清空；首次使用写入 3 个示例目标与覆盖补记/休息日/连续漏打/障碍预案状态的记录。 |
 
 ---
 
@@ -144,7 +145,7 @@
 
 | 文件 | 路由 | 职责 |
 |---|---|---|
-| `LoginView.vue` | `/login` | 登录页。左侧品牌区已改为 `CompassLogo` +「智习罗盘」（原 Smart Dashboard 已移除），移动端有 `.mobile-brand` 文案。 |
+| `LoginView.vue` | `/login` | 登录页。左侧品牌区已改为 `CompassLogo` +「智习」（原 Smart Dashboard 已移除），移动端有 `.mobile-brand` 文案。 |
 | `WelcomeView.vue` | `/welcome` | 欢迎首页（常驻首页）：真实烟花 SVG + 罗盘 logo + 流光标题，提示「从左上角菜单进入」。 |
 | `HomeView.vue` | — | 早期/备用主页（部分旧入口），当前主要落地为 WelcomeView。 |
 | `LandingView.vue` | `/landing` | 公开落地页（未登录可访问）。 |
@@ -165,6 +166,7 @@
 | `LearnEnglishView.vue` | `/learn/english` | 学位英语（按大纲）。 |
 | `LearnIndustryView.vue` | `/learn/industry` | 行业英语。 |
 | `LearnBooksView.vue` | `/learn/books` | 图书/书库学习。 |
+| `LearningGoalsView.vue` | `/learn/goals` | **学习目标管理台**：有终点、有总量的目标管理（如背完 2000 词、读完 440 页）。四 Tab（今日/看板/周报/我的），响应式导航（桌面左栏 / 平板顶栏 / 手机底栏）；今日含新建、昨日漏打卡黄/红卡置顶、打卡区（预填建议量、选填分钟、补记最近 6 天）；看板含进度环、三核心数字、预案、最近 10 条可删记录、手写 SVG 近 14 天投入分钟堆叠柱状图；周报含周汇总、环比、四栏（保持/问题/尝试/下周预案）与一键生成周报文本；我的含导出/导入/清空示例/清空全部/添加到主屏幕三步说明；累计 20 条后顶部温和备份横幅；达成彩带动效；图标全内联 SVG；数据全存 localStorage 即时保存。 |
 | `ThirdPartyApiView.vue` | `/third-api` | 第三方 API 信息页。 |
 | `FeedbackView.vue` | `/feedback` | 用户反馈提交。 |
 | `FeedbackAdminView.vue` | `/feedback-admin` | 反馈管理后台（列表/详情双栏，窄屏切换）。 |

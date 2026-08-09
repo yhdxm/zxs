@@ -1144,5 +1144,12 @@ onBeforeUnmount(() => {
   .np-body { grid-template-columns: 1fr; }
   .np-hot { max-height: 320px; }
   .np-fl-hint { margin-left: 0; width: 100%; }
+  /* 筛选栏：窄屏下分类与搜索框各占整行，避免固定宽度拥挤/出屏幕 */
+  .np-cat-select,
+  .np-search {
+    width: 100%;
+    flex: 1 1 100%;
+    min-width: 0;
+  }
 }
 </style>

@@ -18,6 +18,7 @@ import AiModelsView from '../views/AiModelsView.vue'
 import LearnEnglishView from '../views/LearnEnglishView.vue'
 import LearnIndustryView from '../views/LearnIndustryView.vue'
 import LearnBooksView from '../views/LearnBooksView.vue'
+import LearningGoalsView from '../views/LearningGoalsView.vue'
 import ThirdPartyApiView from '../views/ThirdPartyApiView.vue'
 import FeedbackView from '../views/FeedbackView.vue'
 import FeedbackAdminView from '../views/FeedbackAdminView.vue'
@@ -150,6 +151,11 @@ const router = createRouter({
       name: 'learn-books',
       component: LearnBooksView,
       meta: { requirePermission: 'learn-books' }
+    },
+    {
+      path: '/learn/goals',
+      name: 'learn-goals',
+      component: LearningGoalsView
     },
     {
       path: '/third-api',

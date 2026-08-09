@@ -32,7 +32,7 @@
 
     <div class="welcome-center">
       <CompassLogo :size="104" animated glow class="wl-logo" />
-      <h1 class="wl-title">智习罗盘欢迎你</h1>
+      <h1 class="wl-title">智习欢迎你</h1>
       <p class="wl-hint">从左上角菜单进入各功能模块</p>
     </div>
   </div>

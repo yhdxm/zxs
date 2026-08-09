@@ -16,6 +16,7 @@ import {
   Link,
   Reading,
   Document,
+  Aim,
   DataBoard,
   List,
   Setting,
@@ -92,7 +93,8 @@ export const APP_MENU: SideItem[] = [
     children: [
       { key: 'learn-english', label: '学位英语', icon: Document, permissionKey: 'learn-english', to: '/learn/english' },
       { key: 'learn-industry', label: '各行业知识', icon: DataBoard, permissionKey: 'learn-industry', to: '/learn/industry' },
-      { key: 'learn-books', label: '书籍阅读', icon: Reading, permissionKey: 'learn-books', to: '/learn/books' }
+      { key: 'learn-books', label: '书籍阅读', icon: Reading, permissionKey: 'learn-books', to: '/learn/books' },
+      { key: 'learn-goals', label: '学习目标', icon: Aim, to: '/learn/goals' }
     ]
   },
   {

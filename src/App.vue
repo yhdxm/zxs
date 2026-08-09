@@ -14,9 +14,9 @@
   <div v-else-if="isLoggedIn" class="app-shell is-authed" :class="{ collapsed: sidebarCollapsed }">
     <aside class="app-sidebar">
       <div class="side-brand">
-        <CompassLogo :size="38" class="brand-logo-img" label="智习罗盘" />
+        <CompassLogo :size="38" class="brand-logo-img" label="智习" />
         <div class="brand-text">
-          <span class="brand-name">智习罗盘</span>
+          <span class="brand-name">智习</span>
         </div>
       </div>
 
@@ -137,9 +137,9 @@
     <!-- 已登录：移动端抽屉 -->
     <el-drawer v-model="mobileNavVisible" direction="ltr" size="280px" :with-header="false" class="mobile-drawer">
       <div class="drawer-brand">
-        <CompassLogo :size="38" class="brand-logo-img" label="智习罗盘" />
+        <CompassLogo :size="38" class="brand-logo-img" label="智习" />
         <div class="brand-text">
-          <span class="brand-name">智习罗盘</span>
+          <span class="brand-name">智习</span>
         </div>
       </div>
       <div class="drawer-search">
@@ -210,12 +210,12 @@
       <el-button text class="menu-btn" @click="drawerVisible = true">
         <span class="menu-icon">☰</span>
       </el-button>
-      <div class="brand">智习罗盘</div>
+      <div class="brand">智习</div>
       <div class="topbar-user">{{ currentUser?.nickname || '' }}</div>
     </header>
 
     <el-drawer v-model="drawerVisible" direction="ltr" size="230px" :with-header="false">
-      <div class="drawer-brand">智习罗盘</div>
+      <div class="drawer-brand">智习</div>
       <nav class="side-menu">
         <button
           v-for="item in menuItems"
@@ -236,7 +236,7 @@
 
     <div class="layout">
       <aside class="sidebar">
-        <div class="sidebar-brand">智习罗盘</div>
+        <div class="sidebar-brand">智习</div>
         <nav class="side-menu">
           <button
             v-for="item in menuItems"
@@ -417,6 +417,7 @@ const isMenuActive = (key: string) => {
   if (key === 'learn-english') return route.path === '/learn/english'
   if (key === 'learn-industry') return route.path === '/learn/industry'
   if (key === 'learn-books') return route.path === '/learn/books'
+  if (key === 'learn-goals') return route.path === '/learn/goals'
   if (key === 'news') return route.path === '/news' || route.path === '/yingcang'
   if (key === 'news-main') return route.path === '/news'
   if (key === 'yingcang') return route.path === '/yingcang'
