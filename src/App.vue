@@ -108,7 +108,7 @@
 
     <!-- 主区域（无独立顶栏，页面自身标题顶到最上方） -->
     <div class="app-main">
-      <main class="main-content authed-main">
+      <main class="main-content authed-main" :class="{ 'no-global-pad': isCetPrepRoute }">
         <router-view v-slot="{ Component }">
           <transition name="fade" mode="out-in">
             <component :is="Component" />
@@ -118,7 +118,7 @@
     </div>
 
     <!-- 移动端底部导航（高频场景原生 Tab 模式，替代悬浮菜单按钮） -->
-    <nav class="mobile-bottom-nav" v-if="isMobile">
+    <nav class="mobile-bottom-nav" v-if="isMobile && !isCetPrepRoute">
       <button
         v-for="b in mobileBottomNav"
         :key="b.key"
@@ -268,7 +268,7 @@
     </div>
 
     <!-- 移动端底部导航（未登录访客版） -->
-    <nav class="mobile-bottom-nav" v-if="isMobile">
+    <nav class="mobile-bottom-nav" v-if="isMobile && !isCetPrepRoute">
       <button
         v-for="b in mobileBottomNavGuest"
         :key="b.key"
@@ -513,6 +513,10 @@ function onBottomNav(item: BottomNavItem) {
     navigate(item.to)
   }
 }
+
+// 备考台（四六级）自带 fixed 底部导航（今日/刷题/错本/我的），层级较低；
+// 进入该路由时隐藏全局移动端底部导航，避免双导航重叠遮挡、点击不到备考台自身按钮。
+const isCetPrepRoute = computed(() => route.path === '/learn/cet-prep')
 
 // 页面标题由各视图自身渲染（单一标题铁律），顶部 topbar 不再重复展示
 
@@ -1244,6 +1248,10 @@ onMounted(async () => {
   }
   .main-content {
     padding-bottom: calc(84px + env(safe-area-inset-bottom));
+  }
+  /* 备考台自带底部导航，进入该路由时去掉全局底部留白，避免双重留白 */
+  .main-content.authed-main.no-global-pad {
+    padding-bottom: 0;
   }
   /* 未登录顶栏避让刘海/状态栏安全区 */
   .mobile-topbar {

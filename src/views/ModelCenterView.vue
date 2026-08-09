@@ -315,6 +315,20 @@
             </el-table-column>
           </el-table>
         </div>
+
+        <!-- 移动端卡片（桌面端隐藏，避免 el-table 窄屏挤压） -->
+        <div class="mc-conf-cards">
+          <div class="mc-conf-card" v-for="row in configuredModels" :key="row.model">
+            <div class="mc-cc-head">
+              <span class="mc-cc-model">{{ row.model }}</span>
+              <el-tag :type="row.isFree ? 'success' : 'warning'" effect="light" size="small">{{ row.isFree ? '免费' : '付费' }}</el-tag>
+            </div>
+            <div class="mc-cc-row"><span>厂商</span><b>{{ providerLabel(row.provider) }}</b></div>
+            <div class="mc-cc-row"><span>接口</span><b class="mc-cc-url" :title="row.baseUrl">{{ row.baseUrl || '默认' }}</b></div>
+            <div class="mc-cc-row"><span>密钥</span><el-tag :type="row.hasKey ? 'success' : 'info'" effect="light" size="small">{{ row.hasKey ? '已配置' : '未配置' }}</el-tag></div>
+          </div>
+          <div v-if="!configuredModels.length" class="mc-free-empty">尚未配置任何模型</div>
+        </div>
       </el-tab-pane>
 
       <!-- ===== 免费模型清单 ===== -->
@@ -400,8 +414,62 @@
             />
           </div>
         </div>
+
+        <!-- 移动端卡片（桌面端隐藏，避免 el-table 窄屏挤压出屏） -->
+        <div class="mc-free-cards">
+          <div class="mc-free-card" v-for="row in pagedFreeList" :key="row.model">
+            <div class="mc-fc-head">
+              <span class="mc-fc-model">{{ row.model }}</span>
+              <span class="mc-fc-provider">{{ providerLabel(row.provider) }}</span>
+            </div>
+            <div class="mc-fc-note">{{ row.note || '—' }}</div>
+            <div class="mc-fc-meta">
+              <span class="mc-status" :class="statusClass(row.status)"><span class="dot"></span>{{ statusText(row.status) }}</span>
+              <el-tag size="small" :type="row.source === 'live' ? 'success' : row.source === 'custom' ? 'warning' : 'info'" effect="light">
+                {{ row.source === 'live' ? '实时' : row.source === 'custom' ? '自定义' : '预置' }}
+              </el-tag>
+              <span class="mc-fc-time">{{ fmtTime(row.lastChecked) }}</span>
+            </div>
+            <div class="mc-fc-actions">
+              <el-button v-if="row.source === 'custom'" link type="danger" size="small" @click="removeCustom(row)">删除</el-button>
+              <el-button link type="primary" size="small" @click="goConfig(row)">去配置</el-button>
+            </div>
+          </div>
+          <div v-if="!pagedFreeList.length" class="mc-free-empty">点击「刷新检测」获取免费模型清单</div>
+        </div>
       </el-tab-pane>
     </el-tabs>
+
+    <!-- ===== 免费资源动态（每日 WebSearch 检索更新） ===== -->
+    <section class="mc-resources">
+      <div class="mc-res-head">
+        <div class="mc-res-title">
+          <h3>免费资源动态 · 每日更新</h3>
+          <p>聚焦「真正免费」：无需信用卡、不消耗积分/额度。覆盖免费调用 API、评测 / 信息查询平台、免费学习资源。每日自动检索全球大模型领域新动态。</p>
+        </div>
+        <el-select v-model="resCategory" placeholder="全部分类" clearable size="default" class="mc-res-sel">
+          <el-option label="免费调用 API" value="api" />
+          <el-option label="评测 / 信息查询平台" value="eval" />
+          <el-option label="免费学习资源" value="learn" />
+        </el-select>
+      </div>
+      <div class="mc-res-grid">
+        <a class="mc-res-card" v-for="r in filteredResources" :key="r.id" :href="r.url" target="_blank" rel="noopener">
+          <div class="mc-res-card-head">
+            <span class="mc-res-name">{{ r.name }}</span>
+            <el-tag size="small" effect="light" type="success">{{ FREE_RESOURCE_CATEGORY_LABEL[r.category] }}</el-tag>
+          </div>
+          <div class="mc-res-note">{{ r.freeNote }}</div>
+          <div class="mc-res-meta">
+            <span class="mc-res-tag" v-for="t in (r.tags || [])" :key="t">{{ t }}</span>
+            <span class="mc-res-date">核查 {{ r.lastChecked }}</span>
+          </div>
+        </a>
+      </div>
+      <div class="mc-res-foot">
+        数据由 WebSearch 每日自动检索并刷新；全部资源免费、无需信用卡、不消耗积分，点击卡片跳转官方页面。
+      </div>
+    </section>
 
     <!-- 超管查看密码设置/验证弹框 -->
     <el-dialog
@@ -588,6 +656,11 @@ import {
 import PageHeader from '../components/PageHeader.vue'
 import { decryptSecret } from '../services/secret'
 import { CALLABLE_MODELS } from '../services/modelCatalog'
+import {
+  FREE_LLM_RESOURCES,
+  FREE_RESOURCE_CATEGORY_LABEL,
+  type FreeResourceCategory
+} from '../data/freeLlmResources'
 
 const PROVIDER_LABELS: Record<string, string> = {
   siliconflow: '硅基流动',
@@ -830,6 +903,15 @@ const pagedFreeList = computed(() => {
 
 watch([freeProviderFilter, freeStatusFilter, freeSourceFilter], () => {
   freePage.value = 1
+})
+
+/* 免费资源动态（每日 WebSearch 检索更新）：分类筛选 + 按最近核查倒序 */
+const resCategory = ref<FreeResourceCategory | ''>('')
+const filteredResources = computed(() => {
+  const list = resCategory.value
+    ? FREE_LLM_RESOURCES.filter((r) => r.category === resCategory.value)
+    : FREE_LLM_RESOURCES
+  return [...list].sort((a, b) => b.lastChecked.localeCompare(a.lastChecked))
 })
 
 /** 仅刷新免费模型清单（不动其他模块） */
@@ -1539,6 +1621,52 @@ const onWindowBlur = () => {
 .mc-free-foot { margin-top: 14px; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 .mc-free-foot-info { font-size: 12px; color: var(--text-muted); }
 
+/* 移动端卡片（桌面默认隐藏，由媒体查询在窄屏开启） */
+.mc-free-cards, .mc-conf-cards { display: none; }
+.mc-free-cards, .mc-conf-cards { flex-direction: column; gap: 12px; margin-top: 4px; }
+.mc-free-card, .mc-conf-card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+  padding: 14px; box-shadow: var(--shadow-card);
+}
+.mc-fc-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 8px; }
+.mc-fc-model { font-size: 14px; font-weight: 700; color: var(--text-strong); }
+.mc-fc-provider { font-size: 12px; color: var(--text-muted); flex-shrink: 0; }
+.mc-fc-note { font-size: 12.5px; color: var(--text-muted); line-height: 1.6; margin-bottom: 10px; word-break: break-word; }
+.mc-fc-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+.mc-fc-time { font-size: 11px; color: var(--text-faint); }
+.mc-fc-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.mc-free-empty { font-size: 12px; color: var(--text-faint); padding: 12px 0; text-align: center; }
+.mc-conf-card .mc-cc-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 10px; }
+.mc-cc-model { font-size: 14px; font-weight: 700; color: var(--text-strong); }
+.mc-cc-row { display: flex; align-items: baseline; gap: 8px; font-size: 12.5px; margin-bottom: 6px; }
+.mc-cc-row > span { color: var(--text-muted); flex-shrink: 0; width: 36px; }
+.mc-cc-row > b { color: var(--text-strong); font-weight: 600; }
+.mc-cc-url { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+
+/* 免费资源动态区块 */
+.mc-resources {
+  margin-top: 18px; background: var(--surface); border: 1px solid var(--border);
+  border-left: 4px solid #06b6d4; border-radius: 14px; padding: 16px 18px; box-shadow: var(--shadow-card);
+}
+.mc-res-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+.mc-res-head h3 { margin: 0 0 4px; font-size: 15px; color: var(--text-strong); }
+.mc-res-head p { margin: 0; font-size: 12px; color: var(--text-muted); max-width: 680px; line-height: 1.6; }
+.mc-res-sel { width: 200px; flex-shrink: 0; }
+.mc-res-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
+.mc-res-card {
+  display: block; text-decoration: none; color: inherit;
+  background: var(--surface-soft); border: 1px solid var(--border); border-radius: 12px;
+  padding: 14px; transition: transform 0.15s, box-shadow 0.15s;
+}
+.mc-res-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-card); }
+.mc-res-card-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 8px; }
+.mc-res-name { font-size: 14px; font-weight: 700; color: var(--text-strong); }
+.mc-res-note { font-size: 12.5px; color: var(--text-muted); line-height: 1.7; margin-bottom: 10px; }
+.mc-res-meta { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.mc-res-tag { font-size: 11px; color: var(--primary); background: rgba(124, 58, 237, 0.08); border-radius: 6px; padding: 2px 8px; }
+.mc-res-date { font-size: 11px; color: var(--text-faint); margin-left: auto; }
+.mc-res-foot { margin-top: 14px; font-size: 12px; color: var(--text-faint); line-height: 1.7; }
+
 /* 调用详情弹框 */
 .mc-call-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 16px; }
 .mc-call-stat { background: var(--surface-soft); border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; text-align: center; }
@@ -1569,5 +1697,15 @@ const onWindowBlur = () => {
   .mc-qm-num-div { display: none; }
   /* 工具栏内搜索/排序控件占满整行，避免出屏幕 */
   .mc-qm-search, .mc-qm-sort { width: 100%; flex: 1 1 100%; }
+  /* 移动端：表格改为卡片，避免 el-table 窄屏挤压出屏 */
+  .mc-table-wrap { display: none; }
+  .mc-free-cards, .mc-conf-cards { display: flex; }
+  /* 免费清单筛选控件占满整行 */
+  .mc-free-sel { width: 100%; flex: 1 1 100%; }
+  /* tabs 头部横向滚动，避免标签溢出 */
+  .mc-tabs :deep(.el-tabs__nav-wrap) { overflow-x: auto; }
+  .mc-tabs :deep(.el-tabs__header) { overflow: hidden; }
+  /* 资源分类选择占满 */
+  .mc-res-sel { width: 100%; }
 }
 </style>

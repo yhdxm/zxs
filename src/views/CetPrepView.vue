@@ -24,7 +24,7 @@
 
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref } from 'vue'
-import { initPrep, type PrepStorage } from '../prep/prepApp'
+import { initPrep, type PrepStorage, FALLBACK_MASTER } from '../prep/prepApp'
 import {
   fetchMasterWords,
   loadAll,
@@ -83,7 +83,7 @@ onMounted(async () => {
       error.value = ''
       const fallbackStorage: PrepStorage = {
         ...storage,
-        fetchMasterWords: async () => [],
+        fetchMasterWords: async () => FALLBACK_MASTER,
         loadAll: async () => emptyState()
       }
       try {
@@ -331,6 +331,25 @@ onUnmounted(() => {
   padding: 2px 6px;
   border-radius: 6px;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  color: var(--orange);
+}
+
+/* 词库数量不足提示 */
+.cet-prep-root .prep-vocab-banner {
+  background: #FFF7E8;
+  border: 1px solid var(--orange-soft);
+  border-radius: var(--radius-sm);
+  color: var(--ink);
+  padding: 10px 14px;
+  font-size: 13px;
+  line-height: 1.6;
+  margin-bottom: 14px;
+}
+.cet-prep-root .prep-vocab-banner svg {
+  width: 16px;
+  height: 16px;
+  vertical-align: -3px;
+  margin-right: 6px;
   color: var(--orange);
 }
 

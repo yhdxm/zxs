@@ -51,7 +51,7 @@ const TYPES = [
 
 // 主词表来自数据库；库为空时回退到内置 97 词，保证 UI 在尚未导入全量词表前仍可用。
 let MASTER: PrepWord[] = []
-const FALLBACK_MASTER: PrepWord[] = [
+export const FALLBACK_MASTER: PrepWord[] = [
   ['abandon', '/əˈbændən/', 'v.', '抛弃，放弃', 'abandon oneself to 沉溺于'],
   ['abroad', '/əˈbrɔːd/', 'ad.', '在国外，到国外', 'go abroad 出国'],
   ['absent', '/ˈæbsənt/', 'a.', '缺席的，不在的', 'be absent from 缺席'],
@@ -166,6 +166,7 @@ interface PrepS {
 let S: PrepS = defaults()
 let storage: PrepStorage
 let IS_ADMIN = false
+let USING_FALLBACK_MASTER = false
 
 function defaults() {
   const y = new Date().getFullYear()
@@ -463,11 +464,17 @@ function renderToday() {
   const ring = ringSvg(pct)
   const heat = heatmapHtml()
 
+  const vocabBanner = MASTER.length < 200 ? `
+    <div class="prep-vocab-banner">
+      ${ICON.warn}当前词库仅 <b>${MASTER.length}</b> 个演示单词，建议管理员在「我的」页导入完整四级词库（CSV/JSON），否则很快会出现「今日队列已清空」。
+    </div>` : ''
+
   return `
   ${totalRecords() >= 20 ? backupBanner() : ''}
+  ${vocabBanner}
   <div class="page-head">
     <h1 class="page-title">今日备考</h1>
-    <p class="page-sub">距考试 ${daysLeft >= 0 ? daysLeft + ' 天' : '已过期'} · 连续背词 ${streak()} 天</p>
+    <p class="page-sub">距考试 ${daysLeft >= 0 ? daysLeft + ' 天' : '已过期'} · 连续背词 ${streak()} 天 · 词库共 ${MASTER.length} 词</p>
   </div>
 
   <div class="handle">
@@ -981,8 +988,30 @@ function handleWordFile(e: Event) {
   ;(e.target as HTMLInputElement).value = ''
 }
 // 解析词库文件：支持 JSON 数组 或 CSV（首行表头 word,phonetic,pos,definition,collocation）
+// RFC4180 感知的 CSV 行解析：正确处理双引号包裹字段内的逗号/换行
+function splitCsvLine(line: string): string[] {
+  const out: string[] = []
+  let cur = ''
+  let inQ = false
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i]
+    if (inQ) {
+      if (c === '"') {
+        if (line[i + 1] === '"') { cur += '"'; i++ }
+        else inQ = false
+      } else cur += c
+    } else {
+      if (c === '"') inQ = true
+      else if (c === ',') { out.push(cur); cur = '' }
+      else cur += c
+    }
+  }
+  out.push(cur)
+  return out
+}
+
 function parseWordFile(text: string, fileName: string): PrepWord[] {
-  const trimmed = text.trim()
+  const trimmed = text.replace(/^\uFEFF/, '').trim()
   if (fileName.toLowerCase().endsWith('.json') || trimmed.startsWith('[') || trimmed.startsWith('{')) {
     const data = JSON.parse(trimmed)
     const arr = Array.isArray(data) ? data : data.words || []
@@ -997,7 +1026,7 @@ function parseWordFile(text: string, fileName: string): PrepWord[] {
   // CSV
   const lines = trimmed.split(/\r?\n/).filter((l) => l.trim())
   if (!lines.length) return []
-  const header = (lines[0] ?? '').split(',').map((h) => h.trim().toLowerCase())
+  const header = splitCsvLine(lines[0] ?? '').map((h) => h.trim().toLowerCase())
   const idx = (name: string) => header.indexOf(name)
   const wi = idx('word')
   if (wi < 0) throw new Error('CSV 缺少 word 列')
@@ -1007,7 +1036,7 @@ function parseWordFile(text: string, fileName: string): PrepWord[] {
   const ci = idx('collocation')
   const out: PrepWord[] = []
   for (let i = 1; i < lines.length; i++) {
-    const cols = (lines[i] ?? '').split(',')
+    const cols = splitCsvLine(lines[i] ?? '')
     out.push([
       (cols[wi] || '').trim(),
       pi >= 0 ? (cols[pi] || '').trim() : '',
@@ -1025,7 +1054,11 @@ let current: { w: string; kind: string } | null = null
 function startFocus() {
   queueArr = buildQueue()
   if (queueArr.length === 0) {
-    alert('今日队列已清空，明天再来或调高每日新词数。')
+    if (MASTER.length < 200) {
+      alert('演示词库已用完。请管理员在「我的」页导入完整四级词库（CSV/JSON），或执行 scripts/cet4_prep.sql 后导入词表。')
+    } else {
+      alert('今日队列已清空，明天再来或调高每日新词数。')
+    }
     return
   }
   const f = document.querySelector('#focus')
@@ -1329,6 +1362,7 @@ function ensureDay() {
 }
 async function init() {
   MASTER = await storage.fetchMasterWords()
+  USING_FALLBACK_MASTER = !MASTER.length
   if (!MASTER.length) MASTER = FALLBACK_MASTER
   IS_ADMIN = await storage.isAdmin()
   const st = await storage.loadAll()
