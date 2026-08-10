@@ -257,6 +257,47 @@ function normalizeConfig(cfg: PermissionConfig): PermissionConfig {
 let permissionConfigCache: { config: PermissionConfig; expiredAt: number } | null = null
 const PERMISSION_CACHE_TTL_MS = 30_000
 
+/**
+ * 给可能走网络的 Promise 包超时兜底：超时即 resolve fallback，绝不永久 pending。
+ * 用于弱网/被墙场景，避免路由守卫或登录态判断卡死导致页面一直加载。
+ */
+function withTimeout<T>(p: Promise<T>, ms: number, fallback: T): Promise<T> {
+  return Promise.race([p, new Promise<T>((resolve) => setTimeout(() => resolve(fallback), ms))])
+}
+
+/** Supabase 会话探测结果：区分「确无登录」「弱网/被墙未知」「已登录」三种情况 */
+type SessionProbe =
+  | { kind: 'present'; userId: string }
+  | { kind: 'absent' }
+  | { kind: 'unknown' }
+
+const SESSION_TIMEOUT_MS = 3000
+
+/**
+ * 带超时的会话探测。
+ * - 正常返回 session：present / absent
+ * - 超时（弱网/被墙）或异常：unknown —— 调用方应信任本地缓存，不强制登出
+ * 直接 await supabase.auth.getSession() 在弱网/被墙时会永久 pending（autoRefresh 触发刷新但网络断开），
+ * 正是移动端「进入一直加载」的根因，这里用 Promise.race 强制 3 秒兜底。
+ */
+async function safeGetSession(): Promise<SessionProbe> {
+  const timeoutProbe: SessionProbe = { kind: 'unknown' }
+  const probe = (async (): Promise<SessionProbe> => {
+    try {
+      const res = await supabase.auth.getSession()
+      const session = res.data?.session
+      if (session && session.user?.id) return { kind: 'present', userId: session.user.id }
+      return { kind: 'absent' }
+    } catch {
+      return { kind: 'unknown' }
+    }
+  })()
+  return Promise.race([
+    probe,
+    new Promise<SessionProbe>((resolve) => setTimeout(() => resolve(timeoutProbe), SESSION_TIMEOUT_MS))
+  ])
+}
+
 /** 读取全局角色权限配置（优先 app_settings 表，其次 admin profile，最后默认） */
 export async function loadPermissionConfig(): Promise<PermissionConfig> {
   if (permissionConfigCache && permissionConfigCache.expiredAt > Date.now()) {
@@ -1034,17 +1075,25 @@ async function buildUserFromSession(session: { user: { id: string } }): Promise<
 }
 
 export async function getSavedUser(): Promise<AppUser | null> {
-  const { data } = await supabase.auth.getSession()
-  if (!data.session) {
+  const cached = getStoredUser()
+  const probe = await safeGetSession()
+
+  // 确无登录（Supabase 明确返回空会话）：清登录态，引导到登录页。
+  if (probe.kind === 'absent') {
     return null
   }
-  const cached = getStoredUser()
-  if (cached && cached.id === data.session.user.id) {
+
+  // 弱网/被墙（超时或异常）：信任本地缓存，保持登录态，避免门禁卡死导致一直加载。
+  if (probe.kind === 'unknown') {
+    return cached
+  }
+
+  // 已登录：本地缓存命中则仅按最新权限配置重算权限字段，其余沿用缓存以减少重建开销。
+  if (cached && cached.id === probe.userId) {
     // 角色权限配置可能已被超管修改，必须重新按最新配置计算权限，
     // 否则返回旧快照会导致「改了角色权限、其他账号登录不生效」的问题。
-    // 仅重算权限字段，其余用户信息沿用缓存以减少会话重建开销。
     try {
-      const roleConfig = await loadPermissionConfig()
+      const roleConfig = await withTimeout(loadPermissionConfig(), 2500, DEFAULT_ROLE_CONFIG)
       cached.permissions = getRolePermissions(cached.role, roleConfig)
       setStoredUser(cached) // 写回缓存，避免新标签页/下次读取仍拿旧权限
     } catch {
@@ -1052,17 +1101,28 @@ export async function getSavedUser(): Promise<AppUser | null> {
     }
     return cached
   }
-  return await buildUserFromSession(data.session)
+
+  // 缓存与当前会话用户不一致：以会话重建用户（网络通畅，会走真实查询）。
+  return await buildUserFromSession({ user: { id: probe.userId } })
 }
 
 /** 从 Supabase Auth 会话刷新当前登录用户（会话恢复 / 路由切换时调用） */
 export async function refreshSavedUser(): Promise<AppUser | null> {
-  const { data } = await supabase.auth.getSession()
-  if (!data.session) {
+  const cached = getStoredUser()
+  const probe = await safeGetSession()
+
+  // 确无登录：清登录态。
+  if (probe.kind === 'absent') {
     clearStoredUser()
     return null
   }
-  return await buildUserFromSession(data.session)
+
+  // 弱网/被墙：信任本地缓存，不强制清登录态（避免移动端频繁跳登录）。
+  if (probe.kind === 'unknown') {
+    return cached
+  }
+
+  return await buildUserFromSession({ user: { id: probe.userId } })
 }
 
 export interface AccountRecord {

@@ -1,5 +1,10 @@
 import { createRouter, createWebHashHistory } from 'vue-router'
-import { hasPermission, loadPermissionConfig, getSavedUser, type AppUser } from '../services/appDataService'
+import { hasPermission, loadPermissionConfig, getSavedUser, DEFAULT_ROLE_CONFIG, type AppUser } from '../services/appDataService'
+
+/** 给可能走网络的 Promise 包超时兜底：超时即 resolve fallback，避免路由守卫永久 pending（移动端弱网一直加载）。 */
+function withTimeout<T>(p: Promise<T>, ms: number, fallback: T): Promise<T> {
+  return Promise.race([p, new Promise<T>((resolve) => setTimeout(() => resolve(fallback), ms))])
+}
 
 // 路由守卫高频调用 getSavedUser，加短周期内存缓存避免每次导航都请求 Supabase
 //（ especially 移动端弱网/被墙时，supabase.auth.getSession 可能触发网络刷新）。
@@ -212,7 +217,8 @@ router.beforeEach(async (to, _from, next) => {
       moduleKey = DASHBOARD_VIEW_PERM[view] || 'dashboard'
     }
     const platform = typeof window !== 'undefined' && window.innerWidth <= 768 ? 'mobile' : 'pc'
-    const config = await loadPermissionConfig()
+    // 权限配置首次加载仍走 Supabase 网络，包超时兜底，避免弱网下守卫卡死（配合 appDataService 内 30s 缓存，后续命中缓存秒回）。
+    const config = await withTimeout(loadPermissionConfig(), 3000, DEFAULT_ROLE_CONFIG)
     if (!hasPermission(user, moduleKey, platform, config)) {
       // 权限不足：跳转到「用户有权限的第一个页面」，避免无限重定向到被拒页面（白屏/无反应）。
       // 优先回主页 dashboard；若连 dashboard 都无权限，则回 account（已登录恒可访问），杜绝死循环。
