@@ -62,7 +62,7 @@
           </div>
         </header>
 
-        <div v-if="!pushSupported" class="ac-tip warn">当前浏览器不支持 Web Push，请使用 Chrome / Edge / Safari 16.4+。</div>
+        <div v-if="!pushSupported" class="ac-tip warn">当前浏览器不支持系统推送（如 iQOO / vivo 自带浏览器）。请用 Chrome / Edge / Firefox 打开本页订阅；或直接使用右上角「铃铛」站内消息中心，消息仍会实时收到（每 30 秒刷新）。</div>
         <template v-else>
           <div class="ac-row">
             <span>通知权限：<b>{{ permLabel }}</b></span>
