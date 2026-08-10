@@ -88,6 +88,10 @@
               <span class="su-name">{{ currentUser?.nickname || '用户' }}</span>
               <span class="su-role">{{ roleLabel }}</span>
             </div>
+            <button class="su-bell" type="button" title="消息中心" @click.stop="openNotif">
+              <el-icon><Bell /></el-icon>
+              <span v-if="unread > 0" class="su-badge">{{ unread > 99 ? '99+' : unread }}</span>
+            </button>
             <button class="su-logout" type="button" title="退出登录" @click.stop="handleLogout">
               <el-icon><SwitchButton /></el-icon>
             </button>
@@ -133,6 +137,29 @@
         <span class="mbn-label">{{ b.label }}</span>
       </button>
     </nav>
+
+    <!-- 消息中心抽屉 -->
+    <el-drawer v-model="notifDrawerVisible" direction="rtl" size="360px" :with-header="false" class="notif-drawer">
+      <div class="notif-header">
+        <span class="notif-header-title">消息中心</span>
+        <span class="notif-header-sub">{{ unread > 0 ? unread + ' 条未读' : '全部已读' }}</span>
+        <el-button text type="primary" size="small" :disabled="unread === 0" @click="markAllReadLocal">全部已读</el-button>
+      </div>
+      <div v-if="notifLoading" class="notif-loading"><el-icon class="notif-spin"><Loading /></el-icon></div>
+      <div v-else-if="notifications.length === 0" class="notif-empty">暂无消息</div>
+      <ul v-else class="notif-list">
+        <li
+          v-for="n in notifications"
+          :key="n.id"
+          :class="{ unread: !n.read }"
+          @click="openNotification(n)"
+        >
+          <div class="notif-title">{{ n.title }}</div>
+          <div class="notif-body">{{ n.body }}</div>
+          <div class="notif-time">{{ formatNotifTime(n.created_at) }}</div>
+        </li>
+      </ul>
+    </el-drawer>
 
     <!-- 已登录：移动端抽屉 -->
     <el-drawer v-model="mobileNavVisible" direction="ltr" size="280px" :with-header="false" class="mobile-drawer">
@@ -196,6 +223,10 @@
             <span class="su-name">{{ currentUser?.nickname || '用户' }}</span>
             <span class="su-role">{{ roleLabel }}</span>
           </div>
+          <button class="su-bell" type="button" title="消息中心" @click.stop="openNotif">
+            <el-icon><Bell /></el-icon>
+            <span v-if="unread > 0" class="su-badge">{{ unread > 99 ? '99+' : unread }}</span>
+          </button>
           <button class="su-logout" type="button" title="退出登录" @click.stop="handleLogout">
             <el-icon><SwitchButton /></el-icon>
           </button>
@@ -287,7 +318,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import type { Component } from 'vue'
 import {
@@ -299,7 +330,8 @@ import {
   Moon,
   Loading,
   ArrowLeft,
-  ArrowRight
+  ArrowRight,
+  Bell
 } from '@element-plus/icons-vue'
 import {
   logoutUser, getSavedUser, refreshSavedUser,
@@ -309,6 +341,15 @@ import {
 import { APP_MENU, canManageSystem, type SideItem } from './config/appMenu'
 import CompassLogo from './components/CompassLogo.vue'
 import { clearRouterUserCache } from './router'
+import {
+  isPushSupported,
+  fetchNotifications,
+  unreadCount as fetchUnreadCount,
+  markRead,
+  markAllRead,
+  autoRemindDue,
+  type AppNotification
+} from './services/pushService'
 
 const router = useRouter()
 const route = useRoute()
@@ -320,6 +361,68 @@ const permissionConfig = ref<PermissionConfig | null>(null)
 const isMobile = ref(false)
 const initializing = ref(true)
 const platform = computed(() => (isMobile.value ? 'mobile' : 'pc'))
+
+/* ===== 消息中心（站内收件箱 + Web Push 未读角标） ===== */
+const notifDrawerVisible = ref(false)
+const notifications = ref<AppNotification[]>([])
+const unread = ref(0)
+const notifLoading = ref(false)
+let unreadTimer: number | undefined
+let remindTimer: number | undefined
+
+async function refreshUnread() {
+  try {
+    unread.value = await fetchUnreadCount()
+  } catch {
+    unread.value = 0
+  }
+}
+async function loadNotifications() {
+  notifLoading.value = true
+  try {
+    notifications.value = await fetchNotifications(50)
+  } catch {
+    notifications.value = []
+  } finally {
+    notifLoading.value = false
+  }
+  await refreshUnread()
+}
+async function openNotif() {
+  notifDrawerVisible.value = true
+  await loadNotifications()
+}
+async function openNotification(n: AppNotification) {
+  if (!n.read) {
+    await markRead(n.id)
+    n.read = true
+    await refreshUnread()
+  }
+  if (n.url) router.push(n.url)
+}
+async function markAllReadLocal() {
+  await markAllRead()
+  await loadNotifications()
+}
+function formatNotifTime(iso: string): string {
+  const d = new Date(iso)
+  const diff = Date.now() - d.getTime()
+  if (diff < 60_000) return '刚刚'
+  if (diff < 3_600_000) return Math.floor(diff / 60_000) + ' 分钟前'
+  if (diff < 86_400_000) return Math.floor(diff / 3_600_000) + ' 小时前'
+  return d.toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
+}
+function onSwMessage(e: MessageEvent) {
+  if (e.data && e.data.type === 'zxs-push-click' && e.data.url) {
+    router.push(e.data.url)
+  }
+}
+function refreshUnreadIfLoggedIn() {
+  if (isLoggedIn.value) refreshUnread().catch(() => {})
+}
+function triggerAutoRemind() {
+  if (isLoggedIn.value && isPushSupported()) autoRemindDue().catch(() => {})
+}
 
 /* ===== 侧边栏折叠（PC 端，三角形按钮） ===== */
 const sidebarCollapsed = ref(
@@ -433,6 +536,7 @@ const isMenuActive = (key: string) => {
   if (key === 'system-roles') return route.path === '/system' && route.query.view === 'roles'
   if (key === 'feedback') return route.path === '/feedback'
   if (key === 'feedback-admin') return route.path === '/feedback-admin'
+  if (key === 'push') return route.path === '/push'
   if (key === 'account') return route.path === '/account'
   if (key === 'overview') return route.path === '/dashboard' && (route.query.view || 'overview') === 'overview'
   return route.path === '/dashboard' && route.query.view === key
@@ -601,6 +705,23 @@ onMounted(async () => {
     currentUser.value = null
   } finally {
     initializing.value = false
+    // 消息中心：未读轮询 + 自动提醒 + SW 点击跳转
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.addEventListener('message', onSwMessage)
+    }
+    refreshUnreadIfLoggedIn()
+    unreadTimer = window.setInterval(refreshUnreadIfLoggedIn, 30_000)
+    remindTimer = window.setInterval(triggerAutoRemind, 5 * 60_000)
+    // 登录后稍等片刻触发一次自动提醒，捕捉到期待办
+    window.setTimeout(triggerAutoRemind, 12_000)
+  }
+})
+
+onUnmounted(() => {
+  if (unreadTimer) clearInterval(unreadTimer)
+  if (remindTimer) clearInterval(remindTimer)
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.removeEventListener('message', onSwMessage)
   }
 })
 </script>
@@ -1053,6 +1174,40 @@ onMounted(async () => {
 }
 .su-logout:active { transform: scale(0.92); }
 .su-logout :deep(svg) { font-size: 16px; }
+.su-bell {
+  position: relative;
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-faint);
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+.su-bell:hover { color: var(--primary); border-color: var(--primary); background: rgba(99, 102, 241, 0.08); }
+.su-bell:active { transform: scale(0.92); }
+.su-bell :deep(svg) { font-size: 16px; }
+.su-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: #ef4444;
+  color: #fff;
+  font-size: 11px;
+  line-height: 16px;
+  text-align: center;
+  font-weight: 700;
+  box-shadow: 0 0 0 2px var(--surface-mute);
+}
 
 /* 主区域 */
 .app-main {
@@ -1261,4 +1416,41 @@ onMounted(async () => {
   .drawer-footer .side-user { padding: 9px 10px; }
   .drawer-footer .su-name { font-size: 13px; }
 }
+
+/* 消息中心抽屉（teleport 到 body，需全局样式） */
+:global(.notif-drawer .el-drawer__body) {
+  background: var(--bg-app-grad);
+  color: var(--text);
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+:global(.notif-header) {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+}
+:global(.notif-header-title) { font-size: 15px; font-weight: 700; color: var(--text-strong); }
+:global(.notif-header-sub) { font-size: 12px; color: var(--text-muted); flex: 1; }
+:global(.notif-loading), :global(.notif-empty) {
+  padding: 40px 16px; text-align: center; color: var(--text-muted); font-size: 13px;
+}
+:global(.notif-spin) { animation: spin 1s linear infinite; font-size: 24px; }
+:global(.notif-list) { list-style: none; margin: 0; padding: 0; overflow-y: auto; flex: 1; }
+:global(.notif-list li) {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+:global(.notif-list li:hover) { background: var(--nav-hover); }
+:global(.notif-list li.unread) { background: color-mix(in srgb, var(--primary) 6%, transparent); }
+:global(.notif-title) { font-size: 14px; font-weight: 600; color: var(--text-strong); margin-bottom: 4px; position: relative; padding-left: 10px; }
+:global(.notif-list li.unread .notif-title::before) {
+  content: ''; position: absolute; left: 0; top: 7px; width: 6px; height: 6px; border-radius: 50%; background: var(--primary);
+}
+:global(.notif-body) { font-size: 13px; color: var(--text-muted); line-height: 1.5; word-break: break-word; }
+:global(.notif-time) { font-size: 11px; color: var(--text-faint); margin-top: 4px; }
 </style>

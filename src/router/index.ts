@@ -182,6 +182,12 @@ const router = createRouter({
       meta: { requirePermission: 'feedback.admin' }
     },
     {
+      path: '/push',
+      name: 'push',
+      component: () => import('../views/PushManageView.vue'),
+      meta: { requirePermission: 'system' }
+    },
+    {
       path: '/welcome',
       name: 'welcome',
       component: () => import('../views/WelcomeView.vue')

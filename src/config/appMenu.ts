@@ -138,7 +138,8 @@ export const APP_MENU: SideItem[] = [
       { key: 'system-accounts', label: '账号管理', permissionKey: 'system.accounts', to: '/system?view=accounts' },
       { key: 'system-roles', label: '角色权限', permissionKey: 'system.roles', to: '/system?view=roles' },
       // 反馈管理：仅超级管理员可见（普通管理员/子账号无入口；视图内 isFeedbackAdmin() 二次拦截）
-      { key: 'feedback-admin', label: '反馈管理', permissionKey: 'feedback.admin', to: '/feedback-admin', visible: (u) => u?.role === 'superadmin' }
+      { key: 'feedback-admin', label: '反馈管理', permissionKey: 'feedback.admin', to: '/feedback-admin', visible: (u) => u?.role === 'superadmin' },
+      { key: 'push', label: '消息推送', permissionKey: 'system', to: '/push' }
     ]
   },
   { key: 'account', label: '个人设置', icon: User, to: '/account' }

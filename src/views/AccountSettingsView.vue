@@ -51,6 +51,38 @@
           </el-form-item>
         </el-form>
       </section>
+
+      <!-- 消息推送订阅 -->
+      <section class="account-card">
+        <header class="ac-head">
+          <span class="ac-ico"><el-icon><Bell /></el-icon></span>
+          <div class="ac-head-txt">
+            <h3>消息推送订阅</h3>
+            <p>开启后可在手机锁屏收到系统通知</p>
+          </div>
+        </header>
+
+        <div v-if="!pushSupported" class="ac-tip warn">当前浏览器不支持 Web Push，请使用 Chrome / Edge / Safari 16.4+。</div>
+        <template v-else>
+          <div class="ac-row">
+            <span>通知权限：<b>{{ permLabel }}</b></span>
+            <span v-if="subRow">已订阅</span>
+            <span v-else>未订阅</span>
+          </div>
+          <div class="ac-modules">
+            <span class="ac-modules-label">接收模块：</span>
+            <el-checkbox-group v-model="subModules">
+              <el-checkbox v-for="m in PUSH_MODULES" :key="m.key" :value="m.key">{{ m.label }}</el-checkbox>
+            </el-checkbox-group>
+          </div>
+          <div class="ac-actions">
+            <el-button v-if="!subRow" type="success" :loading="subLoading" @click="onSub">订阅本机通知</el-button>
+            <el-button v-else :loading="subLoading" @click="onSaveModules">保存模块选择</el-button>
+            <el-button v-if="subRow" text type="danger" @click="onUnsub">退订</el-button>
+          </div>
+          <div v-if="subMsg" class="ac-tip">{{ subMsg }}</div>
+        </template>
+      </section>
     </div>
   </div>
 </template>
@@ -61,7 +93,7 @@ import { useKeyboardAvoid } from '../composables/useKeyboardAvoid'
 useKeyboardAvoid()
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import { User, Lock } from '@element-plus/icons-vue'
+import { User, Lock, Bell } from '@element-plus/icons-vue'
 import {
   getSavedUser,
   updateAccount,
@@ -70,6 +102,16 @@ import {
   type AppUser
 } from '../services/appDataService'
 import PageHeader from '../components/PageHeader.vue'
+import {
+  PUSH_MODULES,
+  isPushSupported,
+  currentPermission,
+  subscribe as pushSubscribe,
+  updateModules,
+  unsubscribe as pushUnsubscribe,
+  getSubscriptionRow,
+  type PushSubscriptionRow
+} from '../services/pushService'
 
 const currentUser = ref<AppUser | null>(null)
 const saving = ref(false)
@@ -78,6 +120,69 @@ const form = reactive({
   password: '',
   confirmPassword: ''
 })
+
+/* ===== 消息推送订阅 ===== */
+const pushSupported = isPushSupported()
+const perm = ref<NotificationPermission>('default')
+const subRow = ref<PushSubscriptionRow | null>(null)
+const subModules = ref<string[]>(PUSH_MODULES.map((m) => m.key))
+const subLoading = ref(false)
+const subMsg = ref('')
+const permLabel = computed(() =>
+  perm.value === 'granted' ? '已授权' : perm.value === 'denied' ? '已拒绝' : '未授权'
+)
+
+const refreshSub = async () => {
+  perm.value = currentPermission()
+  if (!pushSupported) return
+  try {
+    subRow.value = await getSubscriptionRow()
+    if (subRow.value) {
+      subModules.value = subRow.value.modules?.length ? subRow.value.modules : PUSH_MODULES.map((m) => m.key)
+    }
+  } catch {
+    subRow.value = null
+  }
+}
+const onSub = async () => {
+  subLoading.value = true
+  subMsg.value = ''
+  try {
+    await pushSubscribe(subModules.value)
+    subMsg.value = '订阅成功，将接收所选模块的消息'
+    await refreshSub()
+  } catch (e) {
+    subMsg.value = '订阅失败：' + (e instanceof Error ? e.message : String(e))
+  } finally {
+    subLoading.value = false
+  }
+}
+const onSaveModules = async () => {
+  subLoading.value = true
+  subMsg.value = ''
+  try {
+    await updateModules(subModules.value)
+    subMsg.value = '模块选择已保存'
+    await refreshSub()
+  } catch (e) {
+    subMsg.value = '保存失败：' + (e instanceof Error ? e.message : String(e))
+  } finally {
+    subLoading.value = false
+  }
+}
+const onUnsub = async () => {
+  subLoading.value = true
+  subMsg.value = ''
+  try {
+    await pushUnsubscribe()
+    subRow.value = null
+    subMsg.value = '已退订'
+  } catch (e) {
+    subMsg.value = '退订失败：' + (e instanceof Error ? e.message : String(e))
+  } finally {
+    subLoading.value = false
+  }
+}
 
 const isSuperadmin = computed(() => currentUser.value?.role === 'superadmin')
 
@@ -135,6 +240,7 @@ const save = async () => {
 
 onMounted(() => {
   loadUser()
+  refreshSub()
 })
 </script>
 
@@ -214,6 +320,13 @@ onMounted(() => {
 .ac-profile-meta { min-width: 0; }
 .ac-nick { font-size: 15px; font-weight: 600; color: var(--text-strong); }
 .ac-uname { font-size: 12px; color: #64748b; margin: 2px 0 6px; }
+.ac-tip { font-size: 13px; color: #64748b; margin-bottom: 10px; }
+.ac-tip.warn { color: #ef4444; }
+.ac-row { display: flex; gap: 16px; flex-wrap: wrap; font-size: 13px; color: var(--text); margin-bottom: 12px; }
+.ac-modules { display: flex; align-items: flex-start; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+.ac-modules-label { font-size: 13px; color: #64748b; padding-top: 6px; }
+.ac-modules :deep(.el-checkbox-group) { display: flex; flex-wrap: wrap; gap: 4px 14px; }
+.ac-actions { display: flex; gap: 10px; flex-wrap: wrap; }
 
 @media (max-width: 768px) {
   .account-page { padding: 0 12px 12px; }
