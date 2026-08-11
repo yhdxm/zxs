@@ -1,8 +1,6 @@
 // 学位英语备考台 · 核心逻辑（挂载到 DegreeEnglishView 的 root 元素）
 // 数据全部存 localStorage（自包含，无需后端表，部署即用）。
-// 词库来源：内置示例词包 + 用户上传《大纲/模拟卷/复习指南》PDF → 浏览器端 Tesseract OCR 抽取。
-// pdfjs-dist + tesseract.js 均改为动态按需导入（避免模块顶层初始化崩溃：InsertBefore / TesseractBefore）
-// 仅在用户点"上传 PDF"时才加载
+// 词库来源：内置示例词包（PDF 导入功能因兼容性问题暂不可用）
 import { type DegreeWord, DEGREE_WORDS_BUNDLE } from './degreeWordsBundle'
 import { DIALOGUE_QUESTIONS, type DialogueQuestion } from './dialogueData'
 import { GRAMMAR_QUESTIONS, type GrammarQuestion } from './grammarData'
@@ -123,7 +121,6 @@ let rootEl: HTMLElement | null = null
 let activeTab = 'vocab'
 let queueArr: string[] = []
 let current: string | null = null
-let ocrRunning = false
 
 /* ===================== 对话练习状态 ===================== */
 let dlgSceneFilter = ''
@@ -873,7 +870,7 @@ function render() {
       <div class="handle">
         <div class="h-item">${ICON.file}词库 ${WORDS.length} 词</div>
         <button class="btn btn-primary" id="deStart">${ICON.book}开始背词</button>
-        <button class="btn" id="deUpload">${ICON.upload}上传PDF导入词库</button>
+        <button class="btn" id="deUpload">${ICON.upload}导入词库（开发中）</button>
         <input type="file" id="dePdf" accept=".pdf,application/pdf" style="display:none;">
       </div>
       <div id="deMsg" class="muted" style="margin:10px 0;"></div>
@@ -911,57 +908,9 @@ function render() {
     </div>`
 }
 
-/* ===================== OCR 导入 ===================== */
-async function handlePdf(e: Event) {
-  const input = e.target as HTMLInputElement
-  const f = input.files?.[0]
-  if (!f) return
-  const msg = document.querySelector('#deMsg') as HTMLElement | null
-  if (ocrRunning) return
-  ocrRunning = true
-  if (msg) msg.textContent = '正在解析 PDF（逐页 OCR，请稍候，大文件可能需数分钟）…'
-  try {
-    const buf = await f.arrayBuffer()
-    // 动态导入 pdfjs-dist（避免模块顶层初始化崩溃）
-    const pdfjsLib = await import('pdfjs-dist')
-    const PdfWorker = await import('pdfjs-dist/build/pdf.worker.min.mjs?url')
-    pdfjsLib.GlobalWorkerOptions.workerSrc = PdfWorker.default
-    const doc = await pdfjsLib.getDocument({ data: buf }).promise
-    let text = ''
-    for (let i = 1; i <= doc.numPages; i++) {
-      const page = await doc.getPage(i)
-      const vp = page.getViewport({ scale: 2 })
-      const canvas = document.createElement('canvas')
-      canvas.width = Math.floor(vp.width)
-      canvas.height = Math.floor(vp.height)
-      const ctx = canvas.getContext('2d')
-      if (!ctx) continue
-      await page.render({ canvas, canvasContext: ctx, viewport: vp }).promise
-      // 动态导入 tesseract.js（避免模块顶层初始化崩溃）
-      const { default: Tesseract } = await import('tesseract.js')
-      const { data } = await Tesseract.recognize(canvas, 'eng+chi_sim')
-      text += data.text + '\n'
-      if (msg) msg.textContent = `OCR 进度 ${i} / ${doc.numPages}…`
-    }
-    const rows = parseDegreeWords(text)
-    if (!rows.length) {
-      if (msg) msg.textContent = '未从 PDF 识别到单词，请确认 PDF 含「单词 + 音标 + 释义」排版。'
-      return
-    }
-    const added = rows.length
-    if (confirm(`从 PDF 解析到 ${added} 个单词，确认导入词库（与现有词去重合并）？`)) {
-      mergeWords(rows)
-      if (msg) msg.textContent = `成功导入 ${added} 个词条到词库。`
-      render()
-    } else if (msg) {
-      msg.textContent = '已取消导入。'
-    }
-  } catch (err: any) {
-    if (msg) msg.textContent = 'PDF 解析失败：' + (err?.message || err)
-  } finally {
-    input.value = ''
-    ocrRunning = false
-  }
+/* ===================== PDF 导入（暂不可用） ===================== */
+async function handlePdf(_e: Event) {
+  alert('PDF 词表导入功能暂不可用（PDF 解析库与当前环境兼容性问题）。\n当前使用内置 53 个核心词汇，后续版本将支持手动添加单词。')
 }
 
 /* ===================== 对话练习逻辑 ===================== */

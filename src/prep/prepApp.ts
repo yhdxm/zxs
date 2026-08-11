@@ -11,8 +11,6 @@ import {
   type PrepState,
   newId
 } from '../services/cetPrepService'
-// pdfjs-dist 改为动态按需导入（避免模块顶层初始化崩溃：InsertBefore）
-// 仅在用户点"上传 PDF 词表"时才加载
 import { MASTER_WORDS_BUNDLE } from './masterWordsBundle'
 
 export interface PrepStorage {
@@ -611,12 +609,10 @@ function renderMine() {
   const adminNote = IS_ADMIN
     ? `<div class="card">
       <div class="sec-title">${ICON.book}词库管理（管理员）</div>
-      <p class="muted" style="margin:0 0 12px;">导入完整四级词表（CSV / JSON，或直接上传 PDF 词表）。字段：<b>word, phonetic, pos, definition, collocation</b>。导入会按单词去重合并进主词表。</p>
+      <p class="muted" style="margin:0 0 12px;">导入完整四级词表（CSV / JSON）。字段：<b>word, phonetic, pos, definition, collocation</b>。导入会按单词去重合并进主词表。</p>
       <div class="row">
         <button class="btn btn-primary" data-act="pickWords">${ICON.download}选择词库文件导入</button>
         <input type="file" id="wordFile" accept=".csv,.json,application/json,text/csv" style="display:none;">
-        <button class="btn" data-act="pickPdf">${ICON.file}上传 PDF 词表</button>
-        <input type="file" id="pdfFile" accept="application/pdf,.pdf" style="display:none;">
       </div>
       <div id="seedMsg" class="muted" style="margin-top:10px;"></div>
     </div>`
@@ -789,11 +785,6 @@ function bindView() {
     wf.dataset.bound = '1'
     wf.addEventListener('change', handleWordFile)
   }
-  const pf = document.querySelector('#pdfFile') as HTMLInputElement | null
-  if (pf && !pf.dataset.bound) {
-    pf.dataset.bound = '1'
-    pf.addEventListener('change', handlePdfFile)
-  }
 }
 function onAct(e: Event) {
   const el = e.currentTarget as HTMLElement
@@ -805,8 +796,7 @@ function onAct(e: Event) {
   else if (act === 'goto') setView(v || '')
   else if (act === 'png') downloadPng()
   else if (act === 'pickPdf') {
-    const pf = document.querySelector('#pdfFile') as HTMLInputElement | null
-    if (pf) pf.click()
+    alert('PDF 词表导入功能暂不可用（PDF 解析库与当前环境兼容性问题）。\n请使用内置词库或「上传词表文件」功能（支持 .txt/.csv）。')
   }
   else if (act === 'pickWords') {
     const wf = document.querySelector('#wordFile') as HTMLInputElement | null
@@ -952,63 +942,11 @@ function handleWordFile(e: Event) {
   ;(e.target as HTMLInputElement).value = ''
 }
 
-/* ===================== PDF 词表导入 ===================== */
-// 上传 PDF 词表 → pdf.js 提取文本 → 启发式抽取单词 → 合并进主词表（复用 seedMasterWords 入库链）
-async function handlePdfFile(e: Event) {
-  const input = e.target as HTMLInputElement
-  const f = input.files?.[0]
-  if (!f) return
-  const msg = document.querySelector('#seedMsg') as HTMLElement | null
-  if (msg) msg.textContent = '正在解析 PDF，请稍候…'
-  try {
-    const buf = await f.arrayBuffer()
-    const text = await extractPdfText(buf)
-    const rows = parsePdfWords(text)
-    if (!rows.length) {
-      if (msg) msg.textContent = '未从 PDF 解析到单词，请确认是「单词 + 音标 + 释义」排版的词表。'
-      return
-    }
-    if (confirm(`已从 PDF 解析到 ${rows.length} 个单词，确认导入主词表？`)) {
-      const n = await storage.seedMasterWords(rows)
-      if (msg) msg.textContent = `成功导入 ${n} 个词条到主词表。`
-      const mw = await storage.fetchMasterWords()
-      MASTER = mw.length ? mw : MASTER_WORDS_BUNDLE
-      render()
-    } else if (msg) {
-      msg.textContent = '已取消导入。'
-    }
-  } catch (err: any) {
-    if (msg) msg.textContent = 'PDF 解析失败：' + (err?.message || err)
-  } finally {
-    input.value = ''
-  }
-}
+/* ===================== PDF 词表导入（暂不可用） ===================== */
 
-// 逐页提取文本，并按 transform 的 y 坐标分组还原真实行布局（PDF 表格线丢失，但文字顺序基本保留）
-async function extractPdfText(buf: ArrayBuffer): Promise<string> {
-  // 动态导入 pdfjs-dist（避免模块顶层初始化崩溃）
-  const pdfjsLib = await import('pdfjs-dist')
-  const PdfWorker = await import('pdfjs-dist/build/pdf.worker.min.mjs?url')
-  pdfjsLib.GlobalWorkerOptions.workerSrc = PdfWorker.default
-  const doc = await pdfjsLib.getDocument({ data: buf }).promise
-  const pages: string[] = []
-  for (let i = 1; i <= doc.numPages; i++) {
-    const page = await doc.getPage(i)
-    const tc = await page.getTextContent()
-    const linesMap = new Map<number, { x: number; s: string }[]>()
-    for (const it of tc.items as any[]) {
-      const str: string | undefined = it.str
-      if (!str) continue
-      const y = Math.round(it.transform[5] as number)
-      if (!linesMap.has(y)) linesMap.set(y, [])
-      linesMap.get(y)!.push({ x: it.transform[4] as number, s: str })
-    }
-    const lines = [...linesMap.entries()]
-      .sort((a, b) => b[0] - a[0])
-      .map(([, arr]) => arr.sort((p, q) => p.x - q.x).map((o) => o.s).join(' '))
-    pages.push(lines.join('\n'))
-  }
-  return pages.join('\n')
+// PDF 文本提取（暂不可用：pdfjs-dist 与当前打包环境不兼容）
+async function extractPdfText(_buf: ArrayBuffer): Promise<string> {
+  throw new Error('PDF 解析暂不可用，请使用内置词库或上传 .txt/.csv 词表文件')
 }
 
 // 启发式：从每行抽取 word / 音标(/.../ 或 [...]) / 词性(n. v. adj. 等) / 释义，跳过页码与纯中文行
