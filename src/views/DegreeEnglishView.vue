@@ -1,7 +1,5 @@
 <template>
-  <div class="degree-eng-root" ref="root">
-    <div v-if="loading" class="prep-state">正在加载学位英语备考台…</div>
-  </div>
+  <div class="degree-eng-root" ref="root"></div>
 </template>
 
 <script setup lang="ts">
@@ -9,7 +7,6 @@ import { onMounted, onUnmounted, ref } from 'vue'
 import { initDegreePrep } from '../prep/degreePrep'
 
 const root = ref<HTMLElement | null>(null)
-const loading = ref(true)
 let cleanup: (() => void) | null = null
 
 onMounted(async () => {
@@ -18,8 +15,6 @@ onMounted(async () => {
     cleanup = await initDegreePrep(root.value)
   } catch (e: any) {
     if (root.value) root.value.innerHTML = `<div class="prep-state prep-error">加载失败：${e?.message || e}</div>`
-  } finally {
-    loading.value = false
   }
 })
 

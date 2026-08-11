@@ -28,9 +28,9 @@ export const FREE_LLM_RESOURCES: FreeResource[] = [
     id: 'google-ai-studio',
     name: 'Google AI Studio（Gemini）',
     category: 'api',
-    freeNote: '永久免费层，无需信用卡。Gemini 2.5/3 Flash + Gemma，约 10 RPM / 250 RPD（Flash），1M 上下文。',
+    freeNote: '永久免费层，无需信用卡。Gemini 2.5/3 Flash + Gemma，约 10 RPM / 250 RPD（Flash），1M 上下文。（Gemini Pro 系列自 2026-04 起已移除免费层。）',
     url: 'https://aistudio.google.com',
-    lastChecked: '2026-08-02',
+    lastChecked: '2026-08-11',
     tags: ['Gemini', '多模态', '无需信用卡']
   },
   {
@@ -73,18 +73,18 @@ export const FREE_LLM_RESOURCES: FreeResource[] = [
     id: 'mistral',
     name: 'Mistral AI',
     category: 'api',
-    freeNote: '免费「Experiment」层，无需信用卡。Large / Medium / Small / Codestral / Devstral。',
+    freeNote: '免费「Experiment」层，无需信用卡（需手机号验证）。约 10 亿 tokens/月（~1 RPS / 500K TPM），Large / Medium / Small / Codestral / Devstral 全模型可用。',
     url: 'https://mistral.ai',
-    lastChecked: '2026-08-02',
+    lastChecked: '2026-08-11',
     tags: ['欧洲', '代码模型', '无需信用卡']
   },
   {
     id: 'huggingface-inference',
     name: 'Hugging Face Inference API',
     category: 'api',
-    freeNote: '数千开源模型经统一 OpenAI 兼容端点免费调用，无需信用卡。共享配额约 300 次/小时。',
+    freeNote: '数千开源模型经统一 OpenAI 兼容端点免费调用，无需信用卡。共享配额约 300 次/小时。平台亦托管 Meta Muse Glimmer、Kimi K3 等最新 Apache 2.0 开源权重，可免费下载自部署。',
     url: 'https://huggingface.co',
-    lastChecked: '2026-08-02',
+    lastChecked: '2026-08-11',
     tags: ['模型最全', '开源', '无需信用卡']
   },
   {
@@ -136,20 +136,29 @@ export const FREE_LLM_RESOURCES: FreeResource[] = [
     id: 'deepseek',
     name: 'DeepSeek 官方 API',
     category: 'api',
-    freeNote: '官方提供免费调用额度，无需信用卡。DeepSeek-V3 / R1 等。',
+    freeNote: '官方提供免费调用额度，无需信用卡。DeepSeek-V4 / V3-Lite（永久免费不限量）/ R1 等；网页端 chat.deepseek.com 永久免费。',
     url: 'https://platform.deepseek.com',
-    lastChecked: '2026-08-02',
+    lastChecked: '2026-08-11',
     tags: ['推理', '无需信用卡']
+  },
+  {
+    id: 'aliyun-bailian',
+    name: '阿里云百炼（通义千问 DashScope）',
+    category: 'api',
+    freeNote: '新用户赠免费额度（千万级 tokens，无需绑卡），Qwen 系列可免费调用；实名认证后可用，国内直连友好，OpenAI 兼容。',
+    url: 'https://bailian.console.aliyun.com',
+    lastChecked: '2026-08-11',
+    tags: ['国内可用', 'Qwen', '无需信用卡']
   },
 
   /* ===================== 评测 / 信息查询平台 ===================== */
   {
     id: 'lmarena',
-    name: 'LMArena（Chatbot Arena）',
+    name: 'LMArena / Arena（Chatbot Arena）',
     category: 'eval',
-    freeNote: '完全免费。全球引用最广的人类偏好盲测榜单，覆盖文本/代码/视觉/视频。',
-    url: 'https://lmarena.ai',
-    lastChecked: '2026-08-02',
+    freeNote: '完全免费，无需注册。前身 Chatbot Arena，2026 年初更名 Arena；全球引用最广的人类偏好盲测榜单，覆盖文本/代码/视觉/视频等 9 大类别。',
+    url: 'https://arena.ai',
+    lastChecked: '2026-08-11',
     tags: ['人类偏好', '盲测', '免费']
   },
   {
@@ -378,5 +387,59 @@ export const FREE_LLM_RESOURCES: FreeResource[] = [
     url: 'https://skillsbuild.org',
     lastChecked: '2026-08-02',
     tags: ['徽章', '免费']
+  },
+  {
+    id: 'anthropic-academy',
+    name: 'Anthropic Academy',
+    category: 'learn',
+    freeNote: '完全免费，含完成证书。2026 年 3 月上线，20+ 门课程覆盖 Claude、Claude Code、Claude API 与 MCP 实战。',
+    url: 'https://academy.anthropic.com',
+    lastChecked: '2026-08-11',
+    tags: ['Claude', '证书', '免费']
+  },
+  {
+    id: 'ms-generative-ai-beginners',
+    name: 'Microsoft 生成式 AI 入门（21 课）',
+    category: 'learn',
+    freeNote: '完全免费开源（MIT）。从提示工程到 RAG、Agent 的 21 节动手课程，GitHub 仓库持续维护。',
+    url: 'https://github.com/microsoft/generative-ai-for-beginners',
+    lastChecked: '2026-08-11',
+    tags: ['开源', '提示工程', '免费']
+  },
+  {
+    id: 'ms-ai-agents-beginners',
+    name: 'Microsoft AI Agents 入门（15 课）',
+    category: 'learn',
+    freeNote: '完全免费开源。15 节以代码为主的 AI Agent 课程，覆盖构建与编排智能体。',
+    url: 'https://github.com/microsoft/ai-agents-for-beginners',
+    lastChecked: '2026-08-11',
+    tags: ['Agent', '开源', '免费']
+  },
+  {
+    id: 'hf-agents-course',
+    name: 'Hugging Face Agents 课程',
+    category: 'learn',
+    freeNote: '完全免费，含完成证书。面向 Agent 构建的动手课程，配套 Notebook 与示例。',
+    url: 'https://huggingface.co/learn/agents-course',
+    lastChecked: '2026-08-11',
+    tags: ['Agent', '证书', '免费']
+  },
+  {
+    id: 'karpathy-nn-zero-to-hero',
+    name: 'Neural Networks: Zero to Hero（Karpathy）',
+    category: 'learn',
+    freeNote: '完全免费。8 集视频从反向传播手搓到完整 GPT，深入理解 LLM 工作原理。',
+    url: 'https://www.youtube.com/playlist?list=PLAqhIrjkxbuWI23v9cThsA9GvCAUhRvKZ',
+    lastChecked: '2026-08-11',
+    tags: ['原理', '免费', '无注册']
+  },
+  {
+    id: 'mit-6s191',
+    name: 'MIT 6.S191 深度学习导论',
+    category: 'learn',
+    freeNote: '完全免费开放。2026 版讲义、幻灯片与实验全部公开，无需注册。',
+    url: 'https://introtodeeplearning.com',
+    lastChecked: '2026-08-11',
+    tags: ['大学级', '免费']
   }
 ]
