@@ -4,7 +4,8 @@
 import * as pdfjsLib from 'pdfjs-dist'
 import PdfWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
 pdfjsLib.GlobalWorkerOptions.workerSrc = PdfWorker
-import Tesseract from 'tesseract.js'
+// tesseract.js 改为动态按需导入（避免模块顶层初始化崩溃：v7 在某些环境下访问 null.TesseractBefore）
+// 仅在用户点"上传 PDF"时才加载
 import { type DegreeWord, DEGREE_WORDS_BUNDLE } from './degreeWordsBundle'
 import { DIALOGUE_QUESTIONS, type DialogueQuestion } from './dialogueData'
 import { GRAMMAR_QUESTIONS, type GrammarQuestion } from './grammarData'
@@ -935,6 +936,8 @@ async function handlePdf(e: Event) {
       const ctx = canvas.getContext('2d')
       if (!ctx) continue
       await page.render({ canvas, canvasContext: ctx, viewport: vp }).promise
+      // 动态导入 tesseract.js（避免模块顶层初始化崩溃）
+      const { default: Tesseract } = await import('tesseract.js')
       const { data } = await Tesseract.recognize(canvas, 'eng+chi_sim')
       text += data.text + '\n'
       if (msg) msg.textContent = `OCR 进度 ${i} / ${doc.numPages}…`
