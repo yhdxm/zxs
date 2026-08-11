@@ -124,17 +124,17 @@ onUnmounted(() => {
 .cet-prep-root {
   --bg: #FBF6EE;
   --surface: #FFFFFF;
-  --surface-2: #FDF3E7;
+  --surface-2: #F4F3FB;
   --ink: #22304E;
   --ink-soft: #5B6A86;
-  --orange: #F0922B;
-  --orange-2: #FFB877;
-  --orange-soft: #FCEBD6;
+  --orange: #534AB7;
+  --orange-2: #7F77DD;
+  --orange-soft: #ECEAF8;
   --green: #2E9E5B;
   --red: #E0492F;
   --amber: #E8A33D;
-  --border: #ECE0CE;
-  --border-2: #F3E8D7;
+  --border: #E6E3F2;
+  --border-2: #F0EEF8;
   --shadow: 0 8px 24px rgba(34, 48, 78, 0.08);
   --shadow-sm: 0 3px 10px rgba(34, 48, 78, 0.06);
   --radius: 16px;
@@ -231,7 +231,7 @@ onUnmounted(() => {
 .cet-prep-root .stat.red .num { color: var(--red); }
 
 /* today handle bar */
-.cet-prep-root .handle { background: linear-gradient(135deg, #FFF4E6, #FDEAD2); border: 1px solid var(--orange-soft); border-radius: var(--radius); padding: 16px 18px; display: flex; flex-wrap: wrap; gap: 14px; align-items: center; }
+.cet-prep-root .handle { background: linear-gradient(135deg, #F1EFFB, #E3E0F7); border: 1px solid var(--orange-soft); border-radius: var(--radius); padding: 16px 18px; display: flex; flex-wrap: wrap; gap: 14px; align-items: center; }
 .cet-prep-root .handle .h-title { font-weight: 800; font-size: 16px; display: flex; align-items: center; gap: 8px; }
 .cet-prep-root .handle .h-item { display: flex; align-items: center; gap: 8px; background: var(--surface); border: 1px solid var(--border); border-radius: 999px; padding: 7px 14px; font-size: 13.5px; font-weight: 600; }
 .cet-prep-root .handle .h-item b { color: var(--orange); }
@@ -318,7 +318,7 @@ onUnmounted(() => {
 .cet-prep-root .struct-row .s-pct { color: var(--orange); font-weight: 800; }
 
 /* backup banner */
-.cet-prep-root .backup-banner { background: #FFF7E8; border: 1px solid var(--orange-soft); border-radius: 12px; padding: 12px 16px; display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+.cet-prep-root .backup-banner { background: #F3F1FB; border: 1px solid var(--orange-soft); border-radius: 12px; padding: 12px 16px; display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
 .cet-prep-root .backup-banner svg { width: 22px; height: 22px; color: var(--orange); flex: 0 0 22px; }
 
 .cet-prep-root .empty { text-align: center; color: var(--ink-soft); padding: 30px 10px; font-size: 14px; }
@@ -360,7 +360,7 @@ onUnmounted(() => {
 .cet-prep-root .prep-error { color: var(--red); }
 
 .cet-prep-root .prep-missing-banner {
-  background: #FFF7E8;
+  background: #F3F1FB;
   border-bottom: 1px solid var(--orange-soft);
   color: var(--ink);
   padding: 12px 16px;
@@ -378,7 +378,7 @@ onUnmounted(() => {
 
 /* 词库数量不足提示 */
 .cet-prep-root .prep-vocab-banner {
-  background: #FFF7E8;
+  background: #F3F1FB;
   border: 1px solid var(--orange-soft);
   border-radius: var(--radius-sm);
   color: var(--ink);

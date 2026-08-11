@@ -150,6 +150,60 @@ export const FREE_LLM_RESOURCES: FreeResource[] = [
     lastChecked: '2026-08-11',
     tags: ['国内可用', 'Qwen', '无需信用卡']
   },
+  {
+    id: 'scnet-llm',
+    name: '国家超算互联网（SCNet）',
+    category: 'api',
+    freeNote: '国家级公共算力平台，2026-08-02 起免费开放 DeepSeek-V4-Flash-0731 等大模型 API 调用，无需信用卡。聚合 1700+ 开源模型（DeepSeek / GLM / Qwen / Kimi / MiniMax），MaaS 统一入口一键调用，适配政企与国内开发者。',
+    url: 'https://www.scnet.cn/ui/console/index.html#/llm/models',
+    lastChecked: '2026-08-11',
+    tags: ['国内可用', '国家级算力', '无需信用卡']
+  },
+  {
+    id: 'ovhcloud-ai-endpoints',
+    name: 'OVHcloud AI Endpoints',
+    category: 'api',
+    freeNote: '永久免费层，无需信用卡；匿名层连账号都不用（约 2 RPM）。欧盟数据中心（GDPR 合规），托管 Qwen3-Coder / Mistral / Llama / DeepSeek 等开源模型，OpenAI 兼容。',
+    url: 'https://endpoints.ai.cloud.ovh.net',
+    lastChecked: '2026-08-11',
+    tags: ['欧洲', 'GDPR', '匿名可用', '无需信用卡']
+  },
+  {
+    id: 'llm7',
+    name: 'LLM7.io',
+    category: 'api',
+    freeNote: '免费聚合网关，无需信用卡。罕见地提供免费 GPT-4o-mini，外加 DeepSeek-R1 / Qwen / Llama 等，30 RPM（注册 token 提至 120 RPM），OpenAI 兼容。小型独立服务，适合原型。',
+    url: 'https://llm7.io',
+    lastChecked: '2026-08-11',
+    tags: ['GPT-4o-mini', '无需信用卡', 'OpenAI兼容']
+  },
+  {
+    id: 'modelscope',
+    name: '魔搭 ModelScope',
+    category: 'api',
+    freeNote: '阿里开源社区，绑定阿里云账号 + 实名后每日 2000 次免费 API-Inference（单模型≤500/天），无需信用卡。覆盖 Qwen / DeepSeek / GLM 等近 3000 模型，OpenAI 与 Anthropic 双兼容。',
+    url: 'https://modelscope.cn',
+    lastChecked: '2026-08-11',
+    tags: ['国内可用', 'Qwen', '无需信用卡']
+  },
+  {
+    id: 'chutes',
+    name: 'Chutes.ai',
+    category: 'api',
+    freeNote: '免费层，无需信用卡。托管 DeepSeek、Qwen 等开源模型的 OpenAI 兼容端点，适合个人项目与原型验证。',
+    url: 'https://chutes.ai',
+    lastChecked: '2026-08-11',
+    tags: ['开源', '无需信用卡', 'OpenAI兼容']
+  },
+  {
+    id: 'glhf',
+    name: 'Glhf.chat',
+    category: 'api',
+    freeNote: '免费层，无需信用卡。提供若干开源模型的 OpenAI 兼容 API，适合轻量调用与评测。',
+    url: 'https://glhf.chat',
+    lastChecked: '2026-08-11',
+    tags: ['开源', '无需信用卡', 'OpenAI兼容']
+  },
 
   /* ===================== 评测 / 信息查询平台 ===================== */
   {
@@ -268,6 +322,15 @@ export const FREE_LLM_RESOURCES: FreeResource[] = [
     url: 'https://epoch.ai',
     lastChecked: '2026-08-02',
     tags: ['研究', '免费']
+  },
+  {
+    id: 'llm-stats',
+    name: 'LLM-Stats Benchmarks',
+    category: 'eval',
+    freeNote: '完全免费。汇总 600+ AI/LLM 基准（推理 / 代码 / 数学 / 视觉 / 工具调用等），每条基准直连实时排行榜与独立验证分数，持续更新。',
+    url: 'https://llm-stats.com',
+    lastChecked: '2026-08-11',
+    tags: ['基准索引', '实时榜单', '免费']
   },
 
   /* ===================== 免费学习资源 ===================== */

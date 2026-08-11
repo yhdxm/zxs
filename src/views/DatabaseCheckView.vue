@@ -227,7 +227,16 @@ const TABLE_DESC: Record<string, string> = {
   cet4_prep_practice: '四六级备考台·刷题记录表：听力/阅读/写作/翻译的做题数与正确数',
   cet4_prep_mistakes: '四六级备考台·错题本表：题型/错因/正确思路与 1/3/7/15/30 天复习计划',
   cet4_prep_checkins: '四六级备考台·打卡表：按日期聚合的背词/刷题次数',
-  cet4_prep_settings: '四六级备考台·设置表：每日新词数、考试日、手动连续天数、关联目标'
+  cet4_prep_settings: '四六级备考台·设置表：每日新词数、考试日、手动连续天数、关联目标',
+  degree_materials: '学位英语备考台·资料表：三本 PDF（大纲/指南/模拟卷）元数据与站内路径',
+  degree_settings: '学位英语备考台·设置表：目标院校、考试日、每日新词数、手动连续天数',
+  degree_word_progress: '学位英语备考台·单词进度表：每用户每词的艾宾浩斯复习状态（status/level/due/weak）',
+  degree_practice: '学位英语备考台·练习记录表：五大题型的做题数与正确数',
+  degree_mistakes: '学位英语备考台·错题本表：题号/错因/正确思路与复习计划',
+  degree_favorites: '学位英语备考台·收藏笔记表：笔记/好句收藏/生词本（kind 区分）',
+  push_subscriptions: '消息推送·订阅表：用户浏览器/设备推送订阅端点与公钥，按账号隔离',
+  notifications: '消息推送·通知表：系统生成的站内通知与待推送消息（标题/正文/类型/已读状态）',
+  push_reminder_log: '消息推送·发送日志表：每次提醒/推送的实际发送记录与结果，用于去重与排查'
 }
 
 /** Supabase 平台托管的系统表（多建在 public 模式下但由平台管理、默认不开 RLS），不纳入「业务表未开 RLS」告警，避免误报 */
@@ -253,7 +262,9 @@ const TABLE_GROUP: Record<string, string> = {
   car_watchlist: 'xingyu',
   learn_progress: 'learn', learn_bookmarks: 'learn', learn_reading: 'learn',
   third_party_apis: 'third', api_grants: 'third', api_usage_logs: 'third',
-  feedbacks: 'feedback', feedback_replies: 'feedback'
+  feedbacks: 'feedback', feedback_replies: 'feedback',
+  degree_materials: 'degree', degree_settings: 'degree', degree_word_progress: 'degree',
+  degree_practice: 'degree', degree_mistakes: 'degree', degree_favorites: 'degree'
 }
 
 /** 业务域元信息：中文名 + 主题色（浅色主题下的柔和色，用于分组色条与标识） */
@@ -265,6 +276,7 @@ const GROUP_META: Record<string, { label: string; color: string }> = {
   learn: { label: '学习中心', color: '#10b981' },
   third: { label: '第三方 API', color: '#14b8a6' },
   feedback: { label: '意见反馈', color: '#6366f1' },
+  degree: { label: '学位英语备考', color: '#534AB7' },
   archive: { label: '消息归档', color: '#ec4899' },
   other: { label: '其他表', color: '#64748b' }
 }

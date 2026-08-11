@@ -1,170 +1,846 @@
 <template>
-  <div class="degree-eng-root" ref="root"></div>
+  <div class="degree-view">
+    <PageHeader
+      :icon="Reading"
+      title="学位英语备考台"
+      :subtitle="`大纲 ${MATERIALS[0]?.pages ?? 0}页 · 指南 ${MATERIALS[1]?.pages ?? 0}页 · 模拟卷 ${MATERIALS[2]?.pages ?? 0}页，全本已内置 · 目标：${settings.targetSchool || '商丘师范学院继续教育学院'}`"
+    >
+      <template #actions>
+        <el-button text :icon="Setting" @click="settingsVisible = true">设置</el-button>
+        <el-button type="primary" round :icon="VideoPlay" @click="startStudy">开始学习</el-button>
+      </template>
+    </PageHeader>
+
+    <!-- 统计卡 -->
+    <div class="stat-grid">
+      <div class="stat-card">
+        <div class="stat-label">今日新词</div>
+        <div class="stat-num" style="color: #534ab7">{{ settings.newPerDay }}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">连续学习</div>
+        <div class="stat-num" style="color: #185fa5">{{ streakDays }}<span class="unit">天</span></div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">词汇掌握</div>
+        <div class="stat-num" style="color: #0f6e56">
+          {{ graduatedCount }}<span class="unit">/{{ degreeWords.length || VOCAB_REQUIREMENT.receptive }}</span>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">题库总量</div>
+        <div class="stat-num" style="color: #854f0b">{{ degreeQuestions.length }}</div>
+      </div>
+    </div>
+
+    <!-- 胶囊 Tab -->
+    <div class="tab-bar">
+      <button v-for="t in tabs" :key="t.key" class="tab-pill" :class="{ active: activeTab === t.key }" @click="activeTab = t.key">
+        {{ t.label }}
+      </button>
+    </div>
+
+    <!-- 概览 -->
+    <section v-show="activeTab === 'overview'" class="panel">
+      <div class="overview-top">
+        <div class="plan-card">
+          <div class="card-title">今日学习计划</div>
+          <ul class="plan-list">
+            <li>新学单词 {{ settings.newPerDay }} 个</li>
+            <li>复习待巩固词 {{ reviewCount }} 个</li>
+            <li>题型训练：{{ EXAM_SECTIONS.find((s) => s.key === trainingType)?.name }}</li>
+            <li v-if="settings.examDate">距考试还有 <b>{{ daysToExam }}</b> 天</li>
+          </ul>
+          <el-button type="primary" round size="small" @click="startStudy">开始今日学习</el-button>
+        </div>
+        <div class="ring-card">
+          <svg width="120" height="120" viewBox="0 0 120 120">
+            <circle cx="60" cy="60" r="50" fill="none" stroke="#eceaf8" stroke-width="12" />
+            <circle
+              cx="60" cy="60" r="50" fill="none" stroke="#534ab7" stroke-width="12" stroke-linecap="round"
+              :stroke-dasharray="`${ringLen} 314`" transform="rotate(-90 60 60)"
+            />
+            <text x="60" y="66" text-anchor="middle" font-size="22" font-weight="600" fill="#3c3489">{{ masteryPercent }}%</text>
+          </svg>
+          <div class="ring-cap">总掌握进度</div>
+        </div>
+      </div>
+
+      <div class="card-title" style="margin: 18px 0 10px">五大题型（严格按大纲）</div>
+      <div class="type-grid">
+        <div
+          v-for="s in EXAM_SECTIONS"
+          :key="s.key"
+          class="type-card"
+          :style="{ borderTopColor: s.color }"
+          @click="goTraining(s.key)"
+        >
+          <div class="type-name" :style="{ color: s.color }">{{ s.name }}</div>
+          <div class="type-meta">{{ s.count }}题 · {{ s.score }}分 · {{ s.minutes }}min</div>
+          <div class="type-desc">{{ s.desc }}</div>
+        </div>
+      </div>
+
+      <div class="card-title" style="margin: 18px 0 10px">词汇要求 & 语法项目（大纲规定）</div>
+      <div class="req-grid">
+        <div class="req-card">
+          <div class="req-h">词汇要求</div>
+          <div class="req-row">领会式掌握：<b>{{ VOCAB_REQUIREMENT.receptive }}</b> 词 + {{ VOCAB_REQUIREMENT.receptivePhrase }} 词组</div>
+          <div class="req-row">复用式掌握：<b>{{ VOCAB_REQUIREMENT.productive }}</b> 词 + {{ VOCAB_REQUIREMENT.productivePhrase }} 词组（大纲带 <span class="star">*</span>）</div>
+          <div class="req-row">另需掌握：{{ VOCAB_REQUIREMENT.affix }}</div>
+        </div>
+        <div class="req-card">
+          <div class="req-h">语法项目（10 项）</div>
+          <div v-for="(g, i) in GRAMMAR_ITEMS" :key="i" class="grammar-item">{{ i + 1 }}. {{ g }}</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 单词本 -->
+    <section v-show="activeTab === 'words'" class="panel">
+      <div class="toolbar">
+        <el-input v-model="wordQuery" placeholder="搜索单词 / 释义" clearable style="max-width: 320px" />
+        <el-tag v-if="degreeWords.length" type="info" effect="plain">共 {{ degreeWords.length }} 词</el-tag>
+        <el-tag v-else type="warning" effect="plain">OCR 生成中，稍候自动填充</el-tag>
+      </div>
+      <div v-if="degreeWords.length" class="word-list">
+        <div v-for="w in filteredWords" :key="w.word" class="word-item" :class="{ weak: wordProgress[w.word]?.weak }">
+          <div class="word-main">
+            <span class="word-text">{{ w.word }}<span v-if="w.productive" class="star">*</span></span>
+            <span class="word-phon" v-if="w.phonetic">{{ w.phonetic }}</span>
+            <span class="word-pos" v-if="w.pos">{{ w.pos }}</span>
+          </div>
+          <div class="word-def">{{ w.definition }}</div>
+          <div class="word-ops">
+            <el-button size="small" @click="cycleWord(w.word)">
+              {{ wordProgress[w.word]?.status === 'graduated' ? '已掌握' : wordProgress[w.word]?.status === 'learning' ? '学习中' : '标记学习' }}
+            </el-button>
+            <el-button size="small" text type="primary" @click="addWordBook(w)">加入生词本</el-button>
+          </div>
+        </div>
+      </div>
+      <el-empty v-else description="词汇表正在由《考试大纲》OCR 提取，完成后这里会显示全部 4400+ 词，并标注复用式（*）" />
+    </section>
+
+    <!-- 题型训练 -->
+    <section v-show="activeTab === 'training'" class="panel">
+      <div class="toolbar">
+        <el-radio-group v-model="trainingType" @change="pickQuestion">
+          <el-radio-button v-for="s in EXAM_SECTIONS" :key="s.key" :value="s.key">{{ s.name }}</el-radio-button>
+        </el-radio-group>
+        <el-tag type="info" effect="plain">{{ questionsOfType.length }} 题</el-tag>
+      </div>
+
+      <div v-if="currentQ" class="quiz-card">
+        <div class="quiz-stem">{{ currentQ.stem }}</div>
+        <div v-if="currentQ.passage" class="quiz-passage">{{ currentQ.passage }}</div>
+        <div v-if="currentQ.options" class="quiz-options">
+          <label v-for="(o, i) in currentQ.options" :key="i" class="opt" :class="{ right: showAnswer && isRight(o), wrong: showAnswer && myAnswer === o && !isRight(o) }">
+            <input type="radio" :name="'q'" :value="o" v-model="myAnswer" :disabled="showAnswer" />
+            <span>{{ String.fromCharCode(65 + i) }}. {{ o }}</span>
+          </label>
+        </div>
+        <div class="quiz-actions">
+          <el-button v-if="!showAnswer" type="primary" @click="revealAnswer">提交 / 看答案</el-button>
+          <el-button v-else @click="nextQuestion">下一题</el-button>
+          <el-button v-if="showAnswer" text type="danger" @click="markMistake(currentQ)">错题收藏</el-button>
+        </div>
+        <div v-if="showAnswer" class="quiz-explain">
+          <div class="ex-h">答案：<b>{{ currentQ.answer }}</b></div>
+          <div class="ex-b">解析：{{ currentQ.explanation }}</div>
+          <div class="ex-src">来源：{{ currentQ.source.basis }}（{{ currentQ.source.book }} 第 {{ currentQ.source.page }} 页）</div>
+        </div>
+      </div>
+      <el-empty v-else :description="`《${trainingTypeLabel}》题库正在由 PDF 原题 + 大纲生成，完成后即可逐题练习并看解析`" />
+    </section>
+
+    <!-- 模拟考试 -->
+    <section v-show="activeTab === 'mock'" class="panel">
+      <div class="card-title" style="margin-bottom: 10px">全真模拟考试（5 套，计时交卷 + 判分）</div>
+      <div class="paper-grid">
+        <div v-for="p in MOCK_PAPERS" :key="p.id" class="paper-card">
+          <div class="paper-no">第 {{ p.no }} 套</div>
+          <div class="paper-title">{{ p.title }}</div>
+          <div class="paper-note">{{ p.note }}</div>
+          <div class="paper-meta">满分 100 · 120 分钟 · 52 题</div>
+          <el-button type="primary" plain size="small" round @click="startMock(p)">开始模考</el-button>
+        </div>
+      </div>
+      <el-alert
+        v-if="!degreeQuestions.length"
+        type="info"
+        :closable="false"
+        style="margin-top: 12px"
+        title="模拟卷原题题库正在由《全真模拟试卷及考点点睛》OCR 生成，完成后可直接在线计时模考、交卷判分与薄弱项分析。"
+      />
+    </section>
+
+    <!-- 资料库 -->
+    <section v-show="activeTab === 'library'" class="panel">
+      <div class="card-title" style="margin-bottom: 10px">资料库（三本 PDF 原文件内置，点开即看，不加载）</div>
+      <div class="material-grid">
+        <div v-for="m in MATERIALS" :key="m.id" class="material-card">
+          <div class="material-title">{{ m.title }}</div>
+          <div class="material-meta">{{ m.pages }} 页 · {{ m.remark }}</div>
+          <div class="material-ops">
+            <el-button size="small" type="primary" :icon="Picture" @click="openPreview(m)">预览</el-button>
+            <el-button size="small" text @click="addMaterialNote(m.title)">记笔记</el-button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 读写中心 -->
+    <section v-show="activeTab === 'rw'" class="panel">
+      <div class="rw-grid">
+        <div class="rw-col">
+          <div class="card-title">学习笔记 <el-button size="small" text type="primary" @click="addNote()">＋写笔记</el-button></div>
+          <div v-if="notes.length" class="note-list">
+            <div v-for="n in notes" :key="n.id" class="note-item">
+              <div class="note-body">{{ n.content }}</div>
+              <el-button size="small" text type="danger" @click="removeFav(n.id)">删除</el-button>
+            </div>
+          </div>
+          <el-empty v-else description="写下你的学习笔记、好句摘抄" :image-size="60" />
+        </div>
+        <div class="rw-col">
+          <div class="card-title">错题本（可重练）</div>
+          <div v-if="mistakes.length" class="note-list">
+            <div v-for="m in mistakes" :key="m.id" class="note-item">
+              <div class="note-body">{{ m.reason || '错题' }} <span class="muted">（{{ typeLabel(m.type) }}）</span></div>
+              <el-button size="small" text type="primary" @click="removeFav(m.id, true)">移除</el-button>
+            </div>
+          </div>
+          <el-empty v-else description="做错的题会自动归集到这里" :image-size="60" />
+        </div>
+        <div class="rw-col">
+          <div class="card-title">生词本</div>
+          <div v-if="wordBook.length" class="note-list">
+            <div v-for="w in wordBook" :key="w.id" class="note-item">
+              <div class="note-body">{{ w.content }}</div>
+              <el-button size="small" text type="danger" @click="removeFav(w.id)">删除</el-button>
+            </div>
+          </div>
+          <el-empty v-else description="单词本里「加入生词本」的词会在这里" :image-size="60" />
+        </div>
+      </div>
+    </section>
+
+    <!-- PDF 预览 -->
+    <el-dialog v-model="previewVisible" :title="previewTitle" width="90%" top="5vh" class="pdf-dialog">
+      <iframe :src="previewUrl" class="pdf-frame" />
+    </el-dialog>
+
+    <!-- 设置 -->
+    <el-dialog v-model="settingsVisible" title="备考设置" width="420px">
+      <el-form label-width="92px">
+        <el-form-item label="目标院校">
+          <el-input v-model="settings.targetSchool" placeholder="如 商丘师范学院继续教育学院" />
+        </el-form-item>
+        <el-form-item label="考试日期">
+          <el-date-picker v-model="settings.examDate" type="date" value-format="YYYY-MM-DD" placeholder="选择考试日" style="width: 100%" />
+        </el-form-item>
+        <el-form-item label="每日新词">
+          <el-input-number v-model="settings.newPerDay" :min="1" :max="50" />
+        </el-form-item>
+        <el-form-item label="连续天数">
+          <el-input-number v-model="manualStreakInput" :min="0" :max="999" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="settingsVisible = false">取消</el-button>
+        <el-button type="primary" @click="saveSettings">保存</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 写笔记 -->
+    <el-dialog v-model="noteVisible" title="学习笔记" width="460px">
+      <el-input v-model="noteTitleInput" placeholder="标题（可选）" style="margin-bottom: 10px" />
+      <el-input v-model="noteInput" type="textarea" :rows="5" placeholder="写下你的笔记、好句、心得……" />
+      <template #footer>
+        <el-button @click="noteVisible = false">取消</el-button>
+        <el-button type="primary" @click="saveNote">保存</el-button>
+      </template>
+    </el-dialog>
+  </div>
 </template>
 
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref } from 'vue'
-import { initDegreePrep } from '../prep/degreePrep'
+import { ref, computed, onMounted } from 'vue'
+import { Reading, Setting, VideoPlay, Picture } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
+import PageHeader from '../components/PageHeader.vue'
+import {
+  EXAM_SECTIONS,
+  VOCAB_REQUIREMENT,
+  GRAMMAR_ITEMS,
+  MATERIALS,
+  MOCK_PAPERS,
+  type MaterialMeta
+} from '../prep/degreeExamStructure'
+import { degreeWords } from '../prep/degreeWords'
+import { degreeQuestions } from '../prep/degreeQuestions'
+import type { DegreeSettings, WordProgress, MistakeRec, FavoriteRec, QuestionType, DegreeQuestion } from '../prep/degreeTypes'
+import * as svc from '../prep/degreeService'
 
-const root = ref<HTMLElement | null>(null)
-let cleanup: (() => void) | null = null
+const base = import.meta.env.BASE_URL
 
-onMounted(async () => {
-  if (!root.value) return
-  try {
-    cleanup = await initDegreePrep(root.value)
-  } catch (e: any) {
-    if (root.value) root.value.innerHTML = `<div class="prep-state prep-error">加载失败：${e?.message || e}</div>`
+const tabs = [
+  { key: 'overview', label: '概览' },
+  { key: 'words', label: '单词本' },
+  { key: 'training', label: '题型训练' },
+  { key: 'mock', label: '模拟考试' },
+  { key: 'library', label: '资料库' },
+  { key: 'rw', label: '读写中心' }
+]
+const activeTab = ref('overview')
+
+const settings = ref<DegreeSettings>({ targetSchool: '商丘师范学院继续教育学院', examDate: null, newPerDay: 15, manualStreak: null })
+const manualStreakInput = ref(0)
+const wordProgress = ref<Record<string, WordProgress>>({})
+const mistakes = ref<MistakeRec[]>([])
+const notes = ref<FavoriteRec[]>([])
+const wordBook = ref<FavoriteRec[]>([])
+
+const wordQuery = ref('')
+const filteredWords = computed(() => {
+  const q = wordQuery.value.trim().toLowerCase()
+  if (!q) return degreeWords.slice(0, 200)
+  return degreeWords.filter((w) => w.word.toLowerCase().includes(q) || w.definition.toLowerCase().includes(q)).slice(0, 200)
+})
+
+const graduatedCount = computed(() => Object.values(wordProgress.value).filter((p) => p.status === 'graduated').length)
+const reviewCount = computed(() => Object.values(wordProgress.value).filter((p) => p.status === 'learning' || p.weak).length)
+const masteryPercent = computed(() => {
+  const total = degreeWords.length || VOCAB_REQUIREMENT.receptive
+  return Math.round((graduatedCount.value / total) * 100)
+})
+const ringLen = computed(() => (masteryPercent.value / 100) * 314)
+const streakDays = computed(() => settings.value.manualStreak ?? 0)
+const daysToExam = computed(() => {
+  if (!settings.value.examDate) return null
+  const d = new Date(settings.value.examDate).getTime() - Date.now()
+  return Math.max(0, Math.ceil(d / 86400000))
+})
+
+const trainingType = ref<QuestionType>('vocab_grammar')
+const trainingTypeLabel = computed(() => EXAM_SECTIONS.find((s) => s.key === trainingType.value)?.name || '')
+const questionsOfType = computed(() => degreeQuestions.filter((q) => q.type === trainingType.value))
+const currentQ = ref<DegreeQuestion | null>(null)
+const showAnswer = ref(false)
+const myAnswer = ref('')
+
+const previewVisible = ref(false)
+const previewUrl = ref('')
+const previewTitle = ref('')
+const settingsVisible = ref(false)
+const noteVisible = ref(false)
+const noteInput = ref('')
+const noteTitleInput = ref('')
+
+function typeLabel(t?: QuestionType | null) {
+  return EXAM_SECTIONS.find((s) => s.key === t)?.name || '通用'
+}
+
+async function loadAll() {
+  settings.value = await svc.loadDegreeSettings()
+  manualStreakInput.value = settings.value.manualStreak ?? 0
+  wordProgress.value = await svc.loadWordProgress()
+  mistakes.value = await svc.loadMistakes()
+  notes.value = await svc.loadFavorites('note')
+  wordBook.value = await svc.loadFavorites('word')
+}
+
+function startStudy() {
+  activeTab.value = 'words'
+}
+
+function goTraining(key: QuestionType) {
+  trainingType.value = key
+  activeTab.value = 'training'
+  pickQuestion()
+}
+
+function pickQuestion() {
+  const list = questionsOfType.value
+  if (list.length) {
+    currentQ.value = list[Math.floor(Math.random() * list.length)] ?? null
+    showAnswer.value = false
+    myAnswer.value = ''
+  } else {
+    currentQ.value = null
   }
-})
+}
+function revealAnswer() {
+  showAnswer.value = true
+  if (currentQ.value && myAnswer.value && myAnswer.value !== currentQ.value.answer) {
+    svc.addMistake({ questionId: currentQ.value.id, type: currentQ.value.type, userAnswer: myAnswer.value, reason: `你的答案：${myAnswer.value}`, due: null })
+  }
+}
+function isRight(o: string) {
+  return currentQ.value?.answer === o
+}
+function nextQuestion() {
+  pickQuestion()
+}
+async function markMistake(q: DegreeQuestion) {
+  await svc.addMistake({ questionId: q.id, type: q.type, userAnswer: myAnswer.value || null, reason: q.explanation, due: null })
+  mistakes.value = await svc.loadMistakes()
+  ElMessage.success('已收入错题本')
+}
 
-onUnmounted(() => {
-  if (cleanup) cleanup()
-})
+async function cycleWord(word: string) {
+  const cur = wordProgress.value[word]?.status || 'new'
+  const next = cur === 'new' ? 'learning' : cur === 'learning' ? 'graduated' : 'new'
+  const p: WordProgress = { status: next, level: 0, due: null, weak: false }
+  wordProgress.value = { ...wordProgress.value, [word]: p }
+  await svc.saveWordProgress(word, p)
+}
+async function addWordBook(w: { word: string; definition: string }) {
+  await svc.addFavorite('word', `${w.word} ${w.definition}`)
+  wordBook.value = await svc.loadFavorites('word')
+  ElMessage.success('已加入生词本')
+}
+
+function openPreview(m: MaterialMeta) {
+  previewUrl.value = base + m.file
+  previewTitle.value = m.title
+  previewVisible.value = true
+}
+function startMock(p: { id: string; title: string }) {
+  ElMessage.info(`「${p.title}」原题题库生成后即可在线计时模考`)
+}
+
+async function saveSettings() {
+  settings.value.manualStreak = manualStreakInput.value
+  await svc.saveDegreeSettings(settings.value)
+  settingsVisible.value = false
+  ElMessage.success('已保存')
+}
+
+function addNote(prefix = '') {
+  noteTitleInput.value = prefix
+  noteInput.value = ''
+  noteVisible.value = true
+}
+function addMaterialNote(title: string) {
+  noteTitleInput.value = title
+  noteInput.value = ''
+  noteVisible.value = true
+}
+async function saveNote() {
+  if (!noteInput.value.trim()) {
+    ElMessage.warning('笔记内容不能为空')
+    return
+  }
+  await svc.addFavorite('note', noteInput.value, null, noteTitleInput.value || null)
+  notes.value = await svc.loadFavorites('note')
+  noteVisible.value = false
+  ElMessage.success('笔记已保存')
+}
+
+async function removeFav(id: string, isMistake = false) {
+  await svc.removeFavorite(id)
+  if (isMistake) mistakes.value = await svc.loadMistakes()
+  else {
+    notes.value = await svc.loadFavorites('note')
+    wordBook.value = await svc.loadFavorites('word')
+  }
+}
+
+onMounted(loadAll)
 </script>
 
 <style scoped>
-.degree-eng-root {
-  --orange: #f0922b;
-  --orange-2: #ffb877;
-  --orange-soft: #fdeada;
-  --green: #2e9e5b;
-  --red: #e0492f;
-  --ink: #22304e;
-  --ink-soft: #5b6a86;
-  --surface: #fff;
-  --surface-2: #f6f7fb;
-  --border: #e8ebf2;
-  --border-2: #eef1f6;
-  --radius: 16px;
-  --radius-sm: 12px;
-  --shadow: 0 10px 30px rgba(34, 48, 78, 0.1);
-  --shadow-sm: 0 4px 14px rgba(34, 48, 78, 0.07);
+.degree-view {
   max-width: 1180px;
   margin: 0 auto;
-  padding: 22px 26px 60px;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  color: var(--ink);
+  padding: 4px 4px 40px;
 }
-.degree-eng-root * { box-sizing: border-box; }
-.degree-eng-root button { font-family: inherit; cursor: pointer; }
-.degree-eng-root .de-header { margin-bottom: 16px; }
-.degree-eng-root .de-title { font-size: 23px; font-weight: 800; display: flex; align-items: center; gap: 8px; }
-.degree-eng-root .de-title svg { width: 24px; height: 24px; color: var(--orange); }
-.degree-eng-root .de-exam { color: var(--ink-soft); font-size: 13px; margin-top: 4px; }
-.degree-eng-root .de-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 18px; border-bottom: 1px solid var(--border); padding-bottom: 10px; }
-.degree-eng-root .de-tab {
-  display: inline-flex; align-items: center; gap: 7px; padding: 9px 15px; border-radius: 11px;
-  border: 1px solid var(--border); background: var(--surface); color: var(--ink-soft); font-weight: 700; font-size: 14px;
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 14px;
 }
-.degree-eng-root .de-tab svg { width: 17px; height: 17px; }
-.degree-eng-root .de-tab.active { background: linear-gradient(135deg, var(--orange), var(--orange-2)); color: #fff; border-color: transparent; }
-.degree-eng-root .page-head { margin-bottom: 14px; }
-.degree-eng-root .page-title { font-size: 20px; font-weight: 800; margin: 0 0 4px; }
-.degree-eng-root .page-sub { color: var(--ink-soft); font-size: 13.5px; margin: 0; }
-.degree-eng-root .handle { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; background: linear-gradient(135deg, #fff4e6, #fdead2); border: 1px solid var(--orange-soft); border-radius: var(--radius); padding: 14px 16px; margin-bottom: 8px; }
-.degree-eng-root .h-item { display: flex; align-items: center; gap: 7px; background: var(--surface); border: 1px solid var(--border); border-radius: 999px; padding: 7px 14px; font-size: 13.5px; font-weight: 600; }
-.degree-eng-root .h-item svg { width: 16px; height: 16px; color: var(--orange); }
-.degree-eng-root .btn { display: inline-flex; align-items: center; gap: 7px; padding: 9px 16px; border-radius: 11px; font-weight: 700; font-size: 14px; background: var(--surface-2); color: var(--ink); border: 1px solid var(--border); transition: 0.15s; }
-.degree-eng-root .btn:hover { background: var(--surface); }
-.degree-eng-root .btn svg { width: 17px; height: 17px; }
-.degree-eng-root .btn-primary { background: linear-gradient(135deg, var(--orange), var(--orange-2)); color: #fff; border: none; box-shadow: var(--shadow-sm); }
-.degree-eng-root .btn-primary:hover { filter: brightness(1.04); }
-.degree-eng-root .btn-ghost { background: transparent; }
-.degree-eng-root .btn-sm { padding: 6px 11px; font-size: 13px; border-radius: 9px; }
-.degree-eng-root .btn-block { width: 100%; justify-content: center; }
-.degree-eng-root .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px; box-shadow: var(--shadow-sm); margin-top: 16px; }
-.degree-eng-root .sec-title { font-size: 15.5px; font-weight: 800; margin: 0 0 12px; display: flex; align-items: center; gap: 8px; }
-.degree-eng-root .sec-title svg { width: 18px; height: 18px; color: var(--orange); }
-.degree-eng-root .muted { color: var(--ink-soft); font-size: 13px; }
-.degree-eng-root .note { font-size: 12.5px; color: #b9791f; background: #fcf3e2; border: 1px solid #f6e4c0; border-radius: 10px; padding: 9px 12px; margin-top: 12px; display: flex; gap: 7px; align-items: flex-start; }
-.degree-eng-root .note svg { width: 16px; height: 16px; flex: 0 0 16px; margin-top: 1px; }
-.degree-eng-root .stat { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 14px 16px; }
-.degree-eng-root .stat .label { font-size: 12.5px; color: var(--ink-soft); margin-bottom: 6px; }
-.degree-eng-root .stat .num { font-size: 26px; font-weight: 800; color: var(--ink); line-height: 1.1; }
-.degree-eng-root .stat .num small { font-size: 14px; font-weight: 600; color: var(--ink-soft); }
-.degree-eng-root .stat.accent .num { color: var(--orange); }
-.degree-eng-root .stat.green .num { color: var(--green); }
-.degree-eng-root .stat.red .num { color: var(--red); }
-.degree-eng-root .input { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); outline: none; font-size: 14px; }
-.degree-eng-root .input:focus { border-color: var(--orange); box-shadow: 0 0 0 3px var(--orange-soft); }
-.degree-eng-root .row { display: flex; gap: 10px; flex-wrap: wrap; }
-.degree-eng-root .wl-group { margin-bottom: 14px; }
-.degree-eng-root .wl-letter { font-weight: 800; font-size: 15px; color: var(--orange); margin: 6px 0; border-bottom: 2px solid var(--orange-soft); display: inline-block; padding: 0 8px; }
-.degree-eng-root .wl-item { display: flex; align-items: center; gap: 12px; padding: 11px 14px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); margin-bottom: 8px; }
-.degree-eng-root .wl-main { flex: 1; min-width: 0; }
-.degree-eng-root .wl-word { font-weight: 700; font-size: 15px; }
-.degree-eng-root .wl-ph { color: var(--ink-soft); font-size: 13px; font-weight: 400; margin-left: 8px; }
-.degree-eng-root .wl-def { font-size: 13px; color: var(--ink-soft); margin-top: 2px; }
-.degree-eng-root .wl-tag { flex: 0 0 auto; }
-.degree-eng-root .tag { display: inline-block; font-size: 11.5px; font-weight: 700; padding: 2px 9px; border-radius: 999px; background: var(--orange-soft); color: var(--orange); }
-.degree-eng-root .tag.green { background: #e2f5ea; color: var(--green); }
-.degree-eng-root .tag.red { background: #fbe3dd; color: var(--red); }
-.degree-eng-root .tag.ink { background: #e7ecf5; color: var(--ink); }
-.degree-eng-root .empty { text-align: center; color: var(--ink-soft); padding: 30px 10px; font-size: 14px; }
-/* 对话/语法练习 */
-.degree-eng-root .dlg-badge { display:inline-block; font-size:12px; font-weight:700; color:#fff; background:linear-gradient(135deg,var(--orange),var(--orange-2)); padding:3px 10px; border-radius:999px; margin-bottom:12px; }
-.degree-eng-root .dlg-context { background:var(--surface-2); border:1px solid var(--border); border-radius:12px; padding:16px 18px; margin-bottom:14px; line-height:1.9; }
-.degree-eng-root .dlg-line { padding:4px 0; }
-.degree-eng-root .dlg-blank { font-weight:700; }
-.degree-eng-root .blank-mark { display:inline-block; min-width:60px; border-bottom:2px solid var(--orange); color:var(--orange); text-align:center; margin:0 3px; }
-.degree-eng-root .dlg-opts { display:flex; flex-direction:column; gap:8px; margin-bottom:14px; }
-.degree-eng-root .dlg-opt { display:flex; align-items:center; gap:10px; padding:12px 14px; border:1.5px solid var(--border); border-radius:11px; background:var(--surface); cursor:pointer; transition:0.15s; text-align:left; font-size:14px; }
-.degree-eng-root .dlg-opt:hover { border-color:var(--orange); background:var(--orange-soft); }
-.degree-eng-root .dlg-opt.correct { border-color:var(--green); background:#e8f8ed; pointer-events:none; }
-.degree-eng-root .dlg-opt.wrong { border-color:var(--red); background:#fef0ec; pointer-events:none; }
-.degree-eng-root .dlg-opt.show-correct { border-color:var(--green); box-shadow:0 0 0 2px rgba(46,158,91,0.25); }
-.degree-eng-root .dlg-opt-label { flex:0 0 28px; width:28px; height:28px; border-radius:50%; background:var(--surface-2); border:1.5px solid var(--border); display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:800; }
-.degree-eng-root .dlg-opt-text { flex:1; }
-.degree-eng-root .dlg-exp { font-size:13px; line-height:1.6; color:var(--ink); background:#fffbeb; border:1px solid #f6e4c0; border-radius:10px; padding:10px 14px; margin-top:10px; display:flex; gap:7px; align-items:flex-start; }
-.degree-eng-root .dlg-exp svg { flex:0 0 16px; margin-top:2px; color:var(--orange); }
-.degree-eng-root .gram-q { font-size:16px; font-weight:600; padding:14px 0; line-height:1.7; }
-.degree-eng-root .ph-list { margin: 10px 0; padding-left: 18px; color: var(--ink-soft); font-size: 13.5px; line-height: 1.8; }
-.degree-eng-root .prep-state { text-align: center; color: var(--ink-soft); padding: 40px 10px; font-size: 14px; }
-.degree-eng-root .prep-error { color: var(--red); }
-/* 阅读理解 / 翻译写作 */
-.degree-eng-root .rd-passage { background: var(--surface-2); border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px; margin: 12px 0; line-height: 1.9; font-size: 14px; color: var(--ink); max-height: 340px; overflow-y: auto; -webkit-overflow-scrolling: touch; }
-.degree-eng-root .rd-passage p { margin: 0 0 12px; }
-.degree-eng-root .rd-passage p:last-child { margin-bottom: 0; }
-.degree-eng-root .rd-qmeta { font-size: 12.5px; font-weight: 700; color: var(--orange); margin: 6px 0 10px; }
-.degree-eng-root .tr-en { background: linear-gradient(135deg, #fff4e6, #fdead2); border: 1px solid var(--orange-soft); border-radius: 12px; padding: 18px 20px; font-size: 18px; line-height: 1.7; font-weight: 600; color: var(--ink); }
-.degree-eng-root .tr-ref { background: #fffbeb; border: 1px solid #f6e4c0; border-radius: 10px; padding: 12px 14px; margin-top: 6px; font-size: 13.5px; line-height: 1.7; }
-.degree-eng-root .tr-zh { margin-bottom: 8px; }
-.degree-eng-root .tr-tips { color: var(--ink-soft); }
-.degree-eng-root .wr-sec { margin-top: 14px; }
-.degree-eng-root .wr-sec > b { font-size: 13.5px; color: var(--orange); }
-.degree-eng-root .wr-sample { background: #0f172a; color: #e2e8f0; border-radius: 10px; padding: 14px 16px; font-size: 13px; line-height: 1.6; white-space: pre-wrap; word-break: break-word; overflow-x: auto; margin: 8px 0; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
-/* 专注背词遮罩 */
-.degree-eng-root .focus { position: fixed; inset: 0; background: linear-gradient(160deg, #fff8ef, #fdebd6); z-index: 50; display: none; flex-direction: column; align-items: center; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 24px; }
-.degree-eng-root .focus.show { display: flex; }
-.degree-eng-root .focus-top { position: absolute; top: 18px; left: 0; right: 0; display: flex; justify-content: space-between; align-items: center; padding: 0 22px; }
-.degree-eng-root .focus-progress { font-weight: 800; font-size: 16px; color: var(--ink); }
-.degree-eng-root .focus-card { width: min(560px, 92vw); margin: auto; background: var(--surface); border-radius: 24px; box-shadow: var(--shadow); padding: 34px 30px; text-align: center; position: relative; min-height: 300px; display: flex; flex-direction: column; justify-content: center; }
-.degree-eng-root .fc-word { font-size: 44px; font-weight: 900; color: var(--ink); letter-spacing: 0.5px; }
-.degree-eng-root .fc-ph { font-size: 21px; color: var(--ink-soft); margin-top: 8px; }
-.degree-eng-root .fc-speak { margin-top: 14px; display: inline-flex; align-items: center; gap: 7px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 999px; padding: 8px 15px; font-weight: 700; font-size: 13.5px; color: var(--ink); }
-.degree-eng-root .fc-speak svg { width: 17px; height: 17px; color: var(--orange); }
-.degree-eng-root .fc-divider { height: 1px; background: var(--border-2); margin: 22px 0; }
-.degree-eng-root .fc-pos { display: inline-block; font-size: 13px; font-weight: 700; color: var(--orange); background: var(--orange-soft); border-radius: 6px; padding: 2px 8px; margin-bottom: 10px; }
-.degree-eng-root .fc-back { font-size: 19px; color: var(--ink); font-weight: 700; line-height: 1.5; }
-.degree-eng-root .fc-actions { display: flex; gap: 14px; margin-top: 30px; }
-.degree-eng-root .fc-btn { flex: 1; padding: 16px; border-radius: 16px; font-weight: 800; font-size: 17px; display: flex; align-items: center; justify-content: center; gap: 8px; border: none; }
-.degree-eng-root .fc-btn svg { width: 20px; height: 20px; }
-.degree-eng-root .fc-known { background: var(--green); color: #fff; }
-.degree-eng-root .fc-unknown { background: #fff0ec; color: var(--red); border: 1.5px solid #f3c4b8; }
-.degree-eng-root .fc-kind { position: absolute; top: 14px; left: 16px; font-size: 12px; font-weight: 700; color: var(--ink-soft); }
-.degree-eng-root .fc-kind.review { color: var(--orange); }
-.degree-eng-root .focus-done { text-align: center; }
-.degree-eng-root .focus-done h2 { font-size: 28px; margin: 0 0 8px; color: var(--green); }
-.degree-eng-root .focus-done p { color: var(--ink-soft); margin: 0 0 20px; }
-@media (max-width: 768px) {
-  .degree-eng-root { padding: 16px 14px 92px; }
-  .degree-eng-root .g4 { grid-template-columns: repeat(2, 1fr) !important; }
-  .degree-eng-root .fc-word { font-size: 36px; }
-  .degree-eng-root .fc-actions { flex-direction: column; gap: 10px; }
-  .degree-eng-root .focus { padding: 60px 14px calc(16px + env(safe-area-inset-bottom)); }
-  .degree-eng-root .focus-card { min-height: 0; padding: 22px 16px; }
-  .degree-eng-root .fc-btn { padding: 14px; font-size: 16px; }
-  .degree-eng-root .tr-en { font-size: 16px; padding: 14px 16px; }
+.stat-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px 16px;
+  box-shadow: var(--shadow-card);
+}
+.stat-label {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+.stat-num {
+  font-size: 26px;
+  font-weight: 600;
+  margin-top: 4px;
+  line-height: 1.1;
+}
+.unit {
+  font-size: 13px;
+  font-weight: 400;
+  margin-left: 2px;
+}
+.tab-bar {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+.tab-pill {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-muted);
+  border-radius: 20px;
+  padding: 7px 16px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.tab-pill.active {
+  background: #534ab7;
+  color: #fff;
+  border-color: #534ab7;
+  font-weight: 600;
+}
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 18px;
+  box-shadow: var(--shadow-card);
+}
+.card-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-strong);
+}
+.overview-top {
+  display: flex;
+  gap: 16px;
+  align-items: stretch;
+  flex-wrap: wrap;
+}
+.plan-card {
+  flex: 1 1 320px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+  background: linear-gradient(180deg, #f6f5ff, #fff);
+}
+.plan-list {
+  list-style: none;
+  padding: 0;
+  margin: 10px 0 14px;
+  font-size: 14px;
+  color: var(--text-strong);
+  line-height: 2;
+}
+.ring-card {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 18px;
+}
+.ring-cap {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-top: 6px;
+}
+.type-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+}
+.type-card {
+  border: 1px solid var(--border);
+  border-top: 3px solid #534ab7;
+  border-radius: 10px;
+  padding: 12px;
+  cursor: pointer;
+  background: #fff;
+  transition: transform 0.12s;
+}
+.type-card:hover {
+  transform: translateY(-2px);
+}
+.type-name {
+  font-size: 14px;
+  font-weight: 600;
+}
+.type-meta {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin: 6px 0;
+}
+.type-desc {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+.req-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.req-card {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px;
+}
+.req-h {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: #534ab7;
+}
+.req-row {
+  font-size: 13px;
+  color: var(--text-strong);
+  line-height: 1.9;
+}
+.grammar-item {
+  font-size: 13px;
+  color: var(--text-strong);
+  line-height: 1.9;
+}
+.star {
+  color: #993c1d;
+  font-weight: 700;
+}
+.toolbar {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+.word-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 10px;
+}
+.word-item {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px;
+}
+.word-item.weak {
+  border-color: #f09595;
+  background: #fdf3f3;
+}
+.word-main {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.word-text {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-strong);
+}
+.word-phon {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.word-pos {
+  font-size: 12px;
+  color: #185fa5;
+}
+.word-def {
+  font-size: 13px;
+  color: var(--text-strong);
+  margin: 6px 0 10px;
+  line-height: 1.6;
+}
+.word-ops {
+  display: flex;
+  gap: 8px;
+}
+.quiz-card {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 18px;
+}
+.quiz-stem {
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.7;
+}
+.quiz-passage {
+  font-size: 13px;
+  color: var(--text-muted);
+  background: #f7f7fb;
+  border-radius: 8px;
+  padding: 10px;
+  margin: 10px 0;
+  line-height: 1.7;
+}
+.quiz-options {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0;
+}
+.opt {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  cursor: pointer;
+  font-size: 14px;
+}
+.opt.right {
+  border-color: #0f6e56;
+  background: #eaf3de;
+}
+.opt.wrong {
+  border-color: #a32d2d;
+  background: #fcebeb;
+}
+.quiz-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 8px;
+}
+.quiz-explain {
+  margin-top: 14px;
+  border-top: 1px dashed var(--border);
+  padding-top: 12px;
+}
+.ex-h {
+  font-size: 14px;
+}
+.ex-b {
+  font-size: 13px;
+  color: var(--text-strong);
+  line-height: 1.7;
+  margin-top: 6px;
+}
+.ex-src {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 6px;
+}
+.paper-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
+}
+.paper-card {
+  border: 1px solid var(--border);
+  border-top: 3px solid #534ab7;
+  border-radius: 10px;
+  padding: 14px;
+  text-align: center;
+}
+.paper-no {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+.paper-title {
+  font-size: 15px;
+  font-weight: 600;
+  margin: 4px 0;
+}
+.paper-note {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.paper-meta {
+  font-size: 12px;
+  color: #185fa5;
+  margin: 8px 0 10px;
+}
+.material-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
+}
+.material-card {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+}
+.material-title {
+  font-size: 15px;
+  font-weight: 600;
+}
+.material-meta {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin: 8px 0 12px;
+  line-height: 1.6;
+}
+.material-ops {
+  display: flex;
+  gap: 8px;
+}
+.rw-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+.rw-col {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px;
+}
+.note-list {
+  margin-top: 10px;
+  display: grid;
+  gap: 8px;
+}
+.note-item {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px;
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: flex-start;
+}
+.note-body {
+  font-size: 13px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+.muted {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.pdf-frame {
+  width: 100%;
+  height: 82vh;
+  border: none;
+  border-radius: 8px;
+}
+@media (max-width: 900px) {
+  .type-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .req-grid,
+  .rw-grid {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 560px) {
+  .stat-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .type-grid {
+    grid-template-columns: 1fr;
+  }
+  .panel {
+    padding: 14px;
+  }
 }
 </style>
