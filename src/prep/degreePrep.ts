@@ -1,10 +1,7 @@
 // 学位英语备考台 · 核心逻辑（挂载到 DegreeEnglishView 的 root 元素）
 // 数据全部存 localStorage（自包含，无需后端表，部署即用）。
 // 词库来源：内置示例词包 + 用户上传《大纲/模拟卷/复习指南》PDF → 浏览器端 Tesseract OCR 抽取。
-import * as pdfjsLib from 'pdfjs-dist'
-import PdfWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
-pdfjsLib.GlobalWorkerOptions.workerSrc = PdfWorker
-// tesseract.js 改为动态按需导入（避免模块顶层初始化崩溃：v7 在某些环境下访问 null.TesseractBefore）
+// pdfjs-dist + tesseract.js 均改为动态按需导入（避免模块顶层初始化崩溃：InsertBefore / TesseractBefore）
 // 仅在用户点"上传 PDF"时才加载
 import { type DegreeWord, DEGREE_WORDS_BUNDLE } from './degreeWordsBundle'
 import { DIALOGUE_QUESTIONS, type DialogueQuestion } from './dialogueData'
@@ -925,6 +922,10 @@ async function handlePdf(e: Event) {
   if (msg) msg.textContent = '正在解析 PDF（逐页 OCR，请稍候，大文件可能需数分钟）…'
   try {
     const buf = await f.arrayBuffer()
+    // 动态导入 pdfjs-dist（避免模块顶层初始化崩溃）
+    const pdfjsLib = await import('pdfjs-dist')
+    const PdfWorker = await import('pdfjs-dist/build/pdf.worker.min.mjs?url')
+    pdfjsLib.GlobalWorkerOptions.workerSrc = PdfWorker.default
     const doc = await pdfjsLib.getDocument({ data: buf }).promise
     let text = ''
     for (let i = 1; i <= doc.numPages; i++) {

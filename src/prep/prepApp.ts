@@ -11,10 +11,9 @@ import {
   type PrepState,
   newId
 } from '../services/cetPrepService'
+// pdfjs-dist 改为动态按需导入（避免模块顶层初始化崩溃：InsertBefore）
+// 仅在用户点"上传 PDF 词表"时才加载
 import { MASTER_WORDS_BUNDLE } from './masterWordsBundle'
-import * as pdfjsLib from 'pdfjs-dist'
-import PdfWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
-pdfjsLib.GlobalWorkerOptions.workerSrc = PdfWorker
 
 export interface PrepStorage {
   fetchMasterWords(): Promise<PrepWord[]>
@@ -987,6 +986,10 @@ async function handlePdfFile(e: Event) {
 
 // 逐页提取文本，并按 transform 的 y 坐标分组还原真实行布局（PDF 表格线丢失，但文字顺序基本保留）
 async function extractPdfText(buf: ArrayBuffer): Promise<string> {
+  // 动态导入 pdfjs-dist（避免模块顶层初始化崩溃）
+  const pdfjsLib = await import('pdfjs-dist')
+  const PdfWorker = await import('pdfjs-dist/build/pdf.worker.min.mjs?url')
+  pdfjsLib.GlobalWorkerOptions.workerSrc = PdfWorker.default
   const doc = await pdfjsLib.getDocument({ data: buf }).promise
   const pages: string[] = []
   for (let i = 1; i <= doc.numPages; i++) {
