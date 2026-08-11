@@ -235,86 +235,7 @@
     </el-drawer>
   </div>
 
-  <!-- 未登录：保留原全局侧边栏 + 移动端抽屉（公开页 / LandingView 等） -->
-  <div v-else class="app-shell">
-    <header class="mobile-topbar">
-      <el-button text class="menu-btn" @click="drawerVisible = true">
-        <span class="menu-icon">☰</span>
-      </el-button>
-      <div class="brand">智习</div>
-      <div class="topbar-user">{{ currentUser?.nickname || '' }}</div>
-    </header>
-
-    <el-drawer v-model="drawerVisible" direction="ltr" size="230px" :with-header="false">
-      <div class="drawer-brand">智习</div>
-      <nav class="side-menu">
-        <button
-          v-for="item in menuItems"
-          :key="item.path"
-          class="menu-item"
-          :class="{ active: isActive(item.path) }"
-          @click="navigate(item.path)"
-        >
-          <span class="menu-item-icon">{{ item.icon }}</span>
-          <span>{{ item.label }}</span>
-        </button>
-      </nav>
-      <div class="drawer-footer">
-        <el-button v-if="currentUser" type="danger" plain class="full" @click="handleLogout">退出登录</el-button>
-        <el-button v-else type="primary" plain class="full" @click="navigate('/login')">登录 / 注册</el-button>
-      </div>
-    </el-drawer>
-
-    <div class="layout">
-      <aside class="sidebar">
-        <div class="sidebar-brand">智习</div>
-        <nav class="side-menu">
-          <button
-            v-for="item in menuItems"
-            :key="item.path"
-            class="menu-item"
-            :class="{ active: isActive(item.path) }"
-            @click="navigate(item.path)"
-          >
-            <span class="menu-item-icon">{{ item.icon }}</span>
-            <span>{{ item.label }}</span>
-          </button>
-        </nav>
-        <div class="sidebar-footer">
-          <template v-if="currentUser">
-            <div class="user-chip">{{ currentUser.nickname }}</div>
-            <el-button type="danger" plain size="small" class="full" @click="handleLogout">退出登录</el-button>
-          </template>
-          <el-button v-else type="primary" plain size="small" class="full" @click="navigate('/login')">登录 / 注册</el-button>
-        </div>
-      </aside>
-
-      <main class="main-content">
-        <router-view v-slot="{ Component }">
-          <transition name="fade" mode="out-in">
-            <component :is="Component" />
-          </transition>
-        </router-view>
-      </main>
-    </div>
-
-    <!-- 移动端底部导航（未登录访客版） -->
-    <nav class="mobile-bottom-nav" v-if="isMobile && !isCetPrepRoute">
-      <button
-        v-for="b in mobileBottomNavGuest"
-        :key="b.key"
-        class="mbn-item"
-        :class="{ active: b.active }"
-        @click="onBottomNav(b)"
-      >
-        <span class="mbn-icon">
-          <el-icon v-if="b.iconComp"><component :is="b.iconComp" /></el-icon>
-          <span v-else class="mbn-emoji">{{ b.iconText }}</span>
-        </span>
-        <span class="mbn-label">{{ b.label }}</span>
-      </button>
-    </nav>
-  </div>
+  <!-- 未登录访客分支已移除：路由守卫拦截所有未登录非 login 访问，此分支不可达 -->
 </template>
 
 <script setup lang="ts">
@@ -597,24 +518,14 @@ const mobileBottomNav = computed<BottomNavItem[]>(() => {
   items.push({ key: 'more', label: '更多', iconComp: Menu, isMore: true })
   return items
 })
-const mobileBottomNavGuest = computed<BottomNavItem[]>(() => [
-  { key: 'dashboard', label: '工作数据看板', iconText: '📊', to: '/dashboard?view=overview' },
-  { key: 'ai', label: 'AI 助手', iconText: '🤖', to: '/ai' },
-  { key: 'more', label: '更多', iconComp: Menu, isMore: true }
-])
 function onBottomNav(item: BottomNavItem) {
   if (item.isMore) {
-    if (isLoggedIn.value) mobileNavVisible.value = true
-    else drawerVisible.value = true
+    mobileNavVisible.value = true
     return
   }
-  if (isLoggedIn.value) {
-    if (item.to) {
-      mobileNavVisible.value = false
-      router.push(item.to)
-    }
-  } else if (typeof item.to === 'string') {
-    navigate(item.to)
+  if (item.to) {
+    mobileNavVisible.value = false
+    router.push(item.to)
   }
 }
 
@@ -623,26 +534,6 @@ function onBottomNav(item: BottomNavItem) {
 const isCetPrepRoute = computed(() => route.path === '/learn/cet-prep')
 
 // 页面标题由各视图自身渲染（单一标题铁律），顶部 topbar 不再重复展示
-
-/* ===== 未登录：全局侧边栏菜单 ===== */
-const menuItems = computed(() => [
-  { path: '/dashboard?view=overview', label: '工作数据看板', icon: '📊' },
-  { path: '/ai', label: 'AI 助手', icon: '🤖' }
-])
-
-const isActive = (path: string) => {
-  const [base, query] = path.split('?')
-  if (route.path !== base) return false
-  if (!query) return true
-  const want = new URLSearchParams(query).get('view')
-  const cur = Array.isArray(route.query.view) ? route.query.view[0] : route.query.view
-  return want === cur
-}
-
-const navigate = (path: string) => {
-  drawerVisible.value = false
-  router.push(path)
-}
 
 const refreshUser = async () => {
   permissionConfig.value = await loadPermissionConfig()

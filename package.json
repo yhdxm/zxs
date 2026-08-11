@@ -16,10 +16,14 @@
   "dependencies": {
     "@element-plus/icons-vue": "^2.3.2",
     "@supabase/supabase-js": "^2.110.7",
+    "@tesseract.js-data/chi_sim": "^1.0.0",
+    "@tesseract.js-data/eng": "^1.0.0",
     "axios": "^1.18.1",
     "echarts": "^6.1.0",
     "element-plus": "^2.14.3",
     "leaflet": "^1.9.4",
+    "pdfjs-dist": "^6.2.108",
+    "tesseract.js": "^7.0.0",
     "vant": "^4.10.0",
     "vue": "^3.5.38",
     "vue-router": "^4.6.4"

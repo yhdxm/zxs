@@ -3,13 +3,24 @@
 </template>
 
 <script setup lang="ts">
-import * as echarts from 'echarts'
+import type { EChartsOption } from 'echarts'
+import * as echarts from 'echarts/core'
+import { LineChart, BarChart, PieChart, GaugeChart } from 'echarts/charts'
+import { GridComponent, TooltipComponent, LegendComponent, TitleComponent } from 'echarts/components'
+import { CanvasRenderer } from 'echarts/renderers'
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
+
+// 按需注册：项目实际仅用到 line/bar/pie/gauge 四种图表及 grid/tooltip/legend/title 组件，显著减小打包体积
+echarts.use([
+  LineChart, BarChart, PieChart, GaugeChart,
+  GridComponent, TooltipComponent, LegendComponent, TitleComponent,
+  CanvasRenderer
+])
 
 const props = withDefaults(
   defineProps<{
     /** ECharts 配置项 */
-    option: echarts.EChartsOption
+    option: EChartsOption
     /** 容器高度，默认 280px */
     height?: string
   }>(),
@@ -19,7 +30,7 @@ const props = withDefaults(
 )
 
 const chartRef = ref<HTMLDivElement | null>(null)
-let chart: echarts.ECharts | null = null
+let chart: echarts.EChartsType | null = null
 let resizeObserver: ResizeObserver | null = null
 
 function render() {

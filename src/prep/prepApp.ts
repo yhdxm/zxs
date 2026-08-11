@@ -12,6 +12,9 @@ import {
   newId
 } from '../services/cetPrepService'
 import { MASTER_WORDS_BUNDLE } from './masterWordsBundle'
+import * as pdfjsLib from 'pdfjs-dist'
+import PdfWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
+pdfjsLib.GlobalWorkerOptions.workerSrc = PdfWorker
 
 export interface PrepStorage {
   fetchMasterWords(): Promise<PrepWord[]>
@@ -269,6 +272,7 @@ function speak(word: string) {
 
 /* ===================== 图标（内联 SVG，无 emoji） ===================== */
 const ICON = {
+  file: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>',
   home: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/><path d="M9 20v-6h6v6"/></svg>',
   practice:
     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5V6a2 2 0 0 1 2-2h11l3 3v12.5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/><path d="M8 7h7M8 11h9M8 15h6"/></svg>',
@@ -608,10 +612,12 @@ function renderMine() {
   const adminNote = IS_ADMIN
     ? `<div class="card">
       <div class="sec-title">${ICON.book}词库管理（管理员）</div>
-      <p class="muted" style="margin:0 0 12px;">导入完整四级词表（CSV / JSON）。字段：<b>word, phonetic, pos, definition, collocation</b>。导入会按单词去重合并进主词表。</p>
+      <p class="muted" style="margin:0 0 12px;">导入完整四级词表（CSV / JSON，或直接上传 PDF 词表）。字段：<b>word, phonetic, pos, definition, collocation</b>。导入会按单词去重合并进主词表。</p>
       <div class="row">
         <button class="btn btn-primary" data-act="pickWords">${ICON.download}选择词库文件导入</button>
         <input type="file" id="wordFile" accept=".csv,.json,application/json,text/csv" style="display:none;">
+        <button class="btn" data-act="pickPdf">${ICON.file}上传 PDF 词表</button>
+        <input type="file" id="pdfFile" accept="application/pdf,.pdf" style="display:none;">
       </div>
       <div id="seedMsg" class="muted" style="margin-top:10px;"></div>
     </div>`
@@ -784,6 +790,11 @@ function bindView() {
     wf.dataset.bound = '1'
     wf.addEventListener('change', handleWordFile)
   }
+  const pf = document.querySelector('#pdfFile') as HTMLInputElement | null
+  if (pf && !pf.dataset.bound) {
+    pf.dataset.bound = '1'
+    pf.addEventListener('change', handlePdfFile)
+  }
 }
 function onAct(e: Event) {
   const el = e.currentTarget as HTMLElement
@@ -794,6 +805,10 @@ function onAct(e: Event) {
   if (act === 'startFocus') startFocus()
   else if (act === 'goto') setView(v || '')
   else if (act === 'png') downloadPng()
+  else if (act === 'pickPdf') {
+    const pf = document.querySelector('#pdfFile') as HTMLInputElement | null
+    if (pf) pf.click()
+  }
   else if (act === 'pickWords') {
     const wf = document.querySelector('#wordFile') as HTMLInputElement | null
     if (wf) wf.click()
@@ -937,6 +952,92 @@ function handleWordFile(e: Event) {
   reader.readAsText(f)
   ;(e.target as HTMLInputElement).value = ''
 }
+
+/* ===================== PDF 词表导入 ===================== */
+// 上传 PDF 词表 → pdf.js 提取文本 → 启发式抽取单词 → 合并进主词表（复用 seedMasterWords 入库链）
+async function handlePdfFile(e: Event) {
+  const input = e.target as HTMLInputElement
+  const f = input.files?.[0]
+  if (!f) return
+  const msg = document.querySelector('#seedMsg') as HTMLElement | null
+  if (msg) msg.textContent = '正在解析 PDF，请稍候…'
+  try {
+    const buf = await f.arrayBuffer()
+    const text = await extractPdfText(buf)
+    const rows = parsePdfWords(text)
+    if (!rows.length) {
+      if (msg) msg.textContent = '未从 PDF 解析到单词，请确认是「单词 + 音标 + 释义」排版的词表。'
+      return
+    }
+    if (confirm(`已从 PDF 解析到 ${rows.length} 个单词，确认导入主词表？`)) {
+      const n = await storage.seedMasterWords(rows)
+      if (msg) msg.textContent = `成功导入 ${n} 个词条到主词表。`
+      const mw = await storage.fetchMasterWords()
+      MASTER = mw.length ? mw : MASTER_WORDS_BUNDLE
+      render()
+    } else if (msg) {
+      msg.textContent = '已取消导入。'
+    }
+  } catch (err: any) {
+    if (msg) msg.textContent = 'PDF 解析失败：' + (err?.message || err)
+  } finally {
+    input.value = ''
+  }
+}
+
+// 逐页提取文本，并按 transform 的 y 坐标分组还原真实行布局（PDF 表格线丢失，但文字顺序基本保留）
+async function extractPdfText(buf: ArrayBuffer): Promise<string> {
+  const doc = await pdfjsLib.getDocument({ data: buf }).promise
+  const pages: string[] = []
+  for (let i = 1; i <= doc.numPages; i++) {
+    const page = await doc.getPage(i)
+    const tc = await page.getTextContent()
+    const linesMap = new Map<number, { x: number; s: string }[]>()
+    for (const it of tc.items as any[]) {
+      const str: string | undefined = it.str
+      if (!str) continue
+      const y = Math.round(it.transform[5] as number)
+      if (!linesMap.has(y)) linesMap.set(y, [])
+      linesMap.get(y)!.push({ x: it.transform[4] as number, s: str })
+    }
+    const lines = [...linesMap.entries()]
+      .sort((a, b) => b[0] - a[0])
+      .map(([, arr]) => arr.sort((p, q) => p.x - q.x).map((o) => o.s).join(' '))
+    pages.push(lines.join('\n'))
+  }
+  return pages.join('\n')
+}
+
+// 启发式：从每行抽取 word / 音标(/.../ 或 [...]) / 词性(n. v. adj. 等) / 释义，跳过页码与纯中文行
+function parsePdfWords(text: string): PrepWord[] {
+  const out: PrepWord[] = []
+  const seen = new Set<string>()
+  const posRe = /\b(n\.|v\.|vt\.|vi\.|adj\.|adv\.|prep\.|conj\.|pron\.|int\.|art\.|num\.|abbr\.)\b/i
+  const phoRe = /\/([^/]+)\/|\[([^\]]+)\]/
+  for (const raw of text.split(/\r?\n/)) {
+    const line = raw.trim()
+    if (!line) continue
+    if (/^\d+$/.test(line)) continue
+    const m = line.match(/^([A-Za-z][A-Za-z'’\-]*(?:\s+[A-Za-z][A-Za-z'’\-]*){0,3})/)
+    if (!m) continue
+    const word = (m[1] ?? '').trim()
+    if (seen.has(word.toLowerCase())) continue
+    const pm = line.match(phoRe)
+    const phonetic = pm ? (pm[1] ?? pm[2] ?? '').trim() : ''
+    const ppos = line.match(posRe)
+    const pos = ppos ? (ppos[1] ?? '').replace(/\.$/, '').toLowerCase() : ''
+    const def = line
+      .replace(m[1] ?? '', '')
+      .replace(phoRe, '')
+      .replace(posRe, '')
+      .replace(/\s{2,}/g, ' ')
+      .trim()
+    if (!def) continue
+    seen.add(word.toLowerCase())
+    out.push([word, phonetic, pos, def, ''])
+  }
+  return out
+}
 // 解析词库文件：支持 JSON 数组 或 CSV（首行表头 word,phonetic,pos,definition,collocation）
 // RFC4180 感知的 CSV 行解析：正确处理双引号包裹字段内的逗号/换行
 function splitCsvLine(line: string): string[] {
@@ -1065,8 +1166,9 @@ function renderCard(m: PrepWord, flipped: boolean) {
     `
     const kn = document.querySelector('#fcKn')
     const unk = document.querySelector('#fcUnk')
-    if (kn) kn.addEventListener('click', () => reviewWord(current!.w, true))
-    if (unk) unk.addEventListener('click', () => reviewWord(current!.w, false))
+    // 关键：判断认识/不认识后必须调用 afterReview() 前进到下一个卡片（修复卡片卡死）
+    if (kn) kn.addEventListener('click', () => { reviewWord(current!.w, true); afterReview() })
+    if (unk) unk.addEventListener('click', () => { reviewWord(current!.w, false); afterReview() })
   }
 }
 function afterReview() {

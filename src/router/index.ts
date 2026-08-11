@@ -164,6 +164,11 @@ const router = createRouter({
       component: () => import('../views/CetPrepView.vue')
     },
     {
+      path: '/learn/degree-english',
+      name: 'degree-english',
+      component: () => import('../views/DegreeEnglishView.vue')
+    },
+    {
       path: '/third-api',
       name: 'third-api',
       component: () => import('../views/ThirdPartyApiView.vue'),

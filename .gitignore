@@ -47,3 +47,6 @@ __screenshots__/
 
 # Internal workbuddy memory (not for deployment)
 .workbuddy/
+
+# Tesseract OCR 语言包缓存（运行时从 CDN 加载，不入库）
+tessdata/

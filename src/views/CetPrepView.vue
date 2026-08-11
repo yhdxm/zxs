@@ -4,6 +4,13 @@
     <div v-if="missingTable" class="prep-missing-banner">
       备考词库表（cet4_words）尚未创建或网络连接失败，当前使用内置完整四级词库（4544 词）。联网并在 Supabase 中执行 <code>scripts/cet4_prep.sql</code> 后，可自动同步云端进度与词表。
     </div>
+    <div class="degree-entry" @click="goDegree">
+      <div class="de-entry-text">
+        <div class="de-entry-title">学位英语备考台 · 新上线</div>
+        <div class="de-entry-sub">上传你的《大纲/模拟卷/复习指南》PDF，自动 OCR 生成专属词库与背词计划，按考试 5 大题型系统备考。</div>
+      </div>
+      <div class="de-entry-go">进入 →</div>
+    </div>
     <div class="content" id="content"></div>
     <nav class="bottom-nav" id="bottomNav"></nav>
 
@@ -24,6 +31,7 @@
 
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { initPrep, type PrepStorage } from '../prep/prepApp'
 import { MASTER_WORDS_BUNDLE } from '../prep/masterWordsBundle'
 import {
@@ -44,6 +52,7 @@ import {
 } from '../services/cetPrepService'
 
 const root = ref<HTMLElement | null>(null)
+const router = useRouter()
 const loading = ref(true)
 const error = ref('')
 const missingTable = ref(false)
@@ -56,6 +65,10 @@ const emptyState = () => ({
   checkins: {},
   settings: { newPerDay: 10, examDate: null, manualStreak: null, linkedGoal: null }
 })
+
+function goDegree() {
+  router.push('/learn/degree-english')
+}
 
 const storage: PrepStorage = {
   fetchMasterWords,
@@ -285,11 +298,11 @@ onUnmounted(() => {
 .cet-prep-root .spacer { flex: 1; }
 
 /* ===== Focus overlay ===== */
-.cet-prep-root .focus { position: fixed; inset: 0; background: linear-gradient(160deg, #FFF8EF, #FDEBD6); z-index: 50; display: none; flex-direction: column; align-items: center; justify-content: center; padding: 24px; }
+.cet-prep-root .focus { position: fixed; inset: 0; background: linear-gradient(160deg, #FFF8EF, #FDEBD6); z-index: 50; display: none; flex-direction: column; align-items: center; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 24px; }
 .cet-prep-root .focus.show { display: flex; }
 .cet-prep-root .focus-top { position: absolute; top: 18px; left: 0; right: 0; display: flex; justify-content: space-between; align-items: center; padding: 0 22px; }
 .cet-prep-root .focus-progress { font-weight: 800; font-size: 16px; color: var(--ink); }
-.cet-prep-root .focus-card { width: min(560px, 92vw); background: var(--surface); border-radius: 24px; box-shadow: var(--shadow); padding: 34px 30px; text-align: center; position: relative; min-height: 300px; display: flex; flex-direction: column; justify-content: center; }
+.cet-prep-root .focus-card { width: min(560px, 92vw); margin: auto; background: var(--surface); border-radius: 24px; box-shadow: var(--shadow); padding: 34px 30px; text-align: center; position: relative; min-height: 300px; display: flex; flex-direction: column; justify-content: center; }
 .cet-prep-root .fc-word { font-size: 44px; font-weight: 900; color: var(--ink); letter-spacing: 0.5px; }
 .cet-prep-root .fc-ph { font-size: 21px; color: var(--ink-soft); margin-top: 8px; }
 .cet-prep-root .fc-speak { margin-top: 14px; display: inline-flex; align-items: center; gap: 7px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 999px; padding: 8px 15px; font-weight: 700; font-size: 13.5px; color: var(--ink); }
@@ -353,6 +366,28 @@ onUnmounted(() => {
   margin-right: 6px;
   color: var(--orange);
 }
+.cet-prep-root .degree-entry {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  background: linear-gradient(135deg, #2e9e5b, #1f7a45);
+  color: #fff;
+  border-radius: var(--radius);
+  padding: 14px 18px;
+  margin-bottom: 16px;
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  transition: 0.15s;
+}
+.cet-prep-root .degree-entry:hover { filter: brightness(1.05); transform: translateY(-1px); }
+.cet-prep-root .de-entry-title { font-weight: 800; font-size: 15.5px; margin-bottom: 3px; }
+.cet-prep-root .de-entry-sub { font-size: 12.5px; opacity: 0.92; line-height: 1.5; }
+.cet-prep-root .de-entry-go { flex: 0 0 auto; font-weight: 800; font-size: 15px; background: rgba(255, 255, 255, 0.2); padding: 8px 14px; border-radius: 999px; }
+@media (max-width: 768px) {
+  .cet-prep-root .degree-entry { flex-direction: column; align-items: flex-start; }
+  .cet-prep-root .de-entry-go { align-self: flex-end; }
+}
 
 /* ===== Responsive ===== */
 @media (max-width: 768px) {
@@ -382,6 +417,11 @@ onUnmounted(() => {
   .cet-prep-root .page-title { font-size: 20px; }
   .cet-prep-root .fc-word { font-size: 36px; }
   .cet-prep-root .fc-actions { flex-direction: column; }
+  /* 移动端：全屏背词卡片留出顶部退出栏与底部安全区，卡片超高时可整屏滚动，避免「认识/不认识」按钮被裁切遮挡 */
+  .cet-prep-root .focus { padding: 60px 14px calc(16px + env(safe-area-inset-bottom)); }
+  .cet-prep-root .focus-card { min-height: 0; padding: 22px 16px; }
+  .cet-prep-root .fc-actions { gap: 10px; margin-top: 22px; }
+  .cet-prep-root .fc-btn { padding: 14px; font-size: 16px; }
 }
 @media (max-width: 380px) {
   .cet-prep-root .handle { flex-direction: column; align-items: stretch; }
