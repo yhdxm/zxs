@@ -384,7 +384,7 @@ function cloneMenu(items: SideItem[]): SideItem[] {
   return items.map((it) => ({
     ...it,
     children: it.children ? cloneMenu(it.children) : undefined,
-    expanded: it.expanded ?? false
+    expanded: false // 强制默认闭合，不受数据源影响
   }))
 }
 const sideMenu = reactive(cloneMenu(APP_MENU))
