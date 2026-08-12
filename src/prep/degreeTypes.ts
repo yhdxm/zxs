@@ -9,6 +9,14 @@ export type QuestionType =
 
 export type SourceBook = '考试大纲' | '复习指南' | '模拟试卷'
 
+// 资料库可读文章（三本 PDF 正文切分，供「资料库」浏览）
+export interface DegreeArticle {
+  id: string
+  book: string // 来源 PDF 名
+  title: string
+  content: string
+}
+
 export interface QuestionSource {
   book: SourceBook
   page: number // PDF 原书页码（来源标注，便于溯源与查证）
@@ -37,6 +45,7 @@ export interface DegreeWord {
   definition: string // 中文释义
   productive: boolean // 复用式掌握（大纲词表中带 * 号）
   sourcePage?: number // 大纲词汇表所在页
+  sourceBooks?: SourceBook[] // 来源 PDF：词表只出自《考试大纲》；扫描《复习指南》《模拟试卷》正文，词在其中出现则追加标签
 }
 
 // 语句 / 词组数据（来自《考试大纲》附录二~八）

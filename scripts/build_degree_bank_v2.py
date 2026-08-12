@@ -187,12 +187,37 @@ def ts_str(s):
     return (s or "").replace("\\", "\\\\").replace("'", "\\'").replace("\n", "\\n").replace("\r", "")
 
 
-def write_words(words):
-    L = ["// 自动生成，请勿手改。来源：《学位英语水平考试大纲》附录一 词汇表（OCR 重解析 v2，带 * 为复用式掌握）。",
-         "import type { DegreeWord } from './degreeTypes'", "", "export const degreeWords: DegreeWord[] = ["]
+def scan_source_books(words, zhinan, moni):
+    """词表只出自《考试大纲》词汇表；扫描《复习指南》《模拟试卷》正文，词在其中出现则追加来源标签。"""
+    zh_txt = "\n".join(p["t"] for p in zhinan).lower()
+    mo_txt = "\n".join(p["t"] for p in moni).lower()
+    def in_text(w, txt):
+        for pt in re.split(r"[/.]", w):
+            pt = pt.strip()
+            if len(pt) < 2:
+                continue
+            if re.search(r"(?<![a-z])" + re.escape(pt) + r"(?![a-z])", txt):
+                return True
+        return False
+    src = {}
     for w in words:
-        L.append("  { word: '%s', phonetic: '', definition: '%s', productive: %s }," %
-                 (ts_str(w["word"]), ts_str(w["definition"]), "true" if w["productive"] else "false"))
+        books = ["考试大纲"]
+        if in_text(w["word"], zh_txt):
+            books.append("复习指南")
+        if in_text(w["word"], mo_txt):
+            books.append("模拟试卷")
+        src[w["word"]] = books
+    return src
+
+
+def write_words(words, src_map):
+    L = ["// 自动生成，请勿手改。来源：《学位英语水平考试大纲》附录一 词汇表（OCR 重解析 v2，带 * 为复用式掌握）。",
+         "import type { DegreeWord, SourceBook } from './degreeTypes'", "", "export const degreeWords: DegreeWord[] = ["]
+    for w in words:
+        books = src_map.get(w["word"], ["考试大纲"])
+        books_ts = "[" + ", ".join("'%s'" % b for b in books) + "]"
+        L.append("  { word: '%s', phonetic: '', definition: '%s', productive: %s, sourceBooks: %s }," %
+                 (ts_str(w["word"]), ts_str(w["definition"]), "true" if w["productive"] else "false", books_ts))
     L.append("]")
     L.append("")
     open(os.path.join(OUT_TS, "degreeWords.ts"), "w", encoding="utf-8").write("\n".join(L))
@@ -238,6 +263,8 @@ def write_phrases(phrases_tbl, spoken, affixes, irregular):
 
 def main():
     dagang = load("dagang")
+    zhinan = load("zhinan")
+    moni = load("moni")
     # 链式边界：词汇表结束=词组表开始，词组表结束=词缀开始，依次类推
     vocab_start = next_idx(dagang, "复用式掌握的词汇")
     vocab_end = next_idx(dagang, "附录二", vocab_start)
@@ -257,7 +284,11 @@ def main():
     affixes = parse_affixes(dagang, affix_start, affix_end)
     irregular = parse_irregular(dagang, irreg_start, irreg_end)
     print(f"[phrase] 词组表 {len(phrases_tbl)} | 口语 {len(spoken)} (分类 {len(cats)}) | 词缀 {len(affixes)} | 不规则动词 {len(irregular)}")
-    nw = write_words(words)
+    src_map = scan_source_books(words, zhinan, moni)
+    from collections import Counter
+    dist = Counter(tuple(v) for v in src_map.values())
+    print("[source] 来源分布:", dict(dist))
+    nw = write_words(words, src_map)
     np_, ns, na, ni = write_phrases(phrases_tbl, spoken, affixes, irregular)
     print(f"已写出 degreeWords.ts({nw}) 与 degreePhrases.ts(短语{np_}+口语{ns}+词缀{na}+不规则{ni})")
 

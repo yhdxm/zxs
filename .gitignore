@@ -50,3 +50,8 @@ __screenshots__/
 
 # Tesseract OCR 语言包缓存（运行时从 CDN 加载，不入库）
 tessdata/
+
+# Python 缓存
+scripts/__pycache__/
+__pycache__/
+*.pyc

@@ -100,17 +100,29 @@
     <section v-show="activeTab === 'words'" class="panel">
       <div class="toolbar">
         <el-input v-model="wordQuery" placeholder="搜索单词 / 释义" clearable style="max-width: 320px" />
-        <el-tag v-if="degreeWords.length" type="info" effect="plain">共 {{ degreeWords.length }} 词</el-tag>
+        <el-radio-group v-model="wordSrc" size="small">
+          <el-radio-button value="all">全部</el-radio-button>
+          <el-radio-button value="考试大纲">大纲</el-radio-button>
+          <el-radio-button value="复习指南">指南</el-radio-button>
+          <el-radio-button value="模拟试卷">模拟</el-radio-button>
+        </el-radio-group>
+        <el-tag v-if="degreeWords.length" type="info" effect="plain">共 {{ filteredWords.length }} 词</el-tag>
         <el-tag v-else type="warning" effect="plain">OCR 生成中，稍候自动填充</el-tag>
       </div>
-      <div v-if="degreeWords.length" class="word-list">
-        <div v-for="w in filteredWords" :key="w.word" class="word-item" :class="{ weak: wordProgress[w.word]?.weak }">
+      <div v-if="filteredWords.length" class="word-list">
+        <div v-for="w in visibleWords" :key="w.word" class="word-item" :class="{ weak: wordProgress[w.word]?.weak }">
           <div class="word-main">
             <span class="word-text">{{ w.word }}<span v-if="w.productive" class="star">*</span></span>
-            <span class="word-phon" v-if="w.phonetic">{{ w.phonetic }}</span>
-            <span class="word-pos" v-if="w.pos">{{ w.pos }}</span>
+            <button class="speak-btn" :title="'朗读 ' + w.word" @click="speak(w.word)">🔊</button>
+            <button class="speak-btn" :title="'查看例句 ' + w.word" @click="loadExample(w.word)" :disabled="exampleLoading[w.word]">📖</button>
           </div>
           <div class="word-def">{{ w.definition }}</div>
+          <div class="word-example" v-if="examples[w.word]">
+            <span class="ex-label">例句</span> {{ examples[w.word] }}
+          </div>
+          <div class="word-src">
+            <el-tag v-for="b in (w.sourceBooks || [])" :key="b" size="small" :type="srcTagType(b)" effect="plain">{{ b }}</el-tag>
+          </div>
           <div class="word-ops">
             <el-button size="small" @click="cycleWord(w.word)">
               {{ wordProgress[w.word]?.status === 'graduated' ? '已掌握' : wordProgress[w.word]?.status === 'learning' ? '学习中' : '标记学习' }}
@@ -118,6 +130,9 @@
             <el-button size="small" text type="primary" @click="addWordBook(w)">加入生词本</el-button>
           </div>
         </div>
+      </div>
+      <div class="load-more" v-if="filteredWords.length > wordLimit">
+        <el-button @click="wordLimit = filteredWords.length">显示全部 {{ filteredWords.length }} 词</el-button>
       </div>
       <el-empty v-else description="词汇表正在由《考试大纲》OCR 提取，完成后这里会显示全部 4400+ 词，并标注复用式（*）" />
     </section>
@@ -205,7 +220,34 @@
 
     <!-- 资料库 -->
     <section v-show="activeTab === 'library'" class="panel">
-      <div class="card-title" style="margin-bottom: 10px">资料库（三本 PDF 原文件内置，点开即看，不加载）</div>
+      <div class="card-title" style="margin-bottom: 10px">资料库（三本 PDF 内容已全量内置，可在线阅读讲解正文）</div>
+      <div class="lib-layout">
+        <div class="lib-side">
+          <el-radio-group v-model="libBook" size="small" class="lib-filter">
+            <el-radio-button value="all">全部</el-radio-button>
+            <el-radio-button value="考试大纲">大纲</el-radio-button>
+            <el-radio-button value="复习指南">指南</el-radio-button>
+          </el-radio-group>
+          <div class="lib-list">
+            <div v-for="a in libraryArticles" :key="a.id" class="lib-item" :class="{ active: activeArticle?.id === a.id }" @click="openArticle(a)">
+              <span class="lib-book">{{ a.book === '复习指南' ? '指南' : '大纲' }}</span>
+              <span class="lib-title">{{ a.title }}</span>
+            </div>
+          </div>
+        </div>
+        <div class="lib-reader">
+          <template v-if="activeArticle">
+            <div class="reader-head">
+              <span class="reader-book">{{ activeArticle.book }}</span>
+              <h3 class="reader-title">{{ activeArticle.title }}</h3>
+              <el-button size="small" text :icon="Reading" @click="speakText(activeArticle.content)">朗读全文</el-button>
+            </div>
+            <div class="reader-body">{{ activeArticle.content }}</div>
+          </template>
+          <el-empty v-else description="从左侧选择一篇讲解开始阅读" :image-size="70" />
+        </div>
+      </div>
+      <div class="card-title" style="margin: 16px 0 10px">原文件（点开看扫描件）</div>
       <div class="material-grid">
         <div v-for="m in MATERIALS" :key="m.id" class="material-card">
           <div class="material-title">{{ m.title }}</div>
@@ -309,8 +351,29 @@ import {
 import { degreeWords } from '../prep/degreeWords'
 import { degreeQuestions } from '../prep/degreeQuestions'
 import { degreePhrases } from '../prep/degreePhrases'
-import type { DegreeSettings, WordProgress, MistakeRec, FavoriteRec, QuestionType, DegreeQuestion, DegreePhrase, PhraseCategory } from '../prep/degreeTypes'
+import { guideArticles } from '../prep/degreeGuide'
+import { syllabusProse } from '../prep/degreeSyllabusProse'
+import type { DegreeSettings, WordProgress, MistakeRec, FavoriteRec, QuestionType, DegreeQuestion, DegreePhrase, PhraseCategory, SourceBook, DegreeArticle } from '../prep/degreeTypes'
 import * as svc from '../prep/degreeService'
+
+// 资料库：三本 PDF 正文切分后的可读文章（确保内容不遗漏）
+const allArticles: DegreeArticle[] = [...syllabusProse, ...guideArticles]
+const libBook = ref<'all' | string>('all')
+const activeArticle = ref<DegreeArticle | null>(null)
+const libraryArticles = computed(() =>
+  libBook.value === 'all' ? allArticles : allArticles.filter((a) => a.book === libBook.value)
+)
+function openArticle(a: DegreeArticle) {
+  activeArticle.value = a
+}
+function speakText(t: string) {
+  if (typeof window === 'undefined' || !('speechSynthesis' in window)) return
+  const u = new SpeechSynthesisUtterance(t)
+  u.lang = 'en-US'
+  u.rate = 0.95
+  window.speechSynthesis.cancel()
+  window.speechSynthesis.speak(u)
+}
 
 const base = import.meta.env.BASE_URL
 
@@ -333,11 +396,62 @@ const notes = ref<FavoriteRec[]>([])
 const wordBook = ref<FavoriteRec[]>([])
 
 const wordQuery = ref('')
+const wordSrc = ref<'all' | SourceBook>('all')
+const wordLimit = ref(300)
 const filteredWords = computed(() => {
   const q = wordQuery.value.trim().toLowerCase()
-  if (!q) return degreeWords.slice(0, 200)
-  return degreeWords.filter((w) => w.word.toLowerCase().includes(q) || w.definition.toLowerCase().includes(q)).slice(0, 200)
+  return degreeWords.filter((w) => {
+    if (wordSrc.value !== 'all' && !(w.sourceBooks || []).includes(wordSrc.value)) return false
+    if (!q) return true
+    return w.word.toLowerCase().includes(q) || w.definition.toLowerCase().includes(q)
+  })
 })
+const visibleWords = computed(() => filteredWords.value.slice(0, wordLimit.value))
+
+// 单词读音（浏览器内置 TTS，离线可用） + 例句（免费词典 API，按需加载并缓存）
+const examples = ref<Record<string, string>>({})
+const exampleLoading = ref<Record<string, boolean>>({})
+function srcTagType(b: SourceBook): 'success' | 'warning' | 'info' {
+  if (b === '考试大纲') return 'success'
+  if (b === '复习指南') return 'warning'
+  return 'info'
+}
+function speak(word: string) {
+  if (typeof window === 'undefined' || !('speechSynthesis' in window)) return
+  const u = new SpeechSynthesisUtterance(word)
+  u.lang = 'en-US'
+  u.rate = 0.9
+  window.speechSynthesis.cancel()
+  window.speechSynthesis.speak(u)
+}
+async function loadExample(word: string) {
+  if (examples.value[word] || exampleLoading.value[word]) return
+  exampleLoading.value = { ...exampleLoading.value, [word]: true }
+  try {
+    const res = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(word)}`)
+    if (res.ok) {
+      const data = await res.json()
+      const arr = Array.isArray(data) ? data : [data]
+      let found = ''
+      for (const entry of arr) {
+        for (const m of entry.meanings || []) {
+          for (const d of m.definitions || []) {
+            if (d.example) { found = d.example; break }
+          }
+          if (found) break
+        }
+        if (found) break
+      }
+      examples.value = { ...examples.value, [word]: found || `（暂无例句）Please memorize "${word}".` }
+    } else {
+      examples.value = { ...examples.value, [word]: `Please memorize "${word}".` }
+    }
+  } catch {
+    examples.value = { ...examples.value, [word]: `Please memorize "${word}".` }
+  } finally {
+    exampleLoading.value = { ...exampleLoading.value, [word]: false }
+  }
+}
 
 // 词组 / 语句
 const phraseCat = ref<'all' | PhraseCategory>('all')
@@ -720,6 +834,52 @@ onMounted(loadAll)
   display: flex;
   gap: 8px;
 }
+.speak-btn {
+  border: 1px solid var(--border);
+  background: #fff;
+  border-radius: 8px;
+  width: 30px;
+  height: 30px;
+  font-size: 15px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+}
+.speak-btn:hover {
+  border-color: #534ab7;
+  background: #f3f1ff;
+}
+.speak-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.word-example {
+  font-size: 12.5px;
+  color: var(--text-strong);
+  background: #f7f8ff;
+  border-left: 3px solid #c9c2ff;
+  border-radius: 6px;
+  padding: 6px 8px;
+  margin: 6px 0 8px;
+  line-height: 1.6;
+}
+.ex-label {
+  color: #6b5bd6;
+  font-weight: 600;
+  margin-right: 4px;
+}
+.word-src {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+.load-more {
+  text-align: center;
+  margin-top: 14px;
+}
 .quiz-card {
   border: 1px solid var(--border);
   border-radius: 12px;
@@ -840,6 +1000,95 @@ onMounted(loadAll)
   display: flex;
   gap: 8px;
 }
+.lib-layout {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  gap: 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px;
+  min-height: 420px;
+}
+.lib-side {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border-right: 1px solid var(--border);
+  padding-right: 12px;
+}
+.lib-filter {
+  flex-wrap: wrap;
+}
+.lib-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  overflow-y: auto;
+  max-height: 560px;
+}
+.lib-item {
+  display: flex;
+  gap: 6px;
+  align-items: baseline;
+  padding: 7px 8px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.lib-item:hover {
+  background: #f3f1ff;
+}
+.lib-item.active {
+  background: #ece8ff;
+  font-weight: 600;
+}
+.lib-book {
+  flex: none;
+  font-size: 11px;
+  color: #6b5bd6;
+  background: #efeaff;
+  border-radius: 4px;
+  padding: 0 5px;
+}
+.lib-title {
+  color: var(--text-strong);
+}
+.lib-reader {
+  overflow-y: auto;
+  max-height: 600px;
+  padding: 4px 8px;
+}
+.reader-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  position: sticky;
+  top: 0;
+  background: var(--bg, #fff);
+  padding: 6px 0 10px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 10px;
+}
+.reader-book {
+  font-size: 11px;
+  color: #6b5bd6;
+  background: #efeaff;
+  border-radius: 4px;
+  padding: 2px 6px;
+}
+.reader-title {
+  font-size: 16px;
+  margin: 0;
+  flex: 1;
+  color: var(--text-strong);
+}
+.reader-body {
+  font-size: 13.5px;
+  line-height: 1.9;
+  white-space: pre-wrap;
+  color: var(--text-strong);
+}
 .rw-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -948,6 +1197,18 @@ onMounted(loadAll)
   .req-grid,
   .rw-grid {
     grid-template-columns: 1fr;
+  }
+  .lib-layout {
+    grid-template-columns: 1fr;
+  }
+  .lib-side {
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+    padding-right: 0;
+    padding-bottom: 10px;
+  }
+  .lib-list {
+    max-height: 240px;
   }
 }
 @media (max-width: 560px) {
