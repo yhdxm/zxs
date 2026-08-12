@@ -146,6 +146,10 @@
           <div class="word-def">{{ w.definition }}</div>
           <div class="word-example" v-if="examples[w.word]">
             <span class="ex-label">例句</span> {{ examples[w.word] }}
+            <button class="trans-btn" @click="translateExample(w.word)" :disabled="translating[w.word]">
+              {{ translations[w.word] ? '已翻译' : '翻译' }}
+            </button>
+            <div class="word-translation" v-if="translations[w.word]">📝 {{ translations[w.word] }}</div>
           </div>
           <div class="word-src">
             <el-tag v-for="b in (w.sourceBooks || [])" :key="b" size="small" :type="srcTagType(b)" effect="plain">{{ b }}</el-tag>
@@ -194,6 +198,10 @@
           <div class="wc-def">{{ w.definition }}</div>
           <div class="wc-example" v-if="examples[w.word]">
             <span class="ex-label">例句</span> {{ examples[w.word] }}
+            <button class="trans-btn" @click="translateExample(w.word)" :disabled="translating[w.word]">
+              {{ translations[w.word] ? '已翻译' : '翻译' }}
+            </button>
+            <div class="wc-translation" v-if="translations[w.word]">📝 {{ translations[w.word] }}</div>
           </div>
           <div class="wc-src">
             <el-tag v-for="b in (w.sourceBooks || [])" :key="b" size="small" :type="srcTagType(b)" effect="plain">{{ b }}</el-tag>
@@ -496,6 +504,9 @@ const visibleWords = computed(() => filteredWords.value.slice(0, wordLimit.value
 // 单词读音（浏览器内置 TTS，离线可用） + 例句（免费词典 API，按需加载并缓存）
 const examples = ref<Record<string, string>>({})
 const exampleLoading = ref<Record<string, boolean>>({})
+// 例句中文翻译（MyMemory 免费 API，无需 Key）
+const translations = ref<Record<string, string>>({})
+const translating = ref<Record<string, boolean>>({})
 function srcTagType(b: SourceBook): 'success' | 'warning' | 'info' {
   if (b === '考试大纲') return 'success'
   if (b === '复习指南') return 'warning'
@@ -535,6 +546,30 @@ async function loadExample(word: string) {
     examples.value = { ...examples.value, [word]: `Please memorize "${word}".` }
   } finally {
     exampleLoading.value = { ...exampleLoading.value, [word]: false }
+  }
+}
+
+async function translateExample(word: string) {
+  if (!examples.value[word] || translations.value[word] || translating.value[word]) return
+  translating.value = { ...translating.value, [word]: true }
+  try {
+    const text = examples.value[word]
+    const res = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=en|zh-CN`)
+    if (res.ok) {
+      const data = await res.json()
+      const zh = data?.responseData?.translatedText
+      if (zh && zh !== text) {
+        translations.value = { ...translations.value, [word]: zh }
+      } else {
+        translations.value = { ...translations.value, [word]: '（翻译暂不可用）' }
+      }
+    } else {
+      translations.value = { ...translations.value, [word]: '（翻译服务暂时不可用）' }
+    }
+  } catch {
+    translations.value = { ...translations.value, [word]: '（网络异常，翻译失败）' }
+  } finally {
+    translating.value = { ...translating.value, [word]: false }
   }
 }
 
@@ -1042,6 +1077,34 @@ onMounted(loadAll)
   font-weight: 600;
   margin-right: 4px;
 }
+.trans-btn {
+  border: 1px solid #c9c2ff;
+  background: #fff;
+  border-radius: 10px;
+  padding: 1px 10px;
+  font-size: 11.5px;
+  color: #6b5bd6;
+  cursor: pointer;
+  margin-left: 8px;
+  transition: all 0.15s;
+}
+.trans-btn:hover:not(:disabled) {
+  background: #edeaff;
+  border-color: #9588e8;
+}
+.trans-btn:disabled {
+  opacity: 0.5;
+  cursor: wait;
+}
+.word-translation {
+  font-size: 12px;
+  color: #2d7a4f;
+  margin-top: 5px;
+  padding: 4px 8px;
+  background: #f0faf4;
+  border-radius: 4px;
+  line-height: 1.5;
+}
 .word-src {
   display: flex;
   gap: 6px;
@@ -1127,6 +1190,15 @@ onMounted(loadAll)
   padding: 6px 8px;
   margin-bottom: 8px;
   line-height: 1.6;
+}
+.wc-translation {
+  font-size: 12px;
+  color: #2d7a4f;
+  margin-top: 5px;
+  padding: 4px 8px;
+  background: #f0faf4;
+  border-radius: 4px;
+  line-height: 1.5;
 }
 .wc-src {
   display: flex;
