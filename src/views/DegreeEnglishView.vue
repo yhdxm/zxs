@@ -122,6 +122,34 @@
       <el-empty v-else description="词汇表正在由《考试大纲》OCR 提取，完成后这里会显示全部 4400+ 词，并标注复用式（*）" />
     </section>
 
+    <!-- 词组 / 语句 -->
+    <section v-show="activeTab === 'phrases'" class="panel">
+      <div class="toolbar">
+        <el-radio-group v-model="phraseCat">
+          <el-radio-button value="all">全部</el-radio-button>
+          <el-radio-button value="phrase">词组表</el-radio-button>
+          <el-radio-button value="spoken">口语表达</el-radio-button>
+          <el-radio-button value="affix">常用词缀</el-radio-button>
+          <el-radio-button value="irregular">不规则动词</el-radio-button>
+        </el-radio-group>
+        <el-input v-model="phraseQuery" placeholder="搜索英文 / 中文" clearable style="max-width: 300px" />
+        <el-tag type="info" effect="plain">共 {{ filteredPhrases.length }} 条</el-tag>
+      </div>
+      <div v-if="filteredPhrases.length" class="phrase-list">
+        <div v-for="p in filteredPhrases" :key="p.id" class="phrase-item" :class="p.category">
+          <div class="phrase-top">
+            <span class="phrase-en">{{ p.en }}<span v-if="p.productive" class="star">*</span></span>
+            <span class="phrase-cat">{{ catLabel(p.category) }}</span>
+          </div>
+          <div class="phrase-zh" v-if="p.zh">{{ p.zh }}</div>
+          <div class="phrase-extra" v-if="p.extra">
+            {{ p.category === 'irregular' ? '过去式 / 过去分词：' : p.category === 'affix' ? '例词：' : '' }}{{ p.extra }}
+          </div>
+        </div>
+      </div>
+      <el-empty v-else description="词组 / 语句数据正在由《考试大纲》OCR 提取" />
+    </section>
+
     <!-- 题型训练 -->
     <section v-show="activeTab === 'training'" class="panel">
       <div class="toolbar">
@@ -280,7 +308,8 @@ import {
 } from '../prep/degreeExamStructure'
 import { degreeWords } from '../prep/degreeWords'
 import { degreeQuestions } from '../prep/degreeQuestions'
-import type { DegreeSettings, WordProgress, MistakeRec, FavoriteRec, QuestionType, DegreeQuestion } from '../prep/degreeTypes'
+import { degreePhrases } from '../prep/degreePhrases'
+import type { DegreeSettings, WordProgress, MistakeRec, FavoriteRec, QuestionType, DegreeQuestion, DegreePhrase, PhraseCategory } from '../prep/degreeTypes'
 import * as svc from '../prep/degreeService'
 
 const base = import.meta.env.BASE_URL
@@ -288,6 +317,7 @@ const base = import.meta.env.BASE_URL
 const tabs = [
   { key: 'overview', label: '概览' },
   { key: 'words', label: '单词本' },
+  { key: 'phrases', label: '词组/语句' },
   { key: 'training', label: '题型训练' },
   { key: 'mock', label: '模拟考试' },
   { key: 'library', label: '资料库' },
@@ -307,6 +337,32 @@ const filteredWords = computed(() => {
   const q = wordQuery.value.trim().toLowerCase()
   if (!q) return degreeWords.slice(0, 200)
   return degreeWords.filter((w) => w.word.toLowerCase().includes(q) || w.definition.toLowerCase().includes(q)).slice(0, 200)
+})
+
+// 词组 / 语句
+const phraseCat = ref<'all' | PhraseCategory>('all')
+const phraseQuery = ref('')
+const CAT_LABEL: Record<PhraseCategory, string> = {
+  phrase: '词组',
+  spoken: '口语',
+  affix: '词缀',
+  irregular: '不规则动词'
+}
+function catLabel(c: PhraseCategory) {
+  return CAT_LABEL[c]
+}
+const filteredPhrases = computed(() => {
+  const q = phraseQuery.value.trim().toLowerCase()
+  const list = degreePhrases.filter((p) => {
+    if (phraseCat.value !== 'all' && p.category !== phraseCat.value) return false
+    if (!q) return true
+    return (
+      p.en.toLowerCase().includes(q) ||
+      (p.zh || '').toLowerCase().includes(q) ||
+      (p.extra || '').toLowerCase().includes(q)
+    )
+  })
+  return list.slice(0, 300)
 })
 
 const graduatedCount = computed(() => Object.values(wordProgress.value).filter((p) => p.status === 'graduated').length)
@@ -822,6 +878,68 @@ onMounted(loadAll)
   height: 82vh;
   border: none;
   border-radius: 8px;
+}
+.phrase-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 10px;
+}
+.phrase-item {
+  border: 1px solid var(--border);
+  border-left: 3px solid #534ab7;
+  border-radius: 10px;
+  padding: 12px 14px;
+}
+.phrase-item.spoken {
+  border-left-color: #0f6e56;
+}
+.phrase-item.affix {
+  border-left-color: #185fa5;
+}
+.phrase-item.irregular {
+  border-left-color: #854f0b;
+}
+.phrase-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+.phrase-en {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-strong);
+  word-break: break-word;
+}
+.phrase-cat {
+  font-size: 11px;
+  color: #fff;
+  background: #534ab7;
+  border-radius: 10px;
+  padding: 1px 8px;
+  white-space: nowrap;
+}
+.phrase-item.spoken .phrase-cat {
+  background: #0f6e56;
+}
+.phrase-item.affix .phrase-cat {
+  background: #185fa5;
+}
+.phrase-item.irregular .phrase-cat {
+  background: #854f0b;
+}
+.phrase-zh {
+  font-size: 13px;
+  color: var(--text-strong);
+  margin-top: 6px;
+  line-height: 1.6;
+}
+.phrase-extra {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 6px;
+  line-height: 1.6;
+  word-break: break-word;
 }
 @media (max-width: 900px) {
   .type-grid {

@@ -39,6 +39,18 @@ export interface DegreeWord {
   sourcePage?: number // 大纲词汇表所在页
 }
 
+// 语句 / 词组数据（来自《考试大纲》附录二~八）
+export type PhraseCategory = 'phrase' | 'spoken' | 'affix' | 'irregular'
+export interface DegreePhrase {
+  id: string
+  category: PhraseCategory
+  en: string // 英文短语 / 句子 / 词缀 / 动词原形
+  zh?: string // 中文释义（词组、词缀有；口语表达多为空）
+  extra?: string // irregular=过去式/过去分词；affix=例词；spoken=分类名
+  productive?: boolean // 复用式掌握（词组表带 * 号）
+  sourcePage?: number
+}
+
 // 个人学习态（入库，按 user_id 隔离）
 export interface DegreeSettings {
   targetSchool: string | null
