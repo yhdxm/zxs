@@ -1,5 +1,15 @@
 <template>
   <div class="degree-view">
+    <!-- 模块标题栏（与 AI 助手/四六级等模块统一风格） -->
+    <PageHeader
+      title="学位英语备考台"
+      subtitle="上传你的《大纲/模拟卷/复习指南》PDF，自动 OCR 生成专题词库与背诵计划，按考试 5 大题型系统备考。"
+      :icon="Reading"
+    >
+      <el-button text :icon="Setting" @click="settingsVisible = true">设置</el-button>
+      <el-button type="primary" round :icon="VideoPlay" @click="startStudy">开始学习</el-button>
+    </PageHeader>
+
     <!-- 顶部导航栏（PC端：与 AI/四六级模块风格完全一致） -->
     <nav class="de-topnav">
       <button class="de-nav-item" :class="{ active: topNav === 'today' }" @click="topNav = 'today'">
@@ -42,21 +52,6 @@
 
     <!-- ===== 今日视图：原有全部内容（品牌头+统计+功能tab+各面板） ===== -->
     <template v-if="topNav === 'today'">
-    <!-- 统一顶部：品牌头 + 统计 + 导航 tab（对齐 AI/CET 模块风格） -->
-    <header class="degree-header">
-      <div class="dh-brand">
-        <span class="dh-icon">📚</span>
-        <div class="dh-text">
-          <h2 class="dh-title">学位英语备考台</h2>
-          <p class="dh-sub">大纲 {{ MATERIALS[0]?.pages ?? 0 }}页 · 指南 {{ MATERIALS[1]?.pages ?? 0 }}页 · 模拟卷 {{ MATERIALS[2]?.pages ?? 0 }}页 · 目标：{{ settings.targetSchool || '商丘师范学院继续教育学院' }}</p>
-        </div>
-      </div>
-      <div class="dh-actions">
-        <el-button text :icon="Setting" @click="settingsVisible = true">设置</el-button>
-        <el-button type="primary" round :icon="VideoPlay" @click="startStudy">开始学习</el-button>
-      </div>
-    </header>
-
     <!-- 统计行 -->
     <div class="dh-stats">
       <div class="dh-stat"><span class="dh-stat-label">今日新词</span><span class="dh-stat-val purple">{{ settings.newPerDay }}</span></div>
