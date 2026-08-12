@@ -168,56 +168,71 @@
       <el-empty v-else description="词汇表正在由《考试大纲》OCR 提取，完成后这里会显示全部 4400+ 词，并标注复用式（*）" />
     </section>
 
-    <!-- 背单词卡（学位英语专属，与四六级 prepApp 隔离；全部词一次性卡片墙展示，非逐个翻卡） -->
+    <!-- 背单词闪卡（学位英语专属：逐个展示） -->
     <section v-show="activeTab === 'cards'" class="panel">
-      <div class="card-banner">
-        <div class="card-banner-title">背单词卡 · 学位英语专属</div>
-        <div class="card-banner-sub">一次性展示全部 {{ filteredWords.length }} 词（不是逐个翻卡），每张卡可 🔊 朗读 · 📖 看例句 · 标记掌握 / 收进生词本</div>
+      <div v-if="!cardStarted" class="card-start-screen">
+        <div class="card-start-icon">📚</div>
+        <h3 style="margin: 0 0 8px">学位英语背单词</h3>
+        <p style="color: var(--text-muted); margin: 0 0 16px; font-size: 13.5px">
+          共 <b>{{ filteredWords.length }}</b> 词 · 今日新学 {{ settings.newPerDay }} · 待复习 {{ reviewCount }}
+        </p>
+        <el-button type="primary" size="large" round :icon="VideoPlay" @click="startCardMode">
+          开始背单词
+        </el-button>
       </div>
-      <div class="toolbar">
-        <el-input v-model="wordQuery" placeholder="搜索单词 / 释义" clearable style="max-width: 320px" />
-        <el-radio-group v-model="wordSrc" size="small">
-          <el-radio-button value="all">全部</el-radio-button>
-          <el-radio-button value="考试大纲">大纲</el-radio-button>
-          <el-radio-button value="复习指南">指南</el-radio-button>
-          <el-radio-button value="模拟试卷">模拟</el-radio-button>
-        </el-radio-group>
-        <el-tag type="info" effect="plain">共 {{ filteredWords.length }} 词</el-tag>
-        <el-tag v-if="graduatedCount" type="success" effect="plain">已掌握 {{ graduatedCount }}</el-tag>
-        <el-tag v-if="reviewCount" type="warning" effect="plain">待复习 {{ reviewCount }}</el-tag>
-      </div>
-      <div v-if="visibleWords.length" class="card-wall">
-        <div v-for="w in visibleWords" :key="w.word" class="word-card" :class="{ weak: wordProgress[w.word]?.weak, graduated: wordProgress[w.word]?.status === 'graduated' }">
-          <div class="wc-head">
-            <span class="wc-word">{{ w.word }}<span v-if="w.productive" class="star">*</span></span>
-            <div class="wc-actions">
-              <button class="speak-btn" :title="'朗读 ' + w.word" @click="speak(w.word)">🔊</button>
-              <button class="speak-btn" :title="'查看例句 ' + w.word" @click="loadExample(w.word)" :disabled="exampleLoading[w.word]">📖</button>
+
+      <template v-else>
+        <!-- 闪卡进度条 -->
+        <div class="flashcard-progress">
+          <span class="flashcard-pos">{{ cardIndex + 1 }} / {{ filteredWords.length }}</span>
+          <div class="flashcard-bar"><div class="flashcard-fill" :style="{ width: cardPercent + '%' }"></div></div>
+          <button class="flashcard-exit" @click="exitCardMode" title="退出背词">✕</button>
+        </div>
+
+        <!-- 单张闪卡 -->
+        <div v-if="currentCardWord" class="flashcard" :class="{ flipped: cardFlipped }" @click="cardFlipped = !cardFlipped">
+          <div class="flashcard-inner">
+            <!-- 正面：单词 -->
+            <div class="flashcard-front">
+              <div class="fc-word-row">
+                <span class="fc-word">{{ currentCardWord.word }}<span v-if="currentCardWord.productive" class="star">*</span></span>
+                <button class="speak-btn fc-speak" @click.stop="speak(currentCardWord.word)" title="朗读">🔊</button>
+              </div>
+              <div v-if="currentCardWord.phonetic" class="fc-phonetic">{{ currentCardWord.phonetic }}</div>
+              <div class="fc-hint">点击翻转查看释义</div>
+            </div>
+            <!-- 背面：释义+例句 -->
+            <div class="flashcard-back">
+              <div class="fc-def">{{ currentCardWord.definition }}</div>
+              <div class="fc-src" v-if="currentCardWord.sourceBooks?.length">
+                <el-tag v-for="b in currentCardWord.sourceBooks" :key="b" size="small" :type="srcTagType(b)" effect="plain">{{ b }}</el-tag>
+              </div>
+              <div class="fc-example" v-if="examples[currentCardWord.word]">
+                <span class="ex-label">例句</span> {{ examples[currentCardWord.word] }}
+                <button class="trans-btn" @click.stop="translateExample(currentCardWord.word)" :disabled="translating[currentCardWord.word]">
+                  {{ translations[currentCardWord.word] ? '已翻译' : '翻译' }}
+                </button>
+                <div class="fc-translation" v-if="translations[currentCardWord.word]">📝 {{ translations[currentCardWord.word] }}</div>
+              </div>
+              <button class="fc-load-ex" v-if="!examples[currentCardWord.word] && !exampleLoading[currentCardWord.word]" @click.stop="loadExample(currentCardWord.word)">📖 加载例句</button>
             </div>
           </div>
-          <div class="wc-def">{{ w.definition }}</div>
-          <div class="wc-example" v-if="examples[w.word]">
-            <span class="ex-label">例句</span> {{ examples[w.word] }}
-            <button class="trans-btn" @click="translateExample(w.word)" :disabled="translating[w.word]">
-              {{ translations[w.word] ? '已翻译' : '翻译' }}
-            </button>
-            <div class="wc-translation" v-if="translations[w.word]">📝 {{ translations[w.word] }}</div>
-          </div>
-          <div class="wc-src">
-            <el-tag v-for="b in (w.sourceBooks || [])" :key="b" size="small" :type="srcTagType(b)" effect="plain">{{ b }}</el-tag>
-          </div>
-          <div class="wc-ops">
-            <el-button size="small" :type="wordProgress[w.word]?.status === 'graduated' ? 'success' : 'default'" @click="cycleWord(w.word)">
-              {{ wordProgress[w.word]?.status === 'graduated' ? '已掌握' : wordProgress[w.word]?.status === 'learning' ? '学习中' : '标记学习' }}
-            </el-button>
-            <el-button size="small" text type="primary" @click="addWordBook(w)">生词本</el-button>
-          </div>
         </div>
-      </div>
-      <div class="load-more" v-if="filteredWords.length > wordLimit">
-        <el-button @click="wordLimit = filteredWords.length">显示全部 {{ filteredWords.length }} 词</el-button>
-      </div>
-      <el-empty v-else description="词汇表生成中，稍候自动填充" />
+
+        <!-- 操作栏 -->
+        <div class="flashcard-ops">
+          <button class="fc-nav-btn" :disabled="cardIndex <= 0" @click="prevCard">← 上一个</button>
+          <div class="fc-actions">
+            <el-button size="small" type="success" @click="cycleWord(currentCardWord!.word); nextCard()">掌握 ✓</el-button>
+            <el-button size="small" type="warning" @click="addWordBook(currentCardWord!)">生词本</el-button>
+            <el-button size="small" @click="nextCard()">跳过 →</el-button>
+          </div>
+          <button class="fc-nav-btn" :disabled="cardIndex >= filteredWords.length - 1" @click="nextCard">下一个 →</button>
+        </div>
+
+        <!-- 快捷键提示 -->
+        <div class="fc-shortcuts" v-if="!isMobileDevice">← → 翻页 · 空格 翻转 · ✓ 掌握并下一张</div>
+      </template>
     </section>
 
     <!-- 词组 / 语句 -->
@@ -645,6 +660,59 @@ function startStudy() {
   activeTab.value = 'cards'
 }
 
+// ===== 闪卡模式（逐个背单词） =====
+const cardStarted = ref(false)
+const cardIndex = ref(0)
+const cardFlipped = ref(false)
+const isMobileDevice = ref(typeof window !== 'undefined' && window.innerWidth <= 768)
+
+const currentCardWord = computed(() => filteredWords.value[cardIndex.value] ?? null)
+const cardPercent = computed(() => {
+  const total = Math.max(filteredWords.value.length, 1)
+  return Math.round(((cardIndex.value + 1) / total) * 100)
+})
+
+function startCardMode() {
+  cardStarted.value = true
+  cardIndex.value = 0
+  cardFlipped.value = false
+  // 自动加载当前词的例句
+  if (currentCardWord.value && !examples.value[currentCardWord.value.word]) {
+    loadExample(currentCardWord.value.word)
+  }
+}
+
+function exitCardMode() {
+  cardStarted.value = false
+  cardFlipped.value = false
+}
+
+function nextCard() {
+  if (cardIndex.value < filteredWords.value.length - 1) {
+    cardIndex.value++
+    cardFlipped.value = false
+    const w = currentCardWord.value
+    if (w && !examples.value[w.word]) loadExample(w.word)
+  }
+}
+
+function prevCard() {
+  if (cardIndex.value > 0) {
+    cardIndex.value--
+    cardFlipped.value = false
+  }
+}
+
+// 键盘快捷键（PC端）
+if (typeof window !== 'undefined') {
+  window.addEventListener('keydown', (e: KeyboardEvent) => {
+    if (!cardStarted.value) return
+    if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); nextCard() }
+    else if (e.key === 'ArrowLeft') { e.preventDefault(); prevCard() }
+    else if (e.key === 'Enter') { e.preventDefault(); cardFlipped.value = !cardFlipped.value }
+  })
+}
+
 function goTraining(key: QuestionType) {
   trainingType.value = key
   activeTab.value = 'training'
@@ -745,7 +813,8 @@ onMounted(loadAll)
 .degree-view {
   max-width: 1180px;
   margin: 0 auto;
-  padding: 4px 4px 40px;
+  padding: 4px 4px calc(40px + env(safe-area-inset-bottom));
+  /* 移动端为底部固定导航留空间，避免tab被遮挡无法点击 */
 }
 /* ===== 统一顶部（对齐 AI/CET 模块风格）===== */
 .degree-header {
@@ -765,14 +834,25 @@ onMounted(loadAll)
   align-items: center;
   gap: 10px;
   min-width: 0;
+  width: 100%;
 }
-.dh-icon { font-size: 28px; }
+.dh-icon { font-size: 28px; flex-shrink: 0; }
+.dh-text {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+}
 .dh-title {
   font-size: 18px; font-weight: 800; margin: 0; line-height: 1.3;
   color: var(--text-strong);
+  word-break: keep-all;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .dh-sub {
   font-size: 12.5px; color: var(--text-muted); margin: 2px 0 0; line-height: 1.4;
+  word-break: break-all;
 }
 .dh-actions { display: flex; gap: 8px; flex-shrink: 0; }
 
@@ -826,6 +906,9 @@ onMounted(loadAll)
   cursor: pointer;
   transition: all 0.15s;
   white-space: nowrap;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
 }
 .dh-nav-item:hover { background: var(--surface-2, #f5f5fa); color: var(--text-strong); }
 .dh-nav-item.active {
@@ -839,6 +922,7 @@ onMounted(loadAll)
   border-radius: 14px;
   padding: 18px;
   box-shadow: var(--shadow-card);
+  touch-action: pan-y;
 }
 .card-title {
   font-size: 15px;
@@ -1115,6 +1199,184 @@ onMounted(loadAll)
   text-align: center;
   margin-top: 14px;
 }
+
+/* ===== 闪卡模式（逐个背单词） ===== */
+.card-start-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  text-align: center;
+}
+.card-start-icon { font-size: 56px; margin-bottom: 16px; }
+
+.flashcard-progress {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.flashcard-pos {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.flashcard-bar {
+  flex: 1;
+  height: 6px;
+  background: #edeaff;
+  border-radius: 3px;
+  overflow: hidden;
+}
+.flashcard-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #534ab7, #7c6fd6);
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+.flashcard-exit {
+  border: 1px solid var(--border);
+  background: #fff;
+  border-radius: 8px;
+  width: 28px; height: 28px;
+  font-size: 14px;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+
+.flashcard {
+  perspective: 1000px;
+  cursor: pointer;
+  margin-bottom: 16px;
+}
+.flashcard-inner {
+  position: relative;
+  width: 100%;
+  min-height: 260px;
+  transition: transform 0.5s;
+  transform-style: preserve-3d;
+}
+.flipped .flashcard-inner {
+  transform: rotateY(180deg);
+}
+.flashcard-front, .flashcard-back {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 28px 24px;
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  box-shadow: var(--shadow-card);
+}
+.flashcard-back {
+  transform: rotateY(180deg);
+  background: linear-gradient(135deg, #faf8ff, #f3f0ff);
+  justify-content: flex-start;
+  overflow-y: auto;
+}
+.fc-word-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.fc-word {
+  font-size: 28px;
+  font-weight: 800;
+  color: #3c3489;
+  word-break: keep-all;
+}
+.fc-speak { width: 36px; height: 36px; font-size: 18px; }
+.fc-phonetic {
+  font-size: 14px;
+  color: #888;
+  margin-top: 4px;
+}
+.fc-hint {
+  margin-top: auto;
+  padding-top: 20px;
+  font-size: 12.5px;
+  color: #aaa;
+  text-align: center;
+}
+.fc-def {
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--text-strong);
+  line-height: 1.6;
+  margin-bottom: 10px;
+}
+.fc-src { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+.fc-example {
+  font-size: 13px;
+  color: var(--text-strong);
+  background: #f7f8ff;
+  border-left: 3px solid #c9c2ff;
+  border-radius: 6px;
+  padding: 8px 10px;
+  margin-bottom: 8px;
+  line-height: 1.6;
+}
+.fc-translation {
+  font-size: 12px;
+  color: #2d7a4f;
+  margin-top: 5px;
+  padding: 4px 8px;
+  background: #f0faf4;
+  border-radius: 4px;
+}
+.fc-load-ex {
+  border: 1px solid #c9c2ff;
+  background: #fff;
+  border-radius: 8px;
+  padding: 6px 14px;
+  font-size: 13px;
+  color: #6b5bd6;
+  cursor: pointer;
+  margin-top: 8px;
+  align-self: flex-start;
+}
+
+.flashcard-ops {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 4px;
+}
+.fc-nav-btn {
+  border: 1px solid var(--border);
+  background: #fff;
+  border-radius: 10px;
+  padding: 8px 16px;
+  font-size: 13px;
+  cursor: pointer;
+  color: var(--text-strong);
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+.fc-nav-btn:hover:not(:disabled) { background: #f5f5fa; border-color: #ccc; }
+.fc-nav-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+.fc-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.fc-shortcuts {
+  text-align: center;
+  font-size: 11.5px;
+  color: #aaa;
+  margin-top: 10px;
+}
+
 /* 背单词卡（学位英语专属） */
 .card-banner {
   background: linear-gradient(135deg, #6b5bd6, #8a7be0);
@@ -1542,11 +1804,38 @@ onMounted(loadAll)
     max-height: 240px;
   }
 }
+
+@media (max-width: 768px) {
+  .dh-header { padding: 10px 12px; }
+  .dh-title { font-size: 17px; }
+  .dh-sub { font-size: 12px; -webkit-line-clamp: 2; display: -webkit-box; -webkit-box-orient: vertical; overflow: hidden; }
+  .dh-stats { grid-template-columns: repeat(2, 1fr); gap: 6px; }
+  .dh-stat { padding: 8px 8px; }
+  .dh-stat-val { font-size: 20px; }
+  .dh-nav { gap: 4px; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .dh-nav-item { min-width: 56px; padding: 7px 10px; font-size: 12px; border-radius: 9px; flex: 0 0 auto; }
+  .step-indicator { overflow-x: auto; -webkit-overflow-scrolling: touch; flex-wrap: nowrap; }
+  .step-dot { flex: 0 0 auto; }
+  .panel { padding: 14px; }
+  .card-wall { grid-template-columns: 1fr; }
+  .phrase-list { grid-template-columns: 1fr; }
+  /* 闪卡移动端 */
+  .flashcard-inner { min-height: 220px; }
+  .fc-word { font-size: 24px; }
+  .fc-def { font-size: 15px; }
+  .flashcard-ops { flex-wrap: wrap; justify-content: center; }
+  .fc-nav-btn { padding: 6px 12px; font-size: 12px; }
+  .fc-actions { width: 100%; justify-content: center; }
+}
+
 @media (max-width: 560px) {
   .dh-header {
-    flex-direction: column; align-items: flex-start; padding: 12px 14px;
+    flex-direction: column; align-items: stretch; padding: 12px 14px;
   }
-  .dh-actions { width: 100%; justify-content: flex-end; }
+  .dh-brand { flex-wrap: nowrap; gap: 8px; }
+  .dh-title { font-size: 16px; white-space: normal; word-break: keep-all; }
+  .dh-sub { font-size: 11.5px; line-height: 1.35; -webkit-line-clamp: 2; display: -webkit-box; -webkit-box-orient: vertical; overflow: hidden; }
+  .dh-actions { width: 100%; justify-content: flex-end; flex-shrink: 0; }
   .dh-stats { grid-template-columns: repeat(2, 1fr); gap: 6px; }
   .dh-stat { padding: 8px 10px; }
   .dh-stat-val { font-size: 18px; }
@@ -1566,5 +1855,13 @@ onMounted(loadAll)
   .toolbar {
     flex-wrap: wrap;
   }
+  /* 闪卡小屏 */
+  .flashcard-inner { min-height: 200px; }
+  .fc-word { font-size: 22px; }
+  .flashcard-front, .flashcard-back { padding: 20px 16px; }
+  .fc-def { font-size: 14.5px; }
+  .fc-nav-btn { width: 100%; text-align: center; margin-bottom: 4px; }
+  .fc-actions { width: 100%; flex-direction: column; }
+  .fc-actions .el-button { width: 100%; }
 }
 </style>
