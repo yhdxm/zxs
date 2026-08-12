@@ -1,14 +1,23 @@
 <template>
   <div class="degree-view">
     <!-- 模块标题栏（与 AI 助手/四六级等模块统一风格） -->
-    <PageHeader
-      title="学位英语备考台"
-      subtitle="上传你的《大纲/模拟卷/复习指南》PDF，自动 OCR 生成专题词库与背诵计划，按考试 5 大题型系统备考。"
-      :icon="Reading"
-    >
-      <el-button text :icon="Setting" @click="settingsVisible = true">设置</el-button>
-      <el-button type="primary" round :icon="VideoPlay" @click="startStudy">开始学习</el-button>
-    </PageHeader>
+    <header class="page-header-card">
+      <div class="ph-inner">
+        <div class="ph-brand">
+          <span class="ph-icon">
+            <el-icon :size="20"><Reading /></el-icon>
+          </span>
+          <div class="ph-text">
+            <h2 class="ph-title">学位英语备考台</h2>
+            <p class="ph-sub">上传你的《大纲/模拟卷/复习指南》PDF，自动 OCR 生成专题词库与背诵计划，按考试 5 大题型系统备考。</p>
+          </div>
+        </div>
+        <div class="ph-actions">
+          <el-button text :icon="Setting" @click="settingsVisible = true">设置</el-button>
+          <el-button type="primary" round :icon="VideoPlay" @click="startStudy">开始学习</el-button>
+        </div>
+      </div>
+    </header>
 
     <!-- 顶部导航栏（PC端：与 AI/四六级模块风格完全一致） -->
     <nav class="de-topnav">
@@ -585,7 +594,6 @@
 import { ref, computed, onMounted } from 'vue'
 import { Reading, Setting, VideoPlay, Picture } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
-import PageHeader from '../components/PageHeader.vue'
 import {
   EXAM_SECTIONS,
   VOCAB_REQUIREMENT,
@@ -974,6 +982,61 @@ onMounted(loadAll)
 </script>
 
 <style scoped>
+/* ===== 模块标题栏（与 PageHeader / AI 助手页完全一致） ===== */
+.page-header-card {
+  background: var(--surface, #fff);
+  border: 1px solid var(--border, #e6e3f2);
+  border-radius: 16px;
+  box-shadow: 0 2px 12px rgba(34, 48, 78, 0.06);
+  margin-bottom: 16px;
+}
+.ph-inner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 20px;
+  min-width: 0;
+}
+.ph-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+.ph-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  background: linear-gradient(135deg, #7c6fd6, #534ab7);
+  color: #fff;
+  box-shadow: 0 6px 16px rgba(83, 74, 183, 0.3);
+}
+.ph-text { min-width: 0; }
+.ph-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-strong, #1a1a2e);
+  line-height: 1.3;
+}
+.ph-sub {
+  margin: 2px 0 0;
+  font-size: 12.5px;
+  font-weight: 400;
+  color: var(--text-muted, #888);
+  line-height: 1.55;
+}
+.ph-actions {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 .degree-view {
   max-width: 1180px;
   margin: 0 auto;
@@ -2086,6 +2149,17 @@ onMounted(loadAll)
 @media (max-width: 768px) {
   /* 移动端：顶部导航隐藏，改用底部固定导航 */
   .de-topnav { display: none; }
+  .page-header-card { margin-bottom: 12px; }
+  .page-header-card .ph-inner {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    padding: 12px 14px;
+  }
+  .page-header-card .ph-actions {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
   .de-bottom-nav {
     display: flex;
     position: fixed;
