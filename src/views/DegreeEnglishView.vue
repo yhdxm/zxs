@@ -1,5 +1,47 @@
 <template>
   <div class="degree-view">
+    <!-- 顶部导航栏（PC端：与 AI/四六级模块风格完全一致） -->
+    <nav class="de-topnav">
+      <button class="de-nav-item" :class="{ active: topNav === 'today' }" @click="topNav = 'today'">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+        <span>今日</span>
+      </button>
+      <button class="de-nav-item" :class="{ active: topNav === 'practice' }" @click="topNav = 'practice'">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+        <span>刷题</span>
+      </button>
+      <button class="de-nav-item" :class="{ active: topNav === 'mistakes' }" @click="topNav = 'mistakes'">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg>
+        <span>错本</span>
+      </button>
+      <button class="de-nav-item" :class="{ active: topNav === 'mine' }" @click="topNav = 'mine'">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+        <span>我的</span>
+      </button>
+    </nav>
+
+    <!-- 移动端底部导航（与顶部相同4项，≤768px显示） -->
+    <nav class="de-bottom-nav">
+      <button class="de-nav-item" :class="{ active: topNav === 'today' }" @click="topNav = 'today'">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+        <span>今日</span>
+      </button>
+      <button class="de-nav-item" :class="{ active: topNav === 'practice' }" @click="topNav = 'practice'">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+        <span>刷题</span>
+      </button>
+      <button class="de-nav-item" :class="{ active: topNav === 'mistakes' }" @click="topNav = 'mistakes'">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg>
+        <span>错本</span>
+      </button>
+      <button class="de-nav-item" :class="{ active: topNav === 'mine' }" @click="topNav = 'mine'">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+        <span>我的</span>
+      </button>
+    </nav>
+
+    <!-- ===== 今日视图：原有全部内容（品牌头+统计+功能tab+各面板） ===== -->
+    <template v-if="topNav === 'today'">
     <!-- 统一顶部：品牌头 + 统计 + 导航 tab（对齐 AI/CET 模块风格） -->
     <header class="degree-header">
       <div class="dh-brand">
@@ -393,8 +435,119 @@
         </div>
       </div>
     </section>
+    </template><!-- /end 今日视图 -->
 
-    <!-- PDF 预览 -->
+    <!-- ===== 刷题视图：直接进入题型训练 ===== -->
+    <section v-if="topNav === 'practice'" class="panel">
+      <div class="card-title" style="margin-bottom: 10px">题型训练</div>
+      <div class="toolbar">
+        <el-radio-group v-model="trainingType" @change="pickQuestion">
+          <el-radio-button v-for="s in EXAM_SECTIONS" :key="s.key" :value="s.key">{{ s.name }}</el-radio-button>
+        </el-radio-group>
+        <el-tag type="info" effect="plain">{{ questionsOfType.length }} 题</el-tag>
+        <el-button type="primary" size="small" @click="topNav = 'today'; activeTab = 'training'">完整模式</el-button>
+      </div>
+
+      <div v-if="currentQ" class="quiz-card">
+        <div class="quiz-stem">{{ currentQ.stem }}</div>
+        <div v-if="currentQ.passage" class="quiz-passage">{{ currentQ.passage }}</div>
+        <div v-if="currentQ.options" class="quiz-options">
+          <label v-for="(o, i) in currentQ.options" :key="i" class="opt" :class="{ right: showAnswer && isRight(o), wrong: showAnswer && myAnswer === o && !isRight(o) }">
+            <input type="radio" :name="'qp'" :value="o" v-model="myAnswer" :disabled="showAnswer" />
+            <span>{{ String.fromCharCode(65 + i) }}. {{ o }}</span>
+          </label>
+        </div>
+        <div class="quiz-actions">
+          <el-button v-if="!showAnswer" type="primary" @click="revealAnswer">提交 / 看答案</el-button>
+          <el-button v-else @click="nextQuestion">下一题</el-button>
+          <el-button v-if="showAnswer" text type="danger" @click="markMistake(currentQ)">错题收藏</el-button>
+        </div>
+        <div v-if="showAnswer" class="quiz-explain">
+          <div class="ex-h">答案：<b>{{ currentQ.answer }}</b></div>
+          <div class="ex-b">解析：{{ currentQ.explanation }}</div>
+          <div class="ex-src">来源：{{ currentQ.source.basis }}（{{ currentQ.source.book }} 第 {{ currentQ.source.page }} 页）</div>
+        </div>
+      </div>
+      <el-empty v-else description="题库正在由 PDF 原题 + 大纲生成，完成后即可逐题练习" />
+    </section>
+
+    <!-- ===== 错本视图：错题集中营 ===== -->
+    <section v-if="topNav === 'mistakes'" class="panel">
+      <div class="card-title" style="margin-bottom: 10px">错题本 <el-tag size="small" :type="mistakes.length ? 'danger' : 'info'">{{ mistakes.length }} 题</el-tag></div>
+      <div v-if="mistakes.length" class="note-list">
+        <div v-for="m in mistakes" :key="m.id" class="note-item">
+          <div class="note-body">{{ m.reason || '错题' }} <span class="muted">（{{ typeLabel(m.type) }}）</span></div>
+          <div class="note-ops-inline">
+            <el-button size="small" text type="primary" @click="retryMistake(m)">重练</el-button>
+            <el-button size="small" text type="danger" @click="removeFav(m.id, true)">移除</el-button>
+          </div>
+        </div>
+      </div>
+      <el-empty v-else description="做错的题会自动归集到这里，目前还没有错题哦 🎉" :image-size="80" />
+
+      <div class="card-title" style="margin: 20px 0 10px">生词本 <el-tag size="small" :type="wordBook.length ? 'warning' : 'info'">{{ wordBook.length }} 词</el-tag></div>
+      <div v-if="wordBook.length" class="note-list">
+        <div v-for="w in wordBook" :key="w.id" class="note-item">
+          <div class="note-body">{{ w.content }}</div>
+          <el-button size="small" text type="danger" @click="removeFav(w.id)">删除</el-button>
+        </div>
+      </div>
+      <el-empty v-else description="点击「加入生词本」收藏生词" :image-size="60" />
+    </section>
+
+    <!-- ===== 我的视图：学习统计 + 设置入口 ===== -->
+    <section v-if="topNav === 'mine'" class="panel">
+      <div class="mine-header">
+        <div class="mine-avatar">🎓</div>
+        <div class="mine-info">
+          <h3 class="mine-name">{{ settings.targetSchool || '学位英语备考' }}</h3>
+          <p class="mine-desc">已坚持学习 <b>{{ streakDays }}</b> 天 · 目标每日新学 <b>{{ settings.newPerDay }}</b> 词</p>
+        </div>
+      </div>
+
+      <div class="mine-stats">
+        <div class="mine-stat-card">
+          <div class="mine-stat-num purple">{{ graduatedCount }}</div>
+          <div class="mine-stat-label">已掌握单词</div>
+        </div>
+        <div class="mine-stat-card">
+          <div class="mine-stat-num blue">{{ reviewCount }}</div>
+          <div class="mine-stat-label">待巩固</div>
+        </div>
+        <div class="mine-stat-card">
+          <div class="mine-stat-num green">{{ degreeWords.length }}</div>
+          <div class="mine-stat-label">总词汇量</div>
+        </div>
+        <div class="mine-stat-card">
+          <div class="mine-stat-num orange">{{ degreeQuestions.length }}</div>
+          <div class="mine-stat-label">题库总量</div>
+        </div>
+      </div>
+
+      <div class="mine-progress">
+        <div class="card-title">总掌握进度</div>
+        <div class="mine-ring-row">
+          <svg width="140" height="140" viewBox="0 0 120 120">
+            <circle cx="60" cy="60" r="50" fill="none" stroke="#eceaf8" stroke-width="12" />
+            <circle cx="60" cy="60" r="50" fill="none" stroke="#534ab7" stroke-width="12" stroke-linecap="round"
+              :stroke-dasharray="`${ringLen} 314`" transform="rotate(-90 60 60)" />
+            <text x="60" y="66" text-anchor="middle" font-size="24" font-weight="700" fill="#3c3489">{{ masteryPercent }}%</text>
+          </svg>
+          <div class="mine-ring-info">
+            <p>领会式词汇 <b>{{ VOCAB_REQUIREMENT.receptive }}</b> 词</p>
+            <p>复用式词汇 <b>{{ VOCAB_REQUIREMENT.productive }}</b> 词（带 *）</p>
+            <p>已掌握 <b>{{ graduatedCount }}</b> / {{ degreeWords.length || VOCAB_REQUIREMENT.receptive }}</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="mine-actions">
+        <el-button type="primary" round :icon="Setting" @click="settingsVisible = true">备考设置</el-button>
+        <el-button round @click="topNav = 'today'">返回今日</el-button>
+      </div>
+    </section>
+
+    <!-- PDF 预览（全局弹窗，不受 topNav 影响） -->
     <el-dialog v-model="previewVisible" :title="previewTitle" width="90%" top="5vh" class="pdf-dialog">
       <iframe :src="previewUrl" class="pdf-frame" />
     </el-dialog>
@@ -486,6 +639,9 @@ const tabs = [
   { key: 'rw', label: '读写中心' }
 ]
 const activeTab = ref('overview')
+
+// 顶部导航（与 AI/四六级模块一致：今日/刷题/错本/我的）
+const topNav = ref<'today' | 'practice' | 'mistakes' | 'mine'>('today')
 
 // 概览分步向导
 const OVERVIEW_STEPS = ['今日学习计划', '五大题型', '大纲规定'] as const
@@ -746,6 +902,19 @@ async function markMistake(q: DegreeQuestion) {
   mistakes.value = await svc.loadMistakes()
   ElMessage.success('已收入错题本')
 }
+async function retryMistake(m: MistakeRec) {
+  // 找到原题并进入刷题模式
+  const orig = degreeQuestions.find((q) => q.id === m.questionId)
+  if (orig) {
+    trainingType.value = m.type || 'vocab_grammar'
+    currentQ.value = orig
+    showAnswer.value = false
+    myAnswer.value = ''
+    topNav.value = 'practice'
+  } else {
+    ElMessage.warning('原题未找到，可能题库已更新')
+  }
+}
 
 async function cycleWord(word: string) {
   const cur = wordProgress.value[word]?.status || 'new'
@@ -815,6 +984,60 @@ onMounted(loadAll)
   margin: 0 auto;
   padding: 4px 4px calc(40px + env(safe-area-inset-bottom));
   /* 移动端为底部固定导航留空间，避免tab被遮挡无法点击 */
+}
+
+/* ===== 顶部导航栏（与 AI/四六级模块风格完全一致） ===== */
+.de-topnav {
+  display: flex;
+  position: relative;
+  z-index: 20;
+  background: var(--surface, #fff);
+  border: 1px solid var(--border, #e6e3f2);
+  border-radius: 16px;
+  box-shadow: 0 3px 10px rgba(34, 48, 78, 0.06);
+  padding: 10px 12px;
+  margin: 0 auto 14px;
+  max-width: 1180px;
+  width: calc(100% - 52px);
+  gap: 6px;
+  overflow-x: auto;
+}
+.de-nav-item {
+  flex: 1 1 0;
+  min-width: 72px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 10px 14px;
+  border-radius: 11px;
+  background: transparent;
+  color: #5B6A86;
+  font-weight: 700;
+  font-size: 14px;
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+.de-nav-item svg {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+.de-nav-item:hover { background: #F4F3FB; color: #22304E; }
+.de-nav-item.active {
+  background: linear-gradient(135deg, #534ab7, #7c6fd6);
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(83, 74, 183, 0.25);
+}
+
+/* 移动端底部导航（≤768px 显示，PC端隐藏） */
+.de-bottom-nav {
+  display: none;
 }
 /* ===== 统一顶部（对齐 AI/CET 模块风格）===== */
 .degree-header {
@@ -1783,6 +2006,66 @@ onMounted(loadAll)
   line-height: 1.6;
   word-break: break-word;
 }
+
+/* ===== 我的视图 ===== */
+.mine-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 18px;
+  background: linear-gradient(135deg, #f6f5ff, #fff);
+  border-radius: 12px;
+  margin-bottom: 16px;
+}
+.mine-avatar {
+  font-size: 48px;
+  flex-shrink: 0;
+}
+.mine-name { font-size: 18px; font-weight: 800; margin: 0 0 4px; color: var(--text-strong); }
+.mine-desc { font-size: 13.5px; color: var(--text-muted); margin: 0; line-height: 1.6; }
+.mine-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.mine-stat-card {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px 10px;
+  text-align: center;
+}
+.mine-stat-num { font-size: 26px; font-weight: 800; }
+.mine-stat-num.purple { color: #534ab7; }
+.mine-stat-num.blue { color: #185fa5; }
+.mine-stat-num.green { color: #0f6e56; }
+.mine-stat-num.orange { color: #854f0b; }
+.mine-stat-label { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+.mine-progress { margin-bottom: 16px; }
+.mine-ring-row {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 14px;
+  background: #faf8ff;
+  border-radius: 12px;
+}
+.mine-ring-info { font-size: 13.5px; color: var(--text-strong); line-height: 2; }
+.mine-ring-info b { color: #534ab7; }
+.mine-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+
+/* 错本操作行 */
+.note-ops-inline {
+  display: flex;
+  gap: 6px;
+}
 @media (max-width: 900px) {
   .type-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1806,6 +2089,39 @@ onMounted(loadAll)
 }
 
 @media (max-width: 768px) {
+  /* 移动端：顶部导航隐藏，改用底部固定导航 */
+  .de-topnav { display: none; }
+  .de-bottom-nav {
+    display: flex;
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    z-index: 40;
+    height: calc(60px + env(safe-area-inset-bottom));
+    padding-bottom: env(safe-area-inset-bottom);
+    background: color-mix(in srgb, #fff 92%, transparent);
+    backdrop-filter: saturate(160%) blur(14px);
+    -webkit-backdrop-filter: saturate(160%) blur(14px);
+    border-top: 1px solid var(--border, #e6e3f2);
+    box-shadow: 0 -4px 18px rgba(15, 23, 42, 0.06);
+    gap: 6px;
+  }
+  .de-bottom-nav .de-nav-item {
+    flex-direction: column;
+    gap: 3px;
+    padding: 6px 2px;
+    font-size: 11.5px;
+    min-height: 48px;
+    border-radius: 10px;
+  }
+  .de-bottom-nav .de-nav-item svg { width: 22px; height: 22px; }
+  .de-bottom-nav .de-nav-item.active {
+    color: #534ab7;
+    background: #ECEAF8;
+    box-shadow: none;
+  }
+
+  /* 为底部导航留白 */
+  .degree-view { padding-bottom: calc(100px + env(safe-area-inset-bottom)); }
   .dh-header { padding: 10px 12px; }
   .dh-title { font-size: 17px; }
   .dh-sub { font-size: 12px; -webkit-line-clamp: 2; display: -webkit-box; -webkit-box-orient: vertical; overflow: hidden; }
@@ -1863,5 +2179,11 @@ onMounted(loadAll)
   .fc-nav-btn { width: 100%; text-align: center; margin-bottom: 4px; }
   .fc-actions { width: 100%; flex-direction: column; }
   .fc-actions .el-button { width: 100%; }
+  /* 我的视图小屏 */
+  .mine-stats { grid-template-columns: repeat(2, 1fr); }
+  .mine-header { flex-direction: column; text-align: center; padding: 14px; }
+  .mine-ring-row { flex-direction: column; text-align: center; }
+  .mine-actions { flex-direction: column; }
+  .mine-actions .el-button { width: 100%; }
 }
 </style>
