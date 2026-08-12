@@ -1,5 +1,23 @@
 <template>
   <div class="degree-view">
+    <!-- 模块标题栏：位于导航栏正上方，与 AI 助手页一致（全内联样式确保渲染） -->
+    <div class="deg-module-header"
+      style="background:#fff;border:1px solid #e6e3f2;border-radius:16px;box-shadow:0 2px 12px rgba(34,48,78,.06);margin-bottom:14px;padding:14px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;">
+      <div style="display:flex;align-items:center;gap:12px;min-width:0;">
+        <span style="width:40px;height:40px;border-radius:12px;display:grid;place-items:center;flex-shrink:0;background:linear-gradient(135deg,#7c6fd6,#534ab7);color:#fff;box-shadow:0 6px 16px rgba(83,74,183,.3);">
+          <el-icon :size="20" color="#fff"><Reading /></el-icon>
+        </span>
+        <div style="min-width:0;">
+          <h2 style="margin:0;font-size:18px;font-weight:600;color:#1a1a2e;line-height:1.3;">学位英语备考台</h2>
+          <p style="margin:2px 0 0;font-size:12.5px;color:#888;line-height:1.55;">上传你的《大纲/模拟卷/复习指南》PDF，自动 OCR 生成专题词库与背诵计划，按考试 5 大题型系统备考。</p>
+        </div>
+      </div>
+      <div style="flex-shrink:0;display:flex;align-items:center;gap:10px;">
+        <el-button text :icon="Setting" @click="settingsVisible = true">设置</el-button>
+        <el-button type="primary" round :icon="VideoPlay" @click="startStudy">开始学习</el-button>
+      </div>
+    </div>
+
     <!-- 顶部导航栏（PC端：与 AI/四六级模块风格完全一致） -->
     <nav class="de-topnav">
       <button class="de-nav-item" :class="{ active: topNav === 'today' }" @click="topNav = 'today'">
@@ -42,24 +60,6 @@
 
     <!-- ===== 今日视图 ===== -->
     <template v-if="topNav === 'today'">
-    <!-- 模块标题栏（与 AI 助手页完全一致，在导航栏下方、内容区顶部） -->
-    <div class="deg-module-header"
-      style="background:#fff;border:1px solid #e6e3f2;border-radius:16px;box-shadow:0 2px 12px rgba(34,48,78,.06);margin-bottom:14px;padding:14px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;">
-      <div style="display:flex;align-items:center;gap:12px;min-width:0;">
-        <span style="width:40px;height:40px;border-radius:12px;display:grid;place-items:center;flex-shrink:0;background:linear-gradient(135deg,#7c6fd6,#534ab7);color:#fff;box-shadow:0 6px 16px rgba(83,74,183,.3);">
-          <el-icon :size="20" color="#fff"><Reading /></el-icon>
-        </span>
-        <div style="min-width:0;">
-          <h2 style="margin:0;font-size:18px;font-weight:600;color:#1a1a2e;line-height:1.3;">学位英语备考台</h2>
-          <p style="margin:2px 0 0;font-size:12.5px;color:#888;line-height:1.55;">上传你的《大纲/模拟卷/复习指南》PDF，自动 OCR 生成专题词库与背诵计划，按考试 5 大题型系统备考。</p>
-        </div>
-      </div>
-      <div style="flex-shrink:0;display:flex;align-items:center;gap:10px;">
-        <el-button text :icon="Setting" @click="settingsVisible = true">设置</el-button>
-        <el-button type="primary" round :icon="VideoPlay" @click="startStudy">开始学习</el-button>
-      </div>
-    </div>
-
     <!-- 统计行 -->
     <div class="dh-stats">
       <div class="dh-stat"><span class="dh-stat-label">今日新词</span><span class="dh-stat-val purple">{{ settings.newPerDay }}</span></div>
