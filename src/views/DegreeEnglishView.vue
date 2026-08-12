@@ -1,97 +1,124 @@
 <template>
   <div class="degree-view">
-    <PageHeader
-      :icon="Reading"
-      title="学位英语备考台"
-      :subtitle="`大纲 ${MATERIALS[0]?.pages ?? 0}页 · 指南 ${MATERIALS[1]?.pages ?? 0}页 · 模拟卷 ${MATERIALS[2]?.pages ?? 0}页，全本已内置 · 目标：${settings.targetSchool || '商丘师范学院继续教育学院'}`"
-    >
-      <template #actions>
+    <!-- 统一顶部：品牌头 + 统计 + 导航 tab（对齐 AI/CET 模块风格） -->
+    <header class="degree-header">
+      <div class="dh-brand">
+        <span class="dh-icon">📚</span>
+        <div class="dh-text">
+          <h2 class="dh-title">学位英语备考台</h2>
+          <p class="dh-sub">大纲 {{ MATERIALS[0]?.pages ?? 0 }}页 · 指南 {{ MATERIALS[1]?.pages ?? 0 }}页 · 模拟卷 {{ MATERIALS[2]?.pages ?? 0 }}页 · 目标：{{ settings.targetSchool || '商丘师范学院继续教育学院' }}</p>
+        </div>
+      </div>
+      <div class="dh-actions">
         <el-button text :icon="Setting" @click="settingsVisible = true">设置</el-button>
         <el-button type="primary" round :icon="VideoPlay" @click="startStudy">开始学习</el-button>
-      </template>
-    </PageHeader>
+      </div>
+    </header>
 
-    <!-- 统计卡 -->
-    <div class="stat-grid">
-      <div class="stat-card">
-        <div class="stat-label">今日新词</div>
-        <div class="stat-num" style="color: #534ab7">{{ settings.newPerDay }}</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-label">连续学习</div>
-        <div class="stat-num" style="color: #185fa5">{{ streakDays }}<span class="unit">天</span></div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-label">词汇掌握</div>
-        <div class="stat-num" style="color: #0f6e56">
-          {{ graduatedCount }}<span class="unit">/{{ degreeWords.length || VOCAB_REQUIREMENT.receptive }}</span>
-        </div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-label">题库总量</div>
-        <div class="stat-num" style="color: #854f0b">{{ degreeQuestions.length }}</div>
-      </div>
+    <!-- 统计行 -->
+    <div class="dh-stats">
+      <div class="dh-stat"><span class="dh-stat-label">今日新词</span><span class="dh-stat-val purple">{{ settings.newPerDay }}</span></div>
+      <div class="dh-stat"><span class="dh-stat-label">连续学习</span><span class="dh-stat-val blue">{{ streakDays }}<small>天</small></span></div>
+      <div class="dh-stat"><span class="dh-stat-label">词汇掌握</span><span class="dh-stat-val green">{{ graduatedCount }}<small>/{{ degreeWords.length || VOCAB_REQUIREMENT.receptive }}</small></span></div>
+      <div class="dh-stat"><span class="dh-stat-label">题库总量</span><span class="dh-stat-val orange">{{ degreeQuestions.length }}</span></div>
     </div>
 
-    <!-- 胶囊 Tab -->
-    <div class="tab-bar">
-      <button v-for="t in tabs" :key="t.key" class="tab-pill" :class="{ active: activeTab === t.key }" @click="activeTab = t.key">
+    <!-- 导航 tab（nav-item 圆角按钮风格，与系统其他模块统一） -->
+    <nav class="dh-nav">
+      <button v-for="t in tabs" :key="t.key" class="dh-nav-item" :class="{ active: activeTab === t.key }" @click="activeTab = t.key">
         {{ t.label }}
       </button>
-    </div>
+    </nav>
 
-    <!-- 概览 -->
+    <!-- 概览（分步向导：逐步展示，非一次性全展开） -->
     <section v-show="activeTab === 'overview'" class="panel">
-      <div class="overview-top">
-        <div class="plan-card">
-          <div class="card-title">今日学习计划</div>
-          <ul class="plan-list">
-            <li>新学单词 {{ settings.newPerDay }} 个</li>
-            <li>复习待巩固词 {{ reviewCount }} 个</li>
-            <li>题型训练：{{ EXAM_SECTIONS.find((s) => s.key === trainingType)?.name }}</li>
-            <li v-if="settings.examDate">距考试还有 <b>{{ daysToExam }}</b> 天</li>
-          </ul>
-          <el-button type="primary" round size="small" @click="startStudy">开始今日学习</el-button>
-        </div>
-        <div class="ring-card">
-          <svg width="120" height="120" viewBox="0 0 120 120">
-            <circle cx="60" cy="60" r="50" fill="none" stroke="#eceaf8" stroke-width="12" />
-            <circle
-              cx="60" cy="60" r="50" fill="none" stroke="#534ab7" stroke-width="12" stroke-linecap="round"
-              :stroke-dasharray="`${ringLen} 314`" transform="rotate(-90 60 60)"
-            />
-            <text x="60" y="66" text-anchor="middle" font-size="22" font-weight="600" fill="#3c3489">{{ masteryPercent }}%</text>
-          </svg>
-          <div class="ring-cap">总掌握进度</div>
-        </div>
-      </div>
-
-      <div class="card-title" style="margin: 18px 0 10px">五大题型（严格按大纲）</div>
-      <div class="type-grid">
+      <!-- 步骤指示器 -->
+      <div class="step-indicator">
         <div
-          v-for="s in EXAM_SECTIONS"
-          :key="s.key"
-          class="type-card"
-          :style="{ borderTopColor: s.color }"
-          @click="goTraining(s.key)"
+          v-for="(step, i) in OVERVIEW_STEPS"
+          :key="i"
+          class="step-dot"
+          :class="{ active: overviewStep >= i, current: overviewStep === i }"
+          @click="overviewStep = i"
         >
-          <div class="type-name" :style="{ color: s.color }">{{ s.name }}</div>
-          <div class="type-meta">{{ s.count }}题 · {{ s.score }}分 · {{ s.minutes }}min</div>
-          <div class="type-desc">{{ s.desc }}</div>
+          <span class="step-num">{{ i + 1 }}</span>
+          <span class="step-label">{{ step }}</span>
         </div>
       </div>
 
-      <div class="card-title" style="margin: 18px 0 10px">词汇要求 & 语法项目（大纲规定）</div>
-      <div class="req-grid">
-        <div class="req-card">
-          <div class="req-h">词汇要求</div>
-          <div class="req-row">领会式掌握：<b>{{ VOCAB_REQUIREMENT.receptive }}</b> 词 + {{ VOCAB_REQUIREMENT.receptivePhrase }} 词组</div>
-          <div class="req-row">复用式掌握：<b>{{ VOCAB_REQUIREMENT.productive }}</b> 词 + {{ VOCAB_REQUIREMENT.productivePhrase }} 词组（大纲带 <span class="star">*</span>）</div>
-          <div class="req-row">另需掌握：{{ VOCAB_REQUIREMENT.affix }}</div>
+      <!-- 步骤 0：今日学习计划 -->
+      <div v-if="overviewStep === 0" class="step-content">
+        <div class="overview-top">
+          <div class="plan-card">
+            <div class="card-title">今日学习计划</div>
+            <ul class="plan-list">
+              <li>新学单词 <b>{{ settings.newPerDay }}</b> 个</li>
+              <li>复习待巩固词 <b>{{ reviewCount }}</b> 个</li>
+              <li>题型训练：<b>{{ EXAM_SECTIONS.find((s) => s.key === trainingType)?.name || '词汇和语法' }}</b></li>
+              <li v-if="settings.examDate">距考试还有 <b>{{ daysToExam }}</b> 天</li>
+            </ul>
+            <el-button type="primary" round size="small" @click="startStudy">开始今日学习</el-button>
+          </div>
+          <div class="ring-card">
+            <svg width="120" height="120" viewBox="0 0 120 120">
+              <circle cx="60" cy="60" r="50" fill="none" stroke="#eceaf8" stroke-width="12" />
+              <circle
+                cx="60" cy="60" r="50" fill="none" stroke="#534ab7" stroke-width="12" stroke-linecap="round"
+                :stroke-dasharray="`${ringLen} 314`" transform="rotate(-90 60 60)"
+              />
+              <text x="60" y="66" text-anchor="middle" font-size="22" font-weight="600" fill="#3c3489">{{ masteryPercent }}%</text>
+            </svg>
+            <div class="ring-cap">总掌握进度</div>
+          </div>
         </div>
-        <div class="req-card">
-          <div class="req-h">语法项目（10 项）</div>
-          <div v-for="(g, i) in GRAMMAR_ITEMS" :key="i" class="grammar-item">{{ i + 1 }}. {{ g }}</div>
+        <div class="step-nav">
+          <div></div>
+          <el-button type="primary" @click="overviewStep = 1">下一步：查看五大题型 →</el-button>
+        </div>
+      </div>
+
+      <!-- 步骤 1：五大题型 -->
+      <div v-if="overviewStep === 1" class="step-content">
+        <div class="card-title">五大题型（严格按大纲）</div>
+        <div class="type-grid">
+          <div
+            v-for="s in EXAM_SECTIONS"
+            :key="s.key"
+            class="type-card"
+            :style="{ borderTopColor: s.color }"
+            :class="{ 'type-empty': questionCountByType(s.key) === 0 }"
+            @click="questionCountByType(s.key) > 0 && goTraining(s.key)"
+          >
+            <div class="type-name" :style="{ color: s.color }">{{ s.name }}</div>
+            <div class="type-meta">{{ s.count }}题 · {{ s.score }}分 · {{ s.minutes }}min</div>
+            <div class="type-desc">{{ s.desc }}</div>
+            <div v-if="questionCountByType(s.key) === 0" class="type-empty-badge">暂无题目</div>
+          </div>
+        </div>
+        <div class="step-nav">
+          <el-button @click="overviewStep = 0">← 上一步</el-button>
+          <el-button type="primary" @click="overviewStep = 2">下一步：大纲规定详情 →</el-button>
+        </div>
+      </div>
+
+      <!-- 步骤 2：词汇要求 & 语法项目 -->
+      <div v-if="overviewStep === 2" class="step-content">
+        <div class="card-title">词汇要求 &amp; 语法项目（大纲规定）</div>
+        <div class="req-grid">
+          <div class="req-card">
+            <div class="req-h">词汇要求</div>
+            <div class="req-row">领会式掌握：<b>{{ VOCAB_REQUIREMENT.receptive }}</b> 词 + {{ VOCAB_REQUIREMENT.receptivePhrase }} 词组</div>
+            <div class="req-row">复用式掌握：<b>{{ VOCAB_REQUIREMENT.productive }}</b> 词 + {{ VOCAB_REQUIREMENT.productivePhrase }} 词组（大纲带 <span class="star">*</span>）</div>
+            <div class="req-row">另需掌握：{{ VOCAB_REQUIREMENT.affix }}</div>
+          </div>
+          <div class="req-card">
+            <div class="req-h">语法项目（{{ GRAMMAR_ITEMS.length }} 项）</div>
+            <div v-for="(g, i) in GRAMMAR_ITEMS" :key="i" class="grammar-item">{{ i + 1 }}. {{ g }}</div>
+          </div>
+        </div>
+        <div class="step-nav">
+          <el-button @click="overviewStep = 1">← 上一步</el-button>
+          <div></div>
         </div>
       </div>
     </section>
@@ -437,6 +464,15 @@ const tabs = [
 ]
 const activeTab = ref('overview')
 
+// 概览分步向导
+const OVERVIEW_STEPS = ['今日学习计划', '五大题型', '大纲规定'] as const
+const overviewStep = ref(0)
+
+// 按题型统计题数（用于空状态标注）
+function questionCountByType(type: string): number {
+  return degreeQuestions.filter((q) => q.type === type).length
+}
+
 const settings = ref<DegreeSettings>({ targetSchool: '商丘师范学院继续教育学院', examDate: null, newPerDay: 15, manualStreak: null })
 const manualStreakInput = ref(0)
 const wordProgress = ref<Record<string, WordProgress>>({})
@@ -676,55 +712,91 @@ onMounted(loadAll)
   margin: 0 auto;
   padding: 4px 4px 40px;
 }
-.stat-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+/* ===== 统一顶部（对齐 AI/CET 模块风格）===== */
+.degree-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   gap: 12px;
-  margin-bottom: 14px;
-}
-.stat-card {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 14px 16px;
+  border-radius: 14px;
+  padding: 14px 20px;
+  margin-bottom: 12px;
   box-shadow: var(--shadow-card);
 }
-.stat-label {
-  font-size: 13px;
-  color: var(--text-muted);
-}
-.stat-num {
-  font-size: 26px;
-  font-weight: 600;
-  margin-top: 4px;
-  line-height: 1.1;
-}
-.unit {
-  font-size: 13px;
-  font-weight: 400;
-  margin-left: 2px;
-}
-.tab-bar {
+.dh-brand {
   display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  margin-bottom: 14px;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
 }
-.tab-pill {
-  border: 1px solid var(--border);
+.dh-icon { font-size: 28px; }
+.dh-title {
+  font-size: 18px; font-weight: 800; margin: 0; line-height: 1.3;
+  color: var(--text-strong);
+}
+.dh-sub {
+  font-size: 12.5px; color: var(--text-muted); margin: 2px 0 0; line-height: 1.4;
+}
+.dh-actions { display: flex; gap: 8px; flex-shrink: 0; }
+
+.dh-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.dh-stat {
   background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 14px;
+  text-align: center;
+}
+.dh-stat-label {
+  display: block; font-size: 12px; color: var(--text-muted); margin-bottom: 4px;
+}
+.dh-stat-val {
+  font-size: 22px; font-weight: 700;
+}
+.dh-stat-val.purple { color: #534ab7; }
+.dh-stat-val.blue { color: #185fa5; }
+.dh-stat-val.green { color: #0f6e56; }
+.dh-stat-val.orange { color: #854f0b; }
+.dh-stat-val small { font-size: 13px; font-weight: 400; }
+
+/* 导航 tab（nav-item 圆角按钮风格，与系统其他模块统一） */
+.dh-nav {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  margin-bottom: 16px;
+  padding-bottom: 2px;
+}
+.dh-nav-item {
+  flex: 1 1 0;
+  min-width: 64px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 9px 14px;
+  border-radius: 11px;
+  background: transparent;
   color: var(--text-muted);
-  border-radius: 20px;
-  padding: 7px 16px;
+  font-weight: 700;
   font-size: 13px;
+  border: none;
   cursor: pointer;
   transition: all 0.15s;
+  white-space: nowrap;
 }
-.tab-pill.active {
-  background: #534ab7;
+.dh-nav-item:hover { background: var(--surface-2, #f5f5fa); color: var(--text-strong); }
+.dh-nav-item.active {
+  background: linear-gradient(135deg, #534ab7, #7c6fd6);
   color: #fff;
-  border-color: #534ab7;
-  font-weight: 600;
+  box-shadow: 0 4px 12px rgba(83, 74, 183, 0.25);
 }
 .panel {
   background: var(--surface);
@@ -737,6 +809,57 @@ onMounted(loadAll)
   font-size: 15px;
   font-weight: 600;
   color: var(--text-strong);
+}
+/* 分步向导 */
+.step-indicator {
+  display: flex;
+  gap: 0;
+  margin-bottom: 18px;
+}
+.step-dot {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  background: #f0eeff;
+  color: #999;
+  border: none;
+  flex: 1;
+  justify-content: center;
+}
+.step-dot.active { background: #e8e4ff; color: #534ab7; }
+.step-dot.current { background: #534ab7; color: #fff; box-shadow: 0 2px 8px rgba(83,74,183,0.2); }
+.step-num {
+  width: 22px; height: 22px; border-radius: 50%; background: currentColor; color: #fff;
+  display: inline-flex; align-items: center; justify-content: center; font-size: 12px; flex-shrink: 0;
+}
+.step-dot.current .step-num { background: #fff; color: #534ab7; }
+.step-label { white-space: nowrap; }
+
+.step-content {
+  animation: fadeIn 0.25s ease;
+}
+@keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+
+.step-nav {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+
+/* 空题型卡片 */
+.type-empty { opacity: 0.65; pointer-events: none; }
+.type-empty-badge {
+  position: absolute; top: 8px; right: 8px;
+  background: #f0c987; color: #7a500a; font-size: 11px; font-weight: 700;
+  padding: 2px 8px; border-radius: 10px;
 }
 .overview-top {
   display: flex;
@@ -1348,9 +1471,17 @@ onMounted(loadAll)
   }
 }
 @media (max-width: 560px) {
-  .stat-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  .dh-header {
+    flex-direction: column; align-items: flex-start; padding: 12px 14px;
   }
+  .dh-actions { width: 100%; justify-content: flex-end; }
+  .dh-stats { grid-template-columns: repeat(2, 1fr); gap: 6px; }
+  .dh-stat { padding: 8px 10px; }
+  .dh-stat-val { font-size: 18px; }
+  .dh-nav { gap: 4px; }
+  .dh-nav-item { min-width: 52px; padding: 7px 10px; font-size: 12px; border-radius: 9px; }
+  .step-indicator { flex-direction: column; gap: 6px; }
+  .step-dot { padding: 6px 12px; font-size: 12px; }
   .type-grid {
     grid-template-columns: 1fr;
   }
