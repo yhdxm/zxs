@@ -137,6 +137,54 @@
       <el-empty v-else description="词汇表正在由《考试大纲》OCR 提取，完成后这里会显示全部 4400+ 词，并标注复用式（*）" />
     </section>
 
+    <!-- 背单词卡（学位英语专属，与四六级 prepApp 隔离；全部词一次性卡片墙展示，非逐个翻卡） -->
+    <section v-show="activeTab === 'cards'" class="panel">
+      <div class="card-banner">
+        <div class="card-banner-title">背单词卡 · 学位英语专属</div>
+        <div class="card-banner-sub">一次性展示全部 {{ filteredWords.length }} 词（不是逐个翻卡），每张卡可 🔊 朗读 · 📖 看例句 · 标记掌握 / 收进生词本</div>
+      </div>
+      <div class="toolbar">
+        <el-input v-model="wordQuery" placeholder="搜索单词 / 释义" clearable style="max-width: 320px" />
+        <el-radio-group v-model="wordSrc" size="small">
+          <el-radio-button value="all">全部</el-radio-button>
+          <el-radio-button value="考试大纲">大纲</el-radio-button>
+          <el-radio-button value="复习指南">指南</el-radio-button>
+          <el-radio-button value="模拟试卷">模拟</el-radio-button>
+        </el-radio-group>
+        <el-tag type="info" effect="plain">共 {{ filteredWords.length }} 词</el-tag>
+        <el-tag v-if="graduatedCount" type="success" effect="plain">已掌握 {{ graduatedCount }}</el-tag>
+        <el-tag v-if="reviewCount" type="warning" effect="plain">待复习 {{ reviewCount }}</el-tag>
+      </div>
+      <div v-if="visibleWords.length" class="card-wall">
+        <div v-for="w in visibleWords" :key="w.word" class="word-card" :class="{ weak: wordProgress[w.word]?.weak, graduated: wordProgress[w.word]?.status === 'graduated' }">
+          <div class="wc-head">
+            <span class="wc-word">{{ w.word }}<span v-if="w.productive" class="star">*</span></span>
+            <div class="wc-actions">
+              <button class="speak-btn" :title="'朗读 ' + w.word" @click="speak(w.word)">🔊</button>
+              <button class="speak-btn" :title="'查看例句 ' + w.word" @click="loadExample(w.word)" :disabled="exampleLoading[w.word]">📖</button>
+            </div>
+          </div>
+          <div class="wc-def">{{ w.definition }}</div>
+          <div class="wc-example" v-if="examples[w.word]">
+            <span class="ex-label">例句</span> {{ examples[w.word] }}
+          </div>
+          <div class="wc-src">
+            <el-tag v-for="b in (w.sourceBooks || [])" :key="b" size="small" :type="srcTagType(b)" effect="plain">{{ b }}</el-tag>
+          </div>
+          <div class="wc-ops">
+            <el-button size="small" :type="wordProgress[w.word]?.status === 'graduated' ? 'success' : 'default'" @click="cycleWord(w.word)">
+              {{ wordProgress[w.word]?.status === 'graduated' ? '已掌握' : wordProgress[w.word]?.status === 'learning' ? '学习中' : '标记学习' }}
+            </el-button>
+            <el-button size="small" text type="primary" @click="addWordBook(w)">生词本</el-button>
+          </div>
+        </div>
+      </div>
+      <div class="load-more" v-if="filteredWords.length > wordLimit">
+        <el-button @click="wordLimit = filteredWords.length">显示全部 {{ filteredWords.length }} 词</el-button>
+      </div>
+      <el-empty v-else description="词汇表生成中，稍候自动填充" />
+    </section>
+
     <!-- 词组 / 语句 -->
     <section v-show="activeTab === 'phrases'" class="panel">
       <div class="toolbar">
@@ -380,6 +428,7 @@ const base = import.meta.env.BASE_URL
 const tabs = [
   { key: 'overview', label: '概览' },
   { key: 'words', label: '单词本' },
+  { key: 'cards', label: '背单词卡' },
   { key: 'phrases', label: '词组/语句' },
   { key: 'training', label: '题型训练' },
   { key: 'mock', label: '模拟考试' },
@@ -522,7 +571,7 @@ async function loadAll() {
 }
 
 function startStudy() {
-  activeTab.value = 'words'
+  activeTab.value = 'cards'
 }
 
 function goTraining(key: QuestionType) {
@@ -880,6 +929,93 @@ onMounted(loadAll)
   text-align: center;
   margin-top: 14px;
 }
+/* 背单词卡（学位英语专属） */
+.card-banner {
+  background: linear-gradient(135deg, #6b5bd6, #8a7be0);
+  color: #fff;
+  border-radius: 12px;
+  padding: 14px 18px;
+  margin-bottom: 14px;
+}
+.card-banner-title {
+  font-size: 16px;
+  font-weight: 700;
+}
+.card-banner-sub {
+  font-size: 12.5px;
+  opacity: 0.92;
+  margin-top: 4px;
+  line-height: 1.5;
+}
+.card-wall {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 12px;
+}
+.word-card {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px 14px;
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  transition: all 0.15s;
+}
+.word-card:hover {
+  border-color: #534ab7;
+  box-shadow: 0 4px 14px rgba(83, 74, 183, 0.12);
+}
+.word-card.graduated {
+  background: #f3fbf4;
+  border-color: #c7e9cd;
+}
+.word-card.weak {
+  border-color: #f0c987;
+}
+.wc-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.wc-word {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--text-strong);
+  word-break: break-word;
+}
+.wc-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.wc-def {
+  font-size: 13.5px;
+  color: var(--text-strong);
+  margin: 8px 0 6px;
+  line-height: 1.6;
+}
+.wc-example {
+  font-size: 12.5px;
+  color: var(--text-strong);
+  background: #f7f8ff;
+  border-left: 3px solid #c9c2ff;
+  border-radius: 6px;
+  padding: 6px 8px;
+  margin-bottom: 8px;
+  line-height: 1.6;
+}
+.wc-src {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+.wc-ops {
+  display: flex;
+  gap: 8px;
+  margin-top: auto;
+}
 .quiz-card {
   border: 1px solid var(--border);
   border-radius: 12px;
@@ -1220,6 +1356,12 @@ onMounted(loadAll)
   }
   .panel {
     padding: 14px;
+  }
+  .card-wall {
+    grid-template-columns: 1fr;
+  }
+  .toolbar {
+    flex-wrap: wrap;
   }
 }
 </style>
