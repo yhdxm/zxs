@@ -622,13 +622,57 @@ const libraryArticles = computed(() =>
 function openArticle(a: DegreeArticle) {
   activeArticle.value = a
 }
-function speakText(t: string) {
+// ===== 单词/例句读音（浏览器内置 TTS，离线可用） =====
+// 修复跨平台无声问题：
+// 1) iOS Safari 必须在 speak 前 getVoices() 且选中英文 voice，否则静默
+// 2) Chrome/Safari 经典 bug：cancel() 紧跟 speak() 会吞掉声音，需延迟一帧再 speak
+// 3) iOS 15+ 偶发 speak 后处于 paused 状态，需 resume() 保活才能出声
+let voicesWarmed = false
+function warmVoices() {
   if (typeof window === 'undefined' || !('speechSynthesis' in window)) return
-  const u = new SpeechSynthesisUtterance(t)
+  const synth = window.speechSynthesis
+  if (synth.getVoices().length) {
+    voicesWarmed = true
+    return
+  }
+  // iOS: voices 异步就绪，监听一次即可
+  synth.onvoiceschanged = () => {
+    if (synth.getVoices().length) voicesWarmed = true
+  }
+}
+function pickEnVoice(): SpeechSynthesisVoice | undefined {
+  if (typeof window === 'undefined' || !('speechSynthesis' in window)) return undefined
+  const vs = window.speechSynthesis.getVoices()
+  if (!vs.length) return undefined
+  return vs.find((v) => /en[-_]US/i.test(v.lang)) || vs.find((v) => v.lang?.startsWith('en')) || vs[0]
+}
+function speakWord(text: string, rate = 0.9) {
+  if (!text) return
+  if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
+    ElMessage.warning('当前浏览器不支持语音朗读，请使用 Chrome / Edge / Safari 重试')
+    return
+  }
+  warmVoices()
+  const synth = window.speechSynthesis
+  const u = new SpeechSynthesisUtterance(text)
   u.lang = 'en-US'
-  u.rate = 0.95
-  window.speechSynthesis.cancel()
-  window.speechSynthesis.speak(u)
+  u.rate = rate
+  const voice = pickEnVoice()
+  if (voice) u.voice = voice
+  // 先清空可能积压的朗读，留一帧再播，规避 cancel+speak 竞态导致无声
+  try {
+    synth.cancel()
+  } catch {
+    /* noop */
+  }
+  window.setTimeout(() => {
+    synth.speak(u)
+    // iOS 偶发 paused → resume 保活
+    if (synth.paused) synth.resume()
+  }, 80)
+}
+function speakText(t: string) {
+  speakWord(t, 0.95)
 }
 
 const base = import.meta.env.BASE_URL
@@ -690,12 +734,7 @@ function srcTagType(b: SourceBook): 'success' | 'warning' | 'info' {
   return 'info'
 }
 function speak(word: string) {
-  if (typeof window === 'undefined' || !('speechSynthesis' in window)) return
-  const u = new SpeechSynthesisUtterance(word)
-  u.lang = 'en-US'
-  u.rate = 0.9
-  window.speechSynthesis.cancel()
-  window.speechSynthesis.speak(u)
+  speakWord(word, 0.9)
 }
 async function loadExample(word: string) {
   if (examples.value[word] || exampleLoading.value[word]) return
@@ -981,7 +1020,10 @@ async function removeFav(id: string, isMistake = false) {
   }
 }
 
-onMounted(loadAll)
+onMounted(() => {
+  warmVoices()
+  loadAll()
+})
 </script>
 
 <style scoped>
