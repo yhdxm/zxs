@@ -1027,11 +1027,11 @@ onMounted(() => {
 </script>
 
 <style scoped>
-/* ===== 模块标题栏（与 PageHeader / AI 助手页完全一致） ===== */
+/* ===== 模块标题栏（与 PageHeader / AI 助手页完全一致，对齐图3） ===== */
 .page-header-card {
   background: var(--surface, #fff);
   border: 1px solid var(--border, #e6e3f2);
-  border-radius: 16px;
+  border-radius: 12px;
   box-shadow: 0 2px 12px rgba(34, 48, 78, 0.06);
   margin-bottom: 14px;
 }
@@ -1104,35 +1104,35 @@ onMounted(() => {
   /* 与 AI 助手页 .ai-page 完全一致的容器尺寸 */
 }
 
-/* ===== 顶部导航栏（与 AI/四六级模块风格完全一致） ===== */
+/* ===== 顶部导航栏（与 AI/四六级模块风格完全一致，对齐图3标准） ===== */
 .de-topnav {
   display: flex;
   position: relative;
   z-index: 20;
   background: var(--surface, #fff);
   border: 1px solid var(--border, #e6e3f2);
-  border-radius: 16px;
+  border-radius: 12px;
   box-shadow: 0 3px 10px rgba(34, 48, 78, 0.06);
-  padding: 10px 12px;
-  margin: 0 auto 14px;
+  padding: 8px 12px;
+  margin: 0 auto 12px;
   max-width: 1180px;
   width: calc(100% - 52px);
-  gap: 6px;
+  gap: 4px;
   overflow-x: auto;
 }
 .de-nav-item {
   flex: 1 1 0;
-  min-width: 72px;
+  min-width: 64px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 7px;
-  padding: 10px 14px;
-  border-radius: 11px;
+  gap: 6px;
+  padding: 8px 12px;
+  border-radius: 9px;
   background: transparent;
   color: #5B6A86;
   font-weight: 700;
-  font-size: 14px;
+  font-size: 13px;
   border: none;
   cursor: pointer;
   transition: all 0.15s;
@@ -1142,8 +1142,8 @@ onMounted(() => {
   user-select: none;
 }
 .de-nav-item svg {
-  width: 18px;
-  height: 18px;
+  width: 16px;
+  height: 16px;
   flex-shrink: 0;
 }
 .de-nav-item:hover { background: #F4F3FB; color: #22304E; }
@@ -1201,20 +1201,20 @@ onMounted(() => {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 8px;
-  margin-bottom: 12px;
+  margin-bottom: 10px;
 }
 .dh-stat {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 10px;
-  padding: 10px 14px;
+  padding: 10px 12px;
   text-align: center;
 }
 .dh-stat-label {
-  display: block; font-size: 12px; color: var(--text-muted); margin-bottom: 4px;
+  display: block; font-size: 11.5px; color: var(--text-muted); margin-bottom: 3px;
 }
 .dh-stat-val {
-  font-size: 22px; font-weight: 700;
+  font-size: 20px; font-weight: 700;
 }
 .dh-stat-val.purple { color: #534ab7; }
 .dh-stat-val.blue { color: #185fa5; }
@@ -1222,27 +1222,27 @@ onMounted(() => {
 .dh-stat-val.orange { color: #854f0b; }
 .dh-stat-val small { font-size: 13px; font-weight: 400; }
 
-/* 导航 tab（nav-item 圆角按钮风格，与系统其他模块统一） */
+/* 导航 tab（nav-item 圆角按钮风格，与系统其他模块统一，对齐图3） */
 .dh-nav {
   display: flex;
-  gap: 6px;
+  gap: 4px;
   overflow-x: auto;
-  margin-bottom: 16px;
+  margin-bottom: 12px;
   padding-bottom: 2px;
 }
 .dh-nav-item {
   flex: 1 1 0;
-  min-width: 64px;
+  min-width: 56px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  padding: 9px 14px;
-  border-radius: 11px;
+  gap: 5px;
+  padding: 7px 12px;
+  border-radius: 9px;
   background: transparent;
   color: var(--text-muted);
   font-weight: 700;
-  font-size: 13px;
+  font-size: 12.5px;
   border: none;
   cursor: pointer;
   transition: all 0.15s;
@@ -1260,8 +1260,8 @@ onMounted(() => {
 .panel {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 14px;
-  padding: 18px;
+  border-radius: 12px;
+  padding: 14px 16px;
   box-shadow: var(--shadow-card);
   touch-action: pan-y;
 }
@@ -1330,8 +1330,8 @@ onMounted(() => {
 .plan-card {
   flex: 1 1 320px;
   border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 16px;
+  border-radius: 10px;
+  padding: 14px;
   background: linear-gradient(180deg, #f6f5ff, #fff);
 }
 .plan-list {
@@ -1364,7 +1364,7 @@ onMounted(() => {
   border: 1px solid var(--border);
   border-top: 3px solid #534ab7;
   border-radius: 10px;
-  padding: 12px;
+  padding: 10px;
   cursor: pointer;
   background: #fff;
   transition: transform 0.12s;
@@ -1393,8 +1393,8 @@ onMounted(() => {
 }
 .req-card {
   border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 14px;
+  border-radius: 10px;
+  padding: 12px;
 }
 .req-h {
   font-size: 14px;
@@ -1431,7 +1431,7 @@ onMounted(() => {
 .word-item {
   border: 1px solid var(--border);
   border-radius: 10px;
-  padding: 12px;
+  padding: 10px 12px;
 }
 .word-item.weak {
   border-color: #f09595;
@@ -1816,8 +1816,8 @@ onMounted(() => {
 }
 .quiz-card {
   border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 18px;
+  border-radius: 10px;
+  padding: 14px 16px;
 }
 .quiz-stem {
   font-size: 15px;
@@ -1889,7 +1889,7 @@ onMounted(() => {
   border: 1px solid var(--border);
   border-top: 3px solid #534ab7;
   border-radius: 10px;
-  padding: 14px;
+  padding: 12px;
   text-align: center;
 }
 .paper-no {
@@ -1917,8 +1917,8 @@ onMounted(() => {
 }
 .material-card {
   border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 16px;
+  border-radius: 10px;
+  padding: 14px;
 }
 .material-title {
   font-size: 15px;
@@ -1936,12 +1936,12 @@ onMounted(() => {
 }
 .lib-layout {
   display: grid;
-  grid-template-columns: 280px 1fr;
-  gap: 14px;
+  grid-template-columns: 260px 1fr;
+  gap: 12px;
   border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 12px;
-  min-height: 420px;
+  border-radius: 10px;
+  padding: 10px;
+  min-height: 400px;
 }
 .lib-side {
   display: flex;
@@ -2030,8 +2030,8 @@ onMounted(() => {
 }
 .rw-col {
   border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 14px;
+  border-radius: 10px;
+  padding: 12px;
 }
 .note-list {
   margin-top: 10px;
@@ -2071,7 +2071,7 @@ onMounted(() => {
   border: 1px solid var(--border);
   border-left: 3px solid #534ab7;
   border-radius: 10px;
-  padding: 12px 14px;
+  padding: 10px 12px;
 }
 .phrase-item.spoken {
   border-left-color: #0f6e56;
@@ -2129,11 +2129,11 @@ onMounted(() => {
 .mine-header {
   display: flex;
   align-items: center;
-  gap: 16px;
-  padding: 18px;
+  gap: 14px;
+  padding: 14px;
   background: linear-gradient(135deg, #f6f5ff, #fff);
-  border-radius: 12px;
-  margin-bottom: 16px;
+  border-radius: 10px;
+  margin-bottom: 12px;
 }
 .mine-avatar {
   font-size: 48px;
@@ -2150,11 +2150,11 @@ onMounted(() => {
 .mine-stat-card {
   background: #fff;
   border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 14px 10px;
+  border-radius: 10px;
+  padding: 12px 8px;
   text-align: center;
 }
-.mine-stat-num { font-size: 26px; font-weight: 800; }
+.mine-stat-num { font-size: 22px; font-weight: 800; }
 .mine-stat-num.purple { color: #534ab7; }
 .mine-stat-num.blue { color: #185fa5; }
 .mine-stat-num.green { color: #0f6e56; }
@@ -2164,10 +2164,10 @@ onMounted(() => {
 .mine-ring-row {
   display: flex;
   align-items: center;
-  gap: 20px;
-  padding: 14px;
+  gap: 16px;
+  padding: 12px;
   background: #faf8ff;
-  border-radius: 12px;
+  border-radius: 10px;
 }
 .mine-ring-info { font-size: 13.5px; color: var(--text-strong); line-height: 2; }
 .mine-ring-info b { color: #534ab7; }

@@ -39,9 +39,9 @@ withDefaults(defineProps<{
 .page-header-card {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 16px;
+  border-radius: 12px;
   box-shadow: var(--shadow-card);
-  margin-bottom: 18px;
+  margin-bottom: 14px;
 }
 .ph-inner {
   display: flex;
