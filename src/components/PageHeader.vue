@@ -76,6 +76,9 @@ withDefaults(defineProps<{
   font-weight: 600;
   color: var(--text-strong);
   line-height: 1.3;
+  /* 防止中文标题在窄屏竖排 */
+  word-break: keep-all;
+  white-space: nowrap;
 }
 .ph-sub {
   margin: 2px 0 0;
@@ -92,16 +95,36 @@ withDefaults(defineProps<{
   gap: 10px;
 }
 @media (max-width: 768px) {
-  .page-header-card { margin-bottom: 14px; }
+  .page-header-card { margin-bottom: 10px; }
   .ph-inner {
     flex-direction: column;
     align-items: stretch;
-    gap: 12px;
+    gap: 10px;
     padding: 12px 14px;
+  }
+  .ph-brand { flex-direction: row; align-items: center; gap: 10px; }
+  .ph-title { font-size: 16px; overflow: hidden; text-overflow: ellipsis; }
+  .ph-sub {
+    font-size: 11.5px;
+    line-height: 1.4;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    word-break: break-word;
   }
   .ph-actions {
     flex-wrap: wrap;
     justify-content: flex-end;
+    gap: 8px;
   }
+}
+@media (max-width: 480px) {
+  .ph-inner { padding: 10px 12px; gap: 8px; }
+  .ph-icon { width: 36px; height: 36px; border-radius: 10px; }
+  .ph-title { font-size: 15px; }
+  .ph-sub { -webkit-line-clamp: 1; font-size: 11px; }
+  .ph-actions { flex-direction: column; align-items: stretch; gap: 6px; }
+  .ph-actions :deep(.el-button) { width: 100%; justify-content: center; }
 }
 </style>

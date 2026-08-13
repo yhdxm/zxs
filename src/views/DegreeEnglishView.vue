@@ -1,23 +1,24 @@
 <template>
   <div class="degree-view">
-    <!-- 模块标题栏：位于导航栏正上方，与 AI 助手页一致（全内联样式确保渲染） -->
-    <div class="deg-module-header"
-      style="background:#fff;border:1px solid #e6e3f2;border-radius:16px;box-shadow:0 2px 12px rgba(34,48,78,.06);margin-bottom:14px;padding:14px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;">
-      <div style="display:flex;align-items:center;gap:12px;min-width:0;">
-        <span style="width:40px;height:40px;border-radius:12px;display:grid;place-items:center;flex-shrink:0;background:linear-gradient(135deg,#7c6fd6,#534ab7);color:#fff;box-shadow:0 6px 16px rgba(83,74,183,.3);">
-          <el-icon :size="20" color="#fff"><Reading /></el-icon>
-        </span>
-        <div style="min-width:0;">
-          <h2 style="margin:0;font-size:18px;font-weight:600;color:#1a1a2e;line-height:1.3;">学位英语备考台</h2>
-          <p style="margin:2px 0 0;font-size:12.5px;color:#888;line-height:1.55;">上传你的《大纲/模拟卷/复习指南》PDF，自动 OCR 生成专题词库与背诵计划，按考试 5 大题型系统备考。</p>
+    <!-- 模块标题栏（与 AI 助手/四六级 PageHeader 完全一致） -->
+    <header class="page-header-card deg-header-main">
+      <div class="ph-inner">
+        <div class="ph-brand">
+          <span class="ph-icon">
+            <el-icon :size="20" color="#fff"><Reading /></el-icon>
+          </span>
+          <div class="ph-text">
+            <h2 class="ph-title">学位英语备考台</h2>
+            <p class="ph-sub">上传你的《大纲/模拟卷/复习指南》PDF，自动 OCR 生成专题词库与背诵计划，按考试 5 大题型系统备考。</p>
+          </div>
+        </div>
+        <div class="ph-actions">
+          <el-button :icon="ArrowLeft" @click="router.push('/learn/cet-prep')">返回四级</el-button>
+          <el-button text :icon="Setting" @click="settingsVisible = true">设置</el-button>
+          <el-button type="primary" round :icon="VideoPlay" @click="startStudy">开始学习</el-button>
         </div>
       </div>
-      <div style="flex-shrink:0;display:flex;align-items:center;gap:10px;">
-        <el-button :icon="ArrowLeft" @click="router.push('/learn/cet-prep')">返回四级</el-button>
-        <el-button text :icon="Setting" @click="settingsVisible = true">设置</el-button>
-        <el-button type="primary" round :icon="VideoPlay" @click="startStudy">开始学习</el-button>
-      </div>
-    </div>
+    </header>
 
     <!-- 顶部导航栏（PC端：与 AI/四六级模块风格完全一致） -->
     <nav class="de-topnav">
@@ -990,7 +991,12 @@ onMounted(loadAll)
   border: 1px solid var(--border, #e6e3f2);
   border-radius: 16px;
   box-shadow: 0 2px 12px rgba(34, 48, 78, 0.06);
-  margin-bottom: 16px;
+  margin-bottom: 14px;
+}
+/* 学位英语品牌色：紫色渐变图标 */
+.deg-header-main .ph-icon {
+  background: linear-gradient(135deg, #7c6fd6, #534ab7) !important;
+  box-shadow: 0 6px 16px rgba(83, 74, 183, 0.3) !important;
 }
 .ph-inner {
   display: flex;
@@ -1024,6 +1030,9 @@ onMounted(loadAll)
   font-weight: 600;
   color: var(--text-strong, #1a1a2e);
   line-height: 1.3;
+  /* 防止中文标题在任何情况下竖排 */
+  word-break: keep-all;
+  white-space: nowrap;
 }
 .ph-sub {
   margin: 2px 0 0;
@@ -1048,6 +1057,8 @@ onMounted(loadAll)
   padding: 0 18px calc(18px + env(safe-area-inset-bottom));
   width: 100%;
   box-sizing: border-box;
+  /* 与四六级统一背景色 */
+  background: #FBF6EE;
   /* 与 AI 助手页 .ai-page 完全一致的容器尺寸 */
 }
 
@@ -2156,16 +2167,41 @@ onMounted(loadAll)
 @media (max-width: 768px) {
   /* 移动端：顶部导航隐藏，改用底部固定导航 */
   .de-topnav { display: none; }
-  .page-header-card { margin-bottom: 12px; }
+  /* 标题栏移动端适配（核心修复：防止竖排） */
+  .page-header-card { margin-bottom: 10px; }
   .page-header-card .ph-inner {
     flex-direction: column;
     align-items: stretch;
     gap: 10px;
     padding: 12px 14px;
   }
+  .page-header-card .ph-brand {
+    flex-direction: row;
+    align-items: center;
+    gap: 10px;
+  }
+  .page-header-card .ph-title {
+    font-size: 16px;
+    /* 防止中文标题竖排：禁止折行 */
+    word-break: keep-all;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .page-header-card .ph-sub {
+    font-size: 11.5px;
+    line-height: 1.4;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    /* 允许描述文字正常换行，但不逐字折行 */
+    word-break: break-word;
+  }
   .page-header-card .ph-actions {
     flex-wrap: wrap;
     justify-content: flex-end;
+    gap: 8px;
   }
   .de-bottom-nav {
     display: flex;
@@ -2221,6 +2257,19 @@ onMounted(loadAll)
 }
 
 @media (max-width: 560px) {
+  /* 标题栏超小屏：图标+标题横排不变，按钮全宽 */
+  .page-header-card .ph-inner { padding: 10px 12px; gap: 8px; }
+  .page-header-card .ph-brand { gap: 8px; }
+  .page-header-card .ph-icon { width: 36px; height: 36px; border-radius: 10px; }
+  .page-header-card .ph-title { font-size: 15px; }
+  .page-header-card .ph-sub { font-size: 11px; -webkit-line-clamp: 1; }
+  .page-header-card .ph-actions {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
+  }
+  .page-header-card .ph-actions .el-button { width: 100%; justify-content: center; }
+
   .dh-header {
     flex-direction: column; align-items: stretch; padding: 12px 14px;
   }
