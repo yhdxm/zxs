@@ -1,5 +1,17 @@
 <template>
   <div class="cet-prep-root" ref="root">
+    <!-- 模块标题栏：与系统 PageHeader 组件一致（位于导航栏正上方） -->
+    <PageHeader
+      title="四六级备考"
+      :icon="School"
+      subtitle="大纲词库 4544 词 · 听力 / 阅读 / 写作 / 翻译四轨系统训练 · 智能错本复盘"
+    >
+      <template #actions>
+        <el-button text :icon="Setting" @click="openSettings">设置</el-button>
+        <el-button type="primary" round :icon="VideoPlay" @click="startStudy">开始学习</el-button>
+      </template>
+    </PageHeader>
+
     <nav class="topnav" id="topNav"></nav>
     <div v-if="missingTable" class="prep-missing-banner">
       备考词库表（cet4_words）尚未创建或网络连接失败，当前使用内置完整四级词库（4544 词）。联网并在 Supabase 中执行 <code>scripts/cet4_prep.sql</code> 后，可自动同步云端进度与词表。
@@ -32,6 +44,8 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import PageHeader from '../components/PageHeader.vue'
+import { School, Setting, VideoPlay } from '@element-plus/icons-vue'
 import { initPrep, type PrepStorage } from '../prep/prepApp'
 import { MASTER_WORDS_BUNDLE } from '../prep/masterWordsBundle'
 import {
@@ -68,6 +82,21 @@ const emptyState = () => ({
 
 function goDegree() {
   router.push('/learn/degree-english')
+}
+
+/* PageHeader 按钮：桥接到 vanilla 应用内已有的逻辑（nav-item / data-act） */
+function openSettings() {
+  const mine = root.value?.querySelector('.nav-item[data-view="mine"]') as HTMLElement | null
+  if (mine) mine.click()
+}
+function startStudy() {
+  const today = root.value?.querySelector('.nav-item[data-view="today"]') as HTMLElement | null
+  if (today) today.click()
+  // 切到今日视图后，触发其中的「开始背词」专注模式
+  window.setTimeout(() => {
+    const btn = document.querySelector('[data-act="startFocus"]') as HTMLElement | null
+    if (btn) btn.click()
+  }, 60)
 }
 
 const storage: PrepStorage = {
@@ -137,6 +166,10 @@ onUnmounted(() => {
   --border-2: #F0EEF8;
   --shadow: 0 8px 24px rgba(34, 48, 78, 0.08);
   --shadow-sm: 0 3px 10px rgba(34, 48, 78, 0.06);
+  /* 覆盖全局主题变量，使 PageHeader 图标呈四六级紫色品牌（仅作用于本页） */
+  --primary-2: #7F77DD;
+  --primary-3: #534AB7;
+  --accent-glow: rgba(83, 74, 183, 0.28);
   --radius: 16px;
   --radius-sm: 11px;
   background: var(--bg);
