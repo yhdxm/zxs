@@ -17,6 +17,16 @@ export default defineConfig({
     include: ['test/**/*.test.ts'],
     clearMocks: true,
     restoreMocks: true,
+    // 修复管控/权限测试套件在并行线程池下偶发 ENOENT：
+    // 各文件挂载组件时会实例化真实 Supabase Auth 客户端并写临时锁文件，
+    // 多线程共享同一 os.tmpdir 产生竞态。改用 forks 池 + 单 fork，
+    // 让所有测试在单一进程串行执行，彻底消除跨线程临时目录冲突。
+    pool: 'forks',
+    poolOptions: {
+      forks: {
+        singleFork: true,
+      },
+    },
     // 单测环境注入占位 Supabase 变量：仅为满足 createClient 的非空校验，
     // 不会发出真实请求（客户端在 setup.ts 中已整体桩化）。
     env: {

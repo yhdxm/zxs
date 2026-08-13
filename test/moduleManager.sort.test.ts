@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import { nextTick } from 'vue'
 import { mount } from '@vue/test-utils'
 import ModuleManager from '../src/components/ModuleManager.vue'
 import type { AppDashboardData, TodoItem, PointItem, ContentItem } from '../src/services/appDataService'
@@ -81,5 +82,56 @@ describe('M6 状态优先级排序（ModuleManager.filteredList）', () => {
     )
     const order = mountMgr('contents', dashboard).vm.filteredList.map((x: any) => x.id)
     expect(order).toEqual(['c_undone1', 'c_undone2', 'c_done'])
+  })
+})
+
+describe('M6 模块内交互（点击/输入有响应，防“没反应”回归）', () => {
+  it('搜索框输入实时过滤列表（交互生效）', async () => {
+    const dashboard = makeDashboard(
+      [
+        { title: '苹果待办' },
+        { title: '香蕉待办' },
+        { title: '橙子待办' },
+      ],
+      [],
+      []
+    )
+    const wrapper = mountMgr('todos', dashboard)
+    expect(wrapper.vm.filteredList.length).toBe(3)
+    const input = wrapper.findComponent({ name: 'ElInput' })
+    await input.setValue('苹果')
+    await nextTick()
+    expect(wrapper.vm.filteredList.length).toBe(1)
+    expect(wrapper.vm.filteredList[0].title).toBe('苹果待办')
+  })
+
+  it('清空搜索后恢复全部列表', async () => {
+    const dashboard = makeDashboard([{ title: 'A任务' }, { title: 'B任务' }], [], [])
+    const wrapper = mountMgr('todos', dashboard)
+    const input = wrapper.findComponent({ name: 'ElInput' })
+    await input.setValue('A')
+    await nextTick()
+    expect(wrapper.vm.filteredList.length).toBe(1)
+    await input.setValue('')
+    await nextTick()
+    expect(wrapper.vm.filteredList.length).toBe(2)
+  })
+
+  it('待办状态筛选下拉改变 filteredList（下拉交互生效）', async () => {
+    const dashboard = makeDashboard(
+      [
+        { title: '已完成项', status: 'done' },
+        { title: '未开始项', status: 'todo' },
+      ],
+      [],
+      []
+    )
+    const wrapper = mountMgr('todos', dashboard)
+    expect(wrapper.vm.filteredList.length).toBe(2)
+    // 切换为“已完成”过滤
+    wrapper.vm.todoFilter = 'done'
+    await nextTick()
+    expect(wrapper.vm.filteredList.length).toBe(1)
+    expect(wrapper.vm.filteredList[0].title).toBe('已完成项')
   })
 })
