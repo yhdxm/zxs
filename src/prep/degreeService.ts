@@ -28,6 +28,19 @@ async function getUserId(): Promise<string | null> {
 function lsKey(prefix: string, userId: string) {
   return `degree_${prefix}_${userId}`
 }
+/** 已删除 ID 集合（本地持久化，防止 Supabase 删除失败后旧数据复活） */
+const DELETED_IDS_KEY = 'degree_deleted_ids'
+function getDeletedIds(userId: string): Set<string> {
+  try {
+    const v = localStorage.getItem(lsKey(DELETED_IDS_KEY, userId))
+    return v ? new Set(JSON.parse(v) as string[]) : new Set()
+  } catch { return new Set() }
+}
+function addDeletedId(userId: string, id: string): void {
+  const s = getDeletedIds(userId)
+  s.add(id)
+  try { localStorage.setItem(lsKey(DELETED_IDS_KEY, userId), JSON.stringify([...s])) } catch { /* noop */ }
+}
 function lsGet<T>(prefix: string, userId: string, fallback: T): T {
   try {
     const v = localStorage.getItem(lsKey(prefix, userId))
@@ -212,6 +225,7 @@ export async function addMistake(m: Omit<MistakeRec, 'id' | 'removed'>): Promise
 export async function loadMistakes(): Promise<MistakeRec[]> {
   const userId = await getUserId()
   if (!userId) return []
+  const deletedIds = getDeletedIds(userId)
   try {
     const { data, error } = await supabase
       .from('degree_mistakes')
@@ -219,17 +233,19 @@ export async function loadMistakes(): Promise<MistakeRec[]> {
       .eq('user_id', userId)
       .eq('removed', false)
     if (error) throw error
-    return ((data as any[]) || []).map((r) => ({
-      id: r.id,
-      questionId: r.question_id,
-      type: r.type,
-      userAnswer: r.user_answer,
-      reason: r.reason,
-      due: r.due,
-      removed: r.removed
-    }))
+    return ((data as any[]) || [])
+      .map((r) => ({
+        id: r.id,
+        questionId: r.question_id,
+        type: r.type,
+        userAnswer: r.user_answer,
+        reason: r.reason,
+        due: r.due,
+        removed: r.removed
+      }))
+      .filter((m) => !deletedIds.has(m.id)) // 本地删除缓存兜底
   } catch {
-    return lsGet<MistakeRec[]>('mistakes', userId, []).filter((m) => !m.removed)
+    return lsGet<MistakeRec[]>('mistakes', userId, []).filter((m) => !m.removed && !deletedIds.has(m.id))
   }
 }
 
@@ -267,35 +283,63 @@ export async function addFavorite(
 export async function loadFavorites(kind?: FavoriteKind): Promise<FavoriteRec[]> {
   const userId = await getUserId()
   if (!userId) return []
+  const deletedIds = getDeletedIds(userId)
   try {
     let q = supabase.from('degree_favorites').select('*').eq('user_id', userId)
     if (kind) q = q.eq('kind', kind)
     const { data, error } = await q.order('created_at', { ascending: false })
     if (error) throw error
-    return ((data as any[]) || []).map((r) => ({
-      id: r.id,
-      kind: r.kind,
-      refId: r.ref_id,
-      title: r.title,
-      content: r.content,
-      createdAt: r.created_at
-    }))
+    return ((data as any[]) || [])
+      .map((r) => ({
+        id: r.id,
+        kind: r.kind,
+        refId: r.ref_id,
+        title: r.title,
+        content: r.content,
+        createdAt: r.created_at
+      }))
+      .filter((f) => !deletedIds.has(f.id)) // 本地删除缓存：即使 Supabase 未删成功也过滤掉
   } catch {
     const all = lsGet<FavoriteRec[]>('favorites', userId, [])
-    return kind ? all.filter((f) => f.kind === kind) : all
+    return all.filter((f) => !deletedIds.has(f.id) && (!kind || f.kind === kind))
   }
 }
 
 export async function removeFavorite(id: string): Promise<void> {
   const userId = await getUserId()
-  if (userId) {
-    const all = lsGet<FavoriteRec[]>('favorites', userId, []).filter((f) => f.id !== id)
-    lsSet('favorites', userId, all)
-  }
+  if (!userId) return
+  // 1) 本地删除缓存（立即生效，跨刷新持久化 — 防止 Supabase 删除失败后旧数据复活）
+  addDeletedId(userId, id)
+  // 2) localStorage 兜底：立即从本地数组中移除
+  const all = lsGet<FavoriteRec[]>('favorites', userId, []).filter((f) => f.id !== id)
+  lsSet('favorites', userId, all)
+  // 3) Supabase 硬删除
   try {
     const { error } = await supabase.from('degree_favorites').delete().eq('id', id)
     if (error) throw error
   } catch {
-    /* 兜底 */
+    // 硬删除失败 → 尝试软删除标记（upsert removed=true），确保下次 load 不返回
+    try {
+      await supabase.from('degree_favorites').upsert({ id, user_id: userId, removed: true, updated_at: new Date().toISOString() })
+    } catch {
+      /* 双重兜底均已失效，但本地 deleted_ids 缓存仍保证不显示 */
+    }
+  }
+}
+
+// ---------- 错题删除（与 removeFavorite 同样健壮的删除模式） ----------
+export async function removeMistake(id: string): Promise<void> {
+  const userId = await getUserId()
+  if (!userId) return
+  addDeletedId(userId, id)
+  // localStorage 兜底
+  const all = lsGet<MistakeRec[]>('mistakes', userId, []).map((m) => m.id === id ? { ...m, removed: true } : m)
+  lsSet('mistakes', userId, all)
+  // Supabase 软删除（mistakes 表已有 removed 字段）
+  try {
+    const { error } = await supabase.from('degree_mistakes').update({ removed: true, updated_at: new Date().toISOString() }).eq('id', id)
+    if (error) throw error
+  } catch {
+    /* 本地 deleted_ids + localStorage 已保证不显示 */
   }
 }

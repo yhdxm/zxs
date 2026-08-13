@@ -215,7 +215,7 @@ onUnmounted(() => {
 .cet-prep-root ::-webkit-scrollbar { width: 9px; height: 9px; }
 .cet-prep-root ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 9px; }
 
-/* ===== 顶部导航（桌面/平板横向）—— 与图3标准一致：紧凑尺寸 ===== */
+/* ===== 顶部导航（桌面/平板横向）—— 与学位英语 .de-topnav 完全一致 ===== */
 .cet-prep-root .topnav {
   display: flex;
   position: relative;
@@ -226,8 +226,9 @@ onUnmounted(() => {
   box-shadow: var(--shadow-sm);
   padding: 8px 12px;
   margin: 0 auto 12px;
-  max-width: 1180px;
-  width: calc(100% - 52px);
+  /* 与学位英语一致：满宽不受额外缩进 */
+  max-width: none;
+  width: 100%;
   gap: 4px;
   overflow-x: auto;
 }
@@ -245,9 +246,16 @@ onUnmounted(() => {
   font-weight: 700;
   font-size: 13px;
   border: none;
-  transition: 0.15s;
+  transition: 0.12s ease-out; /* 缩短过渡 */
   white-space: nowrap;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  transform: translateZ(0);
+  will-change: background-color, color, box-shadow;
 }
+.cet-prep-root .topnav .nav-item:hover { background: var(--surface-2); color: var(--ink); }
+.cet-prep-root .topnav .nav-item:active { transform: scale(0.97); }
 .cet-prep-root .topnav .nav-item:hover { background: var(--surface-2); color: var(--ink); }
 .cet-prep-root .topnav .nav-item.active {
   background: linear-gradient(135deg, var(--orange), var(--orange-2));
@@ -256,6 +264,25 @@ onUnmounted(() => {
 }
 .cet-prep-root .topnav .nav-item svg { width: 16px; height: 16px; }
 .cet-prep-root .bottom-nav { display: none; }
+
+/* ===== 区块分割线（主要区域之间） ===== */
+.cet-prep-root .topnav {
+  margin-bottom: 12px;
+}
+.cet-prep-root .degree-entry {
+  margin-bottom: 12px;
+}
+/* 隐藏 prepApp 内的重复设置按钮（PageHeader 已有） */
+.cet-prep-root [data-act="gotoSettings"] {
+  display: none !important;
+}
+/* prepApp 渲染的内容区内分割线 */
+.cet-prep-root .content > .card + .card,
+.cet-prep-root .content > .handle + .card,
+.cet-prep-root .content > .card + .handle,
+.cet-prep-root .content > .stat-row + .card {
+  margin-top: 12px;
+}
 
 .cet-prep-root .content { padding: 0; max-width: none; width: 100%; margin: 0 auto; }
 .cet-prep-root .page-head { margin-bottom: 18px; }
@@ -287,6 +314,7 @@ onUnmounted(() => {
 /* buttons —— 与图3标准一致 */
 .cet-prep-root .btn { display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; border-radius: 9px; font-weight: 700; font-size: 13px; background: var(--surface-2); color: var(--ink); border: 1px solid var(--border); transition: 0.15s; }
 .cet-prep-root .btn:hover { background: var(--surface); }
+.cet-prep-root .btn:active { transform: scale(0.97); }
 .cet-prep-root .btn svg { width: 17px; height: 17px; }
 .cet-prep-root .btn-primary { background: linear-gradient(135deg, var(--orange), var(--orange-2)); color: #fff; border: none; box-shadow: var(--shadow-sm); }
 .cet-prep-root .btn-primary:hover { filter: brightness(1.04); }
@@ -461,6 +489,7 @@ onUnmounted(() => {
   touch-action: manipulation;
 }
 .cet-prep-root .degree-entry:hover { filter: brightness(1.05); transform: translateY(-1px); }
+.cet-prep-root .degree-entry:active { transform: scale(0.99); transition: 0.05s; }
 .cet-prep-root .de-entry-title { font-weight: 800; font-size: 15.5px; margin-bottom: 3px; }
 .cet-prep-root .de-entry-sub { font-size: 12.5px; opacity: 0.92; line-height: 1.5; }
 .cet-prep-root .de-entry-text,

@@ -1012,9 +1012,11 @@ async function saveNote() {
 }
 
 async function removeFav(id: string, isMistake = false) {
-  await svc.removeFavorite(id)
-  if (isMistake) mistakes.value = await svc.loadMistakes()
-  else {
+  if (isMistake) {
+    await svc.removeMistake(id)
+    mistakes.value = await svc.loadMistakes()
+  } else {
+    await svc.removeFavorite(id)
     notes.value = await svc.loadFavorites('note')
     wordBook.value = await svc.loadFavorites('word')
   }
@@ -1104,7 +1106,7 @@ onMounted(() => {
   /* 与 AI 助手页 .ai-page 完全一致的容器尺寸 */
 }
 
-/* ===== 顶部导航栏（与 AI/四六级模块风格完全一致，对齐图3标准） ===== */
+/* ===== 顶部导航栏（与四六级 .topnav 完全一致的尺寸规格） ===== */
 .de-topnav {
   display: flex;
   position: relative;
@@ -1115,8 +1117,9 @@ onMounted(() => {
   box-shadow: 0 3px 10px rgba(34, 48, 78, 0.06);
   padding: 8px 12px;
   margin: 0 auto 12px;
-  max-width: 1180px;
-  width: calc(100% - 52px);
+  /* 与四六级一致：满宽不受额外缩进 */
+  max-width: none;
+  width: 100%;
   gap: 4px;
   overflow-x: auto;
 }
@@ -1135,11 +1138,13 @@ onMounted(() => {
   font-size: 13px;
   border: none;
   cursor: pointer;
-  transition: all 0.15s;
+  transition: all 0.12s ease-out; /* 缩短过渡 */
   white-space: nowrap;
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
   user-select: none;
+  transform: translateZ(0);
+  will-change: background-color, color, box-shadow;
 }
 .de-nav-item svg {
   width: 16px;
@@ -1147,10 +1152,28 @@ onMounted(() => {
   flex-shrink: 0;
 }
 .de-nav-item:hover { background: #F4F3FB; color: #22304E; }
+.de-nav-item:active { transform: scale(0.97); }
 .de-nav-item.active {
   background: linear-gradient(135deg, #534ab7, #7c6fd6);
   color: #fff;
   box-shadow: 0 4px 12px rgba(83, 74, 183, 0.25);
+}
+
+/* ===== 区块分割线（主要区域之间） ===== */
+.degree-view > .page-header-card,
+.degree-view > .de-topnav,
+.degree-view > .dh-stats,
+.degree-view > .dh-nav,
+.degree-view > .panel {
+  margin-bottom: 12px;
+}
+.degree-view > .dh-stats {
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border, #e6e3f2);
+}
+.degree-view > .dh-nav {
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border, #e6e3f2);
 }
 
 /* 移动端底部导航（≤768px 显示，PC端隐藏） */
@@ -1245,13 +1268,16 @@ onMounted(() => {
   font-size: 12.5px;
   border: none;
   cursor: pointer;
-  transition: all 0.15s;
+  transition: all 0.12s ease-out; /* 缩短过渡时间加快响应感 */
   white-space: nowrap;
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
   user-select: none;
+  transform: translateZ(0);
+  will-change: background-color, color, box-shadow;
 }
 .dh-nav-item:hover { background: var(--surface-2, #f5f5fa); color: var(--text-strong); }
+.dh-nav-item:active { transform: scale(0.97); }
 .dh-nav-item.active {
   background: linear-gradient(135deg, #534ab7, #7c6fd6);
   color: #fff;
@@ -1265,6 +1291,11 @@ onMounted(() => {
   box-shadow: var(--shadow-card);
   touch-action: pan-y;
 }
+/* 卡片/按钮通用点击反馈 */
+.panel:active,
+.type-card:active,
+.quiz-card:active,
+.req-card:active { transform: scale(0.995); }
 .card-title {
   font-size: 15px;
   font-weight: 600;
