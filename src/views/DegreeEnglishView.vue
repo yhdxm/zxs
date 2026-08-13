@@ -1099,8 +1099,8 @@ onMounted(() => {
   padding: 0 18px calc(18px + env(safe-area-inset-bottom));
   width: 100%;
   box-sizing: border-box;
-  /* 与四六级统一背景色 */
-  background: #FBF6EE;
+  /* 与现有系统白底一致 */
+  background: #f8fafc;
   /* 与 AI 助手页 .ai-page 完全一致的容器尺寸 */
 }
 

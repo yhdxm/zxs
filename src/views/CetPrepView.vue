@@ -151,7 +151,7 @@ onUnmounted(() => {
      避免 .btn/.card/.input 等通用类名污染主站 Element Plus 组件 -->
 <style>
 .cet-prep-root {
-  --bg: #FBF6EE;
+  --bg: #f8fafc; /* 与现有系统白底一致（--bg-app） */
   --surface: #FFFFFF;
   --surface-2: #F4F3FB;
   --ink: #22304E;
@@ -164,13 +164,13 @@ onUnmounted(() => {
   --amber: #E8A33D;
   --border: #E6E3F2;
   --border-2: #F0EEF8;
-  --shadow: 0 8px 24px rgba(34, 48, 78, 0.08);
+  --shadow: var(--shadow-card); /* 与现有系统卡片阴影一致（indigo 光晕） */
   --shadow-sm: 0 3px 10px rgba(34, 48, 78, 0.06);
   /* 覆盖全局主题变量，使 PageHeader 图标呈四六级紫色品牌（仅作用于本页） */
   --primary-2: #7F77DD;
   --primary-3: #534AB7;
   --accent-glow: rgba(83, 74, 183, 0.28);
-  --radius: 16px;
+  --radius: 14px; /* 与现有系统卡片圆角一致 */
   --radius-sm: 11px;
 
   /* 与 AI 助手页 .ai-page 完全一致的容器尺寸 */
