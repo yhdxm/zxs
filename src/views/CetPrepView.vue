@@ -172,6 +172,17 @@ onUnmounted(() => {
   --accent-glow: rgba(83, 74, 183, 0.28);
   --radius: 16px;
   --radius-sm: 11px;
+
+  /* 与 AI 助手页 .ai-page 完全一致的容器尺寸 */
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 0 18px 18px;
+  width: 100%;
+  box-sizing: border-box;
+
   background: var(--bg);
   color: var(--ink);
   min-height: 100vh;

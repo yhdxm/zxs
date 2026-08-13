@@ -13,6 +13,7 @@
         </div>
       </div>
       <div style="flex-shrink:0;display:flex;align-items:center;gap:10px;">
+        <el-button :icon="ArrowLeft" @click="router.push('/learn/cet-prep')">返回四级</el-button>
         <el-button text :icon="Setting" @click="settingsVisible = true">设置</el-button>
         <el-button type="primary" round :icon="VideoPlay" @click="startStudy">开始学习</el-button>
       </div>
@@ -591,7 +592,8 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { Reading, Setting, VideoPlay, Picture } from '@element-plus/icons-vue'
+import { useRouter } from 'vue-router'
+import { Reading, Setting, VideoPlay, Picture, ArrowLeft } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import {
   EXAM_SECTIONS,
@@ -640,6 +642,7 @@ const tabs = [
   { key: 'library', label: '资料库' },
   { key: 'rw', label: '读写中心' }
 ]
+const router = useRouter()
 const activeTab = ref('overview')
 
 // 顶部导航（与 AI/四六级模块一致：今日/刷题/错本/我的）
@@ -1037,10 +1040,15 @@ onMounted(loadAll)
 }
 
 .degree-view {
-  max-width: 1180px;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  max-width: 1400px;
   margin: 0 auto;
-  padding: 4px 4px calc(40px + env(safe-area-inset-bottom));
-  /* 移动端为底部固定导航留空间，避免tab被遮挡无法点击 */
+  padding: 0 18px calc(18px + env(safe-area-inset-bottom));
+  width: 100%;
+  box-sizing: border-box;
+  /* 与 AI 助手页 .ai-page 完全一致的容器尺寸 */
 }
 
 /* ===== 顶部导航栏（与 AI/四六级模块风格完全一致） ===== */
