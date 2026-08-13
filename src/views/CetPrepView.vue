@@ -16,7 +16,7 @@
     <div v-if="missingTable" class="prep-missing-banner">
       备考词库表（cet4_words）尚未创建或网络连接失败，当前使用内置完整四级词库（4544 词）。联网并在 Supabase 中执行 <code>scripts/cet4_prep.sql</code> 后，可自动同步云端进度与词表。
     </div>
-    <div class="degree-entry" @click="goDegree">
+    <div class="degree-entry" @click.stop="goDegree" role="button" tabindex="0" @keydown.enter.prevent="goDegree">
       <div class="de-entry-text">
         <div class="de-entry-title">学位英语备考台 · 新上线</div>
         <div class="de-entry-sub">上传你的《大纲/模拟卷/复习指南》PDF，自动 OCR 生成专属词库与背词计划，按考试 5 大题型系统备考。</div>
@@ -81,7 +81,11 @@ const emptyState = () => ({
 })
 
 function goDegree() {
-  router.push('/learn/degree-english')
+  try {
+    router.push('/learn/degree-english')
+  } catch (e) {
+    console.error('[CetPrep] 跳转学位英语失败:', e)
+  }
 }
 
 /* PageHeader 按钮：桥接到 vanilla 应用内已有的逻辑（nav-item / data-act） */
@@ -173,13 +177,13 @@ onUnmounted(() => {
   --radius: 14px; /* 与现有系统卡片圆角一致 */
   --radius-sm: 11px;
 
-  /* 与 AI 助手页 .ai-page 完全一致的容器尺寸 */
+  /* 与 AI 助手页 / 学位英语页 .degree-view 完全一致的容器尺寸（含移动端安全区） */
   display: flex;
   flex-direction: column;
   min-width: 0;
   max-width: 1400px;
   margin: 0 auto;
-  padding: 0 18px 18px;
+  padding: 0 18px calc(18px + env(safe-area-inset-bottom));
   width: 100%;
   box-sizing: border-box;
 
@@ -221,7 +225,7 @@ onUnmounted(() => {
   border-radius: 12px;
   box-shadow: var(--shadow-sm);
   padding: 8px 12px;
-  margin: 14px auto 12px;
+  margin: 0 auto 12px;
   max-width: 1180px;
   width: calc(100% - 52px);
   gap: 4px;
@@ -253,7 +257,7 @@ onUnmounted(() => {
 .cet-prep-root .topnav .nav-item svg { width: 16px; height: 16px; }
 .cet-prep-root .bottom-nav { display: none; }
 
-.cet-prep-root .content { padding: 0 16px 32px; max-width: 1180px; width: 100%; margin: 0 auto; }
+.cet-prep-root .content { padding: 0; max-width: none; width: 100%; margin: 0 auto; }
 .cet-prep-root .page-head { margin-bottom: 18px; }
 .cet-prep-root .page-title { font-size: 23px; font-weight: 800; margin: 0 0 4px; }
 .cet-prep-root .page-sub { color: var(--ink-soft); font-size: 13.5px; margin: 0; }
@@ -446,16 +450,21 @@ onUnmounted(() => {
   color: #fff;
   border-radius: 12px;
   padding: 12px 16px;
-  margin: 0 auto 12px;
-  max-width: 1180px;
-  width: calc(100% - 52px);
+  margin: 0 0 12px;
+  max-width: none;
+  width: 100%;
   cursor: pointer;
   box-shadow: var(--shadow-sm);
   transition: 0.15s;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
 }
 .cet-prep-root .degree-entry:hover { filter: brightness(1.05); transform: translateY(-1px); }
 .cet-prep-root .de-entry-title { font-weight: 800; font-size: 15.5px; margin-bottom: 3px; }
 .cet-prep-root .de-entry-sub { font-size: 12.5px; opacity: 0.92; line-height: 1.5; }
+.cet-prep-root .de-entry-text,
+.cet-prep-root .de-entry-go { pointer-events: none; }
 .cet-prep-root .de-entry-go { flex: 0 0 auto; font-weight: 800; font-size: 15px; background: rgba(255, 255, 255, 0.2); padding: 8px 14px; border-radius: 999px; }
 @media (max-width: 768px) {
   .cet-prep-root .degree-entry { flex-direction: column; align-items: flex-start; }
@@ -497,8 +506,8 @@ onUnmounted(() => {
     background: var(--orange-soft);
   }
   .cet-prep-root .bottom-nav .nav-item svg { width: 22px; height: 22px; }
-  .cet-prep-root .content { padding: 16px 14px calc(92px + env(safe-area-inset-bottom)); }
-  .cet-prep-root .degree-entry { width: calc(100% - 28px); margin-top: 16px; }
+  .cet-prep-root .content { padding: 0 0 calc(92px + env(safe-area-inset-bottom)); }
+  .cet-prep-root .degree-entry { width: 100%; margin: 0 0 12px; }
   .cet-prep-root .g2,
   .cet-prep-root .g3,
   .cet-prep-root .g4 { grid-template-columns: 1fr; }
