@@ -23,7 +23,8 @@ import {
   User,
   Cpu,
   ChatLineSquare,
-  Notebook
+  Notebook,
+  Odometer
 } from '@element-plus/icons-vue'
 
 export interface SideItem {
@@ -97,7 +98,8 @@ export const APP_MENU: SideItem[] = [
       { key: 'learn-industry', label: '各行业知识', icon: DataBoard, permissionKey: 'learn-industry', to: '/learn/industry' },
       { key: 'learn-books', label: '书籍阅读', icon: Reading, permissionKey: 'learn-books', to: '/learn/books' },
       { key: 'learn-goals', label: '学习目标', icon: Aim, to: '/learn/goals' },
-      { key: 'cet-prep', label: '四六级备考台', icon: Notebook, to: '/learn/cet-prep' }
+      { key: 'cet-prep', label: '四六级备考台', icon: Notebook, to: '/learn/cet-prep' },
+      { key: 'weakness', label: '薄弱点分析', icon: Odometer, to: '/learn/weakness' }
     ]
   },
   {

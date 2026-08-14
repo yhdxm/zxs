@@ -443,6 +443,7 @@ const isMenuActive = (key: string) => {
   if (key === 'learn-industry') return route.path === '/learn/industry'
   if (key === 'learn-books') return route.path === '/learn/books'
   if (key === 'learn-goals') return route.path === '/learn/goals'
+  if (key === 'weakness') return route.path === '/learn/weakness'
   if (key === 'news') return route.path === '/news' || route.path === '/yingcang'
   if (key === 'news-main') return route.path === '/news'
   if (key === 'yingcang') return route.path === '/yingcang'

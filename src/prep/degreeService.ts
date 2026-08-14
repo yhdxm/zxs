@@ -230,7 +230,8 @@ export async function loadMistakes(): Promise<MistakeRec[]> {
         userAnswer: r.user_answer,
         reason: r.reason,
         due: r.due,
-        removed: r.removed
+        removed: r.removed,
+        createdAt: (r as any).created_at ?? null
       }))
       .filter((m) => !deletedIds.has(m.id)) // 本地删除缓存兜底
   } catch {

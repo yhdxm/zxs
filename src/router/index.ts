@@ -169,6 +169,11 @@ const router = createRouter({
       component: () => import('../views/DegreeEnglishView.vue')
     },
     {
+      path: '/learn/weakness',
+      name: 'weakness',
+      component: () => import('../views/WeaknessView.vue')
+    },
+    {
       path: '/third-api',
       name: 'third-api',
       component: () => import('../views/ThirdPartyApiView.vue'),

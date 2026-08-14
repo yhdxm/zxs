@@ -91,6 +91,8 @@ export interface MistakeRec {
   reason: string | null
   due: string | null
   removed: boolean
+  /** 入库时间（degree_mistakes.created_at），用于薄弱点趋势；loadMistakes 已映射 */
+  createdAt?: string | null
 }
 
 export type FavoriteKind = 'note' | 'collection' | 'word'
