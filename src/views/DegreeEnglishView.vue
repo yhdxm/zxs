@@ -1033,7 +1033,7 @@ onMounted(() => {
 .page-header-card {
   background: var(--surface, #fff);
   border: 1px solid var(--border, #e6e3f2);
-  border-radius: 12px;
+  border-radius: var(--radius);
   box-shadow: 0 2px 12px rgba(34, 48, 78, 0.06);
   margin-bottom: 14px;
 }
@@ -1113,7 +1113,7 @@ onMounted(() => {
   z-index: 20;
   background: var(--surface, #fff);
   border: 1px solid var(--border, #e6e3f2);
-  border-radius: 12px;
+  border-radius: var(--radius);
   box-shadow: 0 3px 10px rgba(34, 48, 78, 0.06);
   padding: 8px 12px;
   margin: 0 auto 12px;
@@ -1223,21 +1223,21 @@ onMounted(() => {
 .dh-stats {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 8px;
-  margin-bottom: 10px;
+  gap: 16px;
+  margin-bottom: 12px;
 }
 .dh-stat {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  padding: 10px 14px;
   text-align: center;
 }
 .dh-stat-label {
-  display: block; font-size: 11.5px; color: var(--text-muted); margin-bottom: 3px;
+  display: block; font-size: 12px; color: var(--text-muted); margin-bottom: 3px;
 }
 .dh-stat-val {
-  font-size: 20px; font-weight: 700;
+  font-size: 22px; font-weight: 800;
 }
 .dh-stat-val.purple { color: #534ab7; }
 .dh-stat-val.blue { color: #185fa5; }
@@ -1286,7 +1286,7 @@ onMounted(() => {
 .panel {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--radius);
   padding: 14px 16px;
   box-shadow: var(--shadow-card);
   touch-action: pan-y;

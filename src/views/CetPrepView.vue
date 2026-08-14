@@ -174,8 +174,7 @@ onUnmounted(() => {
   --primary-2: #7F77DD;
   --primary-3: #534AB7;
   --accent-glow: rgba(83, 74, 183, 0.28);
-  --radius: 14px; /* 与现有系统卡片圆角一致 */
-  --radius-sm: 11px;
+  /* 半径统一引用全局 --radius(12px) / --radius-sm(10px)，不再本地写死 */
 
   /* 与 AI 助手页 / 学位英语页 .degree-view 完全一致的容器尺寸（含移动端安全区） */
   display: flex;
@@ -222,7 +221,7 @@ onUnmounted(() => {
   z-index: 20;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--radius);
   box-shadow: var(--shadow-sm);
   padding: 8px 12px;
   margin: 0 auto 12px;
@@ -290,13 +289,13 @@ onUnmounted(() => {
 .cet-prep-root .page-sub { color: var(--ink-soft); font-size: 13.5px; margin: 0; }
 
 /* ===== cards —— 与图3标准一致 ===== */
-.cet-prep-root .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; box-shadow: var(--shadow-sm); }
+.cet-prep-root .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; box-shadow: var(--shadow-sm); }
 .cet-prep-root .card + .card { margin-top: 12px; }
 .cet-prep-root .grid { display: grid; gap: 16px; }
 .cet-prep-root .g2 { grid-template-columns: repeat(2, 1fr); }
 .cet-prep-root .g3 { grid-template-columns: repeat(3, 1fr); }
 .cet-prep-root .g4 { grid-template-columns: repeat(4, 1fr); }
-.cet-prep-root .stat { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 10px 14px; }
+.cet-prep-root .stat { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 14px; }
 .cet-prep-root .stat .label { font-size: 12px; color: var(--ink-soft); margin-bottom: 4px; }
 .cet-prep-root .stat .num { font-size: 22px; font-weight: 800; color: var(--ink); line-height: 1.1; }
 .cet-prep-root .stat .num small { font-size: 14px; font-weight: 600; color: var(--ink-soft); }
@@ -305,7 +304,7 @@ onUnmounted(() => {
 .cet-prep-root .stat.red .num { color: var(--red); }
 
 /* today handle bar —— 与图3标准一致：更紧凑 */
-.cet-prep-root .handle { background: linear-gradient(135deg, #F1EFFB, #E3E0F7); border: 1px solid var(--orange-soft); border-radius: 12px; padding: 12px 14px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.cet-prep-root .handle { background: linear-gradient(135deg, #F1EFFB, #E3E0F7); border: 1px solid var(--orange-soft); border-radius: var(--radius); padding: 12px 14px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
 .cet-prep-root .handle .h-title { font-weight: 800; font-size: 15px; display: flex; align-items: center; gap: 8px; }
 .cet-prep-root .handle .h-item { display: flex; align-items: center; gap: 8px; background: var(--surface); border: 1px solid var(--border); border-radius: 999px; padding: 6px 12px; font-size: 13px; font-weight: 600; }
 .cet-prep-root .handle .h-item b { color: var(--orange); }
@@ -476,7 +475,7 @@ onUnmounted(() => {
   gap: 12px;
   background: linear-gradient(135deg, #2e9e5b, #1f7a45);
   color: #fff;
-  border-radius: 12px;
+  border-radius: var(--radius);
   padding: 12px 16px;
   margin: 0 0 12px;
   max-width: none;

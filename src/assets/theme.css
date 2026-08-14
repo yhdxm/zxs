@@ -22,6 +22,8 @@
 
   --border: rgba(99, 102, 241, 0.12);
   --border-strong: rgba(99, 102, 241, 0.18);
+  --radius: 12px;        /* 卡片圆角（统一令牌，学习中心两模块共用） */
+  --radius-sm: 10px;     /* 小组件圆角（统一令牌） */
 
   --primary: #6366f1;
   --primary-2: #38bdf8;
@@ -62,6 +64,8 @@
 
   --border: rgba(129, 140, 248, 0.16);
   --border-strong: rgba(129, 140, 248, 0.22);
+  --radius: 12px;
+  --radius-sm: 10px;
 
   --primary: #818cf8;
   --primary-2: #38bdf8;
