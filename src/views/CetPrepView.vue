@@ -62,7 +62,8 @@ import {
   clearSampleData,
   isAdmin,
   seedMasterWords,
-  isMissingTableError
+  isMissingTableError,
+  flushQueue
 } from '../services/cetPrepService'
 
 const root = ref<HTMLElement | null>(null)
@@ -143,6 +144,8 @@ onMounted(async () => {
     }
   } finally {
     loading.value = false
+    // 进入页面即补发离线队列中未成功的删除/写入（数据可靠性兜底）
+    flushQueue().catch((e) => console.warn('[CetPrep] 离线队列重试失败', e))
   }
 })
 

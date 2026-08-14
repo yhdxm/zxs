@@ -1025,6 +1025,8 @@ async function removeFav(id: string, isMistake = false) {
 onMounted(() => {
   warmVoices()
   loadAll()
+  // 进入页面即补发离线队列中未成功的删除/写入（数据可靠性兜底）
+  svc.flushQueue().catch((e) => console.warn('[DegreeEnglish] 离线队列重试失败', e))
 })
 </script>
 

@@ -3,6 +3,7 @@
 // 注意：本项目为「自建账号表 + 纯前端」架构，RLS 对 anon 放开，由应用层按 user_id 过滤实现隔离。
 import { supabase } from '../lib/supabaseClient'
 import { getSavedUser } from './appDataService'
+import * as reli from '../prep/reliability'
 
 /** 主词表一行：[单词, 音标, 词性, 释义, 常考搭配] */
 export type PrepWord = [string, string, string, string, string]
@@ -83,6 +84,19 @@ async function getUserIdOrThrow(): Promise<string> {
   return id
 }
 
+/** 本地聚合镜像：Supabase 不可达时 loadAll 返回它，避免数据归零 */
+const EMPTY_STATE: PrepState = {
+  words: {},
+  practice: [],
+  mistakes: [],
+  checkins: {},
+  settings: { newPerDay: 10, examDate: null, manualStreak: null, linkedGoal: null }
+}
+let mirror: PrepState = EMPTY_STATE
+function syncMirror(userId: string | null): void {
+  if (userId) reli.mirrorSet(userId, mirror)
+}
+
 /** 读取主词表（全量四级词），按 id 升序。
  * 注意：Supabase 对匿名角色默认单次最多返回 1000 行，必须分页拉取才能拿到全部 4544 词。 */
 export async function fetchMasterWords(): Promise<PrepWord[]> {
@@ -134,149 +148,284 @@ export async function seedMasterWords(rows: PrepWord[]): Promise<number> {
   return n
 }
 
-/** 聚合读取当前用户的全部备考数据 */
+/** 聚合读取当前用户的全部备考数据。
+ *  可靠性：Supabase 失败时回退本地镜像（绝不归零）；并用本地「删除意图集」过滤掉
+ *  已登记删除、但 Supabase 尚未成功删除的记录（双保险，杜绝「删了还在」）。 */
 export async function loadAll(): Promise<PrepState> {
-  const userId = await getUserIdOrThrow()
-  const [w, p, m, c, s] = await Promise.all([
-    supabase.from('cet4_prep_progress').select('*').eq('user_id', userId),
-    supabase.from('cet4_prep_practice').select('*').eq('user_id', userId),
-    supabase.from('cet4_prep_mistakes').select('*').eq('user_id', userId),
-    supabase.from('cet4_prep_checkins').select('*').eq('user_id', userId),
-    supabase.from('cet4_prep_settings').select('*').eq('user_id', userId).maybeSingle()
-  ])
-  if (w.error) throw w.error
-  if (p.error) throw p.error
-  if (m.error) throw m.error
-  if (c.error) throw c.error
-  if (s.error) throw s.error
+  const userId = await getUid()
+  if (!userId) return EMPTY_STATE
+  const local = reli.mirrorGet(userId)
+  try {
+    const [w, p, m, c, s] = await Promise.all([
+      supabase.from('cet4_prep_progress').select('*').eq('user_id', userId),
+      supabase.from('cet4_prep_practice').select('*').eq('user_id', userId),
+      supabase.from('cet4_prep_mistakes').select('*').eq('user_id', userId),
+      supabase.from('cet4_prep_checkins').select('*').eq('user_id', userId),
+      supabase.from('cet4_prep_settings').select('*').eq('user_id', userId).maybeSingle()
+    ])
+    if (w.error) throw w.error
+    if (p.error) throw p.error
+    if (m.error) throw m.error
+    if (c.error) throw c.error
+    if (s.error) throw s.error
 
-  const words: Record<string, WordProgress> = {}
-  for (const r of (w.data as any[]) || []) {
-    words[r.word] = {
-      status: r.status,
-      level: r.level,
-      due: r.due ?? null,
-      wrongStreak: r.wrong_streak ?? 0,
-      wrongStreakDate: r.wrong_streak_date ?? null,
-      weak: !!r.weak,
-      firstIssued: r.first_issued ?? null,
-      last: r.last_reviewed ?? null
+    const words: Record<string, WordProgress> = {}
+    for (const r of (w.data as any[]) || []) {
+      words[r.word] = {
+        status: r.status,
+        level: r.level,
+        due: r.due ?? null,
+        wrongStreak: r.wrong_streak ?? 0,
+        wrongStreakDate: r.wrong_streak_date ?? null,
+        weak: !!r.weak,
+        firstIssued: r.first_issued ?? null,
+        last: r.last_reviewed ?? null
+      }
     }
+    const practice: PracticeRec[] = ((p.data as any[]) || [])
+      .map((r) => ({
+        id: r.id,
+        type: r.type,
+        total: r.total,
+        correct: r.correct,
+        date: r.date,
+        sample: !!r.sample
+      }))
+      .filter((x) => !reli.isDeleted(userId, 'cet4_prep_practice', x.id))
+    const mistakes: MistakeRec[] = ((m.data as any[]) || [])
+      .map((r) => ({
+        id: r.id,
+        type: r.type ?? null,
+        reason: r.reason ?? null,
+        approach: r.approach ?? null,
+        level: r.level,
+        due: r.due ?? null,
+        removed: !!r.removed,
+        sample: !!r.sample,
+        date: r.date ?? null
+      }))
+      .filter((x) => !reli.isDeleted(userId, 'cet4_prep_mistakes', x.id))
+    const checkins: Record<string, CheckinRec> = {}
+    for (const r of (c.data as any[]) || []) {
+      checkins[r.date] = { words: r.words ?? 0, practice: r.practice ?? 0 }
+    }
+    const settings: PrepSettings = {
+      newPerDay: (s.data && s.data.new_per_day) || 10,
+      examDate: (s.data && s.data.exam_date) || null,
+      manualStreak: (s.data && s.data.manual_streak != null) ? Number(s.data.manual_streak) : null,
+      linkedGoal: (s.data && s.data.linked_goal) || null
+    }
+    const state: PrepState = { words, practice, mistakes, checkins, settings }
+    mirror = state
+    reli.mirrorSet(userId, state)
+    return state
+  } catch {
+    // Supabase 不可达：优先返回本地镜像，保证用户数据不归零、不丢失
+    if (local) {
+      mirror = local
+      return local
+    }
+    mirror = EMPTY_STATE
+    return EMPTY_STATE
   }
-  const practice: PracticeRec[] = ((p.data as any[]) || []).map((r) => ({
-    id: r.id,
-    type: r.type,
-    total: r.total,
-    correct: r.correct,
-    date: r.date,
-    sample: !!r.sample
-  }))
-  const mistakes: MistakeRec[] = ((m.data as any[]) || []).map((r) => ({
-    id: r.id,
-    type: r.type ?? null,
-    reason: r.reason ?? null,
-    approach: r.approach ?? null,
-    level: r.level,
-    due: r.due ?? null,
-    removed: !!r.removed,
-    sample: !!r.sample,
-    date: r.date ?? null
-  }))
-  const checkins: Record<string, CheckinRec> = {}
-  for (const r of (c.data as any[]) || []) {
-    checkins[r.date] = { words: r.words ?? 0, practice: r.practice ?? 0 }
-  }
-  const settings: PrepSettings = {
-    newPerDay: (s.data && s.data.new_per_day) || 10,
-    examDate: (s.data && s.data.exam_date) || null,
-    manualStreak: (s.data && s.data.manual_streak != null) ? Number(s.data.manual_streak) : null,
-    linkedGoal: (s.data && s.data.linked_goal) || null
-  }
-  return { words, practice, mistakes, checkins, settings }
 }
 
 export async function persistProgress(word: string, st: WordProgress): Promise<void> {
-  const userId = await getUserIdOrThrow()
-  const { error } = await supabase.from('cet4_prep_progress').upsert(
-    {
-      user_id: userId,
-      word,
-      status: st.status,
-      level: st.level,
-      due: st.due ?? null,
-      wrong_streak: st.wrongStreak,
-      wrong_streak_date: st.wrongStreakDate ?? null,
-      weak: st.weak,
-      first_issued: st.firstIssued ?? null,
-      last_reviewed: st.last ?? null,
-      updated_at: new Date().toISOString()
-    },
-    { onConflict: 'user_id,word' }
-  )
-  if (error) throw error
+  const userId = await getUid()
+  if (!userId) return
+  mirror.words[word] = st
+  syncMirror(userId)
+  try {
+    const { error } = await supabase.from('cet4_prep_progress').upsert(
+      {
+        user_id: userId,
+        word,
+        status: st.status,
+        level: st.level,
+        due: st.due ?? null,
+        wrong_streak: st.wrongStreak,
+        wrong_streak_date: st.wrongStreakDate ?? null,
+        weak: st.weak,
+        first_issued: st.firstIssued ?? null,
+        last_reviewed: st.last ?? null,
+        updated_at: new Date().toISOString()
+      },
+      { onConflict: 'user_id,word' }
+    )
+    if (error) throw error
+  } catch {
+    // 写入失败：入离线队列，网络恢复后 flushQueue 自动补发
+    reli.enqueue({
+      table: 'cet4_prep_progress',
+      type: 'upsert',
+      row: {
+        user_id: userId,
+        word,
+        status: st.status,
+        level: st.level,
+        due: st.due ?? null,
+        wrong_streak: st.wrongStreak,
+        wrong_streak_date: st.wrongStreakDate ?? null,
+        weak: st.weak,
+        first_issued: st.firstIssued ?? null,
+        last_reviewed: st.last ?? null,
+        updated_at: new Date().toISOString()
+      }
+    })
+  }
 }
 
 export async function persistPractice(rec: PracticeRec): Promise<void> {
-  const userId = await getUserIdOrThrow()
-  const { error } = await supabase.from('cet4_prep_practice').upsert(
-    {
-      id: rec.id,
-      user_id: userId,
-      type: rec.type,
-      total: rec.total,
-      correct: rec.correct,
-      date: rec.date,
-      sample: rec.sample
-    },
-    { onConflict: 'id' }
-  )
-  if (error) throw error
+  const userId = await getUid()
+  if (!userId) return
+  const idx = mirror.practice.findIndex((r) => r.id === rec.id)
+  if (idx >= 0) mirror.practice[idx] = rec
+  else mirror.practice.push(rec)
+  syncMirror(userId)
+  try {
+    const { error } = await supabase.from('cet4_prep_practice').upsert(
+      {
+        id: rec.id,
+        user_id: userId,
+        type: rec.type,
+        total: rec.total,
+        correct: rec.correct,
+        date: rec.date,
+        sample: rec.sample
+      },
+      { onConflict: 'id' }
+    )
+    if (error) throw error
+  } catch {
+    reli.enqueue({
+      table: 'cet4_prep_practice',
+      type: 'upsert',
+      row: {
+        id: rec.id,
+        user_id: userId,
+        type: rec.type,
+        total: rec.total,
+        correct: rec.correct,
+        date: rec.date,
+        sample: rec.sample
+      }
+    })
+  }
 }
 
 export async function removePractice(id: string): Promise<void> {
-  const userId = await getUserIdOrThrow()
-  const { error } = await supabase.from('cet4_prep_practice').delete().eq('user_id', userId).eq('id', id)
-  if (error) throw error
+  const userId = await getUid()
+  if (!userId) return
+  // 1) 立即登记删除意图（防回显，且下次 load 严格过滤）
+  reli.markDeleted(userId, 'cet4_prep_practice', id)
+  mirror.practice = mirror.practice.filter((r) => r.id !== id)
+  syncMirror(userId)
+  try {
+    const { error } = await supabase.from('cet4_prep_practice').delete().eq('user_id', userId).eq('id', id)
+    if (error) throw error
+  } catch {
+    // 硬删失败：practice 表无 removed 列，只能进离线队列重试
+    reli.enqueue({ table: 'cet4_prep_practice', type: 'delete', id })
+  }
 }
 
 export async function persistMistake(rec: MistakeRec): Promise<void> {
-  const userId = await getUserIdOrThrow()
-  const { error } = await supabase.from('cet4_prep_mistakes').upsert(
-    {
-      id: rec.id,
-      user_id: userId,
-      type: rec.type ?? null,
-      reason: rec.reason ?? null,
-      approach: rec.approach ?? null,
-      level: rec.level,
-      due: rec.due ?? null,
-      removed: rec.removed,
-      sample: rec.sample,
-      date: rec.date ?? null,
-      updated_at: new Date().toISOString()
-    },
-    { onConflict: 'id' }
-  )
-  if (error) throw error
+  const userId = await getUid()
+  if (!userId) return
+  const idx = mirror.mistakes.findIndex((m) => m.id === rec.id)
+  if (idx >= 0) mirror.mistakes[idx] = rec
+  else mirror.mistakes.push(rec)
+  syncMirror(userId)
+  try {
+    const { error } = await supabase.from('cet4_prep_mistakes').upsert(
+      {
+        id: rec.id,
+        user_id: userId,
+        type: rec.type ?? null,
+        reason: rec.reason ?? null,
+        approach: rec.approach ?? null,
+        level: rec.level,
+        due: rec.due ?? null,
+        removed: rec.removed,
+        sample: rec.sample,
+        date: rec.date ?? null,
+        updated_at: new Date().toISOString()
+      },
+      { onConflict: 'id' }
+    )
+    if (error) throw error
+  } catch {
+    reli.enqueue({
+      table: 'cet4_prep_mistakes',
+      type: 'upsert',
+      row: {
+        id: rec.id,
+        user_id: userId,
+        type: rec.type ?? null,
+        reason: rec.reason ?? null,
+        approach: rec.approach ?? null,
+        level: rec.level,
+        due: rec.due ?? null,
+        removed: rec.removed,
+        sample: rec.sample,
+        date: rec.date ?? null,
+        updated_at: new Date().toISOString()
+      }
+    })
+  }
 }
 
 export async function removeMistake(id: string): Promise<void> {
-  const userId = await getUserIdOrThrow()
-  const { error } = await supabase.from('cet4_prep_mistakes').delete().eq('user_id', userId).eq('id', id)
-  if (error) throw error
+  const userId = await getUid()
+  if (!userId) return
+  // 1) 立即登记删除意图（防回显 + 下次 load 严格过滤）
+  reli.markDeleted(userId, 'cet4_prep_mistakes', id)
+  mirror.mistakes = mirror.mistakes.filter((m) => m.id !== id)
+  syncMirror(userId)
+  try {
+    const { error } = await supabase.from('cet4_prep_mistakes').delete().eq('user_id', userId).eq('id', id)
+    if (error) throw error
+  } catch {
+    // 2) 硬删失败 → 软删兜底（cet4_prep_mistakes 有 removed 列）
+    try {
+      const { error: ue } = await supabase
+        .from('cet4_prep_mistakes')
+        .update({ removed: true, updated_at: new Date().toISOString() })
+        .eq('user_id', userId)
+        .eq('id', id)
+      if (ue) throw ue
+    } catch {
+      // 3) 软删也失败 → 离线队列，页面进入时 flushQueue 重试
+      reli.enqueue({ table: 'cet4_prep_mistakes', type: 'delete', id })
+    }
+  }
 }
 
 export async function persistCheckin(date: string, c: CheckinRec): Promise<void> {
-  const userId = await getUserIdOrThrow()
-  const { error } = await supabase.from('cet4_prep_checkins').upsert(
-    { user_id: userId, date, words: c.words ?? 0, practice: c.practice ?? 0 },
-    { onConflict: 'user_id,date' }
-  )
-  if (error) throw error
+  const userId = await getUid()
+  if (!userId) return
+  mirror.checkins[date] = c
+  syncMirror(userId)
+  try {
+    const { error } = await supabase.from('cet4_prep_checkins').upsert(
+      { user_id: userId, date, words: c.words ?? 0, practice: c.practice ?? 0 },
+      { onConflict: 'user_id,date' }
+    )
+    if (error) throw error
+  } catch {
+    reli.enqueue({
+      table: 'cet4_prep_checkins',
+      type: 'upsert',
+      row: { user_id: userId, date, words: c.words ?? 0, practice: c.practice ?? 0 }
+    })
+  }
 }
 
 export async function persistSettings(s: PrepSettings): Promise<void> {
-  const userId = await getUserIdOrThrow()
+  const userId = await getUid()
+  if (!userId) return
+  mirror.settings = s
+  syncMirror(userId)
   const payload: any = {
     user_id: userId,
     new_per_day: s.newPerDay || 10,
@@ -285,14 +434,52 @@ export async function persistSettings(s: PrepSettings): Promise<void> {
     linked_goal: s.linkedGoal ?? null,
     updated_at: new Date().toISOString()
   }
-  let { error } = await supabase.from('cet4_prep_settings').upsert(payload, { onConflict: 'user_id' })
-  // 兼容：旧表没有 manual_streak 列时，回退到只保存基础字段，不阻断用户保存
-  if (error && /manual_streak|column.*does not exist|Could not find|未知的列/i.test(String(error.message || error))) {
-    delete payload.manual_streak
-    const res2 = await supabase.from('cet4_prep_settings').upsert(payload, { onConflict: 'user_id' })
-    error = res2.error
+  try {
+    let { error } = await supabase.from('cet4_prep_settings').upsert(payload, { onConflict: 'user_id' })
+    // 兼容：旧表没有 manual_streak 列时，回退到只保存基础字段，不阻断用户保存
+    if (error && /manual_streak|column.*does not exist|Could not find|未知的列/i.test(String(error.message || error))) {
+      delete payload.manual_streak
+      const res2 = await supabase.from('cet4_prep_settings').upsert(payload, { onConflict: 'user_id' })
+      error = res2.error
+    }
+    if (error) throw error
+  } catch {
+    reli.enqueue({ table: 'cet4_prep_settings', type: 'upsert', row: { ...payload } })
   }
-  if (error) throw error
+}
+
+/** 离线重试队列：在页面 onMounted 时调用，把未成功的删除/写入补发给 Supabase。
+ *  失败的操作保留在队列中（去重），下次进入再试。 */
+export async function flushQueue(): Promise<void> {
+  const q = reli.getQueue()
+  if (!q.length) return
+  const userId = await getUid()
+  if (!userId) return
+  const remain: reli.QueueOp[] = []
+  for (const op of q) {
+    try {
+      if (op.type === 'delete') {
+        await supabase.from(op.table).delete().eq('user_id', userId).eq('id', op.id)
+      } else {
+        let row = op.row
+        try {
+          await supabase.from(op.table).upsert(row)
+        } catch (e) {
+          // settings 表可能缺 manual_streak 列：去掉后重试一次
+          if (op.table === 'cet4_prep_settings' && 'manual_streak' in row) {
+            const { manual_streak, ...rest } = row
+            await supabase.from(op.table).upsert(rest)
+          } else {
+            throw e
+          }
+        }
+      }
+    } catch {
+      remain.push(op)
+    }
+  }
+  reli.clearQueue()
+  remain.forEach((o) => reli.enqueue(o))
 }
 
 /**
