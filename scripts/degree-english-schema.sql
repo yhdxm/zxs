@@ -81,6 +81,8 @@ create table if not exists public.degree_favorites (
   ref_id     text,                   -- 关联 word / question id
   title      text,
   content    text,
+  removed    boolean     not null default false,  -- 软删兜底：跨设备/清缓存删除一致（A2 数据可靠性加固）
+  updated_at timestamptz not null default now(),
   created_at timestamptz not null default now()
 );
 create index if not exists degree_favorites_user_idx on public.degree_favorites (user_id, kind);
