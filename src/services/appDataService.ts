@@ -1094,11 +1094,23 @@ export async function getSavedUser(): Promise<AppUser | null> {
     return cached
   }
 
-  // 已登录：本地缓存命中则仅按最新权限配置重算权限字段，其余沿用缓存以减少重建开销。
+  // 已登录：本地缓存命中时，同步刷新角色与权限配置，避免「后台改了角色/角色权限但前端仍用旧快照」。
   if (cached && cached.id === probe.userId) {
-    // 角色权限配置可能已被超管修改，必须重新按最新配置计算权限，
-    // 否则返回旧快照会导致「改了角色权限、其他账号登录不生效」的问题。
     try {
+      // 1) 刷新角色：后台可能已修改该账号的角色，本地缓存的 role 必须同步。
+      const latestAccount = await withTimeout(getAccountByAuthId(probe.userId), 1500, null)
+      if (latestAccount && latestAccount.role !== undefined) {
+        const latestRole = normalizeRole(String(latestAccount.role))
+        if (latestRole !== cached.role) {
+          cached.role = latestRole
+        }
+      }
+    } catch {
+      // 查询失败则沿用缓存角色，不阻断登录
+    }
+
+    try {
+      // 2) 刷新权限配置：角色权限配置可能已被超管修改，必须按最新配置重算。
       const roleConfig = await withTimeout(loadPermissionConfig(), 2500, DEFAULT_ROLE_CONFIG)
       cached.permissions = getRolePermissions(cached.role, roleConfig)
       setStoredUser(cached) // 写回缓存，避免新标签页/下次读取仍拿旧权限

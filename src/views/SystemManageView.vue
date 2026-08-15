@@ -315,10 +315,12 @@ const submit = async () => {
     if (isEdit.value) {
       if (!form.authUserId) {
         ElMessage.warning('该账号未绑定认证用户，无法编辑，请删除后重建')
+        saving.value = false
         return
       }
       if (!isSuperAdmin.value) {
         ElMessage.error('权限不足：仅超级管理员可修改账号角色')
+        saving.value = false
         return
       }
       await updateAccount({
@@ -328,6 +330,8 @@ const submit = async () => {
         password: form.password || undefined
       })
       ElMessage.success('已保存')
+      // 角色/昵称变更后广播权限配置刷新事件，当前页面与 App.vue 侧边栏实时同步
+      window.dispatchEvent(new CustomEvent('permission-config-updated'))
     } else {
       const current = await getSavedUser()
       await createAccountByAdmin({

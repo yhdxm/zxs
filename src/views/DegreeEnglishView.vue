@@ -630,6 +630,13 @@
         <button class="wf-close" @click="hideFloatSel" title="关闭">✕</button>
       </div>
     </transition>
+
+    <!-- 模拟考试 -->
+    <MockExamDialog
+      v-model="mockExamVisible"
+      :paper="currentMockPaper"
+      :all-questions="allDegreeQuestions"
+    />
   </div>
 </template>
 
@@ -639,6 +646,7 @@ import { useRouter } from 'vue-router'
 import { Reading, Setting, VideoPlay, Picture, ArrowLeft } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import EChart from '../components/EChart.vue'
+import MockExamDialog from '../components/degree/MockExamDialog.vue'
 import type { EChartsOption } from 'echarts'
 import {
   EXAM_SECTIONS,
@@ -1145,6 +1153,8 @@ const settingsVisible = ref(false)
 const noteVisible = ref(false)
 const noteInput = ref('')
 const noteTitleInput = ref('')
+const mockExamVisible = ref(false)
+const currentMockPaper = ref<{ id: string; title: string; no: number }>({ id: '', title: '', no: 1 })
 
 function typeLabel(t?: QuestionType | null) {
   return EXAM_SECTIONS.find((s) => s.key === t)?.name || '通用'
@@ -1294,8 +1304,9 @@ function openPreview(m: MaterialMeta) {
   previewTitle.value = m.title
   previewVisible.value = true
 }
-function startMock(p: { id: string; title: string }) {
-  ElMessage.info(`「${p.title}」原题题库生成后即可在线计时模考`)
+function startMock(p: { id: string; title: string; no: number }) {
+  currentMockPaper.value = p
+  mockExamVisible.value = true
 }
 
 async function saveSettings() {
