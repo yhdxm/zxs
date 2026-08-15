@@ -2624,14 +2624,49 @@ onBeforeUnmount(() => {
   .toolbar {
     flex-wrap: wrap;
   }
-  /* 闪卡小屏 */
+  /* 闪卡小屏：操作按钮严格统一宽度/边距/高度，左右对齐 */
   .flashcard-inner { min-height: 200px; }
   .fc-word { font-size: 22px; }
   .flashcard-front, .flashcard-back { padding: 20px 16px; }
   .fc-def { font-size: 14.5px; }
-  .fc-nav-btn { width: 100%; text-align: center; margin-bottom: 4px; }
-  .fc-actions { width: 100%; flex-direction: column; }
-  .fc-actions .el-button { width: 100%; }
+  .flashcard-ops {
+    flex-direction: column;
+    gap: 8px;
+    padding: 0 2px;
+  }
+  .flashcard-ops > .fc-nav-btn,
+  .flashcard-ops > .fc-accent,
+  .flashcard-ops > .fc-actions {
+    width: 100%;
+    box-sizing: border-box;
+  }
+  .fc-nav-btn {
+    width: 100%;
+    text-align: center;
+    margin: 0;
+    padding: 10px 14px;
+    font-size: 14px;
+    border-radius: 10px;
+  }
+  .fc-accent {
+    justify-content: center;
+    margin: 0;
+  }
+  .fc-actions {
+    flex-direction: column;
+    gap: 8px;
+  }
+  .fc-actions .el-button {
+    width: 100%;
+    margin: 0 !important;
+    padding: 10px 14px;
+    font-size: 14px;
+    border-radius: 10px;
+    height: auto;
+  }
+  .fc-actions .el-button + .el-button {
+    margin-left: 0 !important;
+  }
   /* 我的视图小屏 */
   .mine-stats { grid-template-columns: repeat(2, 1fr); }
   .mine-header { flex-direction: column; text-align: center; padding: 14px; }
