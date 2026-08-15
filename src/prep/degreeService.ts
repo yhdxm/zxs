@@ -55,10 +55,10 @@ function lsSet(prefix: string, userId: string, val: unknown) {
 //           云端异常 → 回退 localStorage 镜像（绝不返回空对象导致「从新开始」）。
 // ============================================================
 
-/** 云端 upsert：失败入离线队列（幂等，含 PK 整行）。 */
-async function cloudUpsert(table: string, row: Record<string, unknown>): Promise<boolean> {
+/** 云端 upsert：失败入离线队列（幂等，含 PK 整行）。onConflict 指定冲突键，避免重复键报错。 */
+async function cloudUpsert(table: string, row: Record<string, unknown>, onConflict?: string): Promise<boolean> {
   try {
-    const { error } = await supabase.from(table).upsert(row)
+    const { error } = await supabase.from(table).upsert(row, onConflict ? { onConflict } : undefined)
     if (error) throw error
     return true
   } catch {
@@ -66,10 +66,10 @@ async function cloudUpsert(table: string, row: Record<string, unknown>): Promise
     return false
   }
 }
-/** 云端 insert：失败转 upsert 重试（row 含 id/PK，幂等）。 */
+/** 云端 insert：行含客户端生成的 id，改用 upsert(onConflict:'id') 使离线重试幂等，不重复落库。 */
 async function cloudInsert(table: string, row: Record<string, unknown>): Promise<boolean> {
   try {
-    const { error } = await supabase.from(table).insert(row)
+    const { error } = await supabase.from(table).upsert(row, { onConflict: 'id' })
     if (error) throw error
     return true
   } catch {
@@ -128,7 +128,7 @@ export async function saveDegreeSettings(s: DegreeSettings): Promise<void> {
     new_per_day: s.newPerDay,
     manual_streak: s.manualStreak,
     updated_at: new Date().toISOString()
-  })
+  }, 'user_id')
 }
 
 // ---------- 单词进度 ----------
@@ -166,7 +166,7 @@ export async function saveWordProgress(word: string, p: WordProgress): Promise<v
     due: p.due,
     weak: p.weak,
     updated_at: new Date().toISOString()
-  })
+  }, 'user_id,word')
 }
 
 // ---------- 练习记录 ----------

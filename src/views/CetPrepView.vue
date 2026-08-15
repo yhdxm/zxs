@@ -16,13 +16,6 @@
     <div v-if="missingTable" class="prep-missing-banner">
       备考词库表（cet4_words）尚未创建或网络连接失败，当前使用内置完整四级词库（4544 词）。联网并在 Supabase 中执行 <code>scripts/cet4_prep.sql</code> 后，可自动同步云端进度与词表。
     </div>
-    <div class="degree-entry" @click.stop="goDegree" role="button" tabindex="0" @keydown.enter.prevent="goDegree">
-      <div class="de-entry-text">
-        <div class="de-entry-title">学位英语备考台 · 新上线</div>
-        <div class="de-entry-sub">上传你的《大纲/模拟卷/复习指南》PDF，自动 OCR 生成专属词库与背词计划，按考试 5 大题型系统备考。</div>
-      </div>
-      <div class="de-entry-go">进入 →</div>
-    </div>
     <div class="content" id="content"></div>
     <nav class="bottom-nav" id="bottomNav"></nav>
 
@@ -43,7 +36,6 @@
 
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
 import PageHeader from '../components/PageHeader.vue'
 import { School, Setting, VideoPlay } from '@element-plus/icons-vue'
 import { initPrep, type PrepStorage } from '../prep/prepApp'
@@ -67,7 +59,6 @@ import {
 } from '../services/cetPrepService'
 
 const root = ref<HTMLElement | null>(null)
-const router = useRouter()
 const loading = ref(true)
 const error = ref('')
 const missingTable = ref(false)
@@ -80,14 +71,6 @@ const emptyState = () => ({
   checkins: {},
   settings: { newPerDay: 10, examDate: null, manualStreak: null, linkedGoal: null }
 })
-
-function goDegree() {
-  try {
-    router.push('/learn/degree-english')
-  } catch (e) {
-    console.error('[CetPrep] 跳转学位英语失败:', e)
-  }
-}
 
 /* PageHeader 按钮：桥接到 vanilla 应用内已有的逻辑（nav-item / data-act） */
 function openSettings() {
@@ -269,9 +252,6 @@ onUnmounted(() => {
 
 /* ===== 区块分割线（主要区域之间） ===== */
 .cet-prep-root .topnav {
-  margin-bottom: 12px;
-}
-.cet-prep-root .degree-entry {
   margin-bottom: 12px;
 }
 /* 隐藏 prepApp 内的重复设置按钮（PageHeader 已有） */
@@ -471,36 +451,7 @@ onUnmounted(() => {
   margin-right: 6px;
   color: var(--orange);
 }
-.cet-prep-root .degree-entry {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  background: linear-gradient(135deg, #2e9e5b, #1f7a45);
-  color: #fff;
-  border-radius: var(--radius);
-  padding: 12px 16px;
-  margin: 0 0 12px;
-  max-width: none;
-  width: 100%;
-  cursor: pointer;
-  box-shadow: var(--shadow-sm);
-  transition: 0.15s;
-  user-select: none;
-  -webkit-tap-highlight-color: transparent;
-  touch-action: manipulation;
-}
-.cet-prep-root .degree-entry:hover { filter: brightness(1.05); transform: translateY(-1px); }
-.cet-prep-root .degree-entry:active { transform: scale(0.99); transition: 0.05s; }
-.cet-prep-root .de-entry-title { font-weight: 800; font-size: 15.5px; margin-bottom: 3px; }
-.cet-prep-root .de-entry-sub { font-size: 12.5px; opacity: 0.92; line-height: 1.5; }
-.cet-prep-root .de-entry-text,
-.cet-prep-root .de-entry-go { pointer-events: none; }
-.cet-prep-root .de-entry-go { flex: 0 0 auto; font-weight: 800; font-size: 15px; background: rgba(255, 255, 255, 0.2); padding: 8px 14px; border-radius: 999px; }
-@media (max-width: 768px) {
-  .cet-prep-root .degree-entry { flex-direction: column; align-items: flex-start; }
-  .cet-prep-root .de-entry-go { align-self: flex-end; }
-}
+
 
 /* ===== Responsive ===== */
 @media (max-width: 768px) {
@@ -538,7 +489,6 @@ onUnmounted(() => {
   }
   .cet-prep-root .bottom-nav .nav-item svg { width: 22px; height: 22px; }
   .cet-prep-root .content { padding: 0 0 calc(92px + env(safe-area-inset-bottom)); }
-  .cet-prep-root .degree-entry { width: 100%; margin: 0 0 12px; }
   .cet-prep-root .g2,
   .cet-prep-root .g3,
   .cet-prep-root .g4 { grid-template-columns: 1fr; }

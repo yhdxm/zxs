@@ -57,6 +57,8 @@ create table if not exists public.degree_practice (
   created_at timestamptz not null default now()
 );
 create index if not exists degree_practice_user_idx on public.degree_practice (user_id, date);
+-- 唯一索引：使 cloudInsert 的 upsert(onConflict:'id') 幂等（离线重试不重复落库）
+create unique index if not exists degree_practice_id_uidx on public.degree_practice (id);
 
 -- ---------- 5. 错题本 ----------
 create table if not exists public.degree_mistakes (
