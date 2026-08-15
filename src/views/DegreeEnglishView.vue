@@ -169,20 +169,23 @@
         </div>
       </div>
 
-      <!-- 记忆与掌握可视化（免费 ECharts） -->
-      <div class="card-title memory-title">📈 记忆与掌握</div>
-      <div class="memory-grid">
+      <!-- 记忆与掌握可视化（免费 ECharts，移动端可折叠减少首屏滚动） -->
+      <div class="card-title memory-title" role="button" @click="memOpen = !memOpen">
+        <span>📈 记忆与掌握</span>
+        <span class="mem-caret">{{ memOpen ? '▾' : '▸' }}</span>
+      </div>
+      <div class="memory-grid" v-show="memOpen">
         <div class="memory-cell">
           <div class="mc-label">词汇掌握率</div>
-          <EChart :option="masteryOption" height="172px" />
+          <EChart :option="masteryOption" :height="isMobile ? '140px' : '172px'" />
         </div>
         <div class="memory-cell">
           <div class="mc-label">艾宾浩斯遗忘曲线（理论保持率）</div>
-          <EChart :option="memoryOption" height="172px" />
+          <EChart :option="memoryOption" :height="isMobile ? '140px' : '172px'" />
         </div>
         <div class="memory-cell memory-cell-wide">
           <div class="mc-label">待复习分布（按下次复习时间）</div>
-          <EChart :option="reviewDistOption" height="188px" />
+          <EChart :option="reviewDistOption" :height="isMobile ? '150px' : '188px'" />
         </div>
       </div>
     </section>
@@ -780,6 +783,17 @@ const tabs = [
 const router = useRouter()
 const activeTab = ref('overview')
 
+// 移动端响应式：记忆与掌握区在窄屏默认折叠，砍掉首屏一大段滚动
+const isMobile = ref(false)
+const memOpen = ref(true)
+function syncMobile() {
+  isMobile.value = window.matchMedia('(max-width: 768px)').matches
+}
+function onMobileChange(e: MediaQueryListEvent) {
+  isMobile.value = e.matches
+  if (e.matches) memOpen.value = false
+}
+
 // 顶部导航（与 AI/四六级模块一致：今日/刷题/错本/我的）
 const topNav = ref<'today' | 'practice' | 'mistakes' | 'mine'>('today')
 
@@ -1233,6 +1247,10 @@ async function removeFav(id: string, isMistake = false) {
 onMounted(() => {
   warmVoices()
   loadAll()
+  // 移动端检测：窄屏默认折叠记忆区
+  syncMobile()
+  if (isMobile.value) memOpen.value = false
+  window.matchMedia('(max-width: 768px)').addEventListener('change', onMobileChange)
   // 进入页面即补发离线队列中未成功的删除/写入（数据可靠性兜底）
   svc.flushQueue().catch((e) => console.warn('[DegreeEnglish] 离线队列重试失败', e))
   // 划词翻译浮层：监听选区变化（桌面 mouseup / 移动端 touchend）
@@ -1248,6 +1266,7 @@ function onFullscreenChange() {
   if (typeof document !== 'undefined' && !document.fullscreenElement) immersive.value = false
 }
 onBeforeUnmount(() => {
+  window.matchMedia('(max-width: 768px)').removeEventListener('change', onMobileChange)
   if (typeof document !== 'undefined') {
     document.removeEventListener('mouseup', onTextSelected)
     document.removeEventListener('touchend', onTextSelected)
@@ -2491,21 +2510,14 @@ onBeforeUnmount(() => {
     overflow: hidden;
     text-overflow: ellipsis;
   }
-  .page-header-card .ph-sub {
-    font-size: 11.5px;
-    line-height: 1.4;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-    /* 允许描述文字正常换行，但不逐字折行 */
-    word-break: break-word;
-  }
+  .page-header-card .ph-sub { display: none; }
   .page-header-card .ph-actions {
+    flex-direction: row;
     flex-wrap: wrap;
-    justify-content: flex-end;
+    justify-content: flex-start;
     gap: 8px;
   }
+  .page-header-card .ph-actions .el-button { margin: 0; }
   .de-bottom-nav {
     display: flex;
     position: fixed;
@@ -2536,18 +2548,30 @@ onBeforeUnmount(() => {
   }
 
   /* 为底部导航留白 */
-  .degree-view { padding-bottom: calc(100px + env(safe-area-inset-bottom)); }
+  .degree-view { padding: 0 14px calc(84px + env(safe-area-inset-bottom)); }
   .dh-header { padding: 10px 12px; }
   .dh-title { font-size: 17px; }
   .dh-sub { font-size: 12px; -webkit-line-clamp: 2; display: -webkit-box; -webkit-box-orient: vertical; overflow: hidden; }
-  .dh-stats { grid-template-columns: repeat(2, 1fr); gap: 6px; }
-  .dh-stat { padding: 8px 8px; }
-  .dh-stat-val { font-size: 20px; }
-  .dh-nav { gap: 4px; overflow-x: auto; -webkit-overflow-scrolling: touch; }
-  .dh-nav-item { min-width: 56px; padding: 7px 10px; font-size: 12px; border-radius: 9px; flex: 0 0 auto; }
-  .step-indicator { overflow-x: auto; -webkit-overflow-scrolling: touch; flex-wrap: nowrap; }
-  .step-dot { flex: 0 0 auto; }
+  .degree-view > .dh-stats,
+  .degree-view > .dh-nav { margin-bottom: 10px; padding-bottom: 8px; }
+  /* 统计卡：2x2 等宽对齐，值不溢出 */
+  .dh-stats { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+  .dh-stat { padding: 10px 6px; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  .dh-stat-label { font-size: 12px; }
+  .dh-stat-val { font-size: 19px; line-height: 1.15; word-break: break-word; }
+  .dh-stat-val small { font-size: 11px; }
+  /* 导航 tab：4 列网格、2 行对齐，彻底去掉横向滚动 */
+  .dh-nav { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; overflow: visible; }
+  .dh-nav-item { min-width: 0; flex: initial; padding: 9px 4px; font-size: 12px; border-radius: 9px; }
+  /* 步骤指示器：等宽一行不滚动，标签截断防溢出 */
+  .step-indicator { flex-wrap: nowrap; overflow: visible; gap: 6px; margin-bottom: 12px; }
+  .step-dot { flex: 1 1 0; min-width: 0; padding: 7px 6px; }
+  .step-label { overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
   .panel { padding: 14px; }
+  /* 记忆区移动端：标题可点、间距收紧、图表更矮 */
+  .memory-title { margin-top: 12px; }
+  .memory-grid { gap: 8px; }
+  .memory-cell { padding: 8px 10px; }
   .card-wall { grid-template-columns: 1fr; }
   .phrase-list { grid-template-columns: 1fr; }
   /* 闪卡移动端 */
@@ -2567,11 +2591,12 @@ onBeforeUnmount(() => {
   .page-header-card .ph-title { font-size: 15px; }
   .page-header-card .ph-sub { font-size: 11px; -webkit-line-clamp: 1; }
   .page-header-card .ph-actions {
-    flex-direction: column;
-    align-items: stretch;
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: flex-start;
     gap: 6px;
   }
-  .page-header-card .ph-actions .el-button { width: 100%; justify-content: center; }
+  .page-header-card .ph-actions .el-button { width: auto; margin: 0; }
 
   .dh-header {
     flex-direction: column; align-items: stretch; padding: 12px 14px;
@@ -2585,8 +2610,8 @@ onBeforeUnmount(() => {
   .dh-stat-val { font-size: 18px; }
   .dh-nav { gap: 4px; }
   .dh-nav-item { min-width: 52px; padding: 7px 10px; font-size: 12px; border-radius: 9px; }
-  .step-indicator { flex-direction: column; gap: 6px; }
-  .step-dot { padding: 6px 12px; font-size: 12px; }
+  .step-indicator { flex-wrap: nowrap; gap: 6px; }
+  .step-dot { padding: 7px 6px; font-size: 12px; }
   .type-grid {
     grid-template-columns: 1fr;
   }
@@ -2719,7 +2744,8 @@ section.immersive {
 .fc-accent .accent-opt.on { background: #534ab7; color: #fff; border-color: #534ab7; }
 
 /* ===== 记忆与掌握可视化 ===== */
-.memory-title { margin-top: 18px; }
+.memory-title { margin-top: 18px; display: flex; align-items: center; justify-content: space-between; cursor: pointer; }
+.mem-caret { color: var(--text-muted); font-size: 13px; font-weight: 400; }
 .memory-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
