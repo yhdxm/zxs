@@ -28,9 +28,9 @@ export const FREE_LLM_RESOURCES: FreeResource[] = [
     id: 'google-ai-studio',
     name: 'Google AI Studio（Gemini）',
     category: 'api',
-    freeNote: '永久免费层，无需信用卡。Gemini 2.5/3 Flash + Gemma，约 10 RPM / 250 RPD（Flash），1M 上下文。（Gemini Pro 系列自 2026-04 起已移除免费层。）',
+    freeNote: '永久免费层，无需信用卡。Gemini 3.6/3.5 Flash + Gemma，1M 上下文、多模态，约 10 RPM / 250 RPD（Flash）。（Gemini Pro 系列自 2026-04 起已移除免费层。）',
     url: 'https://aistudio.google.com',
-    lastChecked: '2026-08-11',
+    lastChecked: '2026-08-15',
     tags: ['Gemini', '多模态', '无需信用卡']
   },
   {
@@ -46,9 +46,9 @@ export const FREE_LLM_RESOURCES: FreeResource[] = [
     id: 'openrouter',
     name: 'OpenRouter',
     category: 'api',
-    freeNote: '免费模型标 :free，无需信用卡即可开始。单 key 汇聚 30+ 免费模型，约 50–200 RPD。',
+    freeNote: '免费模型标 :free，无需信用卡即可开始。单 key 汇聚 35+ 免费模型，约 50–200 RPD。',
     url: 'https://openrouter.ai',
-    lastChecked: '2026-08-02',
+    lastChecked: '2026-08-15',
     tags: ['聚合', 'OpenAI 兼容', '无需信用卡']
   },
   {
@@ -57,7 +57,7 @@ export const FREE_LLM_RESOURCES: FreeResource[] = [
     category: 'api',
     freeNote: '循环免费层，约 40 RPM 且无每日上限。DeepSeek、Llama、Qwen、Nemotron 等，需手机验证。',
     url: 'https://build.nvidia.com',
-    lastChecked: '2026-08-02',
+    lastChecked: '2026-08-15',
     tags: ['无日上限', '开源权重', '需手机验证']
   },
   {
@@ -127,9 +127,9 @@ export const FREE_LLM_RESOURCES: FreeResource[] = [
     id: 'github-models',
     name: 'GitHub Models',
     category: 'api',
-    freeNote: '用 GitHub 个人令牌免费调用 GPT-4.1 / o3 / Llama 等，无需信用卡，需 GitHub 账号。',
+    freeNote: '用 GitHub 个人令牌免费调用 GPT-5 / GPT-4.1 / o3 / Llama 等（限额随 Copilot 档位），无需信用卡，需 GitHub 账号。',
     url: 'https://github.com/marketplace/models',
-    lastChecked: '2026-08-02',
+    lastChecked: '2026-08-15',
     tags: ['GPT', '开源友好', '无需信用卡']
   },
   {
@@ -165,7 +165,7 @@ export const FREE_LLM_RESOURCES: FreeResource[] = [
     category: 'api',
     freeNote: '永久免费层，无需信用卡；匿名层连账号都不用（约 2 RPM）。欧盟数据中心（GDPR 合规），托管 Qwen3-Coder / Mistral / Llama / DeepSeek 等开源模型，OpenAI 兼容。',
     url: 'https://endpoints.ai.cloud.ovh.net',
-    lastChecked: '2026-08-11',
+    lastChecked: '2026-08-15',
     tags: ['欧洲', 'GDPR', '匿名可用', '无需信用卡']
   },
   {
@@ -204,6 +204,24 @@ export const FREE_LLM_RESOURCES: FreeResource[] = [
     lastChecked: '2026-08-11',
     tags: ['开源', '无需信用卡', 'OpenAI兼容']
   },
+  {
+    id: 'ollama-cloud',
+    name: 'Ollama Cloud',
+    category: 'api',
+    freeNote: '永久免费层，无需信用卡（邮箱注册）。Ollama 官方云端推理，通过熟悉的 Ollama API 格式（含 OpenAI 兼容端点）调用 Llama、Qwen、Gemma、DeepSeek、Kimi 等；免费用户并发 1、按 session/周限额。',
+    url: 'https://ollama.com',
+    lastChecked: '2026-08-15',
+    tags: ['Ollama', '开源', '无需信用卡']
+  },
+  {
+    id: 'sambanova',
+    name: 'SambaNova Cloud',
+    category: 'api',
+    freeNote: '永久免费层，无需信用卡。约 200,000 tokens/天/模型，高速推理 Llama、Qwen、DeepSeek 等开源大模型。',
+    url: 'https://cloud.sambanova.ai',
+    lastChecked: '2026-08-15',
+    tags: ['高速推理', '开源', '无需信用卡']
+  },
 
   /* ===================== 评测 / 信息查询平台 ===================== */
   {
@@ -212,7 +230,7 @@ export const FREE_LLM_RESOURCES: FreeResource[] = [
     category: 'eval',
     freeNote: '完全免费，无需注册。前身 Chatbot Arena，2026 年初更名 Arena；全球引用最广的人类偏好盲测榜单，覆盖文本/代码/视觉/视频等 9 大类别。',
     url: 'https://arena.ai',
-    lastChecked: '2026-08-11',
+    lastChecked: '2026-08-15',
     tags: ['人类偏好', '盲测', '免费']
   },
   {
@@ -331,6 +349,24 @@ export const FREE_LLM_RESOURCES: FreeResource[] = [
     url: 'https://llm-stats.com',
     lastChecked: '2026-08-11',
     tags: ['基准索引', '实时榜单', '免费']
+  },
+  {
+    id: 'aib-vote',
+    name: 'AIB（AI 模型对比平台）',
+    category: 'eval',
+    freeNote: '完全免费，无需注册即可比对主流模型（ChatGPT / Claude / Gemini / Grok / DeepSeek / Mistral / Kimi / GLM / MiniMax 等）。基于真实用户投票与评测，含中日韩多语言实际表现；2026-06 公测上线。',
+    url: 'https://www.aib.vote',
+    lastChecked: '2026-08-15',
+    tags: ['真实用户投票', '多语言', '免费']
+  },
+  {
+    id: 'coarena',
+    name: 'Coarena（计算机操作任务竞技场）',
+    category: 'eval',
+    freeNote: '完全免费，无使用上限。2026-08 上线，面向 Computer Use（计算机操作）任务的模型竞技场：发布真实浏览器任务，多个前沿智能体（Claude Opus 5、GPT-5.6、Gemini 3.6 等）同态执行，盲选投票评估真实任务执行能力。',
+    url: 'https://coarena.ai',
+    lastChecked: '2026-08-15',
+    tags: ['Computer Use', '盲测', '免费']
   },
 
   /* ===================== 免费学习资源 ===================== */

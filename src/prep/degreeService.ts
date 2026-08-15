@@ -294,12 +294,13 @@ export async function loadFavorites(kind?: FavoriteKind): Promise<FavoriteRec[]>
   const userId = await getUserId()
   if (!userId) return []
   const deletedIds = reli.getDeletedIds(userId, 'degree_favorites')
+  const localAll = lsGet<FavoriteRec[]>('favorites', userId, [])
   try {
     let q = supabase.from('degree_favorites').select('*').eq('user_id', userId)
     if (kind) q = q.eq('kind', kind)
     const { data, error } = await q.order('created_at', { ascending: false })
     if (error) throw error
-    const rows: FavoriteRec[] = ((data as any[]) || [])
+    const cloudRows: FavoriteRec[] = ((data as any[]) || [])
       .filter((r) => !(r as any).removed)
       .map((r) => ({
         id: r.id,
@@ -309,12 +310,18 @@ export async function loadFavorites(kind?: FavoriteKind): Promise<FavoriteRec[]>
         content: r.content,
         createdAt: r.created_at
       }))
+    // 合并云端 + 本地：云端优先；本地有但云端尚未同步到的（如刚保存、未回传）予以保留，
+    // 避免「云端返回空」覆盖本地导致保存后的笔记/生词不显示。
+    const cloudIds = new Set(cloudRows.map((r) => r.id))
+    const localOnly = localAll.filter((r) => !cloudIds.has(r.id))
+    const merged = [...cloudRows, ...localOnly]
       .filter((f) => !deletedIds.has(f.id))
-    lsSet('favorites', userId, rows)
-    return rows
+      .filter((f) => !kind || f.kind === kind)
+    lsSet('favorites', userId, merged)
+    return merged
   } catch {
-    const all = lsGet<FavoriteRec[]>('favorites', userId, [])
-    return all.filter((f) => !deletedIds.has(f.id) && (!kind || f.kind === kind))
+    // 云端异常 → 回退本地镜像（绝不返回空导致「从新开始」）
+    return localAll.filter((f) => !deletedIds.has(f.id) && (!kind || f.kind === kind))
   }
 }
 

@@ -101,7 +101,7 @@ import { Odometer, Refresh, Warning } from '@element-plus/icons-vue'
 import { loadAll, flushQueue as cetFlush } from '../services/cetPrepService'
 import { loadMistakes, flushQueue as degFlush } from '../prep/degreeService'
 import { buildWeaknessReport, WEAKNESS_MIN_SAMPLE, type WeaknessMistakeInput, type WeaknessReport } from '../prep/weakness'
-import { degreeQuestions } from '../prep/degreeQuestions'
+import { allDegreeQuestions } from '../prep/degreeQuestionBank'
 import type { DegreeQuestion } from '../prep/degreeTypes'
 
 type Scope = 'cet' | 'degree'
@@ -114,7 +114,7 @@ const emptyReport: WeaknessReport = buildWeaknessReport([])
 const cetReport = ref<WeaknessReport>(emptyReport)
 const degreeReport = ref<WeaknessReport>(emptyReport)
 
-const degreeQuestionMap = new Map<string, DegreeQuestion>(degreeQuestions.map((q) => [q.id, q]))
+const degreeQuestionMap = new Map<string, DegreeQuestion>(allDegreeQuestions.map((q) => [q.id, q]))
 const typeLabelMap: Record<string, string> = {
   dialogue: '完成对话',
   reading: '阅读理解',

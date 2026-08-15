@@ -67,7 +67,7 @@
       <div class="dh-stat"><span class="dh-stat-label">今日新词</span><span class="dh-stat-val purple">{{ settings.newPerDay }}</span></div>
       <div class="dh-stat"><span class="dh-stat-label">连续学习</span><span class="dh-stat-val blue">{{ streakDays }}<small>天</small></span></div>
       <div class="dh-stat"><span class="dh-stat-label">词汇掌握</span><span class="dh-stat-val green">{{ graduatedCount }}<small>/{{ degreeWords.length || VOCAB_REQUIREMENT.receptive }}</small></span></div>
-      <div class="dh-stat"><span class="dh-stat-label">题库总量</span><span class="dh-stat-val orange">{{ degreeQuestions.length }}</span></div>
+      <div class="dh-stat"><span class="dh-stat-label">题库总量</span><span class="dh-stat-val orange">{{ allDegreeQuestions.length }}</span></div>
     </div>
 
     <!-- 导航 tab（nav-item 圆角按钮风格，与系统其他模块统一） -->
@@ -191,22 +191,22 @@
     </section>
 
     <!-- 单词本 -->
-    <section v-show="activeTab === 'words'" class="panel">
+    <section v-if="renderedTabs.has('words')" v-show="activeTab === 'words'" class="panel">
       <div class="toolbar">
         <el-input v-model="wordQuery" placeholder="搜索单词 / 释义" clearable style="max-width: 320px" />
-        <el-radio-group v-model="wordSrc" size="small">
-          <el-radio-button value="all">全部</el-radio-button>
-          <el-radio-button value="考试大纲">大纲</el-radio-button>
-          <el-radio-button value="复习指南">指南</el-radio-button>
-          <el-radio-button value="模拟试卷">模拟</el-radio-button>
+        <el-radio-group :model-value="wordSrc" size="small" @change="wordSrc = $event as 'all' | SourceBook">
+          <el-radio-button value="all">全部({{ wordCountBySrc.all }})</el-radio-button>
+          <el-radio-button value="考试大纲">大纲({{ wordCountBySrc.outline }})</el-radio-button>
+          <el-radio-button value="复习指南">指南({{ wordCountBySrc.guide }})</el-radio-button>
+          <el-radio-button value="模拟试卷">模拟({{ wordCountBySrc.mock }})</el-radio-button>
         </el-radio-group>
-        <el-tag v-if="degreeWords.length" type="info" effect="plain">共 {{ filteredWords.length }} 词</el-tag>
+        <el-tag v-if="degreeWords.length" type="info" effect="plain">当前共 {{ filteredWords.length }} 词</el-tag>
         <el-tag v-else type="warning" effect="plain">OCR 生成中，稍候自动填充</el-tag>
       </div>
       <div v-if="filteredWords.length" class="word-list">
         <div v-for="w in visibleWords" :key="w.word" class="word-item" :class="{ weak: wordProgress[w.word]?.weak }">
           <div class="word-main">
-            <span class="word-text">{{ w.word }}<span v-if="w.productive" class="star">*</span></span>
+            <span class="word-text">{{ w.word }}<span v-if="w.productive" class="star">*</span><span v-if="wordPhonetic(w.word)" class="word-phonetic">{{ wordPhonetic(w.word) }}</span></span>
             <button class="speak-btn" :title="'朗读 ' + w.word" @click="speak(w.word)">🔊</button>
             <button class="speak-btn" :title="'查看例句 ' + w.word" @click="loadExample(w.word)" :disabled="exampleLoading[w.word]">📖</button>
           </div>
@@ -236,7 +236,7 @@
     </section>
 
     <!-- 背单词闪卡（学位英语专属：逐个展示） -->
-    <section v-show="activeTab === 'cards'" ref="cardsSection" :class="['panel', { immersive: immersive }]">
+    <section v-if="renderedTabs.has('cards')" v-show="activeTab === 'cards'" ref="cardsSection" :class="['panel', { immersive: immersive }]">
       <div v-if="!cardStarted" class="card-start-screen">
         <div class="card-start-icon">📚</div>
         <h3 style="margin: 0 0 8px">学位英语背单词</h3>
@@ -266,7 +266,7 @@
                 <span class="fc-word">{{ currentCardWord.word }}<span v-if="currentCardWord.productive" class="star">*</span></span>
                 <button class="speak-btn fc-speak" @click.stop="speak(currentCardWord.word)" title="朗读">🔊</button>
               </div>
-              <div v-if="currentCardWord.phonetic" class="fc-phonetic">{{ currentCardWord.phonetic }}</div>
+              <div v-if="wordPhonetic(currentCardWord.word)" class="fc-phonetic">{{ wordPhonetic(currentCardWord.word) }}</div>
               <div class="fc-hint">点击翻转查看释义</div>
             </div>
             <!-- 背面：释义+例句 -->
@@ -310,7 +310,7 @@
     </section>
 
     <!-- 词组 / 语句 -->
-    <section v-show="activeTab === 'phrases'" class="panel">
+    <section v-if="renderedTabs.has('phrases')" v-show="activeTab === 'phrases'" class="panel">
       <div class="toolbar">
         <el-radio-group v-model="phraseCat">
           <el-radio-button value="all">全部</el-radio-button>
@@ -334,11 +334,11 @@
           </div>
         </div>
       </div>
-      <el-empty v-else description="词组 / 语句数据正在由《考试大纲》OCR 提取" />
+      <el-empty v-else description="没有匹配的词组 / 语句，换个关键词试试" />
     </section>
 
     <!-- 题型训练 -->
-    <section v-show="activeTab === 'training'" class="panel">
+    <section v-if="renderedTabs.has('training')" v-show="activeTab === 'training'" class="panel">
       <div class="toolbar">
         <el-radio-group v-model="trainingType" @change="pickQuestion">
           <el-radio-button v-for="s in EXAM_SECTIONS" :key="s.key" :value="s.key">{{ s.name }}</el-radio-button>
@@ -350,8 +350,8 @@
         <div class="quiz-stem">{{ currentQ.stem }}</div>
         <div v-if="currentQ.passage" class="quiz-passage">{{ currentQ.passage }}</div>
         <div v-if="currentQ.options" class="quiz-options">
-          <label v-for="(o, i) in currentQ.options" :key="i" class="opt" :class="{ right: showAnswer && isRight(o), wrong: showAnswer && myAnswer === o && !isRight(o) }">
-            <input type="radio" :name="'q'" :value="o" v-model="myAnswer" :disabled="showAnswer" />
+          <label v-for="(o, i) in currentQ.options" :key="i" class="opt" :class="{ right: showAnswer && currentQ.answer === optLetter(i), wrong: showAnswer && myAnswer === optLetter(i) && currentQ.answer !== optLetter(i) }">
+            <input type="radio" :name="'q'" :value="optLetter(i)" v-model="myAnswer" :disabled="showAnswer" />
             <span>{{ String.fromCharCode(65 + i) }}. {{ o }}</span>
           </label>
         </div>
@@ -363,14 +363,14 @@
         <div v-if="showAnswer" class="quiz-explain">
           <div class="ex-h">答案：<b>{{ currentQ.answer }}</b></div>
           <div class="ex-b">解析：{{ currentQ.explanation }}</div>
-          <div class="ex-src">来源：{{ currentQ.source.basis }}（{{ currentQ.source.book }} 第 {{ currentQ.source.page }} 页）</div>
+          <div class="ex-src">来源：{{ currentQ.source.basis }}（{{ currentQ.source.book }}{{ currentQ.source.page ? ' 第 ' + currentQ.source.page + ' 页' : '' }}）</div>
         </div>
       </div>
       <el-empty v-else :description="`《${trainingTypeLabel}》题库正在由 PDF 原题 + 大纲生成，完成后即可逐题练习并看解析`" />
     </section>
 
     <!-- 模拟考试 -->
-    <section v-show="activeTab === 'mock'" class="panel">
+    <section v-if="renderedTabs.has('mock')" v-show="activeTab === 'mock'" class="panel">
       <div class="card-title" style="margin-bottom: 10px">全真模拟考试（5 套，计时交卷 + 判分）</div>
       <div class="paper-grid">
         <div v-for="p in MOCK_PAPERS" :key="p.id" class="paper-card">
@@ -382,7 +382,7 @@
         </div>
       </div>
       <el-alert
-        v-if="!degreeQuestions.length"
+        v-if="!allDegreeQuestions.length"
         type="info"
         :closable="false"
         style="margin-top: 12px"
@@ -391,7 +391,7 @@
     </section>
 
     <!-- 资料库 -->
-    <section v-show="activeTab === 'library'" class="panel">
+    <section v-if="renderedTabs.has('library')" v-show="activeTab === 'library'" class="panel">
       <div class="card-title" style="margin-bottom: 10px">资料库（三本 PDF 内容已全量内置，可在线阅读讲解正文）</div>
       <div class="lib-layout">
         <div class="lib-side">
@@ -484,8 +484,8 @@
         <div class="quiz-stem">{{ currentQ.stem }}</div>
         <div v-if="currentQ.passage" class="quiz-passage">{{ currentQ.passage }}</div>
         <div v-if="currentQ.options" class="quiz-options">
-          <label v-for="(o, i) in currentQ.options" :key="i" class="opt" :class="{ right: showAnswer && isRight(o), wrong: showAnswer && myAnswer === o && !isRight(o) }">
-            <input type="radio" :name="'qp'" :value="o" v-model="myAnswer" :disabled="showAnswer" />
+          <label v-for="(o, i) in currentQ.options" :key="i" class="opt" :class="{ right: showAnswer && currentQ.answer === optLetter(i), wrong: showAnswer && myAnswer === optLetter(i) && currentQ.answer !== optLetter(i) }">
+            <input type="radio" :name="'qp'" :value="optLetter(i)" v-model="myAnswer" :disabled="showAnswer" />
             <span>{{ String.fromCharCode(65 + i) }}. {{ o }}</span>
           </label>
         </div>
@@ -497,7 +497,7 @@
         <div v-if="showAnswer" class="quiz-explain">
           <div class="ex-h">答案：<b>{{ currentQ.answer }}</b></div>
           <div class="ex-b">解析：{{ currentQ.explanation }}</div>
-          <div class="ex-src">来源：{{ currentQ.source.basis }}（{{ currentQ.source.book }} 第 {{ currentQ.source.page }} 页）</div>
+          <div class="ex-src">来源：{{ currentQ.source.basis }}（{{ currentQ.source.book }}{{ currentQ.source.page ? ' 第 ' + currentQ.source.page + ' 页' : '' }}）</div>
         </div>
       </div>
       <el-empty v-else description="题库正在由 PDF 原题 + 大纲生成，完成后即可逐题练习" />
@@ -551,7 +551,7 @@
           <div class="mine-stat-label">总词汇量</div>
         </div>
         <div class="mine-stat-card">
-          <div class="mine-stat-num orange">{{ degreeQuestions.length }}</div>
+          <div class="mine-stat-num orange">{{ allDegreeQuestions.length }}</div>
           <div class="mine-stat-label">题库总量</div>
         </div>
       </div>
@@ -634,7 +634,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, reactive, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, reactive, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import { Reading, Setting, VideoPlay, Picture, ArrowLeft } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
@@ -649,8 +649,9 @@ import {
   type MaterialMeta
 } from '../prep/degreeExamStructure'
 import { degreeWords } from '../prep/degreeWords'
-import { degreeQuestions } from '../prep/degreeQuestions'
+import { allDegreeQuestions } from '../prep/degreeQuestionBank'
 import { degreePhrases } from '../prep/degreePhrases'
+import { spokenPhrases, affixPhrases, irregularPhrases } from '../prep/degreePhrasesExtra'
 import { guideArticles } from '../prep/degreeGuide'
 import { syllabusProse } from '../prep/degreeSyllabusProse'
 import type { DegreeSettings, WordProgress, MistakeRec, FavoriteRec, PracticeRec, QuestionType, DegreeQuestion, DegreePhrase, PhraseCategory, SourceBook, DegreeArticle } from '../prep/degreeTypes'
@@ -671,7 +672,9 @@ function openArticle(a: DegreeArticle) {
 // 1) iOS Safari 必须在 speak 前 getVoices() 且选中英文 voice，否则静默
 // 2) Chrome/Safari 经典 bug：cancel() 紧跟 speak() 会吞掉声音，需延迟一帧再 speak
 // 3) iOS 15+ 偶发 speak 后处于 paused 状态，需 resume() 保活才能出声
+// 4) 移动端 AudioContext 需用户手势解锁，首次点击时主动 unlock
 let voicesWarmed = false
+let currentUtterance: SpeechSynthesisUtterance | null = null
 function warmVoices() {
   if (typeof window === 'undefined' || !('speechSynthesis' in window)) return
   const synth = window.speechSynthesis
@@ -682,6 +685,15 @@ function warmVoices() {
   // iOS: voices 异步就绪，监听一次即可
   synth.onvoiceschanged = () => {
     if (synth.getVoices().length) voicesWarmed = true
+  }
+}
+function unlockAudioContext() {
+  if (typeof window === 'undefined') return
+  const AudioCtx = (window as any).AudioContext || (window as any).webkitAudioContext
+  if (!AudioCtx) return
+  const ctx = new AudioCtx()
+  if (ctx.state === 'suspended') {
+    void ctx.resume().catch(() => {})
   }
 }
 // 美 / 英音切换（免费，纯浏览器 TTS）
@@ -699,6 +711,8 @@ function speakWord(text: string, rate = 0.9) {
     ElMessage.warning('当前浏览器不支持语音朗读，请使用 Chrome / Edge / Safari 重试')
     return
   }
+  // 移动端必须先由用户手势解锁音频上下文
+  unlockAudioContext()
   warmVoices()
   const synth = window.speechSynthesis
   const u = new SpeechSynthesisUtterance(text)
@@ -706,6 +720,7 @@ function speakWord(text: string, rate = 0.9) {
   u.rate = rate
   const voice = pickEnVoice()
   if (voice) u.voice = voice
+  currentUtterance = u
   // 先清空可能积压的朗读，留一帧再播，规避 cancel+speak 竞态导致无声
   try {
     synth.cancel()
@@ -713,9 +728,20 @@ function speakWord(text: string, rate = 0.9) {
     /* noop */
   }
   window.setTimeout(() => {
-    synth.speak(u)
+    if (!currentUtterance) return
+    synth.speak(currentUtterance)
     // iOS 偶发 paused → resume 保活
     if (synth.paused) synth.resume()
+    // 部分浏览器 speak 后立即进入 paused，持续轮询 resume 200ms
+    let resumeTicks = 0
+    const keepAlive = window.setInterval(() => {
+      if (!currentUtterance || resumeTicks > 6) {
+        window.clearInterval(keepAlive)
+        return
+      }
+      resumeTicks++
+      if (synth.paused) synth.resume()
+    }, 40)
   }, 80)
 }
 function speakText(t: string) {
@@ -782,6 +808,10 @@ const tabs = [
 ]
 const router = useRouter()
 const activeTab = ref('overview')
+const renderedTabs = ref<Set<string>>(new Set(['overview']))
+watch(activeTab, (tab) => {
+  renderedTabs.value.add(tab)
+}, { immediate: true })
 
 // 移动端响应式：记忆与掌握区在窄屏默认折叠，砍掉首屏一大段滚动
 const isMobile = ref(false)
@@ -803,7 +833,7 @@ const overviewStep = ref(0)
 
 // 按题型统计题数（用于空状态标注）
 function questionCountByType(type: string): number {
-  return degreeQuestions.filter((q) => q.type === type).length
+  return allDegreeQuestions.filter((q) => q.type === type).length
 }
 
 const settings = ref<DegreeSettings>({ targetSchool: '商丘师范学院继续教育学院', examDate: null, newPerDay: 15, manualStreak: null })
@@ -816,7 +846,7 @@ const practice = ref<PracticeRec[]>([])
 
 const wordQuery = ref('')
 const wordSrc = ref<'all' | SourceBook>('all')
-const wordLimit = ref(300)
+const wordLimit = ref(50)
 const filteredWords = computed(() => {
   const q = wordQuery.value.trim().toLowerCase()
   return degreeWords.filter((w) => {
@@ -826,9 +856,20 @@ const filteredWords = computed(() => {
   })
 })
 const visibleWords = computed(() => filteredWords.value.slice(0, wordLimit.value))
+const wordCountBySrc = computed(() => {
+  let outline = 0, guide = 0, mock = 0
+  for (const w of degreeWords) {
+    const books = w.sourceBooks || []
+    if (books.includes('考试大纲')) outline++
+    if (books.includes('复习指南')) guide++
+    if (books.includes('模拟试卷')) mock++
+  }
+  return { all: degreeWords.length, outline, guide, mock }
+})
 
-// 单词读音（浏览器内置 TTS，离线可用） + 例句（免费词典 API，按需加载并缓存）
+// 单词读音（浏览器内置 TTS，离线可用） + 例句/音标（免费词典 API，按需加载并缓存）
 const examples = ref<Record<string, string>>({})
+const phonetics = ref<Record<string, string>>({})
 const exampleLoading = ref<Record<string, boolean>>({})
 // 例句中文翻译（MyMemory 免费 API，无需 Key）
 const translations = ref<Record<string, string>>({})
@@ -841,8 +882,40 @@ function srcTagType(b: SourceBook): 'success' | 'warning' | 'info' {
 function speak(word: string) {
   speakWord(word, 0.9)
 }
+function wordPhonetic(word: string): string {
+  if (phonetics.value[word]) return phonetics.value[word]
+  const w = degreeWords.find((x) => x.word === word)
+  return w?.phonetic || ''
+}
+async function ensurePhonetic(word: string) {
+  if (wordPhonetic(word)) return
+  await loadExample(word)
+}
+
+// 单词本可见词音标懒加载：避免首屏 300 词同时请求，按队列串行拉取
+let phoneticFetchTimer: number | null = null
+let phoneticFetchQueue: string[] = []
+async function processPhoneticQueue() {
+  const word = phoneticFetchQueue.shift()
+  if (!word) return
+  if (!wordPhonetic(word) && !exampleLoading.value[word]) {
+    await loadExample(word)
+  }
+  if (phoneticFetchQueue.length) {
+    window.setTimeout(processPhoneticQueue, 120)
+  }
+}
+watch(visibleWords, (list) => {
+  if (!list.length) return
+  const missing = list.filter((w) => !wordPhonetic(w.word) && !exampleLoading.value[w.word]).map((w) => w.word)
+  if (!missing.length) return
+  // 去重并限制队列长度，避免搜索/翻页时无限累积
+  phoneticFetchQueue = Array.from(new Set([...phoneticFetchQueue, ...missing])).slice(0, 80)
+  if (phoneticFetchTimer) window.clearTimeout(phoneticFetchTimer)
+  phoneticFetchTimer = window.setTimeout(processPhoneticQueue, 200)
+}, { immediate: false, flush: 'post' })
 async function loadExample(word: string) {
-  if (examples.value[word] || exampleLoading.value[word]) return
+  if ((examples.value[word] && phonetics.value[word]) || exampleLoading.value[word]) return
   exampleLoading.value = { ...exampleLoading.value, [word]: true }
   try {
     const res = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(word)}`)
@@ -850,16 +923,27 @@ async function loadExample(word: string) {
       const data = await res.json()
       const arr = Array.isArray(data) ? data : [data]
       let found = ''
+      let phonetic = ''
       for (const entry of arr) {
+        // 优先取美式音标，其次英式，最后任意音标
+        if (!phonetic && entry.phonetic) phonetic = entry.phonetic
+        for (const ph of entry.phonetics || []) {
+          if (ph.text && voiceAccent.value === 'en-US' && /\u02c8|\u02cc|\u0251/.test(ph.text)) {
+            phonetic = ph.text
+            break
+          }
+          if (ph.text && !phonetic) phonetic = ph.text
+        }
         for (const m of entry.meanings || []) {
           for (const d of m.definitions || []) {
             if (d.example) { found = d.example; break }
           }
           if (found) break
         }
-        if (found) break
+        if (found && phonetic) break
       }
       examples.value = { ...examples.value, [word]: found || `（暂无例句）Please memorize "${word}".` }
+      if (phonetic) phonetics.value = { ...phonetics.value, [word]: phonetic }
     } else {
       examples.value = { ...examples.value, [word]: `Please memorize "${word}".` }
     }
@@ -891,9 +975,10 @@ const CAT_LABEL: Record<PhraseCategory, string> = {
 function catLabel(c: PhraseCategory) {
   return CAT_LABEL[c]
 }
+const allDegreePhrases = [...degreePhrases, ...spokenPhrases, ...affixPhrases, ...irregularPhrases]
 const filteredPhrases = computed(() => {
   const q = phraseQuery.value.trim().toLowerCase()
-  const list = degreePhrases.filter((p) => {
+  const list = allDegreePhrases.filter((p) => {
     if (phraseCat.value !== 'all' && p.category !== phraseCat.value) return false
     if (!q) return true
     return (
@@ -1048,7 +1133,7 @@ function onCardTouchEnd(e: TouchEvent) {
 
 const trainingType = ref<QuestionType>('vocab_grammar')
 const trainingTypeLabel = computed(() => EXAM_SECTIONS.find((s) => s.key === trainingType.value)?.name || '')
-const questionsOfType = computed(() => degreeQuestions.filter((q) => q.type === trainingType.value))
+const questionsOfType = computed(() => allDegreeQuestions.filter((q) => q.type === trainingType.value))
 const currentQ = ref<DegreeQuestion | null>(null)
 const showAnswer = ref(false)
 const myAnswer = ref('')
@@ -1066,13 +1151,21 @@ function typeLabel(t?: QuestionType | null) {
 }
 
 async function loadAll() {
-  settings.value = await svc.loadDegreeSettings()
-  manualStreakInput.value = settings.value.manualStreak ?? 0
-  wordProgress.value = await svc.loadWordProgress()
-  mistakes.value = await svc.loadMistakes()
-  practice.value = await svc.loadPractice()
-  notes.value = await svc.loadFavorites('note')
-  wordBook.value = await svc.loadFavorites('word')
+  const [settingsData, progressData, mistakesData, practiceData, notesData, wordBookData] = await Promise.all([
+    svc.loadDegreeSettings(),
+    svc.loadWordProgress(),
+    svc.loadMistakes(),
+    svc.loadPractice(),
+    svc.loadFavorites('note'),
+    svc.loadFavorites('word')
+  ])
+  settings.value = settingsData
+  manualStreakInput.value = settingsData.manualStreak ?? 0
+  wordProgress.value = progressData
+  mistakes.value = mistakesData
+  practice.value = practiceData
+  notes.value = notesData
+  wordBook.value = wordBookData
 }
 
 function startStudy() {
@@ -1158,8 +1251,8 @@ function revealAnswer() {
     svc.addMistake({ questionId: currentQ.value.id, type: currentQ.value.type, userAnswer: myAnswer.value, reason: `你的答案：${myAnswer.value}`, due: null })
   }
 }
-function isRight(o: string) {
-  return currentQ.value?.answer === o
+function optLetter(i: number): string {
+  return String.fromCharCode(65 + i)
 }
 function nextQuestion() {
   pickQuestion()
@@ -1171,7 +1264,7 @@ async function markMistake(q: DegreeQuestion) {
 }
 async function retryMistake(m: MistakeRec) {
   // 找到原题并进入刷题模式
-  const orig = degreeQuestions.find((q) => q.id === m.questionId)
+  const orig = allDegreeQuestions.find((q) => q.id === m.questionId)
   if (orig) {
     trainingType.value = m.type || 'vocab_grammar'
     currentQ.value = orig
@@ -1223,14 +1316,33 @@ function addMaterialNote(title: string) {
   noteVisible.value = true
 }
 async function saveNote() {
-  if (!noteInput.value.trim()) {
+  const content = noteInput.value.trim()
+  if (!content) {
     ElMessage.warning('笔记内容不能为空')
     return
   }
-  await svc.addFavorite('note', noteInput.value, null, noteTitleInput.value || null)
-  notes.value = await svc.loadFavorites('note')
+  const title = noteTitleInput.value.trim() || null
+  // 乐观更新：先清空输入并关闭弹窗，再同步云端，避免用户以为没保存成功
+  noteInput.value = ''
+  noteTitleInput.value = ''
   noteVisible.value = false
-  ElMessage.success('笔记已保存')
+  const tempId = `local_${Date.now()}`
+  const tempRec: FavoriteRec = {
+    id: tempId,
+    kind: 'note',
+    refId: null,
+    title,
+    content,
+    createdAt: new Date().toISOString()
+  }
+  notes.value.unshift(tempRec)
+  try {
+    await svc.addFavorite('note', content, null, title)
+    notes.value = await svc.loadFavorites('note')
+    ElMessage.success('笔记已保存')
+  } catch (e) {
+    ElMessage.warning('笔记已保存到本地，但云端同步失败：' + (e instanceof Error ? e.message : String(e)))
+  }
 }
 
 async function removeFav(id: string, isMistake = false) {
@@ -1728,9 +1840,12 @@ onBeforeUnmount(() => {
   font-weight: 600;
   color: var(--text-strong);
 }
-.word-phon {
+.word-phon,
+.word-phonetic {
   font-size: 12px;
   color: var(--text-muted);
+  margin-left: 6px;
+  font-weight: 400;
 }
 .word-pos {
   font-size: 12px;
@@ -2745,13 +2860,33 @@ section.immersive {
   border-radius: 0 !important;
   border: none !important;
   padding: 16px !important;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
+.immersive .flashcard-progress { flex: none; margin-bottom: 10px; }
 .immersive .flashcard {
-  min-height: 60vh;
-  margin-top: 6vh;
+  flex: 1 1 auto;
+  min-height: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
+.immersive .flashcard-inner {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.immersive .flashcard-back {
+  justify-content: flex-start;
+  overflow-y: auto;
+}
+.immersive .flashcard-ops {
+  flex: none;
+  margin-top: 10px;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+.immersive .fc-shortcuts { flex: none; margin-top: 6px; }
 .immersive-exit {
   background: #3c3489 !important;
   color: #fff !important;

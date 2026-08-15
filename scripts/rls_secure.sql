@@ -31,13 +31,21 @@ drop policy if exists "Allow anonymous access to accounts" on app_accounts;
 drop policy if exists "Allow anonymous access to dashboard" on app_dashboard_data;
 drop policy if exists "Allow anonymous access to profiles" on profiles;
 
--- 3. 账号表：仅本人可访问自己的行（auth.uid() = auth_user_id）
+-- 3. 账号表：仅本人可访问自己的行；超级管理员可管理所有账号
 drop policy if exists "accounts self access" on app_accounts;
 create policy "accounts self access"
   on app_accounts
   for all
   using (auth.uid() = auth_user_id)
   with check (auth.uid() = auth_user_id);
+
+drop policy if exists "accounts superadmin access" on app_accounts;
+create policy "accounts superadmin access"
+  on app_accounts
+  for all
+  to authenticated
+  using (is_superadmin())
+  with check (is_superadmin());
 
 -- 4. 资料表：仅本人可访问（auth.uid() 文本化后与 user_id 比对）
 drop policy if exists "profiles self access" on profiles;
@@ -155,15 +163,25 @@ create or replace function update_account_by_admin(
   p_disabled boolean
 )
 returns void
-language sql
+language plpgsql
 security definer
 set search_path = public
 as $$
+begin
+  if not is_superadmin() then
+    raise exception '权限不足：仅超级管理员可更新账号角色/昵称';
+  end if;
+
   update app_accounts
   set nickname = coalesce(p_nickname, nickname),
       role = coalesce(p_role, role),
       disabled = coalesce(p_disabled, disabled)
-  where auth_user_id = p_auth_user_id and is_superadmin();
+  where auth_user_id = p_auth_user_id;
+
+  if not found then
+    raise exception '更新失败：目标账号不存在或未被绑定（auth_user_id 为空）';
+  end if;
+end;
 $$;
 
 -- 启用/禁用账号（仅超管）

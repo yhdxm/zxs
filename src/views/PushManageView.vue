@@ -56,7 +56,9 @@
           :closable="false"
           :title="lastResult.text"
           style="margin-bottom: 12px"
-        />
+        >
+          <div v-if="lastResult.detail" class="push-detail">{{ lastResult.detail }}</div>
+        </el-alert>
 
         <div class="push-actions">
           <el-button type="primary" :loading="sending" @click="onSend">发送推送</el-button>
@@ -86,6 +88,10 @@
           <el-button v-if="subRow" text type="danger" @click="onUnsubscribe">退订</el-button>
         </div>
         <div v-if="subMsg" class="sub-tip">{{ subMsg }}</div>
+        <div class="sub-tip" style="margin-top: 12px">
+          Web Push 依赖浏览器推送通道，需在<strong>每个设备/浏览器</strong>上点击“订阅”并授权通知。
+          iOS 需 Safari 16.4+ 且添加到主屏幕；部分安卓浏览器或企业网络可能收不到，此时会自动降级为站内消息。
+        </div>
       </div>
     </el-card>
   </div>
@@ -123,7 +129,7 @@ const users = ref<AccountOption[]>([])
 const usersLoading = ref(false)
 const sending = ref(false)
 const testing = ref(false)
-const lastResult = ref<{ ok: boolean; text: string } | null>(null)
+const lastResult = ref<{ ok: boolean; text: string; detail?: string } | null>(null)
 
 const permission = ref<NotificationPermission>('default')
 const subRow = ref<PushSubscriptionRow | null>(null)
@@ -179,12 +185,15 @@ async function onSend() {
       targetModules: form.targetType === 'modules' ? form.targetModules : undefined,
       targetUsernames: form.targetType === 'users' ? form.targetUsernames : undefined
     })
-    if (res.sent === 0 && res.notified === 0) {
-      lastResult.value = { ok: false, text: '未部署推送服务或没有匹配接收人，消息未发出' }
-      ElMessage.warning('未部署推送服务或没有匹配接收人')
+    if (res.sent === 0 && res.notified === 0 && !res.fallback) {
+      lastResult.value = { ok: false, text: '未部署推送服务或没有匹配接收人，消息未发出', detail: res.error }
+      ElMessage.warning(res.error || '未部署推送服务或没有匹配接收人')
     } else {
-      lastResult.value = { ok: true, text: `推送成功：已发送 ${res.sent} 台设备，站内消息 ${res.notified} 条` }
-      ElMessage.success('已发送')
+      const base = res.fallback
+        ? `Web Push 未真正发出，已降级为站内消息 ${res.notified} 条`
+        : `推送成功：已发送 ${res.sent} 台设备，站内消息 ${res.notified} 条`
+      lastResult.value = { ok: !res.fallback, text: base, detail: res.error }
+      ElMessage[res.fallback ? 'warning' : 'success'](res.error || base)
     }
   } catch (e) {
     lastResult.value = { ok: false, text: '发送失败：' + (e instanceof Error ? e.message : String(e)) }
@@ -209,10 +218,12 @@ async function onTestSelf() {
       targetType: 'users',
       targetUsernames: [me.username]
     })
-    if (res.sent === 0 && res.notified === 0) {
-      ElMessage.warning('未部署推送服务或当前账号无接收权限，测试未发出')
+    if (res.sent === 0 && res.notified === 0 && !res.fallback) {
+      ElMessage.warning(res.error || '未部署推送服务或当前账号无接收权限，测试未发出')
     } else {
-      ElMessage.success(`已发送：推送 ${res.sent} 台、站内消息 ${res.notified} 条`)
+      ElMessage[res.fallback ? 'warning' : 'success'](
+        res.error || `已发送：推送 ${res.sent} 台、站内消息 ${res.notified} 条`
+      )
     }
   } catch (e) {
     ElMessage.error('测试失败：' + (e instanceof Error ? e.message : String(e)))
@@ -329,6 +340,12 @@ onMounted(() => {
   display: flex;
   flex-wrap: wrap;
   gap: 4px 14px;
+}
+.push-detail {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--text-muted);
+  word-break: break-all;
 }
 
 @media (max-width: 768px) {

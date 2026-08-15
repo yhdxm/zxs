@@ -1,6 +1,7 @@
 // 消息推送服务：封装 Web Push 的订阅、退订、按模块更新，以及
 // 管理员发消息（调用 Edge Function）、站内消息中心读写、自动提醒。
 import { supabase } from '../lib/supabaseClient'
+import { getSavedUser } from './appDataService'
 
 /** 可订阅的业务模块（与后台发送时的 targetModules 对应）。 */
 export interface PushModuleOption {
@@ -53,6 +54,14 @@ async function registerServiceWorker(): Promise<ServiceWorkerRegistration> {
 }
 
 async function getCurrentUserId(): Promise<string | null> {
+  // 优先使用本地缓存的 Supabase Auth uuid：弱网/会话刷新时更稳定，
+  // 避免项目“自建账号+Supabase Auth”混合架构下 getUser() 偶发返回 null。
+  try {
+    const saved = await getSavedUser()
+    if (saved?.authUserId) return saved.authUserId
+  } catch {
+    /* fallback */
+  }
   try {
     const { data } = await supabase.auth.getUser()
     return data.user?.id ?? null
@@ -127,6 +136,12 @@ export async function subscribe(modules: string[]): Promise<PushSubscriptionRow>
 }
 
 async function getCurrentUsername(): Promise<string | null> {
+  try {
+    const saved = await getSavedUser()
+    if (saved?.username) return saved.username
+  } catch {
+    /* fallback */
+  }
   const uid = await getCurrentUserId()
   if (!uid) return null
   const { data } = await supabase
@@ -215,32 +230,53 @@ export interface SendPushPayload {
   targetUsernames?: string[]
 }
 
+export interface SendPushResult {
+  sent: number
+  notified: number
+  /** Edge Function 未部署/失败时的具体原因，为空表示正常 */
+  error?: string
+  /** 是否已降级为仅站内消息（Web Push 未真正发出） */
+  fallback?: boolean
+}
+
 /** 管理员：发送一条推送消息。
  * 优先调用 Edge Function（Web Push + 站内消息）；若未部署或失败，
  * 则降级为直接写入 notifications 站内消息表；若仍失败则返回 0 不抛错，避免界面报错。
  */
-export async function sendMessage(payload: SendPushPayload): Promise<{ sent: number; notified: number }> {
+export async function sendMessage(payload: SendPushPayload): Promise<SendPushResult> {
   // 1) 优先 Edge Function（项目部署 functions/send-push 后走这里）
+  let edgeError = ''
   try {
     const { data, error } = await supabase.functions.invoke('send-push', { body: payload })
-    if (!error) return (data as { sent: number; notified: number }) || { sent: 0, notified: 0 }
-  } catch {
-    // 未部署 Edge Function 或网络异常：继续降级
+    if (!error) {
+      const res = (data as { sent?: number; notified?: number }) || {}
+      return { sent: res.sent ?? 0, notified: res.notified ?? 0 }
+    }
+    edgeError = String(error.message || error)
+  } catch (e) {
+    edgeError = e instanceof Error ? e.message : String(e)
   }
 
   // 2) 降级：直接写入站内消息表（跳过 Web Push 投递）
   try {
     const rows = await buildNotificationRows(payload)
-    if (rows.length === 0) return { sent: 0, notified: 0 }
+    if (rows.length === 0) return { sent: 0, notified: 0, error: edgeError || '没有匹配接收人', fallback: true }
     const { error } = await supabase.from('notifications').insert(rows)
     if (error) throw error
-    return { sent: 0, notified: rows.length }
+    return {
+      sent: 0,
+      notified: rows.length,
+      error: edgeError || 'Web Push 服务未部署，已降级为站内消息',
+      fallback: true
+    }
   } catch (e) {
     console.error('[push] direct insert failed:', e)
+    return {
+      sent: 0,
+      notified: 0,
+      error: edgeError || (e instanceof Error ? e.message : '站内消息也写入失败')
+    }
   }
-
-  // 3) 全部失败也返回 0，由调用方提示用户未部署推送服务
-  return { sent: 0, notified: 0 }
 }
 
 interface NotificationRow {
