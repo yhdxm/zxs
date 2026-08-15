@@ -506,7 +506,8 @@ const mobileBottomNav = computed<BottomNavItem[]>(() => {
   const items: BottomNavItem[] = []
   for (const k of MOBILE_NAV_PRIORITY) {
     const found = findMenuItem(k)
-    if (found) {
+    // 二次校验：即使父菜单展开导致子项存在，也必须拥有该模块任一平台权限才显示
+    if (found && hasModulePermission(currentUser.value, found.permissionKey || found.key, permissionConfig.value || undefined)) {
       items.push({
         key: found.key,
         label: found.label,

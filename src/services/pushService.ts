@@ -215,11 +215,80 @@ export interface SendPushPayload {
   targetUsernames?: string[]
 }
 
-/** 管理员：发送一条推送消息（调用 Edge Function，由它完成 Web Push 投递 + 写入站内消息） */
+/** 管理员：发送一条推送消息。
+ * 优先调用 Edge Function（Web Push + 站内消息）；若未部署或失败，
+ * 则降级为直接写入 notifications 站内消息表；若仍失败则返回 0 不抛错，避免界面报错。
+ */
 export async function sendMessage(payload: SendPushPayload): Promise<{ sent: number; notified: number }> {
-  const { data, error } = await supabase.functions.invoke('send-push', { body: payload })
-  if (error) throw new Error(error.message || '发送失败')
-  return (data as { sent: number; notified: number }) || { sent: 0, notified: 0 }
+  // 1) 优先 Edge Function（项目部署 functions/send-push 后走这里）
+  try {
+    const { data, error } = await supabase.functions.invoke('send-push', { body: payload })
+    if (!error) return (data as { sent: number; notified: number }) || { sent: 0, notified: 0 }
+  } catch {
+    // 未部署 Edge Function 或网络异常：继续降级
+  }
+
+  // 2) 降级：直接写入站内消息表（跳过 Web Push 投递）
+  try {
+    const rows = await buildNotificationRows(payload)
+    if (rows.length === 0) return { sent: 0, notified: 0 }
+    const { error } = await supabase.from('notifications').insert(rows)
+    if (error) throw error
+    return { sent: 0, notified: rows.length }
+  } catch (e) {
+    console.error('[push] direct insert failed:', e)
+  }
+
+  // 3) 全部失败也返回 0，由调用方提示用户未部署推送服务
+  return { sent: 0, notified: 0 }
+}
+
+interface NotificationRow {
+  id: string
+  user_id: string
+  title: string
+  body: string
+  module: string | null
+  url: string | null
+  sender: string | null
+  read: boolean
+  created_at: string
+}
+
+/** 根据接收范围构造 notifications 表记录 */
+async function buildNotificationRows(payload: SendPushPayload): Promise<NotificationRow[]> {
+  const now = new Date().toISOString()
+  const sender = await getCurrentUsername()
+  const base = {
+    title: payload.title,
+    body: payload.body,
+    module: payload.module || null,
+    url: payload.url || null,
+    sender,
+    read: false,
+    created_at: now
+  }
+
+  let userIds: string[] = []
+  if (payload.targetType === 'all') {
+    const { data, error } = await supabase.from('app_accounts').select('auth_user_id').not('auth_user_id', 'is', null)
+    if (!error && data) userIds = (data as { auth_user_id: string }[]).map((r) => r.auth_user_id)
+  } else if (payload.targetType === 'modules' && payload.targetModules && payload.targetModules.length > 0) {
+    const { data, error } = await supabase
+      .from('push_subscriptions')
+      .select('user_id')
+      .overlaps('modules', payload.targetModules)
+    if (!error && data) userIds = [...new Set((data as { user_id: string }[]).map((r) => r.user_id))]
+  } else if (payload.targetType === 'users' && payload.targetUsernames && payload.targetUsernames.length > 0) {
+    const { data, error } = await supabase.from('app_accounts').select('auth_user_id').in('username', payload.targetUsernames)
+    if (!error && data) userIds = (data as { auth_user_id: string }[]).map((r) => r.auth_user_id)
+  }
+
+  return userIds.map((user_id) => ({
+    ...base,
+    id: crypto.randomUUID(),
+    user_id
+  }))
 }
 
 export interface AppNotification {

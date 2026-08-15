@@ -168,7 +168,7 @@ const baseKeyOf = (k: string): string => k.replace(/\.(pc|mobile)$/, '')
 /** 普通用户默认可访问的模块（仅个人数据类，与「账号级数据隔离」一致） */
 const USER_ALLOWED_BASES = new Set<string>([
   'news', 'yingcang', 'xingyu', 'weather', 'map', 'third-api',
-  'learn-english', 'learn-industry', 'learn-books',
+  'learn-english', 'learn-industry', 'learn-books', 'learn-goals', 'cet-prep', 'weakness',
   'requirements', 'dashboard', 'todos', 'points', 'contents',
   'feedback'
 ])

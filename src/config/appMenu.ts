@@ -97,9 +97,9 @@ export const APP_MENU: SideItem[] = [
       { key: 'learn-english', label: '学位英语', icon: Document, permissionKey: 'learn-english', to: '/learn/english' },
       { key: 'learn-industry', label: '各行业知识', icon: DataBoard, permissionKey: 'learn-industry', to: '/learn/industry' },
       { key: 'learn-books', label: '书籍阅读', icon: Reading, permissionKey: 'learn-books', to: '/learn/books' },
-      { key: 'learn-goals', label: '学习目标', icon: Aim, to: '/learn/goals' },
-      { key: 'cet-prep', label: '四六级备考台', icon: Notebook, to: '/learn/cet-prep' },
-      { key: 'weakness', label: '薄弱点分析', icon: Odometer, to: '/learn/weakness' }
+      { key: 'learn-goals', label: '学习目标', icon: Aim, permissionKey: 'learn-goals', to: '/learn/goals' },
+      { key: 'cet-prep', label: '四六级备考台', icon: Notebook, permissionKey: 'cet-prep', to: '/learn/cet-prep' },
+      { key: 'weakness', label: '薄弱点分析', icon: Odometer, permissionKey: 'weakness', to: '/learn/weakness' }
     ]
   },
   {

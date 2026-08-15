@@ -179,8 +179,13 @@ async function onSend() {
       targetModules: form.targetType === 'modules' ? form.targetModules : undefined,
       targetUsernames: form.targetType === 'users' ? form.targetUsernames : undefined
     })
-    lastResult.value = { ok: true, text: `推送成功：已发送 ${res.sent} 台设备，站内消息 ${res.notified} 条` }
-    ElMessage.success('已发送')
+    if (res.sent === 0 && res.notified === 0) {
+      lastResult.value = { ok: false, text: '未部署推送服务或没有匹配接收人，消息未发出' }
+      ElMessage.warning('未部署推送服务或没有匹配接收人')
+    } else {
+      lastResult.value = { ok: true, text: `推送成功：已发送 ${res.sent} 台设备，站内消息 ${res.notified} 条` }
+      ElMessage.success('已发送')
+    }
   } catch (e) {
     lastResult.value = { ok: false, text: '发送失败：' + (e instanceof Error ? e.message : String(e)) }
   } finally {
@@ -204,7 +209,11 @@ async function onTestSelf() {
       targetType: 'users',
       targetUsernames: [me.username]
     })
-    ElMessage.success(`已发送：推送 ${res.sent} 台、站内消息 ${res.notified} 条`)
+    if (res.sent === 0 && res.notified === 0) {
+      ElMessage.warning('未部署推送服务或当前账号无接收权限，测试未发出')
+    } else {
+      ElMessage.success(`已发送：推送 ${res.sent} 台、站内消息 ${res.notified} 条`)
+    }
   } catch (e) {
     ElMessage.error('测试失败：' + (e instanceof Error ? e.message : String(e)))
   } finally {

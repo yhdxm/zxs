@@ -156,12 +156,14 @@ const router = createRouter({
     {
       path: '/learn/goals',
       name: 'learn-goals',
-      component: () => import('../views/LearningGoalsView.vue')
+      component: () => import('../views/LearningGoalsView.vue'),
+      meta: { requirePermission: 'learn-goals' }
     },
     {
       path: '/learn/cet-prep',
       name: 'cet-prep',
-      component: () => import('../views/CetPrepView.vue')
+      component: () => import('../views/CetPrepView.vue'),
+      meta: { requirePermission: 'cet-prep' }
     },
     {
       path: '/learn/degree-english',
@@ -172,7 +174,8 @@ const router = createRouter({
     {
       path: '/learn/weakness',
       name: 'weakness',
-      component: () => import('../views/WeaknessView.vue')
+      component: () => import('../views/WeaknessView.vue'),
+      meta: { requirePermission: 'weakness' }
     },
     {
       path: '/third-api',
