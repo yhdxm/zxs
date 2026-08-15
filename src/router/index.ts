@@ -166,7 +166,8 @@ const router = createRouter({
     {
       path: '/learn/degree-english',
       name: 'degree-english',
-      component: () => import('../views/DegreeEnglishView.vue')
+      component: () => import('../views/DegreeEnglishView.vue'),
+      meta: { requirePermission: 'learn-english' }
     },
     {
       path: '/learn/weakness',

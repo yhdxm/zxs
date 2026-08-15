@@ -439,7 +439,7 @@ const isMenuActive = (key: string) => {
   if (key === 'fanjingzhixie') return ['/news', '/weather', '/map', '/automation', '/yingcang', '/xingyu', '/third-api'].includes(route.path)
   if (key === 'xingyu') return route.path === '/xingyu'
   if (key === 'learncenter') return route.path.startsWith('/learn')
-  if (key === 'learn-english') return route.path === '/learn/english'
+  if (key === 'learn-english') return route.path === '/learn/english' || route.path === '/learn/degree-english'
   if (key === 'learn-industry') return route.path === '/learn/industry'
   if (key === 'learn-books') return route.path === '/learn/books'
   if (key === 'learn-goals') return route.path === '/learn/goals'

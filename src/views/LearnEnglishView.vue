@@ -28,6 +28,20 @@
           <span class="le-desc">{{ m.desc }}</span>
         </span>
       </button>
+      <!-- 备考台：跳转独立学位英语备考模块（与 CET 内卡片同源，移除卡片后由此进入） -->
+      <button
+        type="button"
+        class="le-entry le-entry-degree"
+        :style="{ '--c': '#534AB7' }"
+        @click="goDegreePrep"
+      >
+        <span class="le-bar"></span>
+        <span class="le-icon"><el-icon><School /></el-icon></span>
+        <span class="le-text">
+          <span class="le-label">备考台</span>
+          <span class="le-desc">背词卡 · 5 大题型 · 模拟考</span>
+        </span>
+      </button>
     </nav>
 
     <Transition name="le-fade" mode="out-in">
@@ -266,6 +280,7 @@
 
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, reactive, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { School, Reading, Collection, Calendar, ChatDotRound, ArrowDown } from '@element-plus/icons-vue'
 import PageHeader from '../components/PageHeader.vue'
@@ -301,6 +316,10 @@ const MODULES = [
   { key: 'ai', label: 'AI 答疑', desc: '语法/备考', color: '#0ea5e9', icon: ChatDotRound }
 ]
 const active = ref('word')
+const router = useRouter()
+function goDegreePrep(): void {
+  router.push('/learn/degree-english')
+}
 
 const nowText = ref('')
 let clockTimer: number | undefined
@@ -525,6 +544,7 @@ onUnmounted(() => { if (clockTimer) window.clearInterval(clockTimer) })
 .le-clock-hint { font-size: 11px; color: var(--text-faint); }
 
 .le-entries { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 18px; }
+.le-entry-degree { border-color: rgba(83, 74, 183, 0.45); box-shadow: 0 0 0 1px rgba(83, 74, 183, 0.15) inset; }
 .le-entry {
   position: relative; display: flex; align-items: center; gap: 10px; padding: 12px 14px 12px 16px;
   background: var(--surface); border: 1px solid var(--border); border-radius: 14px; box-shadow: var(--shadow-card);
