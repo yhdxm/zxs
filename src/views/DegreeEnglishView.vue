@@ -168,6 +168,23 @@
           <div></div>
         </div>
       </div>
+
+      <!-- 记忆与掌握可视化（免费 ECharts） -->
+      <div class="card-title memory-title">📈 记忆与掌握</div>
+      <div class="memory-grid">
+        <div class="memory-cell">
+          <div class="mc-label">词汇掌握率</div>
+          <EChart :option="masteryOption" height="172px" />
+        </div>
+        <div class="memory-cell">
+          <div class="mc-label">艾宾浩斯遗忘曲线（理论保持率）</div>
+          <EChart :option="memoryOption" height="172px" />
+        </div>
+        <div class="memory-cell memory-cell-wide">
+          <div class="mc-label">待复习分布（按下次复习时间）</div>
+          <EChart :option="reviewDistOption" height="188px" />
+        </div>
+      </div>
     </section>
 
     <!-- 单词本 -->
@@ -216,7 +233,7 @@
     </section>
 
     <!-- 背单词闪卡（学位英语专属：逐个展示） -->
-    <section v-show="activeTab === 'cards'" class="panel">
+    <section v-show="activeTab === 'cards'" ref="cardsSection" :class="['panel', { immersive: immersive }]">
       <div v-if="!cardStarted" class="card-start-screen">
         <div class="card-start-icon">📚</div>
         <h3 style="margin: 0 0 8px">学位英语背单词</h3>
@@ -233,11 +250,12 @@
         <div class="flashcard-progress">
           <span class="flashcard-pos">{{ cardIndex + 1 }} / {{ filteredWords.length }}</span>
           <div class="flashcard-bar"><div class="flashcard-fill" :style="{ width: cardPercent + '%' }"></div></div>
+          <button v-if="immersive" class="flashcard-exit immersive-exit" @click="exitImmersiveOnly" title="退出沉浸式">⛶ 退出沉浸</button>
           <button class="flashcard-exit" @click="exitCardMode" title="退出背词">✕</button>
         </div>
 
         <!-- 单张闪卡 -->
-        <div v-if="currentCardWord" class="flashcard" :class="{ flipped: cardFlipped }" @click="cardFlipped = !cardFlipped">
+        <div v-if="currentCardWord" class="flashcard" :class="{ flipped: cardFlipped }" @click="cardFlipped = !cardFlipped" @touchstart="onCardTouchStart" @touchend="onCardTouchEnd">
           <div class="flashcard-inner">
             <!-- 正面：单词 -->
             <div class="flashcard-front">
@@ -269,6 +287,12 @@
         <!-- 操作栏 -->
         <div class="flashcard-ops">
           <button class="fc-nav-btn" :disabled="cardIndex <= 0" @click="prevCard">← 上一个</button>
+          <button class="fc-nav-btn immersible-btn" :class="{ on: immersive }" @click="toggleImmersive">{{ immersive ? '📱 退出沉浸' : '⛶ 沉浸式' }}</button>
+          <div class="fc-accent">
+            <span class="accent-label">读音</span>
+            <button class="accent-opt" :class="{ on: voiceAccent === 'en-US' }" @click="voiceAccent = 'en-US'">美</button>
+            <button class="accent-opt" :class="{ on: voiceAccent === 'en-GB' }" @click="voiceAccent = 'en-GB'">英</button>
+          </div>
           <div class="fc-actions">
             <el-button size="small" type="success" @click="cycleWord(currentCardWord!.word); nextCard()">掌握 ✓</el-button>
             <el-button size="small" type="warning" @click="addWordBook(currentCardWord!)">生词本</el-button>
@@ -429,14 +453,14 @@
           <el-empty v-else description="做错的题会自动归集到这里" :image-size="60" />
         </div>
         <div class="rw-col">
-          <div class="card-title">生词本</div>
+          <div class="card-title">生词本 <span class="ext-tag">拓展 · 非三本PDF大纲</span></div>
           <div v-if="wordBook.length" class="note-list">
             <div v-for="w in wordBook" :key="w.id" class="note-item">
               <div class="note-body">{{ w.content }}</div>
               <el-button size="small" text type="danger" @click="removeFav(w.id)">删除</el-button>
             </div>
           </div>
-          <el-empty v-else description="单词本里「加入生词本」的词会在这里" :image-size="60" />
+          <el-empty v-else description="从单词本「加入生词本」的词会在这里（个人拓展词库，独立于三本PDF大纲词）" :image-size="60" />
         </div>
       </div>
     </section>
@@ -490,7 +514,7 @@
       </div>
       <el-empty v-else description="做错的题会自动归集到这里，目前还没有错题哦 🎉" :image-size="80" />
 
-      <div class="card-title" style="margin: 20px 0 10px">生词本 <el-tag size="small" :type="wordBook.length ? 'warning' : 'info'">{{ wordBook.length }} 词</el-tag></div>
+      <div class="card-title" style="margin: 20px 0 10px">生词本 <el-tag size="small" :type="wordBook.length ? 'warning' : 'info'">{{ wordBook.length }} 词</el-tag> <span class="ext-tag">拓展 · 非三本PDF大纲</span></div>
       <div v-if="wordBook.length" class="note-list">
         <div v-for="w in wordBook" :key="w.id" class="note-item">
           <div class="note-body">{{ w.content }}</div>
@@ -588,14 +612,31 @@
         <el-button type="primary" @click="saveNote">保存</el-button>
       </template>
     </el-dialog>
+
+    <!-- 划词翻译浮层（免费：朗读 + MyMemory 翻译） -->
+    <transition name="fade">
+      <div v-if="floatSel.visible" class="word-float" :style="{ left: floatSel.x + 'px', top: floatSel.y + 'px' }" @click.stop>
+        <div class="wf-text">{{ floatSel.text }}</div>
+        <div class="wf-actions">
+          <button class="wf-btn" @click="floatSpeak">🔊 朗读</button>
+          <button class="wf-btn" :disabled="floatSel.translating" @click="floatTranslate">
+            {{ floatSel.translating ? '翻译中…' : '📝 翻译' }}
+          </button>
+        </div>
+        <div v-if="floatSel.result" class="wf-result">{{ floatSel.result }}</div>
+        <button class="wf-close" @click="hideFloatSel" title="关闭">✕</button>
+      </div>
+    </transition>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, reactive, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import { Reading, Setting, VideoPlay, Picture, ArrowLeft } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
+import EChart from '../components/EChart.vue'
+import type { EChartsOption } from 'echarts'
 import {
   EXAM_SECTIONS,
   VOCAB_REQUIREMENT,
@@ -609,7 +650,7 @@ import { degreeQuestions } from '../prep/degreeQuestions'
 import { degreePhrases } from '../prep/degreePhrases'
 import { guideArticles } from '../prep/degreeGuide'
 import { syllabusProse } from '../prep/degreeSyllabusProse'
-import type { DegreeSettings, WordProgress, MistakeRec, FavoriteRec, QuestionType, DegreeQuestion, DegreePhrase, PhraseCategory, SourceBook, DegreeArticle } from '../prep/degreeTypes'
+import type { DegreeSettings, WordProgress, MistakeRec, FavoriteRec, PracticeRec, QuestionType, DegreeQuestion, DegreePhrase, PhraseCategory, SourceBook, DegreeArticle } from '../prep/degreeTypes'
 import * as svc from '../prep/degreeService'
 
 // 资料库：三本 PDF 正文切分后的可读文章（确保内容不遗漏）
@@ -640,11 +681,14 @@ function warmVoices() {
     if (synth.getVoices().length) voicesWarmed = true
   }
 }
+// 美 / 英音切换（免费，纯浏览器 TTS）
+const voiceAccent = ref<'en-US' | 'en-GB'>('en-US')
 function pickEnVoice(): SpeechSynthesisVoice | undefined {
   if (typeof window === 'undefined' || !('speechSynthesis' in window)) return undefined
   const vs = window.speechSynthesis.getVoices()
   if (!vs.length) return undefined
-  return vs.find((v) => /en[-_]US/i.test(v.lang)) || vs.find((v) => v.lang?.startsWith('en')) || vs[0]
+  const pattern = voiceAccent.value === 'en-GB' ? /en[-_]GB/i : /en[-_]US/i
+  return vs.find((v) => pattern.test(v.lang)) || vs.find((v) => v.lang?.startsWith('en')) || vs[0]
 }
 function speakWord(text: string, rate = 0.9) {
   if (!text) return
@@ -655,7 +699,7 @@ function speakWord(text: string, rate = 0.9) {
   warmVoices()
   const synth = window.speechSynthesis
   const u = new SpeechSynthesisUtterance(text)
-  u.lang = 'en-US'
+  u.lang = voiceAccent.value
   u.rate = rate
   const voice = pickEnVoice()
   if (voice) u.voice = voice
@@ -673,6 +717,52 @@ function speakWord(text: string, rate = 0.9) {
 }
 function speakText(t: string) {
   speakWord(t, 0.95)
+}
+
+// ===== 划词翻译浮层（免费 MyMemory，无需 Key） =====
+function translateText(text: string): Promise<string> {
+  const q = (text || '').trim()
+  if (!q) return Promise.resolve('')
+  return fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(q)}&langpair=en|zh-CN`)
+    .then((r) => r.json())
+    .then((d) => (d?.responseData?.translatedText as string) || '（翻译暂不可用）')
+    .catch(() => '（网络异常，翻译失败）')
+}
+const floatSel = reactive({ visible: false, x: 0, y: 0, text: '', translating: false, result: '' })
+function hideFloatSel() {
+  floatSel.visible = false
+  floatSel.result = ''
+}
+function onTextSelected(e?: Event) {
+  // 来自浮层自身的交互不触发（否则点按钮会先被 mouseup 关掉）
+  const t = e?.target as HTMLElement | null
+  if (t && t.closest && t.closest('.word-float')) return
+  const sel = typeof window !== 'undefined' ? window.getSelection() : null
+  if (!sel || sel.isCollapsed || !sel.rangeCount) {
+    hideFloatSel()
+    return
+  }
+  const text = sel.toString().trim()
+  if (!text || text.length > 120) {
+    hideFloatSel()
+    return
+  }
+  const rect = sel.getRangeAt(0).getBoundingClientRect()
+  floatSel.visible = true
+  floatSel.x = Math.max(12, rect.left + rect.width / 2)
+  floatSel.y = Math.max(12, rect.top)
+  floatSel.text = text
+  floatSel.result = ''
+}
+function floatTranslate() {
+  floatSel.translating = true
+  translateText(floatSel.text).then((r) => {
+    floatSel.result = r
+    floatSel.translating = false
+  })
+}
+function floatSpeak() {
+  speakWord(floatSel.text, 0.9)
 }
 
 const base = import.meta.env.BASE_URL
@@ -708,6 +798,7 @@ const wordProgress = ref<Record<string, WordProgress>>({})
 const mistakes = ref<MistakeRec[]>([])
 const notes = ref<FavoriteRec[]>([])
 const wordBook = ref<FavoriteRec[]>([])
+const practice = ref<PracticeRec[]>([])
 
 const wordQuery = ref('')
 const wordSrc = ref<'all' | SourceBook>('all')
@@ -768,25 +859,10 @@ async function loadExample(word: string) {
 async function translateExample(word: string) {
   if (!examples.value[word] || translations.value[word] || translating.value[word]) return
   translating.value = { ...translating.value, [word]: true }
-  try {
-    const text = examples.value[word]
-    const res = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=en|zh-CN`)
-    if (res.ok) {
-      const data = await res.json()
-      const zh = data?.responseData?.translatedText
-      if (zh && zh !== text) {
-        translations.value = { ...translations.value, [word]: zh }
-      } else {
-        translations.value = { ...translations.value, [word]: '（翻译暂不可用）' }
-      }
-    } else {
-      translations.value = { ...translations.value, [word]: '（翻译服务暂时不可用）' }
-    }
-  } catch {
-    translations.value = { ...translations.value, [word]: '（网络异常，翻译失败）' }
-  } finally {
-    translating.value = { ...translating.value, [word]: false }
-  }
+  const src = examples.value[word]
+  const zh = await translateText(src)
+  translations.value = { ...translations.value, [word]: zh }
+  translating.value = { ...translating.value, [word]: false }
 }
 
 // 词组 / 语句
@@ -822,12 +898,139 @@ const masteryPercent = computed(() => {
   return Math.round((graduatedCount.value / total) * 100)
 })
 const ringLen = computed(() => (masteryPercent.value / 100) * 314)
-const streakDays = computed(() => settings.value.manualStreak ?? 0)
+// 连续学习天数：优先由云端练习/错题实际日期推算，回退到手动校准值（多端一致）
+const streakDays = computed(() => {
+  const days = new Set<string>()
+  for (const p of practice.value) if (p.date) days.add(p.date)
+  for (const m of mistakes.value) if (m.createdAt) days.add(String(m.createdAt).slice(0, 10))
+  const manual = settings.value.manualStreak ?? 0
+  if (!days.size) return manual
+  let streak = 0
+  const d = new Date()
+  for (;;) {
+    const key = d.toISOString().slice(0, 10)
+    if (days.has(key)) {
+      streak++
+      d.setDate(d.getDate() - 1)
+    } else break
+  }
+  return Math.max(streak, manual)
+})
 const daysToExam = computed(() => {
   if (!settings.value.examDate) return null
   const d = new Date(settings.value.examDate).getTime() - Date.now()
   return Math.max(0, Math.ceil(d / 86400000))
 })
+
+// ===== 记忆曲线与量化可视化（ECharts，免费） =====
+// 待复习分布：按 next-due 落入的时间桶统计（今天/1-3天/4-7天/8-14天/15天+）
+const reviewBuckets = computed(() => {
+  const buckets: [number, number, number, number, number] = [0, 0, 0, 0, 0]
+  const now = new Date().setHours(0, 0, 0, 0)
+  for (const p of Object.values(wordProgress.value)) {
+    if (p.status === 'new') continue
+    if (!p.due) {
+      buckets[0]++
+      continue
+    }
+    const diff = Math.ceil((new Date(p.due).setHours(0, 0, 0, 0) - now) / 86400000)
+    if (diff <= 0) buckets[0]++
+    else if (diff <= 3) buckets[1]++
+    else if (diff <= 7) buckets[2]++
+    else if (diff <= 14) buckets[3]++
+    else buckets[4]++
+  }
+  return buckets
+})
+const masteryOption = computed<EChartsOption>(() => ({
+  series: [
+    {
+      type: 'gauge',
+      startAngle: 210,
+      endAngle: -30,
+      min: 0,
+      max: 100,
+      progress: { show: true, width: 14, itemStyle: { color: '#534ab7' } },
+      axisLine: { lineStyle: { width: 14, color: [[1, '#eceaf8']] } },
+      pointer: { show: false },
+      axisTick: { show: false },
+      splitLine: { show: false },
+      axisLabel: { show: false },
+      detail: { valueAnimation: true, fontSize: 26, fontWeight: 700, color: '#3c3489', formatter: '{value}%', offsetCenter: [0, 0] },
+      data: [{ value: masteryPercent.value }]
+    }
+  ]
+}))
+const memoryOption = computed<EChartsOption>(() => ({
+  tooltip: { trigger: 'axis' },
+  grid: { left: 44, right: 16, top: 24, bottom: 30 },
+  xAxis: { type: 'category', data: ['第1天', '第2天', '第4天', '第7天', '第15天', '第30天'], axisLabel: { fontSize: 11 } },
+  yAxis: { type: 'value', max: 100, name: '保持率%', axisLabel: { fontSize: 11 } },
+  series: [
+    {
+      name: '记忆保持率',
+      type: 'line',
+      smooth: true,
+      symbol: 'circle',
+      symbolSize: 7,
+      data: [100, 58, 35, 25, 21, 20],
+      lineStyle: { color: '#534ab7', width: 3 },
+      itemStyle: { color: '#534ab7' },
+      areaStyle: { color: 'rgba(83,74,183,0.15)' }
+    }
+  ]
+}))
+const reviewDistOption = computed<EChartsOption>(() => ({
+  tooltip: { trigger: 'axis' },
+  grid: { left: 40, right: 16, top: 16, bottom: 30 },
+  xAxis: { type: 'category', data: ['今天', '1-3天', '4-7天', '8-14天', '15天+'], axisLabel: { fontSize: 11 } },
+  yAxis: { type: 'value', axisLabel: { fontSize: 11 } },
+  series: [
+    {
+      type: 'bar',
+      data: reviewBuckets.value,
+      barWidth: '52%',
+      itemStyle: { color: '#3c3489', borderRadius: [4, 4, 0, 0] }
+    }
+  ]
+}))
+
+// ===== 移动端沉浸式背词 =====
+const immersive = ref(false)
+const cardsSection = ref<HTMLElement | null>(null)
+function toggleImmersive() {
+  immersive.value = !immersive.value
+  const el = cardsSection.value
+  if (immersive.value) {
+    // 请求真实全屏（移动端隐藏地址栏，获得纯净沉浸区）
+    el?.requestFullscreen?.().catch(() => {})
+  } else if (typeof document !== 'undefined' && document.fullscreenElement) {
+    document.exitFullscreen?.().catch(() => {})
+  }
+}
+function exitImmersiveOnly() {
+  immersive.value = false
+  if (typeof document !== 'undefined' && document.fullscreenElement) document.exitFullscreen?.().catch(() => {})
+}
+let touchStartX = 0
+let touchStartY = 0
+function onCardTouchStart(e: TouchEvent) {
+  const t = e.changedTouches[0]
+  if (!t) return
+  touchStartX = t.clientX
+  touchStartY = t.clientY
+}
+function onCardTouchEnd(e: TouchEvent) {
+  const t = e.changedTouches[0]
+  if (!t) return
+  const dx = t.clientX - touchStartX
+  const dy = t.clientY - touchStartY
+  // 横向滑动翻卡；纵向滑动忽略（防止误触）
+  if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)) {
+    if (dx < 0) nextCard()
+    else prevCard()
+  }
+}
 
 const trainingType = ref<QuestionType>('vocab_grammar')
 const trainingTypeLabel = computed(() => EXAM_SECTIONS.find((s) => s.key === trainingType.value)?.name || '')
@@ -853,6 +1056,7 @@ async function loadAll() {
   manualStreakInput.value = settings.value.manualStreak ?? 0
   wordProgress.value = await svc.loadWordProgress()
   mistakes.value = await svc.loadMistakes()
+  practice.value = await svc.loadPractice()
   notes.value = await svc.loadFavorites('note')
   wordBook.value = await svc.loadFavorites('word')
 }
@@ -884,6 +1088,10 @@ function startCardMode() {
 }
 
 function exitCardMode() {
+  if (immersive.value) {
+    exitImmersiveOnly()
+    return
+  }
   cardStarted.value = false
   cardFlipped.value = false
 }
@@ -1027,6 +1235,26 @@ onMounted(() => {
   loadAll()
   // 进入页面即补发离线队列中未成功的删除/写入（数据可靠性兜底）
   svc.flushQueue().catch((e) => console.warn('[DegreeEnglish] 离线队列重试失败', e))
+  // 划词翻译浮层：监听选区变化（桌面 mouseup / 移动端 touchend）
+  if (typeof document !== 'undefined') {
+    document.addEventListener('mouseup', onTextSelected)
+    document.addEventListener('touchend', onTextSelected)
+    document.addEventListener('scroll', hideFloatSel, true)
+    // 系统手势退出全屏时同步关闭沉浸式
+    document.addEventListener('fullscreenchange', onFullscreenChange)
+  }
+})
+function onFullscreenChange() {
+  if (typeof document !== 'undefined' && !document.fullscreenElement) immersive.value = false
+}
+onBeforeUnmount(() => {
+  if (typeof document !== 'undefined') {
+    document.removeEventListener('mouseup', onTextSelected)
+    document.removeEventListener('touchend', onTextSelected)
+    document.removeEventListener('scroll', hideFloatSel, true)
+    document.removeEventListener('fullscreenchange', onFullscreenChange)
+  }
+  if (typeof document !== 'undefined' && document.fullscreenElement) document.exitFullscreen?.().catch(() => {})
 })
 </script>
 
@@ -2385,5 +2613,138 @@ onMounted(() => {
   .mine-ring-row { flex-direction: column; text-align: center; }
   .mine-actions { flex-direction: column; }
   .mine-actions .el-button { width: 100%; }
+}
+
+/* ===== 划词翻译浮层 ===== */
+.word-float {
+  position: fixed;
+  transform: translate(-50%, -100%);
+  z-index: 3000;
+  min-width: 180px;
+  max-width: 82vw;
+  background: #fff;
+  border: 1px solid var(--border, #e6e3f2);
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(40, 30, 90, 0.18);
+  padding: 10px 12px;
+  color: #2b2350;
+}
+.word-float .wf-text {
+  font-weight: 600;
+  font-size: 14px;
+  margin-bottom: 8px;
+  word-break: break-word;
+  padding-right: 18px;
+}
+.word-float .wf-actions { display: flex; gap: 8px; }
+.word-float .wf-btn {
+  flex: 1;
+  border: 1px solid var(--border, #e6e3f2);
+  background: #f5f3ff;
+  color: #3c3489;
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.word-float .wf-btn:active { background: #e9e5ff; }
+.word-float .wf-btn:disabled { opacity: 0.6; cursor: default; }
+.word-float .wf-result {
+  margin-top: 8px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #4a4170;
+  background: #f7f6ff;
+  border-radius: 8px;
+  padding: 6px 8px;
+}
+.word-float .wf-close {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 18px;
+  height: 18px;
+  border: none;
+  background: transparent;
+  color: #9a93c0;
+  font-size: 12px;
+  cursor: pointer;
+  line-height: 1;
+}
+.fade-enter-active, .fade-leave-active { transition: opacity 0.15s ease; }
+.fade-enter-from, .fade-leave-to { opacity: 0; }
+
+/* ===== 移动端沉浸式背词 ===== */
+.flashcard-section.immersive,
+section.immersive {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 2500 !important;
+  background: var(--surface, #fff);
+  margin: 0 !important;
+  border-radius: 0 !important;
+  border: none !important;
+  padding: 16px !important;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.immersive .flashcard {
+  min-height: 60vh;
+  margin-top: 6vh;
+}
+.immersive-exit {
+  background: #3c3489 !important;
+  color: #fff !important;
+  font-size: 12px !important;
+  padding: 4px 10px !important;
+}
+.immersible-btn.on { background: #3c3489; color: #fff; }
+/* 读音美/英切换 */
+.fc-accent {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.fc-accent .accent-label { font-size: 12px; color: #6b6390; }
+.fc-accent .accent-opt {
+  border: 1px solid var(--border, #e6e3f2);
+  background: #fff;
+  color: #6b6390;
+  border-radius: 6px;
+  width: 28px;
+  height: 26px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.fc-accent .accent-opt.on { background: #534ab7; color: #fff; border-color: #534ab7; }
+
+/* ===== 记忆与掌握可视化 ===== */
+.memory-title { margin-top: 18px; }
+.memory-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.memory-cell {
+  background: var(--surface-soft, #f7f6ff);
+  border: 1px solid var(--border, #e6e3f2);
+  border-radius: 12px;
+  padding: 10px 12px;
+}
+.memory-cell-wide { grid-column: 1 / -1; }
+.mc-label { font-size: 13px; color: #6b6390; margin-bottom: 4px; font-weight: 600; }
+.ext-tag {
+  font-size: 11px;
+  font-weight: 500;
+  color: #fff;
+  background: #b9a7ff;
+  border-radius: 6px;
+  padding: 1px 7px;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+@media (max-width: 768px) {
+  .memory-grid { grid-template-columns: 1fr; }
+  .memory-cell-wide { grid-column: auto; }
 }
 </style>

@@ -46,6 +46,43 @@ function lsSet(prefix: string, userId: string, val: unknown) {
   }
 }
 
+// ============================================================
+// 多端同步核心原则（修复「同账号换设备从新开始」）
+//   - Supabase 为唯一真相源（authoritative）。
+//   - 写入：先写 localStorage 镜像（保证本机即时可用），再 upsert 云端；
+//           云端失败 → 入离线队列，下次 flushQueue 自动补发（不再静默吞错）。
+//   - 读取：优先云端；成功 → 回写 localStorage 镜像（弱网/离线时可回退到最近一次云端快照）；
+//           云端异常 → 回退 localStorage 镜像（绝不返回空对象导致「从新开始」）。
+// ============================================================
+
+/** 云端 upsert：失败入离线队列（幂等，含 PK 整行）。 */
+async function cloudUpsert(table: string, row: Record<string, unknown>): Promise<boolean> {
+  try {
+    const { error } = await supabase.from(table).upsert(row)
+    if (error) throw error
+    return true
+  } catch {
+    reli.enqueue({ table, type: 'upsert', row })
+    return false
+  }
+}
+/** 云端 insert：失败转 upsert 重试（row 含 id/PK，幂等）。 */
+async function cloudInsert(table: string, row: Record<string, unknown>): Promise<boolean> {
+  try {
+    const { error } = await supabase.from(table).insert(row)
+    if (error) throw error
+    return true
+  } catch {
+    reli.enqueue({ table, type: 'upsert', row })
+    return false
+  }
+}
+
+/** 待同步（离线队列）条目数，供 UI 展示同步状态。 */
+export function pendingSyncCount(): number {
+  return reli.getQueue().length
+}
+
 // ---------- 设置 ----------
 const DEFAULT_SETTINGS: DegreeSettings = {
   targetSchool: '商丘师范学院继续教育学院',
@@ -64,15 +101,18 @@ export async function loadDegreeSettings(): Promise<DegreeSettings> {
       .eq('user_id', userId)
       .maybeSingle()
     if (error) throw error
-    if (data)
-      return {
+    if (data) {
+      const s: DegreeSettings = {
         targetSchool: data.target_school ?? null,
         examDate: data.exam_date ?? null,
         newPerDay: data.new_per_day ?? 15,
         manualStreak: data.manual_streak ?? null
       }
+      lsSet('settings', userId, s) // 云端快照回写本地镜像
+      return s
+    }
   } catch {
-    /* 兜底 */
+    /* 云端异常 → 回退本地镜像 */
   }
   return { ...DEFAULT_SETTINGS, ...lsGet('settings', userId, {}) }
 }
@@ -80,20 +120,15 @@ export async function loadDegreeSettings(): Promise<DegreeSettings> {
 export async function saveDegreeSettings(s: DegreeSettings): Promise<void> {
   const userId = await getUserId()
   if (!userId) return
-  lsSet('settings', userId, s)
-  try {
-    const { error } = await supabase.from('degree_settings').upsert({
-      user_id: userId,
-      target_school: s.targetSchool,
-      exam_date: s.examDate,
-      new_per_day: s.newPerDay,
-      manual_streak: s.manualStreak,
-      updated_at: new Date().toISOString()
-    })
-    if (error) throw error
-  } catch {
-    /* 兜底 */
-  }
+  lsSet('settings', userId, s) // 本地镜像（本机即时可用）
+  await cloudUpsert('degree_settings', {
+    user_id: userId,
+    target_school: s.targetSchool,
+    exam_date: s.examDate,
+    new_per_day: s.newPerDay,
+    manual_streak: s.manualStreak,
+    updated_at: new Date().toISOString()
+  })
 }
 
 // ---------- 单词进度 ----------
@@ -110,9 +145,10 @@ export async function loadWordProgress(): Promise<Record<string, WordProgress>> 
     for (const r of (data as any[]) || []) {
       out[r.word] = { status: r.status, level: r.level, due: r.due ?? null, weak: r.weak ?? false }
     }
+    lsSet('words', userId, out) // 云端快照回写本地镜像
     return out
   } catch {
-    return lsGet('words', userId, {})
+    return lsGet('words', userId, {}) // 云端异常 → 回退本地镜像，避免「从新开始」
   }
 }
 
@@ -121,21 +157,16 @@ export async function saveWordProgress(word: string, p: WordProgress): Promise<v
   if (!userId) return
   const all = lsGet<Record<string, WordProgress>>('words', userId, {})
   all[word] = p
-  lsSet('words', userId, all)
-  try {
-    const { error } = await supabase.from('degree_word_progress').upsert({
-      user_id: userId,
-      word,
-      status: p.status,
-      level: p.level,
-      due: p.due,
-      weak: p.weak,
-      updated_at: new Date().toISOString()
-    })
-    if (error) throw error
-  } catch {
-    /* 兜底 */
-  }
+  lsSet('words', userId, all) // 本地镜像（含本词，本机即时可用）
+  await cloudUpsert('degree_word_progress', {
+    user_id: userId,
+    word,
+    status: p.status,
+    level: p.level,
+    due: p.due,
+    weak: p.weak,
+    updated_at: new Date().toISOString()
+  })
 }
 
 // ---------- 练习记录 ----------
@@ -146,19 +177,14 @@ export async function addPractice(type: QuestionType, total: number, correct: nu
   const all = lsGet<PracticeRec[]>('practice', userId, [])
   all.push(rec)
   lsSet('practice', userId, all)
-  try {
-    const { error } = await supabase.from('degree_practice').insert({
-      id: rec.id,
-      user_id: userId,
-      type,
-      total,
-      correct,
-      date: rec.date
-    })
-    if (error) throw error
-  } catch {
-    /* 兜底 */
-  }
+  await cloudInsert('degree_practice', {
+    id: rec.id,
+    user_id: userId,
+    type,
+    total,
+    correct,
+    date: rec.date
+  })
 }
 
 export async function loadPractice(): Promise<PracticeRec[]> {
@@ -171,13 +197,15 @@ export async function loadPractice(): Promise<PracticeRec[]> {
       .eq('user_id', userId)
       .order('date', { ascending: false })
     if (error) throw error
-    return ((data as any[]) || []).map((r) => ({
+    const rows: PracticeRec[] = ((data as any[]) || []).map((r) => ({
       id: r.id,
       type: r.type,
       total: r.total,
       correct: r.correct,
       date: r.date
     }))
+    lsSet('practice', userId, rows)
+    return rows
   } catch {
     return lsGet<PracticeRec[]>('practice', userId, [])
   }
@@ -193,21 +221,16 @@ export async function addMistake(m: Omit<MistakeRec, 'id' | 'removed'>): Promise
     all.push(rec)
     lsSet('mistakes', userId, all)
   }
-  try {
-    const { error } = await supabase.from('degree_mistakes').insert({
-      id,
-      user_id: userId,
-      question_id: m.questionId,
-      type: m.type,
-      user_answer: m.userAnswer,
-      reason: m.reason,
-      due: m.due,
-      removed: false
-    })
-    if (error) throw error
-  } catch {
-    /* 兜底 */
-  }
+  await cloudInsert('degree_mistakes', {
+    id,
+    user_id: userId,
+    question_id: m.questionId,
+    type: m.type,
+    user_answer: m.userAnswer,
+    reason: m.reason,
+    due: m.due,
+    removed: false
+  })
   return id
 }
 
@@ -222,7 +245,7 @@ export async function loadMistakes(): Promise<MistakeRec[]> {
       .eq('user_id', userId)
       .eq('removed', false)
     if (error) throw error
-    return ((data as any[]) || [])
+    const rows: MistakeRec[] = ((data as any[]) || [])
       .map((r) => ({
         id: r.id,
         questionId: r.question_id,
@@ -233,7 +256,9 @@ export async function loadMistakes(): Promise<MistakeRec[]> {
         removed: r.removed,
         createdAt: (r as any).created_at ?? null
       }))
-      .filter((m) => !deletedIds.has(m.id)) // 本地删除缓存兜底
+      .filter((m) => !deletedIds.has(m.id))
+    lsSet('mistakes', userId, rows)
+    return rows
   } catch {
     return lsGet<MistakeRec[]>('mistakes', userId, []).filter((m) => !m.removed && !deletedIds.has(m.id))
   }
@@ -254,19 +279,14 @@ export async function addFavorite(
     all.push(rec)
     lsSet('favorites', userId, all)
   }
-  try {
-    const { error } = await supabase.from('degree_favorites').insert({
-      id,
-      user_id: userId,
-      kind,
-      ref_id: refId,
-      title,
-      content
-    })
-    if (error) throw error
-  } catch {
-    /* 兜底 */
-  }
+  await cloudInsert('degree_favorites', {
+    id,
+    user_id: userId,
+    kind,
+    ref_id: refId,
+    title,
+    content
+  })
   return id
 }
 
@@ -279,8 +299,8 @@ export async function loadFavorites(kind?: FavoriteKind): Promise<FavoriteRec[]>
     if (kind) q = q.eq('kind', kind)
     const { data, error } = await q.order('created_at', { ascending: false })
     if (error) throw error
-    return ((data as any[]) || [])
-      .filter((r) => !(r as any).removed) // 软删兜底（degree_favorites 加 removed 列后生效）
+    const rows: FavoriteRec[] = ((data as any[]) || [])
+      .filter((r) => !(r as any).removed)
       .map((r) => ({
         id: r.id,
         kind: r.kind,
@@ -290,6 +310,8 @@ export async function loadFavorites(kind?: FavoriteKind): Promise<FavoriteRec[]>
         createdAt: r.created_at
       }))
       .filter((f) => !deletedIds.has(f.id))
+    lsSet('favorites', userId, rows)
+    return rows
   } catch {
     const all = lsGet<FavoriteRec[]>('favorites', userId, [])
     return all.filter((f) => !deletedIds.has(f.id) && (!kind || f.kind === kind))
@@ -339,7 +361,7 @@ export async function removeMistake(id: string): Promise<void> {
   }
 }
 
-/** 离线重试队列：页面 onMounted 时调用，把未成功的删除/写入补发给 Supabase。 */
+/** 离线重试队列：页面 onMounted / 网络恢复时调用，把未成功的写入/删除补发给 Supabase。 */
 export async function flushQueue(): Promise<void> {
   const q = reli.getQueue()
   if (!q.length) return
@@ -359,4 +381,11 @@ export async function flushQueue(): Promise<void> {
   }
   reli.clearQueue()
   remain.forEach((o) => reli.enqueue(o))
+}
+
+// 网络恢复时自动补发离线队列（一次性注册，覆盖整个会话）
+if (typeof window !== 'undefined') {
+  window.addEventListener('online', () => {
+    flushQueue().catch(() => {})
+  })
 }
