@@ -343,14 +343,16 @@ const hasMenuPermission = (item: SideItem): boolean => {
 
 const filteredSideMenu = computed(() => {
   const kw = menuSearch.value.trim().toLowerCase()
-  const visible = sideMenu
-    .filter((item) => !item.visible || item.visible(currentUser.value))
-    .filter((item) => hasMenuPermission(item))
-    .map((item) => {
-      if (!item.children) return item
-      const filteredChildren = item.children.filter((child) => hasMenuPermission(child))
-      return { ...item, children: filteredChildren }
-    })
+  function filterMenu(items: SideItem[]): SideItem[] {
+    return items
+      .filter((item) => !item.visible || item.visible(currentUser.value))
+      .filter((item) => hasMenuPermission(item))
+      .map((item) => {
+        if (!item.children) return item
+        return { ...item, children: filterMenu(item.children) }
+      })
+  }
+  const visible = filterMenu(sideMenu)
   if (!kw) return visible
   return visible.filter((item) => {
     if (item.label.toLowerCase().includes(kw)) return true
@@ -374,7 +376,7 @@ const toggleGroup = (key: string) => {
 
 const isMenuActive = (key: string) => {
   if (key === 'learn-english') return route.path.startsWith('/degree') || route.path === '/learn/english'
-  if (key === 'degree-legacy') return route.path === '/learn/english' || route.path.startsWith('/degree')
+  if (key === 'degree-legacy') return route.path === '/learn/english'
   if (key.startsWith('degree-') && key !== 'degree-legacy') return route.path === '/degree/' + key.slice('degree-'.length)
   if (key === 'welcome') return route.path === '/welcome'
   if (key === 'database') return route.path === '/database'

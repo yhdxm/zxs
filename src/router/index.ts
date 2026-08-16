@@ -140,7 +140,7 @@ const router = createRouter({
       path: '/learn/english',
       name: 'learn-english',
       component: () => import('../views/LearnEnglishView.vue'),
-      meta: { requirePermission: 'learn-english' }
+      meta: { requirePermission: 'degree-legacy' }
     },
     {
       path: '/learn/industry',
@@ -170,62 +170,62 @@ const router = createRouter({
       path: '/learn/degree-english',
       name: 'degree-english',
       component: () => import('../views/DegreeEnglishView.vue'),
-      meta: { requirePermission: 'learn-english' }
+      meta: { requirePermission: 'degree-legacy' }
     },
     // ===== 学位英语备考台 2.0 模块（数据已落地数据库，见 scripts/degree-english-schema.sql） =====
     {
       path: '/degree/home',
       name: 'degree-home',
       component: () => import('../views/learn/degree/DegreePrepHome.vue'),
-      meta: { requirePermission: 'learn-english' }
+      meta: { requirePermission: 'degree-home' }
     },
     {
       path: '/degree/materials',
       name: 'degree-materials',
       component: () => import('../views/learn/degree/DegreeMaterialsView.vue'),
-      meta: { requirePermission: 'learn-english' }
+      meta: { requirePermission: 'degree-materials' }
     },
     {
       path: '/degree/reader',
       name: 'degree-reader',
       component: () => import('../views/learn/degree/DegreeReaderView.vue'),
-      meta: { requirePermission: 'learn-english' }
+      meta: { requirePermission: 'degree-reader' }
     },
     {
       path: '/degree/words',
       name: 'degree-words',
       component: () => import('../views/learn/degree/DegreeWordsView.vue'),
-      meta: { requirePermission: 'learn-english' }
+      meta: { requirePermission: 'degree-words' }
     },
     {
       path: '/degree/training',
       name: 'degree-training',
       component: () => import('../views/learn/degree/DegreeTrainingView.vue'),
-      meta: { requirePermission: 'learn-english' }
+      meta: { requirePermission: 'degree-training' }
     },
     {
       path: '/degree/practice',
       name: 'degree-practice',
       component: () => import('../views/learn/degree/DegreePracticeView.vue'),
-      meta: { requirePermission: 'learn-english' }
+      meta: { requirePermission: 'degree-practice' }
     },
     {
       path: '/degree/exam',
       name: 'degree-exam',
       component: () => import('../views/learn/degree/DegreeExamView.vue'),
-      meta: { requirePermission: 'learn-english' }
+      meta: { requirePermission: 'degree-exam' }
     },
     {
       path: '/degree/mine',
       name: 'degree-mine',
       component: () => import('../views/learn/degree/DegreeMineView.vue'),
-      meta: { requirePermission: 'learn-english' }
+      meta: { requirePermission: 'degree-mine' }
     },
     {
       path: '/degree/weakness',
       name: 'degree-weakness',
       component: () => import('../views/learn/degree/DegreeWeaknessView.vue'),
-      meta: { requirePermission: 'learn-english' }
+      meta: { requirePermission: 'degree-weakness' }
     },
     {
       // 旧版薄弱点分析已并入「学位英语备考台 2.0」的薄弱点分析 (/degree/weakness)，此处重定向。

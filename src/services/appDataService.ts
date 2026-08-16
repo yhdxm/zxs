@@ -110,24 +110,14 @@ const AUTH_KEY = 'smart-dashboard-user'
 function buildPermissionTree(menu: SideItem[]): PermissionNode[] {
   const tree: PermissionNode[] = []
   for (const node of menu) {
-    if (!node.permissionKey && !node.children) continue
+    // 有子节点的节点作为分组父节点递归展开；父节点自身不生成 pc/mobile 叶子
     if (node.children && node.children.length > 0) {
-      const children: PermissionNode[] = []
-      for (const child of node.children) {
-        if (!child.permissionKey) continue
-        children.push({
-          key: child.permissionKey,
-          label: child.label,
-          children: [
-            { key: `${child.permissionKey}.pc`, label: 'PC端' },
-            { key: `${child.permissionKey}.mobile`, label: '移动端' }
-          ]
-        })
-      }
+      const children = buildPermissionTree(node.children)
       if (children.length > 0) {
         tree.push({ key: node.key, label: node.label, children })
       }
     } else if (node.permissionKey) {
+      // 叶子节点：生成基础 key + PC/移动端两个叶子
       tree.push({
         key: node.permissionKey,
         label: node.label,
@@ -169,13 +159,15 @@ const baseKeyOf = (k: string): string => k.replace(/\.(pc|mobile)$/, '')
 /** 普通用户默认可访问的模块（仅个人数据类，与「账号级数据隔离」一致） */
 const USER_ALLOWED_BASES = new Set<string>([
   'news', 'yingcang', 'xingyu', 'weather', 'map', 'third-api',
-  'learn-english', 'learn-industry', 'learn-books', 'learn-goals', 'cet-prep', 'weakness',
+  'degree-legacy', 'degree-home', 'degree-materials', 'degree-reader', 'degree-words',
+  'degree-training', 'degree-practice', 'degree-exam', 'degree-weakness', 'degree-mine',
+  'learn-industry', 'learn-books', 'learn-goals', 'cet-prep', 'weakness',
   'requirements', 'dashboard', 'todos', 'points', 'contents',
   'feedback'
 ])
 
 export const DEFAULT_ROLE_CONFIG: PermissionConfig = {
-  version: 2,
+  version: 3,
   roles: [
     {
       key: 'superadmin',
@@ -198,13 +190,14 @@ export const DEFAULT_ROLE_CONFIG: PermissionConfig = {
   ]
 }
 
-/** 当前权限方案版本：v2 起权限 key 细粒度化（每个菜单一个独立 key） */
-export const PERMISSION_SCHEMA_VERSION = 2
+/** 当前权限方案版本：v3 起学位英语备考台子模块独立权限 key */
+export const PERMISSION_SCHEMA_VERSION = 3
 
 /**
- * v1 → v2 权限迁移映射。
- * v1 时期 `dashboard` / `ai` 是两个粗粒度大权限，覆盖了下面这些页面；
- * v2 拆成每页独立 key 后，需要把老配置里的粗粒度权限自动展开，
+ * 权限迁移映射（v1→v2 / v2→v3）。
+ * v1 时期 `dashboard` / `ai` 是两个粗粒度大权限；
+ * v2 拆成每页独立 key；v3 进一步把「学位英语」拆成 9 个独立子模块 key。
+ * 需要把老配置里的粗粒度权限自动展开为当前细粒度 key，
  * 否则老账号升级后左侧菜单会大面积消失。
  */
 const LEGACY_KEY_EXPANSION: Record<string, string[]> = {
@@ -214,7 +207,13 @@ const LEGACY_KEY_EXPANSION: Record<string, string[]> = {
     'learn-english', 'learn-industry', 'learn-books',
     'requirements'
   ],
-  ai: ['ai', 'models', 'aimodels']
+  ai: ['ai', 'models', 'aimodels'],
+  // v2 → v3：旧「学位英语」粗粒度权限自动展开为 9 个独立子模块权限
+  'learn-english': [
+    'learn-english',
+    'degree-legacy', 'degree-home', 'degree-materials', 'degree-reader', 'degree-words',
+    'degree-training', 'degree-practice', 'degree-exam', 'degree-weakness', 'degree-mine'
+  ]
 }
 
 /** 把 v1 粗粒度权限列表展开为 v2 细粒度权限列表（幂等；只增不减，保证升级不掉权限） */
