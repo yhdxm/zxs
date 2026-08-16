@@ -109,119 +109,166 @@
           <WordTrainingPanel :mode="(wordSub as any)" @close="wordSub = 'home'" />
         </div>
 
-        <!-- 知识库：模块导航 + 逐讲精读 -->
+        <!-- 知识库：按三本 PDF 分册浏览 -->
         <div v-else-if="active === 'outline'" class="le-card">
-          <div class="le-kb-head">
-            <div class="le-kb-headtext">
-              <h3 class="le-h">学位英语知识库 · {{ ENGLISH_KB_STATS.modules }} 个模块 / {{ ENGLISH_KB_STATS.lessons }} 讲</h3>
-              <p class="le-sub">每一讲都含讲解正文、对照表、例句与易错点，点开即可学；纯内置内容，断网也能看。</p>
-            </div>
-            <el-input v-model="kbSearch" clearable placeholder="搜索知识点：虚拟语气 / 定语从句 / 婉拒 / 熟词生义…" class="le-kb-search" />
-          </div>
-
-          <!-- 搜索结果 -->
-          <div v-if="kbSearch.trim()" class="le-kb-results">
-            <p class="le-sub">匹配到 {{ searchResults.length }} 讲</p>
-            <button
-              v-for="r in searchResults"
-              :key="r.lesson.id"
-              type="button"
-              class="le-kb-rescard"
-              @click="gotoLesson(r.moduleKey, r.lesson.id)"
-            >
-              <span class="le-kb-resmod">{{ r.moduleName }}</span>
-              <span class="le-kb-restitle">{{ r.lesson.title }}</span>
-              <span class="le-kb-ressum">{{ r.lesson.summary }}</span>
-            </button>
-            <p v-if="!searchResults.length" class="le-empty">没有匹配的知识点，换个关键词试试（如 时态、被动、翻译、作文）。</p>
-          </div>
-
-          <div v-else class="le-kb-main">
-            <!-- 左侧模块导航 -->
-            <aside class="le-kb-nav">
-              <button
-                v-for="m in outline"
-                :key="m.key"
-                type="button"
-                class="le-kb-navi"
-                :class="{ on: curKey === m.key }"
-                @click="selectModule(m.key)"
-              >
-                <span class="le-kb-navname">{{ m.name }}</span>
-                <span class="le-kb-navnum">{{ m.lessons.length }} 讲</span>
-              </button>
-            </aside>
-
-            <!-- 右侧内容 -->
-            <div class="le-kb-content">
-              <div class="le-kb-intro">
-                <div class="le-kb-title">{{ curModule.name }}</div>
-                <p class="le-kb-desc">{{ curModule.desc }}</p>
-                <div class="le-kb-tags"><span v-for="(kp, i) in curModule.keyPoints" :key="i" class="le-kb-tag">{{ kp }}</span></div>
-                <div class="le-row">
-                  <button class="le-mini" @click="expandAll(true)">展开全部</button>
-                  <button class="le-mini" @click="expandAll(false)">收起全部</button>
-                  <button class="le-mini" @click="explainModule(curModule)">AI 讲透本模块</button>
-                </div>
-                <div v-if="moduleAi[curModule.key]" class="le-know-explain">{{ moduleAi[curModule.key] }}</div>
+          <!-- 书的列表页 -->
+          <template v-if="!kbBook">
+            <div class="le-kb-head">
+              <div class="le-kb-headtext">
+                <h3 class="le-h">学位英语知识库 · 三本 PDF 分册</h3>
+                <p class="le-sub">严格按官方考试用书拆分：考试大纲、复习指南、全真模拟试卷；点开即可学，断网也能看。</p>
               </div>
-
-              <article
-                v-for="(l, i) in curModule.lessons"
-                :id="'les-' + l.id"
-                :key="l.id"
-                class="le-lesson"
-                :class="{ open: !!openMap[l.id] }"
-              >
-                <header class="le-lesson-h" @click="toggleLesson(l.id)">
-                  <span class="le-lesson-no">{{ i + 1 }}</span>
-                  <span class="le-lesson-hh">
-                    <span class="le-lesson-t">{{ l.title }}</span>
-                    <span class="le-lesson-s">{{ l.summary }}</span>
-                  </span>
-                  <el-icon class="le-lesson-arrow"><ArrowDown /></el-icon>
-                </header>
-
-                <div v-show="openMap[l.id]" class="le-lesson-b">
-                  <p v-for="(p, pi) in l.body" :key="'p' + pi" class="le-p">{{ p }}</p>
-
-                  <div v-for="(t, ti) in (l.tables || [])" :key="'t' + ti" class="le-tbl-wrap">
-                    <div v-if="t.title" class="le-tbl-title">{{ t.title }}</div>
-                    <div class="le-tbl-scroll">
-                      <table class="le-tbl">
-                        <thead><tr><th v-for="(h, hi) in t.head" :key="hi">{{ h }}</th></tr></thead>
-                        <tbody>
-                          <tr v-for="(r, ri) in t.rows" :key="ri">
-                            <td v-for="(c, ci) in r" :key="ci">{{ c }}</td>
-                          </tr>
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-
-                  <div v-if="l.examples && l.examples.length" class="le-exs">
-                    <div class="le-block-h">例句</div>
-                    <div v-for="(e, ei) in l.examples" :key="'e' + ei" class="le-ex-item">
-                      <div class="le-ex-en">{{ e.en }}</div>
-                      <div class="le-ex-zh">{{ e.zh }}</div>
-                      <div v-if="e.note" class="le-ex-note">提示：{{ e.note }}</div>
-                    </div>
-                  </div>
-
-                  <div v-if="l.traps && l.traps.length" class="le-traps">
-                    <div class="le-block-h warn">易错点 / 考点提醒</div>
-                    <ul><li v-for="(t, ti2) in l.traps" :key="'tr' + ti2">{{ t }}</li></ul>
-                  </div>
-
-                  <div class="le-row">
-                    <button class="le-mini" @click="explainLesson(l)">AI 换种说法再讲一遍</button>
-                    <button class="le-mini" @click="quizLesson(l)">AI 出 3 道练习题</button>
-                  </div>
-                  <div v-if="lessonAi[l.id]" class="le-know-explain">{{ lessonAi[l.id] }}</div>
-                </div>
-              </article>
+              <el-input v-model="kbSearch" clearable placeholder="搜索知识点：虚拟语气 / 定语从句 / 婉拒 / 熟词生义…" class="le-kb-search" />
             </div>
-          </div>
+
+            <!-- 搜索结果 -->
+            <div v-if="kbSearch.trim()" class="le-kb-results">
+              <p class="le-sub">匹配到 {{ searchResults.length }} 讲</p>
+              <button
+                v-for="r in searchResults"
+                :key="r.id"
+                type="button"
+                class="le-kb-rescard"
+                @click="gotoLesson(r._bookId || 'dagang', r._chapterId || '', r.id)"
+              >
+                <span class="le-kb-resmod">{{ r._book }} · {{ r._chapter }}</span>
+                <span class="le-kb-restitle">{{ r.title }}</span>
+                <span class="le-kb-ressum">{{ r.summary }}</span>
+              </button>
+              <p v-if="!searchResults.length" class="le-empty">没有匹配的知识点，换个关键词试试（如 时态、被动、翻译、作文）。</p>
+            </div>
+
+            <!-- 三本书入口 -->
+            <div v-else class="le-book-grid">
+              <button
+                v-for="b in DEGREE_BOOKS"
+                :key="b.id"
+                type="button"
+                class="le-book-card"
+                @click="selectBook(b.id)"
+              >
+                <span class="le-book-icon">📖</span>
+                <span class="le-book-name">{{ b.name }}</span>
+                <span class="le-book-desc">{{ b.desc }}</span>
+                <span class="le-book-meta">{{ b.chapters.length }} 章 / {{ b.chapters.reduce((s, c) => s + c.lessons.length, 0) }} 讲</span>
+              </button>
+            </div>
+          </template>
+
+          <!-- 单本书浏览页 -->
+          <template v-else>
+            <div class="le-kb-head">
+              <div class="le-kb-headtext">
+                <el-button text :icon="ArrowLeft" @click="backToBooks">返回图书列表</el-button>
+                <h3 class="le-h" style="margin-top:8px;">{{ currentBook?.name }}</h3>
+                <p class="le-sub">{{ currentBook?.desc }}</p>
+              </div>
+              <el-input v-model="kbSearch" clearable placeholder="在当前图书中搜索…" class="le-kb-search" />
+            </div>
+
+            <!-- 搜索结果 -->
+            <div v-if="kbSearch.trim()" class="le-kb-results">
+              <p class="le-sub">匹配到 {{ searchResults.length }} 讲</p>
+              <button
+                v-for="r in searchResults"
+                :key="r.id"
+                type="button"
+                class="le-kb-rescard"
+                @click="gotoLesson(r._bookId || kbBook, r._chapterId || '', r.id)"
+              >
+                <span class="le-kb-resmod">{{ r._chapter }}</span>
+                <span class="le-kb-restitle">{{ r.title }}</span>
+                <span class="le-kb-ressum">{{ r.summary }}</span>
+              </button>
+              <p v-if="!searchResults.length" class="le-empty">没有匹配的知识点，换个关键词试试。</p>
+            </div>
+
+            <div v-else class="le-kb-main">
+              <!-- 左侧章节导航 -->
+              <aside class="le-kb-nav">
+                <button
+                  v-for="c in currentBook?.chapters"
+                  :key="c.id"
+                  type="button"
+                  class="le-kb-navi"
+                  :class="{ on: kbChapter === c.id }"
+                  @click="selectChapter(c.id)"
+                >
+                  <span class="le-kb-navname">{{ c.title }}</span>
+                  <span class="le-kb-navnum">{{ c.lessons.length }} 讲</span>
+                </button>
+              </aside>
+
+              <!-- 右侧内容 -->
+              <div class="le-kb-content">
+                <div class="le-kb-intro">
+                  <div class="le-kb-title">{{ currentChapter?.title }}</div>
+                  <p class="le-kb-desc">{{ currentChapter?.summary || '本章内容来自对应 PDF 的 OCR 正文切分。' }}</p>
+                  <div class="le-row">
+                    <button class="le-mini" @click="expandAll(true)">展开全部</button>
+                    <button class="le-mini" @click="expandAll(false)">收起全部</button>
+                    <button v-if="currentChapter" class="le-mini" @click="explainChapter(currentChapter)">AI 讲透本章</button>
+                  </div>
+                  <div v-if="currentChapter && moduleAi[currentChapter.id]" class="le-know-explain">{{ moduleAi[currentChapter.id] }}</div>
+                </div>
+
+                <article
+                  v-for="(l, i) in currentChapter?.lessons"
+                  :id="'les-' + l.id"
+                  :key="l.id"
+                  class="le-lesson"
+                  :class="{ open: !!openMap[l.id] }"
+                >
+                  <header class="le-lesson-h" @click="toggleLesson(l.id)">
+                    <span class="le-lesson-no">{{ i + 1 }}</span>
+                    <span class="le-lesson-hh">
+                      <span class="le-lesson-t">{{ l.title }}</span>
+                      <span class="le-lesson-s">{{ l.summary }}</span>
+                    </span>
+                    <el-icon class="le-lesson-arrow"><ArrowDown /></el-icon>
+                  </header>
+
+                  <div v-show="openMap[l.id]" class="le-lesson-b">
+                    <p v-for="(p, pi) in l.body" :key="'p' + pi" class="le-p">{{ p }}</p>
+
+                    <div v-for="(t, ti) in (l.tables || [])" :key="'t' + ti" class="le-tbl-wrap">
+                      <div v-if="t.title" class="le-tbl-title">{{ t.title }}</div>
+                      <div class="le-tbl-scroll">
+                        <table class="le-tbl">
+                          <thead><tr><th v-for="(h, hi) in t.head" :key="hi">{{ h }}</th></tr></thead>
+                          <tbody>
+                            <tr v-for="(r, ri) in t.rows" :key="ri">
+                              <td v-for="(c, ci) in r" :key="ci">{{ c }}</td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+
+                    <div v-if="l.examples && l.examples.length" class="le-exs">
+                      <div class="le-block-h">例句</div>
+                      <div v-for="(e, ei) in l.examples" :key="'e' + ei" class="le-ex-item">
+                        <div class="le-ex-en">{{ e.en }}</div>
+                        <div class="le-ex-zh">{{ e.zh }}</div>
+                        <div v-if="e.note" class="le-ex-note">提示：{{ e.note }}</div>
+                      </div>
+                    </div>
+
+                    <div v-if="l.traps && l.traps.length" class="le-traps">
+                      <div class="le-block-h warn">易错点 / 考点提醒</div>
+                      <ul><li v-for="(t, ti2) in l.traps" :key="'tr' + ti2">{{ t }}</li></ul>
+                    </div>
+
+                    <div class="le-row">
+                      <button class="le-mini" @click="explainLesson(l)">AI 换种说法再讲一遍</button>
+                      <button class="le-mini" @click="quizLesson(l)">AI 出 3 道练习题</button>
+                    </div>
+                    <div v-if="lessonAi[l.id]" class="le-know-explain">{{ lessonAi[l.id] }}</div>
+                  </div>
+                </article>
+              </div>
+            </div>
+          </template>
         </div>
 
         <!-- 学习计划 -->
@@ -244,7 +291,7 @@
             <div class="le-pf-row le-pf-col">
               <label>重点模块</label>
               <div class="le-chks">
-                <el-checkbox v-for="o in outline" :key="o.key" v-model="planFocus" :value="o.name" size="small">{{ o.name }}</el-checkbox>
+                <el-checkbox v-for="o in DEGREE_BOOKS.flatMap((b) => b.chapters)" :key="o.id" v-model="planFocus" :value="o.title" size="small">{{ o.title }}</el-checkbox>
               </div>
             </div>
             <div class="le-pf-row">
@@ -331,23 +378,25 @@
 import { computed, nextTick, onMounted, onUnmounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { School, Reading, Collection, Calendar, ChatDotRound, ArrowDown, Odometer } from '@element-plus/icons-vue'
+import { School, Reading, Collection, Calendar, ChatDotRound, ArrowDown, ArrowLeft, Odometer } from '@element-plus/icons-vue'
 import PageHeader from '../components/PageHeader.vue'
 import { loadAiConfig, callAi, type AiConfig } from '../services/aiService'
 import {
   fetchDefinitionSafe,
   explainWord,
   explainTopic,
-  ENGLISH_OUTLINE,
-  ENGLISH_KB_STATS,
-  ENGLISH_LESSON_INDEX,
   generateStudyPlan,
   parseMaterialFile,
   type WordDefinition,
   type EnglishLesson,
-  type EnglishOutlineItem,
   type StudyPlan
 } from '../services/learningService'
+import {
+  DEGREE_BOOKS,
+  DEGREE_KNOWLEDGE_FLAT,
+  type DegreeKnowledgeBook,
+  type DegreeKnowledgeChapter
+} from '../services/degreeKnowledge'
 import {
   listLearnBookmarks,
   addLearnBookmark,
@@ -429,37 +478,48 @@ async function addWord(): Promise<void> {
 }
 async function removeWord(id: string): Promise<void> { await removeLearnBookmark(id); await loadWords() }
 
-/* ================= 知识库 ================= */
-const outline = ENGLISH_OUTLINE
-const curKey = ref(outline[0]?.key || 'dialogue')
-const curModule = computed<EnglishOutlineItem>(
-  () => outline.find((o) => o.key === curKey.value) ?? (outline[0] as EnglishOutlineItem)
-)
+/* ================= 知识库（按三本 PDF 分册） ================= */
+const kbSearch = ref('')
+const kbBook = ref('')
+const kbChapter = ref('')
 const openMap = reactive<Record<string, boolean>>({})
 const moduleAi = reactive<Record<string, string>>({})
 const lessonAi = reactive<Record<string, string>>({})
-const kbSearch = ref('')
 
-/** 默认展开当前模块第一讲，降低"看起来还是大纲"的观感 */
-function openFirst(): void {
-  const first = curModule.value?.lessons[0]
-  if (first) openMap[first.id] = true
+const currentBook = computed<DegreeKnowledgeBook | null>(
+  () => DEGREE_BOOKS.find((b) => b.id === kbBook.value) ?? null
+)
+const currentChapter = computed<DegreeKnowledgeChapter | null>(
+  () => currentBook.value?.chapters.find((c) => c.id === kbChapter.value) ?? null
+)
+
+function selectBook(id: string): void {
+  kbBook.value = id
+  kbChapter.value = DEGREE_BOOKS.find((b) => b.id === id)?.chapters[0]?.id ?? ''
+  openMap[ currentChapter.value?.lessons[0]?.id ?? '' ] = true
 }
-function selectModule(key: string): void {
-  curKey.value = key
-  openFirst()
+function backToBooks(): void {
+  kbBook.value = ''
+  kbChapter.value = ''
+  kbSearch.value = ''
+}
+function selectChapter(id: string): void {
+  kbChapter.value = id
+  const first = currentChapter.value?.lessons[0]
+  if (first) openMap[first.id] = true
 }
 function toggleLesson(id: string): void { openMap[id] = !openMap[id] }
 function expandAll(v: boolean): void {
-  curModule.value.lessons.forEach((l) => { openMap[l.id] = v })
+  currentChapter.value?.lessons.forEach((l) => { openMap[l.id] = v })
 }
 
 const searchResults = computed(() => {
   const q = kbSearch.value.trim().toLowerCase()
   if (!q) return []
-  return ENGLISH_LESSON_INDEX.filter(({ moduleName, lesson }) => {
+  return DEGREE_KNOWLEDGE_FLAT.filter((lesson) => {
     const hay = [
-      moduleName,
+      lesson._book || '',
+      lesson._chapter || '',
       lesson.title,
       lesson.summary,
       lesson.body.join(' '),
@@ -471,21 +531,22 @@ const searchResults = computed(() => {
   })
 })
 
-function gotoLesson(moduleKey: string, lessonId: string): void {
+function gotoLesson(bookId: string, chapterId: string, lessonId: string): void {
   kbSearch.value = ''
-  curKey.value = moduleKey
+  kbBook.value = bookId
+  kbChapter.value = chapterId
   openMap[lessonId] = true
   void nextTick(() => {
     document.getElementById('les-' + lessonId)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
   })
 }
 
-async function explainModule(m: EnglishOutlineItem): Promise<void> {
+async function explainChapter(m: DegreeKnowledgeChapter): Promise<void> {
   if (!cfg.value) { ElMessage.warning('请先配置 AI 密钥'); return }
-  moduleAi[m.key] = 'AI 解读中…'
+  moduleAi[m.id] = 'AI 解读中…'
   try {
-    moduleAi[m.key] = await explainTopic(`学位英语「${m.name}」`, cfg.value)
-  } catch (e) { moduleAi[m.key] = '解读失败：' + (e as Error).message }
+    moduleAi[m.id] = await explainTopic(`学位英语「${m.title}」`, cfg.value)
+  } catch (e) { moduleAi[m.id] = '解读失败：' + (e as Error).message }
 }
 async function explainLesson(l: EnglishLesson): Promise<void> {
   if (!cfg.value) { ElMessage.warning('请先配置 AI 密钥'); return }
@@ -616,7 +677,6 @@ async function loadWeakness(): Promise<void> {
 onMounted(async () => {
   updateClock()
   clockTimer = window.setInterval(updateClock, 1000)
-  openFirst()
   try { cfg.value = await loadAiConfig() } catch { /* ignore */ }
   await loadWords()
   await lookup()
@@ -789,6 +849,19 @@ onUnmounted(() => { if (clockTimer) window.clearInterval(clockTimer) })
 .le-training-icon { font-size: 24px; }
 .le-training-name { font-size: 13px; font-weight: 600; color: var(--text-strong); }
 .le-training-desc { font-size: 11px; color: var(--text-faint); text-align: center; }
+
+/* ---------- 知识库图书入口 ---------- */
+.le-book-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-top: 8px; }
+.le-book-card {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 8px;
+  padding: 18px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface-soft);
+  cursor: pointer; text-align: left; transition: transform .16s ease, border-color .16s ease, box-shadow .16s ease;
+}
+.le-book-card:hover { transform: translateY(-2px); border-color: #7c3aed; box-shadow: 0 6px 18px rgba(124,58,237,.08); }
+.le-book-icon { font-size: 28px; }
+.le-book-name { font-size: 15px; font-weight: 700; color: var(--text-strong); }
+.le-book-desc { font-size: 12.5px; color: var(--text-muted); line-height: 1.6; }
+.le-book-meta { font-size: 11px; color: #7c3aed; background: color-mix(in srgb, #7c3aed 10%, transparent); border-radius: 999px; padding: 2px 10px; margin-top: 4px; }
 
 /* ---------- 薄弱点 ---------- */
 .le-weak-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
