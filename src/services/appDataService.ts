@@ -159,9 +159,8 @@ const baseKeyOf = (k: string): string => k.replace(/\.(pc|mobile)$/, '')
 /** 普通用户默认可访问的模块（仅个人数据类，与「账号级数据隔离」一致） */
 const USER_ALLOWED_BASES = new Set<string>([
   'news', 'yingcang', 'xingyu', 'weather', 'map', 'third-api',
-  'degree-legacy', 'degree-home', 'degree-materials', 'degree-reader', 'degree-words',
-  'degree-training', 'degree-practice', 'degree-exam', 'degree-weakness', 'degree-mine',
-  'learn-industry', 'learn-books', 'learn-goals', 'cet-prep', 'weakness',
+  'degree-legacy',
+  'learn-industry', 'learn-books', 'learn-goals', 'cet-prep',
   'requirements', 'dashboard', 'todos', 'points', 'contents',
   'feedback'
 ])
@@ -190,13 +189,14 @@ export const DEFAULT_ROLE_CONFIG: PermissionConfig = {
   ]
 }
 
-/** 当前权限方案版本：v3 起学位英语备考台子模块独立权限 key */
-export const PERMISSION_SCHEMA_VERSION = 3
+/** 当前权限方案版本：v4 起学位英语备考台菜单精简为单一「备考台」入口（degree-legacy） */
+export const PERMISSION_SCHEMA_VERSION = 4
 
 /**
- * 权限迁移映射（v1→v2 / v2→v3）。
+ * 权限迁移映射（v1→v2 / v2→v3 / v3→v4）。
  * v1 时期 `dashboard` / `ai` 是两个粗粒度大权限；
- * v2 拆成每页独立 key；v3 进一步把「学位英语」拆成 9 个独立子模块 key。
+ * v2 拆成每页独立 key；v3 把「学位英语」拆成 9 个独立子模块 key；
+ * v4 菜单精简为单一「备考台」入口（degree-legacy）。
  * 需要把老配置里的粗粒度权限自动展开为当前细粒度 key，
  * 否则老账号升级后左侧菜单会大面积消失。
  */
@@ -208,12 +208,8 @@ const LEGACY_KEY_EXPANSION: Record<string, string[]> = {
     'requirements'
   ],
   ai: ['ai', 'models', 'aimodels'],
-  // v2 → v3：旧「学位英语」粗粒度权限自动展开为 9 个独立子模块权限
-  'learn-english': [
-    'learn-english',
-    'degree-legacy', 'degree-home', 'degree-materials', 'degree-reader', 'degree-words',
-    'degree-training', 'degree-practice', 'degree-exam', 'degree-weakness', 'degree-mine'
-  ]
+  // v4：学位英语备考台精简为单一入口 degree-legacy
+  'learn-english': ['learn-english', 'degree-legacy']
 }
 
 /** 把 v1 粗粒度权限列表展开为 v2 细粒度权限列表（幂等；只增不减，保证升级不掉权限） */

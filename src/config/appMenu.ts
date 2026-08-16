@@ -103,16 +103,7 @@ export const APP_MENU: SideItem[] = [
         expanded: true,
         permissionKey: 'learn-english',
         children: [
-          { key: 'degree-legacy', label: '备考台（原版）', icon: Document, permissionKey: 'degree-legacy', to: '/learn/english' },
-          { key: 'degree-home', label: '备考首页', icon: HomeFilled, permissionKey: 'degree-home', to: '/degree/home' },
-          { key: 'degree-materials', label: '资料中心', icon: Document, permissionKey: 'degree-materials', to: '/degree/materials' },
-          { key: 'degree-reader', label: '阅读器', icon: Reading, permissionKey: 'degree-reader', to: '/degree/reader' },
-          { key: 'degree-words', label: '生词词库', icon: Notebook, permissionKey: 'degree-words', to: '/degree/words' },
-          { key: 'degree-training', label: '高级训练', icon: VideoPlay, permissionKey: 'degree-training', to: '/degree/training' },
-          { key: 'degree-practice', label: '专项练习', icon: List, permissionKey: 'degree-practice', to: '/degree/practice' },
-          { key: 'degree-exam', label: '模拟考试', icon: Medal, permissionKey: 'degree-exam', to: '/degree/exam' },
-          { key: 'degree-weakness', label: '薄弱点分析', icon: Odometer, permissionKey: 'degree-weakness', to: '/degree/weakness' },
-          { key: 'degree-mine', label: '我的', icon: User, permissionKey: 'degree-mine', to: '/degree/mine' }
+          { key: 'degree-legacy', label: '备考台', icon: Document, permissionKey: 'degree-legacy', to: '/learn/english' }
         ]
       },
       { key: 'learn-industry', label: '各行业知识', icon: DataBoard, permissionKey: 'learn-industry', to: '/learn/industry' },

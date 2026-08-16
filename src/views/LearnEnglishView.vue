@@ -28,20 +28,6 @@
           <span class="le-desc">{{ m.desc }}</span>
         </span>
       </button>
-      <!-- 备考台：跳转独立学位英语备考模块（与 CET 内卡片同源，移除卡片后由此进入） -->
-      <button
-        type="button"
-        class="le-entry le-entry-degree"
-        :style="{ '--c': '#534AB7' }"
-        @click="goDegreePrep"
-      >
-        <span class="le-bar"></span>
-        <span class="le-icon"><el-icon><School /></el-icon></span>
-        <span class="le-text">
-          <span class="le-label">备考台</span>
-          <span class="le-desc">背词卡 · 5 大题型 · 模拟考</span>
-        </span>
-      </button>
     </nav>
 
     <Transition name="le-fade" mode="out-in">
@@ -85,6 +71,31 @@
               <button class="le-mini danger" @click="removeWord(b.id)">删除</button>
             </div>
             <p v-if="!words.length" class="le-empty">生词本为空，查词后可一键收藏。</p>
+          </div>
+
+          <h3 class="le-h" style="margin-top:22px;">背单词卡训练</h3>
+          <p class="le-sub">以生词本 + 三本 PDF 词表为数据来源，强化听写、拼写、跟读与翻译。</p>
+          <div class="le-training-grid">
+            <button type="button" class="le-training-card" @click="goTraining('dictation')">
+              <span class="le-training-icon">🎧</span>
+              <span class="le-training-name">听写</span>
+              <span class="le-training-desc">听音频写单词</span>
+            </button>
+            <button type="button" class="le-training-card" @click="goTraining('spelling')">
+              <span class="le-training-icon">✏️</span>
+              <span class="le-training-name">拼写</span>
+              <span class="le-training-desc">看释义写单词</span>
+            </button>
+            <button type="button" class="le-training-card" @click="goTraining('shadow')">
+              <span class="le-training-icon">🎤</span>
+              <span class="le-training-name">跟读</span>
+              <span class="le-training-desc">听音跟读练习</span>
+            </button>
+            <button type="button" class="le-training-card" @click="goTraining('translate')">
+              <span class="le-training-icon">📝</span>
+              <span class="le-training-name">翻译</span>
+              <span class="le-training-desc">英译汉句子训练</span>
+            </button>
           </div>
         </div>
 
@@ -273,6 +284,34 @@
           </div>
           <div v-if="qaAnswer" class="le-answer">{{ qaAnswer }}</div>
         </div>
+
+        <!-- 薄弱点分析 -->
+        <div v-else-if="active === 'weakness'" class="le-card">
+          <h3 class="le-h">薄弱点分析</h3>
+          <p class="le-sub">结合错题本、练习记录、模考与单词进度，定位最该优先补的题型与词汇。</p>
+
+          <div v-if="weakLoading" class="le-empty">加载中…</div>
+          <div v-else-if="!weakEnough" class="le-empty">
+            当前错题/练习样本不足（至少 {{ WEAKNESS_MIN_SAMPLE }} 条），多练几套题后再来看画像。
+          </div>
+          <div v-else class="le-weak-grid">
+            <div class="le-weak-card">
+              <div class="le-weak-title">最薄弱题型</div>
+              <div class="le-weak-value">{{ weakTopType }}</div>
+              <button class="le-mini" @click="router.push('/degree/weakness')">查看完整分析</button>
+            </div>
+            <div class="le-weak-card">
+              <div class="le-weak-title">高频错因</div>
+              <div class="le-weak-value">{{ weakTopReason }}</div>
+              <button class="le-mini" @click="router.push('/degree/practice')">去专项练习</button>
+            </div>
+            <div class="le-weak-card">
+              <div class="le-weak-title">薄弱单词</div>
+              <div class="le-weak-value">{{ weakTopWord }}</div>
+              <button class="le-mini" @click="router.push('/degree/words')">去词库复习</button>
+            </div>
+          </div>
+        </div>
       </section>
     </Transition>
   </div>
@@ -282,7 +321,7 @@
 import { computed, nextTick, onMounted, onUnmounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { School, Reading, Collection, Calendar, ChatDotRound, ArrowDown } from '@element-plus/icons-vue'
+import { School, Reading, Collection, Calendar, ChatDotRound, ArrowDown, Odometer } from '@element-plus/icons-vue'
 import PageHeader from '../components/PageHeader.vue'
 import { loadAiConfig, callAi, type AiConfig } from '../services/aiService'
 import {
@@ -308,18 +347,19 @@ import {
   removeStudyPlan,
   type LearnBookmark
 } from '../services/learnDb'
+import { loadMistakes } from '../prep/degreeService'
+import { buildWeaknessReport, WEAKNESS_MIN_SAMPLE } from '../prep/weakness'
+import type { MistakeRec } from '../prep/degreeTypes'
 
 const MODULES = [
-  { key: 'word', label: '查词收藏', desc: '词典 + 生词本', color: '#0891b2', icon: Reading },
+  { key: 'word', label: '背单词卡', desc: '查词 · 生词本 · 听写/拼写/跟读/翻译', color: '#0891b2', icon: Reading },
   { key: 'outline', label: '知识库', desc: '40+ 讲精读', color: '#7c3aed', icon: Collection },
   { key: 'plan', label: '学习计划', desc: '资料→AI 计划', color: '#e08a00', icon: Calendar },
-  { key: 'ai', label: 'AI 答疑', desc: '语法/备考', color: '#0ea5e9', icon: ChatDotRound }
+  { key: 'ai', label: 'AI 答疑', desc: '语法/备考', color: '#0ea5e9', icon: ChatDotRound },
+  { key: 'weakness', label: '薄弱点分析', desc: '错题 · 练习 · 模考画像', color: '#534ab7', icon: Odometer }
 ]
 const active = ref('word')
 const router = useRouter()
-function goDegreePrep(): void {
-  router.push('/learn/degree-english')
-}
 
 const nowText = ref('')
 let clockTimer: number | undefined
@@ -335,6 +375,7 @@ function switchModule(key: string): void {
   active.value = key
   if (key === 'word' && !words.value.length) void loadWords()
   if (key === 'plan' && !savedPlans.value.length) void loadPlans()
+  if (key === 'weakness') void loadWeakness()
 }
 
 /* ================= 查词 ================= */
@@ -375,6 +416,10 @@ async function addWord(): Promise<void> {
   ElMessage.success('已加入生词本')
 }
 async function removeWord(id: string): Promise<void> { await removeLearnBookmark(id); await loadWords() }
+
+function goTraining(mode: 'dictation' | 'spelling' | 'shadow' | 'translate'): void {
+  router.push({ path: '/degree/training', query: { mode } })
+}
 
 /* ================= 知识库 ================= */
 const outline = ENGLISH_OUTLINE
@@ -520,6 +565,44 @@ async function runQa(): Promise<void> {
     qaAnswer.value = await callAi(cfg.value, '你是学位英语备考辅导老师，用通俗中文解答，结合《学位英语水平考试大纲（第二版）》。\n问题：' + qaQuestion.value)
   } catch (e) { ElMessage.error('AI 调用失败：' + (e as Error).message) }
   finally { qaLoading.value = false }
+}
+
+/* ================= 薄弱点分析 ================= */
+const weakLoading = ref(false)
+const weakMistakes = ref<MistakeRec[]>([])
+const weakEnough = ref(false)
+const weakTopType = ref('—')
+const weakTopReason = ref('—')
+const weakTopWord = ref('—')
+
+const typeLabelMap: Record<string, string> = {
+  dialogue: '完成对话',
+  reading: '阅读理解',
+  vocab_grammar: '词汇语法',
+  translation: '英译汉',
+  writing: '短文写作'
+}
+
+async function loadWeakness(): Promise<void> {
+  weakLoading.value = true
+  try {
+    weakMistakes.value = await loadMistakes()
+    const report = buildWeaknessReport(
+      weakMistakes.value.map((m) => ({ type: m.type, reason: m.reason || '未标注', questionId: m.questionId, createdAt: m.createdAt || null })),
+      { period: 'month' }
+    )
+    weakEnough.value = report.enough
+    if (report.enough) {
+      const topTypeLabel = report.byType[0]?.label
+      weakTopType.value = (topTypeLabel && typeLabelMap[topTypeLabel]) || topTypeLabel || '—'
+      weakTopReason.value = report.byReason[0]?.label || '—'
+      weakTopWord.value = '词汇语法'
+    }
+  } catch (e) {
+    ElMessage.error('薄弱点加载失败：' + (e as Error).message)
+  } finally {
+    weakLoading.value = false
+  }
 }
 
 onMounted(async () => {
@@ -686,6 +769,31 @@ onUnmounted(() => { if (clockTimer) window.clearInterval(clockTimer) })
   .le-pf-row > label { width: auto; }
   .le-lesson-b { padding: 4px 12px 13px; }
   .le-p { font-size: 12.5px; line-height: 1.8; }
+}
+/* ---------- 背单词卡训练 ---------- */
+.le-training-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.le-training-card {
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  padding: 16px 10px; border: 1px solid var(--border); border-radius: 12px;
+  background: var(--surface-soft); cursor: pointer; transition: transform .16s ease, border-color .16s ease;
+}
+.le-training-card:hover { transform: translateY(-2px); border-color: var(--brand, #378add); }
+.le-training-icon { font-size: 24px; }
+.le-training-name { font-size: 13px; font-weight: 600; color: var(--text-strong); }
+.le-training-desc { font-size: 11px; color: var(--text-faint); text-align: center; }
+
+/* ---------- 薄弱点 ---------- */
+.le-weak-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.le-weak-card {
+  display: flex; flex-direction: column; gap: 8px;
+  padding: 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-soft);
+}
+.le-weak-title { font-size: 12px; color: var(--text-faint); }
+.le-weak-value { font-size: 15px; font-weight: 700; color: var(--text-strong); }
+
+@media (max-width: 768px) {
+  .le-training-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .le-weak-grid { grid-template-columns: 1fr; }
 }
 @media (max-width: 460px) { .le-entries { grid-template-columns: 1fr; } }
 </style>

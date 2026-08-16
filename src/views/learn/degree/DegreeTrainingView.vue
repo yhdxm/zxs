@@ -92,13 +92,17 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue'
+import { useRoute } from 'vue-router'
 import { Microphone, Refresh } from '@element-plus/icons-vue'
 import { loadWords } from '../../../prep/degreeDb'
 import { allDegreeQuestions } from '../../../prep/degreeQuestionBank'
 import { speakEn } from '../../../prep/degreeSpeech'
 import type { DegreeWord, DegreeQuestion } from '../../../prep/degreeTypes'
 
-const mode = ref<'flash' | 'dictation' | 'spelling' | 'shadow' | 'translate'>('flash')
+const route = useRoute()
+const validModes = ['flash', 'dictation', 'spelling', 'shadow', 'translate'] as const
+const initialMode = validModes.includes(route.query.mode as any) ? (route.query.mode as typeof validModes[number]) : 'flash'
+const mode = ref<'flash' | 'dictation' | 'spelling' | 'shadow' | 'translate'>(initialMode)
 const words = ref<DegreeWord[]>([])
 const idx = ref(0)
 const revealed = ref(false)
