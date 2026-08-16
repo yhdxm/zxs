@@ -136,10 +136,10 @@ const router = createRouter({
       meta: { requirePermission: 'aimodels' }
     },
     {
-      // 原版学位英语备考台（PDF 预览 / 词库 / 题库 / TTS / 划词翻译），作为「学位英语」分组第一项保留；2.0 模块作为子项加在其下。
+      // 原版学位英语备考台（今日 / 刷题 / 错本 / 我的 / 全真模拟考试）
       path: '/learn/english',
       name: 'learn-english',
-      component: () => import('../views/LearnEnglishView.vue'),
+      component: () => import('../views/DegreeEnglishView.vue'),
       meta: { requirePermission: 'degree-legacy' }
     },
     {
