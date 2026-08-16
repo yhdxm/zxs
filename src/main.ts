@@ -8,6 +8,8 @@ import App from './App.vue'
 import router from './router'
 // 应用启动时确保当前用户的工作台数据行存在（Supabase 不可达时降级本地）
 import { initDatabase } from './services/dbInit'
+// 全局同步看门狗：保证学位英语/四六级个人数据在 PC 与移动端最终一致（离线队列自动补发）
+import { startSyncWatcher } from './prep/syncWatcher'
 
 // PC端UI组件 Element Plus
 import ElementPlus from 'element-plus'
@@ -46,5 +48,7 @@ app.config.errorHandler = (err, _instance, info) => {
 
 // 静默初始化工作台数据（优雅降级，失败不影响页面渲染）
 void initDatabase()
+// 启动全局同步看门狗（离线队列自动补发，覆盖 PC/移动端）
+startSyncWatcher()
 
 app.mount('#app')

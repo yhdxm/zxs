@@ -68,6 +68,11 @@
             </button>
           </div>
         </el-tooltip>
+        <!-- 同步状态提示：个人数据离线队列可视化 -->
+        <button class="sync-pill" :class="syncClass" type="button" :title="syncTitle" @click="onSyncClick">
+          <span class="sync-dot"></span>
+          <span class="sync-text">{{ syncLabel }}</span>
+        </button>
       </div>
 
       <!-- 折叠/展开侧边栏（PC 端，三角形按钮） -->
@@ -173,6 +178,10 @@
             <el-icon><SwitchButton /></el-icon>
           </button>
         </div>
+        <button class="sync-pill" :class="syncClass" type="button" :title="syncTitle" @click="onSyncClick">
+          <span class="sync-dot"></span>
+          <span class="sync-text">{{ syncLabel }}</span>
+        </button>
       </div>
     </el-drawer>
   </div>
@@ -213,6 +222,7 @@ import {
   autoRemindDue,
   type AppNotification
 } from './services/pushService'
+import { syncState, flushAll } from './prep/syncWatcher'
 
 const router = useRouter()
 const route = useRoute()
@@ -223,6 +233,22 @@ const menuSearch = ref('')
 const permissionConfig = ref<PermissionConfig | null>(null)
 const isMobile = ref(false)
 const initializing = ref(true)
+
+// 同步状态提示（学位英语/四六级个人数据离线队列）
+const syncLabel = computed(() => {
+  if (syncState.syncing) return '同步中…'
+  if (syncState.pending > 0) return `${syncState.pending} 条待同步`
+  return '已同步'
+})
+const syncClass = computed(() =>
+  syncState.syncing ? 'is-syncing' : syncState.pending > 0 ? 'is-pending' : 'is-ok'
+)
+const syncTitle = computed(() =>
+  syncState.pending > 0 ? '有数据未同步到云端，点击立即同步' : '个人数据已同步云端'
+)
+function onSyncClick() {
+  void flushAll()
+}
 const platform = computed(() => (isMobile.value ? 'mobile' : 'pc'))
 
 /* ===== 消息中心（站内收件箱 + Web Push 未读角标） ===== */
@@ -816,6 +842,37 @@ onUnmounted(() => {
   flex-direction: column;
   gap: 10px;
 }
+/* 同步状态提示（离线队列可视化） */
+.sync-pill {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  padding: 7px 12px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.sync-pill:hover { border-color: var(--primary); color: var(--text-strong); }
+.sync-pill .sync-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  flex-shrink: 0;
+}
+.sync-pill.is-ok { color: #16a34a; border-color: rgba(22,163,74,.35); }
+.sync-pill.is-ok .sync-dot { background: #16a34a; }
+.sync-pill.is-syncing { color: var(--primary); border-color: rgba(37,99,235,.35); }
+.sync-pill.is-syncing .sync-dot { background: var(--primary); animation: syncPulse 1s ease-in-out infinite; }
+.sync-pill.is-pending { color: #d97706; border-color: rgba(217,119,6,.4); }
+.sync-pill.is-pending .sync-dot { background: #d97706; }
+@keyframes syncPulse { 0%,100% { opacity: 1; } 50% { opacity: .3; } }
 .theme-toggle {
   display: flex;
   align-items: center;
