@@ -119,7 +119,8 @@ import {
   User,
   DataBoard,
   Loading,
-  Refresh
+  Refresh,
+  Odometer
 } from '@element-plus/icons-vue'
 import {
   loadWords,
@@ -156,6 +157,7 @@ const modules = [
   { name: '高级训练', desc: '闪卡 / 听写 / 拼写 / 跟读', to: '/degree/training', icon: VideoPlay, color: '#c2691d' },
   { name: '专项练习', desc: '按题型针对性突破', to: '/degree/practice', icon: List, color: '#2e9e6b' },
   { name: '模拟考试', desc: '5 套全真模拟卷', to: '/degree/exam', icon: Medal, color: '#b23b5b' },
+  { name: '薄弱点分析', desc: '错题·练习·模考·单词画像', to: '/degree/weakness', icon: Odometer, color: '#534ab7' },
   { name: '我的', desc: '设置 · 笔记 · 错题 · 同步', to: '/degree/mine', icon: User, color: '#7a5cc2' },
   { name: '综合训练', desc: '原版一站式备考台', to: '/learn/degree-english', icon: DataBoard, color: '#555' }
 ]

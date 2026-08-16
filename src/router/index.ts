@@ -221,6 +221,12 @@ const router = createRouter({
       meta: { requirePermission: 'learn-english' }
     },
     {
+      path: '/degree/weakness',
+      name: 'degree-weakness',
+      component: () => import('../views/learn/degree/DegreeWeaknessView.vue'),
+      meta: { requirePermission: 'learn-english' }
+    },
+    {
       path: '/learn/weakness',
       name: 'weakness',
       component: () => import('../views/WeaknessView.vue'),

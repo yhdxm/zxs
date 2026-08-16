@@ -118,6 +118,7 @@ export const APP_MENU: SideItem[] = [
       { key: 'degree-training', label: '高级训练', icon: VideoPlay, permissionKey: 'learn-english', to: '/degree/training' },
       { key: 'degree-practice', label: '专项练习', icon: List, permissionKey: 'learn-english', to: '/degree/practice' },
       { key: 'degree-exam', label: '模拟考试', icon: Medal, permissionKey: 'learn-english', to: '/degree/exam' },
+      { key: 'degree-weakness', label: '薄弱点分析', icon: Odometer, permissionKey: 'learn-english', to: '/degree/weakness' },
       { key: 'degree-mine', label: '我的', icon: User, permissionKey: 'learn-english', to: '/degree/mine' }
     ]
   },

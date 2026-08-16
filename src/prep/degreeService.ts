@@ -11,6 +11,7 @@ import type {
   MistakeRec,
   FavoriteRec,
   FavoriteKind,
+  ExamRecord,
   QuestionType
 } from './degreeTypes'
 
@@ -424,4 +425,31 @@ export async function recordExam(
     duration,
     answers
   })
+}
+
+/** 读取模拟考试记录（云端优先 + 本地镜像回退），供薄弱点分析聚合模考正确率与最弱卷。 */
+export async function loadExamRecords(): Promise<ExamRecord[]> {
+  const userId = await getUserId()
+  if (!userId) return []
+  try {
+    const { data, error } = await supabase
+      .from('degree_exam_records')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+    if (error) throw error
+    const rows: ExamRecord[] = ((data as any[]) || []).map((r) => ({
+      id: r.id,
+      paperId: r.paper_id ?? null,
+      total: r.total ?? 0,
+      correct: r.correct ?? 0,
+      duration: r.duration ?? null,
+      answers: r.answers ?? null,
+      createdAt: (r as any).created_at ?? new Date().toISOString()
+    }))
+    lsSet('exams', userId, rows)
+    return rows
+  } catch {
+    return lsGet<ExamRecord[]>('exams', userId, [])
+  }
 }

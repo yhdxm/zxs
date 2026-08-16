@@ -57,9 +57,12 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue'
+import { useRoute } from 'vue-router'
 import { loadQuestions } from '../../../prep/degreeDb'
 import * as svc from '../../../prep/degreeService'
 import type { DegreeQuestion, QuestionType } from '../../../prep/degreeTypes'
+
+const route = useRoute()
 
 const types: { key: QuestionType; label: string }[] = [
   { key: 'vocab_grammar', label: '词汇语法' },
@@ -68,7 +71,13 @@ const types: { key: QuestionType; label: string }[] = [
   { key: 'translation', label: '英译汉' },
   { key: 'writing', label: '短文写作' }
 ]
-const type = ref<QuestionType>('vocab_grammar')
+const typeKeys = types.map((t) => t.key)
+// 支持从薄弱点分析等页面带 query.type 直接定位题型；非法/缺省回退到词汇语法。
+function resolveInitialType(): QuestionType {
+  const q = route.query.type
+  return typeKeys.includes(q as QuestionType) ? (q as QuestionType) : 'vocab_grammar'
+}
+const type = ref<QuestionType>(resolveInitialType())
 const all = ref<DegreeQuestion[]>([])
 const idx = ref(0)
 const selected = ref<number>(-1)

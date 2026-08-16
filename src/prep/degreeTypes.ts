@@ -99,6 +99,18 @@ export interface MistakeRec {
 
 export type FavoriteKind = 'note' | 'collection' | 'word'
 
+/** 模拟考试记录（degree_exam_records，按 user_id 隔离）。 */
+export interface ExamRecord {
+  id: string
+  paperId: string | null
+  total: number
+  correct: number
+  duration: number | null // 用时（秒）
+  answers: Record<string, string> | null
+  /** 入库时间（degree_exam_records.created_at）。 */
+  createdAt: string
+}
+
 export interface FavoriteRec {
   id: string
   kind: FavoriteKind
