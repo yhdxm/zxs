@@ -72,7 +72,7 @@
     <template v-if="topNav === 'today'">
     <!-- 统计行 -->
     <div class="dh-stats">
-      <div class="dh-stat"><span class="dh-stat-label">今日新词</span><span class="dh-stat-val purple">{{ cardNewToday + phraseNewToday }}</span></div>
+      <div class="dh-stat"><span class="dh-stat-label">今日新词</span><span class="dh-stat-val purple">{{ cardNewToday + phraseNewToday }}</span><small class="dh-stat-sub">已学 {{ degreeTodayLearned + phraseTodayLearned }} 个</small></div>
       <div class="dh-stat"><span class="dh-stat-label">今日待复习</span><span class="dh-stat-val orange">{{ cardDueCount + phraseDueCount }}</span></div>
       <div class="dh-stat"><span class="dh-stat-label">连续学习</span><span class="dh-stat-val blue">{{ streakDays }}<small>天</small></span></div>
       <div class="dh-stat"><span class="dh-stat-label">词汇掌握</span><span class="dh-stat-val green">{{ graduatedCount }}<small>/{{ degreeWords.length || VOCAB_REQUIREMENT.receptive }}</small></span></div>
@@ -252,7 +252,7 @@
           共 <b>{{ degreeWords.length }}</b> 词 · 已掌握 {{ graduatedCount }} · 连续学习 <b>{{ streakDays }}</b> 天
         </p>
         <div class="card-dash">
-          <div class="card-dash-stat"><b class="blue">{{ cardNewToday }}</b><span>今日新学</span></div>
+          <div class="card-dash-stat"><b class="blue">{{ cardNewToday }}</b><span>今日新学</span><small class="card-dash-sub">已学 {{ degreeTodayLearned }} 个</small></div>
           <div class="card-dash-stat"><b class="orange">{{ cardDueCount }}</b><span>待复习</span></div>
           <div class="card-dash-stat"><b class="green">{{ graduatedCount }}</b><span>已掌握</span></div>
           <div class="card-dash-stat"><b class="purple">{{ streakDays }}</b><span>连续(天)</span></div>
@@ -361,7 +361,7 @@
           共 <b>{{ allDegreePhrases.length }}</b> 条 · 已掌握 {{ phraseGraduatedCount }} · 连续学习 <b>{{ streakDays }}</b> 天
         </p>
         <div class="card-dash">
-          <div class="card-dash-stat"><b class="blue">{{ phraseNewToday }}</b><span>今日新学</span></div>
+          <div class="card-dash-stat"><b class="blue">{{ phraseNewToday }}</b><span>今日新学</span><small class="card-dash-sub">已学 {{ phraseTodayLearned }} 个</small></div>
           <div class="card-dash-stat"><b class="orange">{{ phraseDueCount }}</b><span>待复习</span></div>
           <div class="card-dash-stat"><b class="green">{{ phraseGraduatedCount }}</b><span>已掌握</span></div>
           <div class="card-dash-stat"><b class="purple">{{ streakDays }}</b><span>连续(天)</span></div>
@@ -783,7 +783,7 @@ import {
   type SrsGrade
 } from '../prep/degreeSrs'
 import { buildReviewQueue as buildGenericReviewQueue } from '../prep/trainingSrs'
-import { getStudySettings, saveStudySettings, getStreak, bumpStreak } from '../services/studySettingsService'
+import { getStudySettings, saveStudySettings, getStreak, bumpStreak, getTodayLearned, bumpTodayLearned } from '../services/studySettingsService'
 
 // 资料库：三本 PDF 正文切分后的可读文章（确保内容不遗漏）
 const allArticles: DegreeArticle[] = [...syllabusProse, ...guideArticles]
@@ -971,6 +971,9 @@ const degreeRemindDue = ref(true)
 const degreeGraduatedReturn = ref(false)
 // 备考台本地连续学习天数：背单词卡/词组评分时推进，保证「只刷词不刷题」也累计连续学习（与学习中心两模块口径一致）
 const degreeLocalStreak = ref(0)
+// 今日已学新词数：背单词卡 / 词组 各自独立累计（当天保留，次日归零）
+const degreeTodayLearned = ref(0)
+const phraseTodayLearned = ref(0)
 const wordProgress = ref<Record<string, WordProgress>>({})
 const mistakes = ref<MistakeRec[]>([])
 const notes = ref<FavoriteRec[]>([])
@@ -1182,6 +1185,7 @@ async function gradePhrase(g: SrsGrade) {
   await svc.saveWordProgress(key, next)
   phraseReviewedCount.value++
   degreeLocalStreak.value = bumpStreak('degree')
+  if (!prev || prev.status === 'new') phraseTodayLearned.value = bumpTodayLearned('degree_phrase')
   if (g === 'again') phraseQueue.value.push(p)
   phraseQueue.value.shift()
   phraseFlipped.value = false
@@ -1391,6 +1395,8 @@ async function loadAll() {
   degreeRemindDue.value = ds.remindDue
   degreeGraduatedReturn.value = ds.graduatedReturn
   degreeLocalStreak.value = getStreak('degree')
+  degreeTodayLearned.value = getTodayLearned('degree')
+  phraseTodayLearned.value = getTodayLearned('degree_phrase')
   wordProgress.value = progressData
   mistakes.value = mistakesData
   practice.value = practiceData
@@ -1474,6 +1480,7 @@ async function gradeCard(g: SrsGrade) {
   await svc.saveWordProgress(w.word, next)
   cardReviewedCount.value++
   degreeLocalStreak.value = bumpStreak('degree')
+  if (!prev || prev.status === 'new') degreeTodayLearned.value = bumpTodayLearned('degree')
   if (g === 'again') {
     cardQueue.value.push(w)
   }
@@ -1946,6 +1953,7 @@ onBeforeUnmount(() => {
 .dh-stat-val.green { color: #0f6e56; }
 .dh-stat-val.orange { color: #854f0b; }
 .dh-stat-val small { font-size: 13px; font-weight: 400; }
+.dh-stat-sub { display: block; font-size: 11px; color: var(--text-faint); font-weight: 400; margin-top: 2px; }
 
 /* 导航 tab（nav-item 圆角按钮风格，与系统其他模块统一，对齐图3） */
 .dh-nav {
@@ -2295,6 +2303,7 @@ onBeforeUnmount(() => {
 .card-dash-stat { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 8px 6px; }
 .card-dash-stat b { display: block; font-size: 19px; font-weight: 800; line-height: 1.2; }
 .card-dash-stat span { font-size: 11px; color: var(--text-faint); }
+.card-dash-stat .card-dash-sub { display: block; font-size: 10px; color: var(--text-faint); margin-top: 2px; }
 .card-dash-stat b.blue { color: #0ea5e9; }
 .card-dash-stat b.orange { color: #f59e0b; }
 .card-dash-stat b.green { color: #2e9e6b; }

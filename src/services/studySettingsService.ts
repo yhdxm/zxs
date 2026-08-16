@@ -18,6 +18,7 @@ export interface StudySettings {
 
 const SETTINGS_KEY = 'study_module_settings_v1'
 const STREAK_KEY = 'study_module_streak_v1'
+const TODAY_LEARNED_KEY = 'study_today_learned_v1'
 
 type SettingsMap = Record<string, StudySettings>
 type StreakMap = Record<string, { streak: number; lastDate: string }>
@@ -88,4 +89,30 @@ export function bumpStreak(module: StudyModule): number {
 export function getStreak(module: StudyModule): number {
   const map = lsGet<StreakMap>(STREAK_KEY, {})
   return map[module]?.streak ?? 0
+}
+
+/**
+ * 今日已学新词数（按 key 区分模块，跨会话保留当天累计；次日自动归零）。
+ * key 不拘泥于 StudyModule 三值：备考台单词卡用 'degree'、词组用 'degree_phrase'，以便两处看板各自独立显示。
+ */
+interface TodayLearnedStore {
+  date: string
+  counts: Record<string, number>
+}
+export function getTodayLearned(key: string): number {
+  const data = lsGet<TodayLearnedStore>(TODAY_LEARNED_KEY, { date: '', counts: {} })
+  if (!data || data.date !== todayStr()) return 0
+  return data.counts[key] || 0
+}
+
+/** 今日新学一个词时调用（prev 为 undefined 或 status==='new'），累计今日已学数，返回最新值。 */
+export function bumpTodayLearned(key: string): number {
+  const data = lsGet<TodayLearnedStore>(TODAY_LEARNED_KEY, { date: '', counts: {} })
+  if (!data || data.date !== todayStr()) {
+    data.date = todayStr()
+    data.counts = {}
+  }
+  data.counts[key] = (data.counts[key] || 0) + 1
+  lsSet(TODAY_LEARNED_KEY, data)
+  return data.counts[key]
 }

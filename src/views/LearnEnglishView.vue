@@ -94,7 +94,7 @@
               <div class="le-dash-ring-cap">单词掌握度</div>
             </div>
             <div class="le-dash-stats">
-              <div class="le-dash-stat"><b class="blue">{{ degreeNewToday }}</b><span>今日新学</span></div>
+              <div class="le-dash-stat"><b class="blue">{{ degreeNewToday }}</b><span>今日新学</span><small class="le-dash-sub">已学 {{ learnTodayLearned }} 个</small></div>
               <div class="le-dash-stat"><b class="orange">{{ degreeDueCount }}</b><span>待复习</span></div>
               <div class="le-dash-stat"><b class="green">{{ degreeGraduated }}</b><span>已掌握</span></div>
               <div class="le-dash-stat"><b class="purple">{{ learnStreak }}</b><span>连续学习(天)</span></div>
@@ -173,7 +173,7 @@
               <div class="le-dash-ring-cap">单词掌握度</div>
             </div>
             <div class="le-dash-stats">
-              <div class="le-dash-stat"><b class="blue">{{ cetNewToday }}</b><span>今日新学</span></div>
+              <div class="le-dash-stat"><b class="blue">{{ cetNewToday }}</b><span>今日新学</span><small class="le-dash-sub">已学 {{ cetTodayLearned }} 个</small></div>
               <div class="le-dash-stat"><b class="orange">{{ cetDueCount }}</b><span>待复习</span></div>
               <div class="le-dash-stat"><b class="green">{{ cetGraduated }}</b><span>已掌握</span></div>
               <div class="le-dash-stat"><b class="purple">{{ cetStreak }}</b><span>连续学习(天)</span></div>
@@ -565,7 +565,7 @@ import { MASTER_WORDS_BUNDLE } from '../prep/masterWordsBundle'
 import { CET6_WORDS_BUNDLE } from '../prep/cet6WordsBundle'
 import { loadWords as loadDegreeWords } from '../prep/degreeDb'
 import { countDueToday, countNewToday } from '../prep/trainingSrs'
-import { getStreak, getStudySettings, saveStudySettings } from '../services/studySettingsService'
+import { getStreak, getStudySettings, saveStudySettings, getTodayLearned } from '../services/studySettingsService'
 import { loadLearnWordProgress } from '../services/learnWordProgressService'
 import { loadCetProgress } from '../services/cetProgressService'
 import type { PrepWord } from '../services/cetPrepService'
@@ -600,6 +600,8 @@ const wordStatsLoading = ref(false)
 // 三模块连续学习天数（本地记录，各自独立）
 const learnStreak = ref(0)
 const cetStreak = ref(0)
+const learnTodayLearned = ref(0)
+const cetTodayLearned = ref(0)
 
 async function loadWordStats(): Promise<void> {
   wordStatsLoading.value = true
@@ -615,6 +617,8 @@ async function loadWordStats(): Promise<void> {
     cetProgress.value = { ...cet4, ...cet6 }
     learnStreak.value = getStreak('learn')
     cetStreak.value = getStreak('cet')
+    learnTodayLearned.value = getTodayLearned('learn')
+    cetTodayLearned.value = getTodayLearned('cet')
   } catch {
     /* ignore */
   }
@@ -1224,6 +1228,7 @@ watch(cetSub, (v) => { if (v === 'home') void loadWordStats() })
 .le-dash-stat.wide { grid-column: span 4; }
 .le-dash-stat b { display: block; font-size: 20px; font-weight: 800; line-height: 1.2; }
 .le-dash-stat span { font-size: 11px; color: var(--text-faint); }
+.le-dash-stat .le-dash-sub { display: block; font-size: 10px; color: var(--text-faint); margin-top: 2px; }
 .le-dash-stat b.blue { color: #0ea5e9; }
 .le-dash-stat b.orange { color: #f59e0b; }
 .le-dash-stat b.green { color: #2e9e6b; }

@@ -165,6 +165,7 @@ import {
   getStudySettings,
   saveStudySettings,
   bumpStreak,
+  bumpTodayLearned,
   type StudyModule
 } from '../services/studySettingsService'
 import type { DegreeWord, DegreePhrase, DegreeQuestion, WordProgress } from '../prep/degreeTypes'
@@ -378,6 +379,7 @@ async function gradeCurrent(grade: SrsGrade) {
   const next = reviewWord(prev as WordProgress | undefined, grade)
   await saveProgress(w.word, next)
   bumpStreak(moduleKey.value)
+  if (!prev || prev.status === 'new') bumpTodayLearned(moduleKey.value)
   sessionReviewed.value++
   lastSchedule.value = scheduleText(w.word, next)
   // 遗忘：本轮队尾再练一次；其它：正常出队
@@ -403,6 +405,7 @@ async function afterCheck(autoNext = true) {
   const next = reviewWord(prev as WordProgress | undefined, grade)
   await saveProgress(w.word, next)
   bumpStreak(moduleKey.value)
+  if (!prev || prev.status === 'new') bumpTodayLearned(moduleKey.value)
   sessionReviewed.value++
   lastSchedule.value = scheduleText(w.word, next)
   if (grade === 'again') {
