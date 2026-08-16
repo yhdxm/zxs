@@ -609,6 +609,12 @@ onMounted(async () => {
     remindTimer = window.setInterval(triggerAutoRemind, 5 * 60_000)
     // 登录后稍等片刻触发一次自动提醒，捕捉到期待办
     window.setTimeout(triggerAutoRemind, 12_000)
+    // 学位英语内容数据：登录后后台触发一次 lazy-seed（无论用户先打开哪个 2.0 页面都生效）
+    if (isLoggedIn.value) {
+      import('./prep/degreeDb')
+        .then((m) => m.ensureContentSeeded().catch(() => {}))
+        .catch(() => {})
+    }
   }
 })
 
