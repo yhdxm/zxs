@@ -33,10 +33,32 @@ async function getUserId(): Promise<string | null> {
   return u?.id ?? null
 }
 
+async function seedCloudFromLocal(
+  level: 'cet4' | 'cet6',
+  userId: string,
+  state: Record<string, CetWordProgress>
+): Promise<void> {
+  const rows = Object.entries(state).map(([word, p]) => ({
+    user_id: userId,
+    level,
+    word,
+    status: p.status,
+    score: p.level,
+    due: p.due,
+    weak: p.weak,
+    wrong_streak: p.wrongStreak ?? 0,
+    updated_at: new Date().toISOString()
+  }))
+  if (!rows.length) return
+  const { error } = await supabase.from('cet_word_progress').upsert(rows, { onConflict: 'user_id,level,word' })
+  if (error) throw error
+}
+
 /** 读取某级别全部进度。 */
 export async function loadCetProgress(level: 'cet4' | 'cet6'): Promise<Record<string, CetWordProgress>> {
   const userId = await getUserId()
   if (!userId) return lsGet(level, 'anonymous', {})
+  const localState = lsGet(level, userId, {})
   try {
     const { data, error } = await supabase
       .from('cet_word_progress')
@@ -54,10 +76,18 @@ export async function loadCetProgress(level: 'cet4' | 'cet6'): Promise<Record<st
         wrongStreak: r.wrong_streak ?? 0
       }
     }
-    lsSet(level, userId, out)
-    return out
+    // 云端有数据则以云端为准，并回写本地镜像
+    if (Object.keys(out).length > 0) {
+      lsSet(level, userId, out)
+      return out
+    }
+    // 云端为空但本地有数据 -> 保留本地，并尝试反哺云端（兼容首次部署/新建空表）
+    if (Object.keys(localState).length > 0) {
+      await seedCloudFromLocal(level, userId, localState)
+    }
+    return localState
   } catch {
-    return lsGet(level, userId, {})
+    return localState
   }
 }
 

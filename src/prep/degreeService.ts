@@ -136,6 +136,7 @@ export async function saveDegreeSettings(s: DegreeSettings): Promise<void> {
 export async function loadWordProgress(): Promise<Record<string, WordProgress>> {
   const userId = await getUserId()
   if (!userId) return {}
+  const localState = lsGet('words', userId, {})
   try {
     const { data, error } = await supabase
       .from('degree_word_progress')
@@ -152,10 +153,29 @@ export async function loadWordProgress(): Promise<Record<string, WordProgress>> 
         wrongStreak: r.wrong_streak ?? 0
       }
     }
-    lsSet('words', userId, out) // 云端快照回写本地镜像
-    return out
+    // 云端有数据则以云端为准，并回写本地镜像
+    if (Object.keys(out).length > 0) {
+      lsSet('words', userId, out)
+      return out
+    }
+    // 云端为空但本地有数据 -> 保留本地，并尝试反哺云端（兼容首次部署/新建空表）
+    if (Object.keys(localState).length > 0) {
+      for (const [word, p] of Object.entries(localState as Record<string, WordProgress>)) {
+        await cloudUpsert('degree_word_progress', {
+          user_id: userId,
+          word,
+          status: p.status,
+          level: p.level,
+          due: p.due,
+          weak: p.weak,
+          wrong_streak: p.wrongStreak ?? 0,
+          updated_at: new Date().toISOString()
+        }, 'user_id,word')
+      }
+    }
+    return localState
   } catch {
-    return lsGet('words', userId, {}) // 云端异常 → 回退本地镜像，避免「从新开始」
+    return localState // 云端异常 → 回退本地镜像，避免「从新开始」
   }
 }
 

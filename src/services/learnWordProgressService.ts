@@ -25,9 +25,26 @@ async function getUserId(): Promise<string | null> {
   return u?.id ?? null
 }
 
+async function seedCloudFromLocal(userId: string, state: Record<string, WordProgress>): Promise<void> {
+  const rows = Object.entries(state).map(([word, p]) => ({
+    user_id: userId,
+    word,
+    status: p.status,
+    level: p.level,
+    due: p.due,
+    weak: p.weak,
+    wrong_streak: p.wrongStreak ?? 0,
+    updated_at: new Date().toISOString()
+  }))
+  if (!rows.length) return
+  const { error } = await supabase.from('learn_word_progress').upsert(rows, { onConflict: 'user_id,word' })
+  if (error) throw error
+}
+
 export async function loadLearnWordProgress(): Promise<Record<string, WordProgress>> {
   const userId = await getUserId()
   if (!userId) return lsGet('anonymous', {})
+  const localState = lsGet(userId, {})
   try {
     const { data, error } = await supabase
       .from('learn_word_progress')
@@ -44,10 +61,18 @@ export async function loadLearnWordProgress(): Promise<Record<string, WordProgre
         wrongStreak: r.wrong_streak ?? 0
       }
     }
-    lsSet(userId, out)
-    return out
+    // 云端有数据则以云端为准，并回写本地镜像
+    if (Object.keys(out).length > 0) {
+      lsSet(userId, out)
+      return out
+    }
+    // 云端为空但本地有数据 -> 保留本地，并尝试反哺云端（兼容首次部署/新建空表）
+    if (Object.keys(localState).length > 0) {
+      await seedCloudFromLocal(userId, localState)
+    }
+    return localState
   } catch {
-    return lsGet(userId, {})
+    return localState
   }
 }
 
