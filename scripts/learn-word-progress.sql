@@ -16,4 +16,7 @@ create index if not exists idx_learn_word_progress_uid on public.learn_word_prog
 
 alter table public.learn_word_progress enable row level security;
 drop policy if exists learn_word_progress_anon on public.learn_word_progress;
-create policy learn_word_progress_anon on public.learn_word_progress for all to anon using (true) with check (true);
+-- 同时开放 anon / authenticated，与 degree_word_progress 保持一致，避免某些客户端被识别为 authenticated 时报 403
+create policy learn_word_progress_all on public.learn_word_progress for all to anon, authenticated using (true) with check (true);
+
+grant select, insert, update, delete on public.learn_word_progress to anon, authenticated;

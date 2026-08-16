@@ -17,4 +17,7 @@ create index if not exists idx_cet_word_progress_uid_level on public.cet_word_pr
 
 alter table public.cet_word_progress enable row level security;
 drop policy if exists cet_word_progress_anon on public.cet_word_progress;
-create policy cet_word_progress_anon on public.cet_word_progress for all to anon using (true) with check (true);
+-- 同时开放 anon / authenticated，与 degree_word_progress 保持一致，避免某些客户端被识别为 authenticated 时报 403
+create policy cet_word_progress_all on public.cet_word_progress for all to anon, authenticated using (true) with check (true);
+
+grant select, insert, update, delete on public.cet_word_progress to anon, authenticated;
