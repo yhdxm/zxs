@@ -169,7 +169,8 @@
 
         <p class="db-tip">
           说明：表按业务域分组展示；新表建好后自动出现（来自 Supabase 实时统计），未登记的表会按表名智能推测说明，
-          可在 <code>DatabaseCheckView.vue</code> 的 <code>TABLE_DESC</code> 补充。RLS 列显示行级安全状态，「未启用」为高危项（见上方「问题 / 告警」）。
+          可在 <code>DatabaseCheckView.vue</code> 的 <code>TABLE_DESC</code> 补充。<b>按项目铁律，新表自动完善监测，无需手动登记。</b>
+          RLS 列显示行级安全状态，「未启用」为高危项（见上方「问题 / 告警」）。
         </p>
       </div>
 
@@ -192,7 +193,9 @@ import {
 import { getDatabaseStats, type DatabaseStats } from '../services/appDataService'
 import PageHeader from '../components/PageHeader.vue'
 
-/** 数据表中文说明映射，便于快速查询业务表用途 */
+// 数据表中文说明映射，便于快速查询业务表用途。
+// 铁律 1（新表自动完善监测，详见 src/config/projectRules.ts）：未在此登记的表会被 guessDesc 智能推测说明，
+// 并自动纳入监测与告警，无需手动登记即可被发现。
 const TABLE_DESC: Record<string, string> = {
   app_accounts: '用户账号表：存储登录账号、密码哈希、角色与禁用状态',
   user_info: '用户账号信息表：登录账号、密码、角色、状态等核心认证信息',
@@ -423,7 +426,7 @@ const problems = computed(() => {
       list.push({ level: 'danger', text: `业务表「${t.name}」未启用行级安全（RLS），任何人（含未登录）都可直读/直写，存在越权与数据泄露风险，请尽快开启 RLS 并配置策略。` })
     }
     if (tableDesc(t.name).startsWith('（推测）')) {
-      list.push({ level: 'info', text: `业务表「${t.name}」缺少正式中文说明，建议在 DatabaseCheckView.vue 的 TABLE_DESC 补充。` })
+      list.push({ level: 'info', text: `业务表「${t.name}」已自动纳入监测（说明为智能推测），建议在 DatabaseCheckView.vue 的 TABLE_DESC 补充正式中文说明以便展示更准确。` })
     }
   }
   return list

@@ -1,5 +1,9 @@
 // 全局菜单唯一数据源：侧边栏（App.vue）与权限树（PERMISSION_TREE）均由此派生。
-// 新增页面只需在此追加一项，左侧菜单与角色权限树会自动同步（满足「权限管理要自动添加」）。
+// 新增页面只需在此追加一项（带 permissionKey），左侧菜单、角色权限树、默认角色权限、迁移映射全【自动同步】。
+//
+// ⚠️ 项目铁律 3（菜单/权限自动完善同步，详见 src/config/projectRules.ts）：
+//   禁止在 PERMISSION_TREE 手动维护与 APP_MENU 重复的项 —— 权限树由 buildPermissionTree(APP_MENU) 派生。
+//   新增页面 = 在 APP_MENU 加一项；侧边栏可见性与路由门禁统一由 permissionKey / visible 驱动。
 import type { Component } from 'vue'
 import type { AppUser } from '../services/appDataService'
 import {
@@ -153,3 +157,19 @@ export const APP_MENU: SideItem[] = [
   },
   { key: 'account', label: '个人设置', icon: User, to: '/account' }
 ]
+
+// 开发期自检：permissionKey 冲突会导致 PERMISSION_TREE 派生出重复节点，提前在控制台告警。
+if (import.meta.env.DEV) {
+  const seen = new Map<string, string>()
+  const walk = (items: SideItem[]) => items.forEach((it) => {
+    if (it.permissionKey) {
+      if (seen.has(it.permissionKey)) {
+        console.warn(`[appMenu] 重复 permissionKey: ${it.permissionKey}（${seen.get(it.permissionKey)} / ${it.label}）`)
+      } else {
+        seen.set(it.permissionKey, it.label)
+      }
+    }
+    if (it.children) walk(it.children)
+  })
+  walk(APP_MENU)
+}

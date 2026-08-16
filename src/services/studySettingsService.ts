@@ -2,6 +2,10 @@
 // 设置项（newPerDay / remindDue / graduatedReturn）仍用 localStorage 镜像，免费、离线可用、无需新增数据库表。
 // 「连续天数」与「今日已学」改为【从云端单词进度派生】：单词每次评分都会把 firstLearned/lastStudied 写入
 //   public.learn_word_progress / cet_word_progress / degree_word_progress，PC 与手机读同一份云端数据，自然同步。
+//
+// ⚠️ 项目铁律 2（跨端同步，详见 src/config/projectRules.ts）：
+//   设备无关的统计指标一律从云端进度派生，禁止用 localStorage 累加同步类计数。
+//   后续任何新模块若需「今日 X / 连续 N 天 / 累计 Y」等指标，必须沿用此派生模式，不得回退到本地计数。
 import { todayStr, addDays } from '../prep/trainingSrs'
 import type { WordProgress } from '../prep/degreeTypes'
 
