@@ -65,16 +65,23 @@
           <div v-if="explainText" class="le-answer">{{ explainText }}</div>
 
           <h3 class="le-h" style="margin-top:18px;">我的生词本</h3>
+          <p class="le-sub">点「翻译」查看中文释义：优先显示收藏时已保存的释义，无释义时自动联网翻译。</p>
           <div class="le-grid">
             <div v-for="b in words" :key="b.id" class="le-worditem">
               <div class="le-wordname">{{ b.title }}</div>
-              <button class="le-mini danger" @click="removeWord(b.id)">删除</button>
+              <div class="le-word-actions">
+                <button class="le-mini" @click="translateWord(b, false)">翻译</button>
+                <button v-if="b.note && transMap[b.id]?.text" class="le-mini" @click="translateWord(b, true)">联网校对</button>
+                <button class="le-mini danger" @click="removeWord(b.id)">删除</button>
+              </div>
+              <div v-if="transMap[b.id]?.loading" class="le-trans le-trans-load">翻译中…</div>
+              <div v-else-if="transMap[b.id]?.text" class="le-trans">{{ transMap[b.id]?.text }}</div>
             </div>
             <p v-if="!words.length" class="le-empty">生词本为空，查词后可一键收藏。</p>
           </div>
 
           <h3 class="le-h" style="margin-top:22px;">背单词卡训练</h3>
-          <p class="le-sub">以生词本 + 三本 PDF 词表为数据来源，强化听写、拼写、跟读与翻译。</p>
+          <p class="le-sub">以三本 PDF 中的单词与词组为数据来源，强化听写、拼写、跟读与翻译。</p>
           <div class="le-training-grid">
             <button type="button" class="le-training-card" @click="wordSub = 'flash'">
               <span class="le-training-icon">🎴</span>
@@ -107,6 +114,43 @@
         <!-- 背单词卡训练面板（内嵌，不跳转） -->
         <div v-else-if="active === 'word'" class="le-card">
           <WordTrainingPanel :mode="(wordSub as any)" @close="wordSub = 'home'" />
+        </div>
+
+        <!-- 四六级单词：首页（级别 + 训练入口） -->
+        <div v-else-if="active === 'cet' && cetSub === 'home'" class="le-card">
+          <h3 class="le-h">四六级单词卡</h3>
+          <p class="le-sub">内置免费词库（离线可用，无需联网/付费），支持闪卡、听写、拼写、跟读训练。</p>
+          <div class="le-level">
+            <button type="button" class="le-level-btn" :class="{ active: cetLevel === 'cet4' }" @click="cetLevel = 'cet4'">四级（{{ MASTER_WORDS_BUNDLE.length }} 词）</button>
+            <button type="button" class="le-level-btn" :class="{ active: cetLevel === 'cet6' }" :disabled="!cet6Ready" @click="cetLevel = 'cet6'">六级（{{ cet6Ready ? CET6_WORDS_BUNDLE.length : '待补充' }} 词）</button>
+          </div>
+          <el-alert
+            v-if="cetLevel === 'cet6' && !cet6Ready"
+            type="info"
+            :closable="false"
+            show-icon
+            title="六级词库待补充"
+            description="将免费六级词表（如 KyleBing/english-vocabulary 的「6 六级-乱序.txt」，格式：单词<TAB>释义）保存到 scripts/cet6_words.csv，运行命令 node scripts/gen-cet6-bundle.mjs 即可生成内置六级词库。"
+          />
+          <div class="le-training-grid">
+            <button type="button" class="le-training-card" @click="cetSub = 'flash'">
+              <span class="le-training-icon">🎴</span><span class="le-training-name">闪卡</span><span class="le-training-desc">卡片式记忆</span>
+            </button>
+            <button type="button" class="le-training-card" @click="cetSub = 'dictation'">
+              <span class="le-training-icon">🎧</span><span class="le-training-name">听写</span><span class="le-training-desc">听音频写单词</span>
+            </button>
+            <button type="button" class="le-training-card" @click="cetSub = 'spelling'">
+              <span class="le-training-icon">✏️</span><span class="le-training-name">拼写</span><span class="le-training-desc">看释义写单词</span>
+            </button>
+            <button type="button" class="le-training-card" @click="cetSub = 'shadow'">
+              <span class="le-training-icon">🎤</span><span class="le-training-name">跟读</span><span class="le-training-desc">听音跟读练习</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 四六级单词训练面板（内嵌） -->
+        <div v-else-if="active === 'cet'" class="le-card">
+          <WordTrainingPanel source="cet" :cet-level="cetLevel" :mode="(cetSub as any)" @close="cetSub = 'home'" />
         </div>
 
         <!-- 知识库：学习模块 -->
@@ -387,7 +431,7 @@
 import { computed, nextTick, onMounted, onUnmounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { School, Reading, Collection, Calendar, ChatDotRound, ArrowDown, ArrowLeft, Odometer, CircleCheck } from '@element-plus/icons-vue'
+import { School, Reading, Collection, Calendar, ChatDotRound, ArrowDown, ArrowLeft, Odometer, CircleCheck, Notebook } from '@element-plus/icons-vue'
 import PageHeader from '../components/PageHeader.vue'
 import { loadAiConfig, callAi, type AiConfig } from '../services/aiService'
 import {
@@ -419,6 +463,8 @@ import { loadMistakes } from '../prep/degreeService'
 import { buildWeaknessReport, WEAKNESS_MIN_SAMPLE } from '../prep/weakness'
 import type { MistakeRec } from '../prep/degreeTypes'
 import WordTrainingPanel from '../components/WordTrainingPanel.vue'
+import { MASTER_WORDS_BUNDLE } from '../prep/masterWordsBundle'
+import { CET6_WORDS_BUNDLE } from '../prep/cet6WordsBundle'
 
 const MODULES = [
   { key: 'word', label: '背单词卡', desc: '查词 · 生词本 · 听写/拼写/跟读/翻译', color: '#0891b2', icon: Reading },
@@ -426,10 +472,13 @@ const MODULES = [
   { key: 'plan', label: '学习计划', desc: '资料→AI 计划', color: '#e08a00', icon: Calendar },
   { key: 'ai', label: 'AI 答疑', desc: '语法/备考', color: '#0ea5e9', icon: ChatDotRound },
   { key: 'weakness', label: '薄弱点分析', desc: '错题 · 练习 · 模考画像', color: '#534ab7', icon: Odometer },
+  { key: 'cet', label: '四六级单词', desc: '内置免费词库·闪卡/听写/拼写/跟读', color: '#d97706', icon: Notebook },
   { key: 'prep', label: '备考台', desc: '今日/刷题/错本/我的/模考', color: '#3c3489', icon: School }
 ]
 const active = ref('word')
 const wordSub = ref<'home' | 'flash' | 'dictation' | 'spelling' | 'shadow' | 'translate'>('home')
+const cetSub = ref<'home' | 'flash' | 'dictation' | 'spelling' | 'shadow'>('home')
+const cetLevel = ref<'cet4' | 'cet6'>('cet4')
 const router = useRouter()
 
 const nowText = ref('')
@@ -445,6 +494,11 @@ const cfg = ref<AiConfig | null>(null)
 function switchModule(key: string): void {
   if (key === 'prep') {
     router.push('/learn/english/prep')
+    return
+  }
+  if (key === 'cet') {
+    active.value = 'cet'
+    cetSub.value = 'home'
     return
   }
   active.value = key
@@ -482,14 +536,52 @@ async function explain(): Promise<void> {
   } catch (e) { explainText.value = '解读失败：' + (e as Error).message }
 }
 const words = ref<LearnBookmark[]>([])
+const transMap = reactive<Record<string, { text: string; loading: boolean }>>({})
+const cet6Ready = CET6_WORDS_BUNDLE.length > 0
+
 async function loadWords(): Promise<void> { words.value = await listLearnBookmarks('word') }
+
+function wordMeaning(): string {
+  if (def.value) {
+    return def.value.meanings
+      .map((m) => `${m.partOfSpeech} ${m.definitions.map((d) => d.definition).join('；')}`)
+      .join('；')
+  }
+  if (builtin.value) {
+    return `${builtin.value.pos} ${builtin.value.def}${builtin.value.example ? ' — ' + builtin.value.example : ''}`
+  }
+  return ''
+}
+
 async function addWord(): Promise<void> {
   const w = word.value.trim().toLowerCase()
   if (!w) return
-  await addLearnBookmark('word', w, w)
+  await addLearnBookmark('word', w, w, wordMeaning())
   await loadWords()
   ElMessage.success('已加入生词本')
 }
+
+async function translateWord(b: LearnBookmark, forceOnline = false): Promise<void> {
+  // 优先显示收藏时已保存的释义（离线、免费、稳定）
+  if (!forceOnline && b.note && !transMap[b.id]?.text) {
+    transMap[b.id] = { text: b.note, loading: false }
+    return
+  }
+  if (transMap[b.id]?.loading) return
+  transMap[b.id] = { text: transMap[b.id]?.text || '', loading: true }
+  try {
+    const r = await fetchDefinitionSafe(b.title)
+    const t = r.def
+      ? r.def.meanings.map((m) => `${m.partOfSpeech} ${m.definitions.map((d) => d.definition).join('；')}`).join('；')
+      : r.builtin
+        ? `${r.builtin.pos} ${r.builtin.def}${r.builtin.example ? ' — ' + r.builtin.example : ''}`
+        : '未找到释义'
+    transMap[b.id] = { text: t, loading: false }
+  } catch {
+    transMap[b.id] = { text: '翻译失败，请稍后重试', loading: false }
+  }
+}
+
 async function removeWord(id: string): Promise<void> { await removeLearnBookmark(id); await loadWords() }
 
 /* ================= 知识库（按三本 PDF 分册 · 学习模块） ================= */
@@ -843,8 +935,18 @@ onUnmounted(() => { if (clockTimer) window.clearInterval(clockTimer) })
 .le-mini { border: 1px solid var(--border); background: var(--surface); color: var(--brand, #378add); border-radius: 6px; padding: 3px 10px; font-size: 12px; cursor: pointer; text-decoration: none; display: inline-block; }
 .le-mini:hover { border-color: var(--brand, #378add); }
 .le-mini.danger { color: #ef4444; }
-.le-worditem { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-soft); }
-.le-wordname { font-size: 13px; color: var(--text-strong); text-transform: capitalize; }
+.le-worditem { display: flex; flex-direction: column; align-items: stretch; gap: 6px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-soft); }
+.le-wordname { font-size: 14px; font-weight: 600; color: var(--text-strong); text-transform: capitalize; }
+.le-word-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.le-trans { font-size: 13px; color: var(--text); background: var(--surface); border: 1px dashed var(--border); border-radius: 6px; padding: 6px 8px; line-height: 1.5; }
+.le-trans-load { color: var(--text-muted); }
+.le-level { display: flex; gap: 10px; margin: 12px 0 6px; flex-wrap: wrap; }
+.le-level-btn {
+  border: 1px solid var(--border); background: var(--surface); color: var(--text-strong);
+  border-radius: 8px; padding: 8px 14px; font-size: 13px; cursor: pointer;
+}
+.le-level-btn.active { border-color: #d97706; color: #d97706; background: #fff7ed; font-weight: 600; }
+.le-level-btn:disabled { opacity: .5; cursor: not-allowed; }
 
 /* ---------- 知识库 ---------- */
 .le-kb-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; flex-wrap: wrap; }
