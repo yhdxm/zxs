@@ -60,6 +60,8 @@ export interface SrsDueOptions {
   newPerDay: number
   /** 仅复习今日到期词（不含新词）。 */
   dueOnly?: boolean
+  /** 已掌握词回流：开启后已毕业（graduated）的词重新进入复习队列，可返回「学习单词中」。 */
+  includeGraduated?: boolean
 }
 
 /**
@@ -79,7 +81,10 @@ export function buildReviewQueue(
     const p = progress[w.word]
     if (!p) {
       fresh.push(w)
-    } else if (p.status !== 'graduated' && (p.due ?? today) <= today) {
+    } else if (p.status === 'graduated') {
+      // 已掌握：默认不进队列；开启「已掌握回流」时重新进入复习队列
+      if (opts.includeGraduated) due.push(w)
+    } else if ((p.due ?? today) <= today) {
       due.push(w)
     }
   }

@@ -249,8 +249,16 @@
         <div class="card-start-icon">📚</div>
         <h3 style="margin: 0 0 8px">学位英语背单词</h3>
         <p style="color: var(--text-muted); margin: 0 0 16px; font-size: 13.5px">
-          共 <b>{{ degreeWords.length }}</b> 词 · 今日新学 {{ cardNewToday }} · 待复习 {{ cardDueCount }} · 已掌握 {{ graduatedCount }}
+          共 <b>{{ degreeWords.length }}</b> 词 · 已掌握 {{ graduatedCount }} · 连续学习 <b>{{ streakDays }}</b> 天
         </p>
+        <div class="card-dash">
+          <div class="card-dash-stat"><b class="blue">{{ cardNewToday }}</b><span>今日新学</span></div>
+          <div class="card-dash-stat"><b class="orange">{{ cardDueCount }}</b><span>待复习</span></div>
+          <div class="card-dash-stat"><b class="green">{{ graduatedCount }}</b><span>已掌握</span></div>
+          <div class="card-dash-stat"><b class="purple">{{ streakDays }}</b><span>连续(天)</span></div>
+        </div>
+        <el-alert v-if="degreeRemindDue && cardDueCount > 0" type="warning" :closable="false" show-icon
+          style="margin: 0 0 14px" title="待复习提醒" :description="`今日有 ${cardDueCount} 个单词到期，记得复习哦`" />
         <div class="card-start-actions">
           <el-button type="primary" size="large" round :icon="VideoPlay" @click="startCardMode">
             开始背单词
@@ -350,8 +358,16 @@
         <div class="card-start-icon">🗣️</div>
         <h3 style="margin: 0 0 8px">词组 / 语句 逐个背</h3>
         <p style="color: var(--text-muted); margin: 0 0 16px; font-size: 13.5px">
-          共 <b>{{ allDegreePhrases.length }}</b> 条 · 今日新学 {{ phraseNewToday }} · 待复习 {{ phraseDueCount }} · 已掌握 {{ phraseGraduatedCount }}
+          共 <b>{{ allDegreePhrases.length }}</b> 条 · 已掌握 {{ phraseGraduatedCount }} · 连续学习 <b>{{ streakDays }}</b> 天
         </p>
+        <div class="card-dash">
+          <div class="card-dash-stat"><b class="blue">{{ phraseNewToday }}</b><span>今日新学</span></div>
+          <div class="card-dash-stat"><b class="orange">{{ phraseDueCount }}</b><span>待复习</span></div>
+          <div class="card-dash-stat"><b class="green">{{ phraseGraduatedCount }}</b><span>已掌握</span></div>
+          <div class="card-dash-stat"><b class="purple">{{ streakDays }}</b><span>连续(天)</span></div>
+        </div>
+        <el-alert v-if="degreeRemindDue && phraseDueCount > 0" type="warning" :closable="false" show-icon
+          style="margin: 0 0 14px" title="待复习提醒" :description="`今日有 ${phraseDueCount} 条词组到期，记得复习哦`" />
         <div class="card-start-actions">
           <el-button type="primary" size="large" round :icon="VideoPlay" @click="startPhraseMode(false)">开始背词组</el-button>
           <el-button size="large" round type="warning" :disabled="phraseDueCount === 0" @click="startPhraseMode(true)">待复习 {{ phraseDueCount }} 条</el-button>
@@ -683,6 +699,14 @@
         <el-form-item label="每日新词">
           <el-input-number v-model="settings.newPerDay" :min="1" :max="50" />
         </el-form-item>
+        <el-form-item label="待复习提醒">
+          <el-switch v-model="degreeRemindDue" />
+          <span class="de-set-hint">背单词卡 / 词组有待复习时在看板高亮提醒</span>
+        </el-form-item>
+        <el-form-item label="已掌握回流">
+          <el-switch v-model="degreeGraduatedReturn" />
+          <span class="de-set-hint">已掌握的单词 / 词组重新进入复习，可返回「学习单词中」</span>
+        </el-form-item>
         <el-form-item label="连续天数">
           <el-input-number v-model="manualStreakInput" :min="0" :max="999" />
         </el-form-item>
@@ -759,6 +783,7 @@ import {
   type SrsGrade
 } from '../prep/degreeSrs'
 import { buildReviewQueue as buildGenericReviewQueue } from '../prep/trainingSrs'
+import { getStudySettings, saveStudySettings, getStreak, bumpStreak } from '../services/studySettingsService'
 
 // 资料库：三本 PDF 正文切分后的可读文章（确保内容不遗漏）
 const allArticles: DegreeArticle[] = [...syllabusProse, ...guideArticles]
@@ -941,6 +966,11 @@ function questionCountByType(type: string): number {
 
 const settings = ref<DegreeSettings>({ targetSchool: '商丘师范学院继续教育学院', examDate: null, newPerDay: 15, manualStreak: null })
 const manualStreakInput = ref(0)
+// 备考台单词学习设置（与学习中心两模块各自独立，本地存储）
+const degreeRemindDue = ref(true)
+const degreeGraduatedReturn = ref(false)
+// 备考台本地连续学习天数：背单词卡/词组评分时推进，保证「只刷词不刷题」也累计连续学习（与学习中心两模块口径一致）
+const degreeLocalStreak = ref(0)
 const wordProgress = ref<Record<string, WordProgress>>({})
 const mistakes = ref<MistakeRec[]>([])
 const notes = ref<FavoriteRec[]>([])
@@ -1128,7 +1158,8 @@ function buildPhraseQueue(dueOnly = false) {
   const phraseItems = allDegreePhrases.map((p) => ({ ...p, word: 'ph:' + p.en }))
   phraseQueue.value = buildGenericReviewQueue(phraseItems, wordProgress.value, {
     newPerDay: settings.value.newPerDay || 15,
-    dueOnly
+    dueOnly,
+    includeGraduated: getStudySettings('degree').graduatedReturn
   })
   phraseReviewedCount.value = 0
 }
@@ -1150,6 +1181,7 @@ async function gradePhrase(g: SrsGrade) {
   wordProgress.value = { ...wordProgress.value, [key]: next }
   await svc.saveWordProgress(key, next)
   phraseReviewedCount.value++
+  degreeLocalStreak.value = bumpStreak('degree')
   if (g === 'again') phraseQueue.value.push(p)
   phraseQueue.value.shift()
   phraseFlipped.value = false
@@ -1195,7 +1227,7 @@ const streakDays = computed(() => {
   for (const p of practice.value) if (p.date) days.add(p.date)
   for (const m of mistakes.value) if (m.createdAt) days.add(String(m.createdAt).slice(0, 10))
   const manual = settings.value.manualStreak ?? 0
-  if (!days.size) return manual
+  if (!days.size) return Math.max(manual, degreeLocalStreak.value)
   let streak = 0
   const d = new Date()
   for (;;) {
@@ -1205,7 +1237,7 @@ const streakDays = computed(() => {
       d.setDate(d.getDate() - 1)
     } else break
   }
-  return Math.max(streak, manual)
+  return Math.max(streak, manual, degreeLocalStreak.value)
 })
 const daysToExam = computed(() => {
   if (!settings.value.examDate) return null
@@ -1355,6 +1387,10 @@ async function loadAll() {
   ])
   settings.value = settingsData
   manualStreakInput.value = settingsData.manualStreak ?? 0
+  const ds = getStudySettings('degree')
+  degreeRemindDue.value = ds.remindDue
+  degreeGraduatedReturn.value = ds.graduatedReturn
+  degreeLocalStreak.value = getStreak('degree')
   wordProgress.value = progressData
   mistakes.value = mistakesData
   practice.value = practiceData
@@ -1398,7 +1434,8 @@ const cardPercent = computed(() => {
 function buildCardQueue(dueOnly = false) {
   cardQueue.value = buildDegreeReviewQueue(degreeWords, wordProgress.value, {
     newPerDay: settings.value.newPerDay || 15,
-    dueOnly
+    dueOnly,
+    includeGraduated: getStudySettings('degree').graduatedReturn
   })
   cardReviewedCount.value = 0
 }
@@ -1436,6 +1473,7 @@ async function gradeCard(g: SrsGrade) {
   wordProgress.value = { ...wordProgress.value, [w.word]: next }
   await svc.saveWordProgress(w.word, next)
   cardReviewedCount.value++
+  degreeLocalStreak.value = bumpStreak('degree')
   if (g === 'again') {
     cardQueue.value.push(w)
   }
@@ -1539,6 +1577,8 @@ function startMock(p: { id: string; title: string; no: number }) {
 async function saveSettings() {
   settings.value.manualStreak = manualStreakInput.value
   await svc.saveDegreeSettings(settings.value)
+  // 备考台单词学习设置（待复习提醒 / 已掌握回流）存本地，三模块各自独立
+  saveStudySettings('degree', { remindDue: degreeRemindDue.value, graduatedReturn: degreeGraduatedReturn.value })
   settingsVisible.value = false
   ElMessage.success('已保存')
 }
@@ -2248,6 +2288,21 @@ onBeforeUnmount(() => {
 }
 .card-start-icon { font-size: 56px; margin-bottom: 16px; }
 .card-start-actions { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+.card-dash {
+  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px;
+  width: 100%; max-width: 460px; margin-bottom: 14px;
+}
+.card-dash-stat { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 8px 6px; }
+.card-dash-stat b { display: block; font-size: 19px; font-weight: 800; line-height: 1.2; }
+.card-dash-stat span { font-size: 11px; color: var(--text-faint); }
+.card-dash-stat b.blue { color: #0ea5e9; }
+.card-dash-stat b.orange { color: #f59e0b; }
+.card-dash-stat b.green { color: #2e9e6b; }
+.card-dash-stat b.purple { color: #534ab7; }
+.de-set-hint { font-size: 11px; color: var(--text-faint); margin-left: 8px; }
+@media (max-width: 640px) {
+  .card-dash { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
 
 .flashcard-progress {
   display: flex;

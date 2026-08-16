@@ -81,7 +81,29 @@
           </div>
 
           <h3 class="le-h" style="margin-top:22px;">背单词卡训练</h3>
-          <p class="le-sub">以三本 PDF 中的单词与词组为数据来源，强化听写、拼写、跟读与翻译。今日新学 <b>{{ degreeNewToday }}</b> 个 · 待复习 <b>{{ degreeDueCount }}</b> 个。</p>
+          <p class="le-sub">以学位英语大纲单词为数据来源（与词组模块独立），强化听写、拼写、跟读与翻译。</p>
+          <!-- 可视化看板：今日学习 / 待复习 / 已掌握 / 连续学习天数 -->
+          <div class="le-dash">
+            <div class="le-dash-ring">
+              <svg width="104" height="104" viewBox="0 0 120 120">
+                <circle cx="60" cy="60" r="50" fill="none" stroke="#eceaf8" stroke-width="12" />
+                <circle cx="60" cy="60" r="50" fill="none" stroke="#534ab7" stroke-width="12" stroke-linecap="round"
+                  :stroke-dasharray="`${degreeRing} 314`" transform="rotate(-90 60 60)" />
+                <text x="60" y="66" text-anchor="middle" font-size="22" font-weight="700" fill="#3c3489">{{ degreeMastery }}%</text>
+              </svg>
+              <div class="le-dash-ring-cap">单词掌握度</div>
+            </div>
+            <div class="le-dash-stats">
+              <div class="le-dash-stat"><b class="blue">{{ degreeNewToday }}</b><span>今日新学</span></div>
+              <div class="le-dash-stat"><b class="orange">{{ degreeDueCount }}</b><span>待复习</span></div>
+              <div class="le-dash-stat"><b class="green">{{ degreeGraduated }}</b><span>已掌握</span></div>
+              <div class="le-dash-stat"><b class="purple">{{ learnStreak }}</b><span>连续学习(天)</span></div>
+              <div class="le-dash-stat wide"><b>{{ degreeItems.length }}</b><span>词库总量</span></div>
+            </div>
+            <el-button class="le-dash-gear" text :icon="Setting" @click="openLearnSettings" title="学习设置" />
+          </div>
+          <el-alert v-if="learnSettings.remindDue && degreeDueCount > 0" type="warning" :closable="false" show-icon
+            style="margin: 4px 0 12px" title="待复习提醒" :description="`今日有 ${degreeDueCount} 个单词到期，记得复习哦`" />
           <div class="le-training-grid">
             <button type="button" class="le-training-card" @click="wordSub = 'flash'">
               <span class="le-training-icon">🎴</span>
@@ -137,7 +159,30 @@
             title="六级词库待补充"
             description="将免费六级词表（如 KyleBing/english-vocabulary 的「6 六级-乱序.txt」，格式：单词<TAB>释义）保存到 scripts/cet6_words.csv，运行命令 node scripts/gen-cet6-bundle.mjs 即可生成内置六级词库。"
           />
+          <p class="le-sub">内置免费词库（离线可用，无需联网/付费），支持闪卡、听写、拼写、跟读训练。</p>
           <p class="le-sub">今日新学 <b>{{ cetNewToday }}</b> 个 · 待复习 <b>{{ cetDueCount }}</b> 个。</p>
+          <!-- 可视化看板：今日学习 / 待复习 / 已掌握 / 连续学习天数 -->
+          <div class="le-dash">
+            <div class="le-dash-ring">
+              <svg width="104" height="104" viewBox="0 0 120 120">
+                <circle cx="60" cy="60" r="50" fill="none" stroke="#eceaf8" stroke-width="12" />
+                <circle cx="60" cy="60" r="50" fill="none" stroke="#534ab7" stroke-width="12" stroke-linecap="round"
+                  :stroke-dasharray="`${cetRing} 314`" transform="rotate(-90 60 60)" />
+                <text x="60" y="66" text-anchor="middle" font-size="22" font-weight="700" fill="#3c3489">{{ cetMastery }}%</text>
+              </svg>
+              <div class="le-dash-ring-cap">单词掌握度</div>
+            </div>
+            <div class="le-dash-stats">
+              <div class="le-dash-stat"><b class="blue">{{ cetNewToday }}</b><span>今日新学</span></div>
+              <div class="le-dash-stat"><b class="orange">{{ cetDueCount }}</b><span>待复习</span></div>
+              <div class="le-dash-stat"><b class="green">{{ cetGraduated }}</b><span>已掌握</span></div>
+              <div class="le-dash-stat"><b class="purple">{{ cetStreak }}</b><span>连续学习(天)</span></div>
+              <div class="le-dash-stat wide"><b>{{ cetTotal }}</b><span>词库总量</span></div>
+            </div>
+            <el-button class="le-dash-gear" text :icon="Setting" @click="openCetSettings" title="学习设置" />
+          </div>
+          <el-alert v-if="cetSettings.remindDue && cetDueCount > 0" type="warning" :closable="false" show-icon
+            style="margin: 4px 0 12px" title="待复习提醒" :description="`今日有 ${cetDueCount} 个单词到期，记得复习哦`" />
           <div class="le-training-grid">
             <button type="button" class="le-training-card" @click="cetSub = 'flash'">
               <span class="le-training-icon">🎴</span><span class="le-training-name">闪卡</span><span class="le-training-desc">卡片式记忆</span>
@@ -431,16 +476,60 @@
             </div>
           </div>
         </div>
+
+        <!-- 背单词卡 学习设置 -->
+        <el-dialog v-model="learnSettingsVisible" title="背单词卡 · 学习设置" width="420px">
+          <el-form label-width="110px">
+            <el-form-item label="每日学习单词">
+              <el-input-number v-model="learnDraft.newPerDay" :min="1" :max="60" />
+              <span class="le-set-hint">每天新学上限（不含复习）</span>
+            </el-form-item>
+            <el-form-item label="待复习提醒">
+              <el-switch v-model="learnDraft.remindDue" />
+              <span class="le-set-hint">有待复习时在看板高亮提醒</span>
+            </el-form-item>
+            <el-form-item label="已掌握回流">
+              <el-switch v-model="learnDraft.graduatedReturn" />
+              <span class="le-set-hint">已掌握的单词重新进入复习，可返回「学习单词中」</span>
+            </el-form-item>
+          </el-form>
+          <template #footer>
+            <el-button @click="learnSettingsVisible = false">取消</el-button>
+            <el-button type="primary" @click="saveLearnSettings">保存</el-button>
+          </template>
+        </el-dialog>
+
+        <!-- 四六级 学习设置 -->
+        <el-dialog v-model="cetSettingsVisible" title="四六级 · 学习设置" width="420px">
+          <el-form label-width="110px">
+            <el-form-item label="每日学习单词">
+              <el-input-number v-model="cetDraft.newPerDay" :min="1" :max="60" />
+              <span class="le-set-hint">每天新学上限（不含复习）</span>
+            </el-form-item>
+            <el-form-item label="待复习提醒">
+              <el-switch v-model="cetDraft.remindDue" />
+              <span class="le-set-hint">有待复习时在看板高亮提醒</span>
+            </el-form-item>
+            <el-form-item label="已掌握回流">
+              <el-switch v-model="cetDraft.graduatedReturn" />
+              <span class="le-set-hint">已掌握的单词重新进入复习，可返回「学习单词中」</span>
+            </el-form-item>
+          </el-form>
+          <template #footer>
+            <el-button @click="cetSettingsVisible = false">取消</el-button>
+            <el-button type="primary" @click="saveCetSettings">保存</el-button>
+          </template>
+        </el-dialog>
       </section>
     </Transition>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, reactive, ref } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { School, Reading, Collection, Calendar, ChatDotRound, ArrowDown, ArrowLeft, Odometer, CircleCheck, Notebook } from '@element-plus/icons-vue'
+import { School, Reading, Collection, Calendar, ChatDotRound, ArrowDown, ArrowLeft, Odometer, CircleCheck, Notebook, Setting } from '@element-plus/icons-vue'
 import PageHeader from '../components/PageHeader.vue'
 import { loadAiConfig, callAi, type AiConfig } from '../services/aiService'
 import {
@@ -474,8 +563,9 @@ import type { MistakeRec, WordProgress } from '../prep/degreeTypes'
 import WordTrainingPanel from '../components/WordTrainingPanel.vue'
 import { MASTER_WORDS_BUNDLE } from '../prep/masterWordsBundle'
 import { CET6_WORDS_BUNDLE } from '../prep/cet6WordsBundle'
-import { loadWords as loadDegreeWords, loadPhrases as loadDegreePhrases } from '../prep/degreeDb'
+import { loadWords as loadDegreeWords } from '../prep/degreeDb'
 import { countDueToday, countNewToday } from '../prep/trainingSrs'
+import { getStreak, getStudySettings, saveStudySettings } from '../services/studySettingsService'
 import { loadLearnWordProgress } from '../services/learnWordProgressService'
 import { loadCetProgress } from '../services/cetProgressService'
 import type { PrepWord } from '../services/cetPrepService'
@@ -504,36 +594,48 @@ const router = useRouter()
 // 学习中心 · 背单词卡 / 四六级：待复习计数（云端优先+本地镜像）
 const wordProgress = ref<Record<string, WordProgress>>({})
 const cetProgress = ref<Record<string, WordProgress>>({})
+// 学习中心背单词卡 = 学位英语单词 ONLY（与词组严格隔离，不混为一起）
 const degreeItems = ref<{ word: string; definition: string }[]>([])
 const wordStatsLoading = ref(false)
+// 三模块连续学习天数（本地记录，各自独立）
+const learnStreak = ref(0)
+const cetStreak = ref(0)
 
 async function loadWordStats(): Promise<void> {
   wordStatsLoading.value = true
   try {
-    const [words, phrases, prog, cet4, cet6] = await Promise.all([
+    const [words, prog, cet4, cet6] = await Promise.all([
       loadDegreeWords(),
-      loadDegreePhrases(),
       loadLearnWordProgress(),
       loadCetProgress('cet4'),
       loadCetProgress('cet6')
     ])
-    degreeItems.value = [
-      ...words.map((w) => ({ word: w.word, definition: w.definition })),
-      ...phrases.map((p) => ({ word: p.en, definition: p.zh || p.extra || '' }))
-    ]
+    degreeItems.value = words.map((w) => ({ word: w.word, definition: w.definition }))
     wordProgress.value = prog
     cetProgress.value = { ...cet4, ...cet6 }
+    learnStreak.value = getStreak('learn')
+    cetStreak.value = getStreak('cet')
   } catch {
     /* ignore */
   }
   wordStatsLoading.value = false
 }
 
+const learnSettings = computed(() => getStudySettings('learn'))
+const cetSettings = computed(() => getStudySettings('cet'))
+
 const degreeDueCount = computed(() => {
-  const newPerDay = 15
-  return countDueToday(degreeItems.value, wordProgress.value, newPerDay)
+  return countDueToday(degreeItems.value, wordProgress.value, learnSettings.value.newPerDay)
 })
-const degreeNewToday = computed(() => countNewToday(degreeItems.value, wordProgress.value, 15))
+const degreeNewToday = computed(() => countNewToday(degreeItems.value, wordProgress.value, learnSettings.value.newPerDay))
+const degreeGraduated = computed(() => {
+  let g = 0
+  for (const it of degreeItems.value) {
+    const p = wordProgress.value[it.word]
+    if (p && p.status === 'graduated') g++
+  }
+  return g
+})
 
 const cetDueCount = computed(() => {
   const bundle = (cetLevel.value === 'cet6' ? CET6_WORDS_BUNDLE : MASTER_WORDS_BUNDLE) as PrepWord[]
@@ -542,7 +644,7 @@ const cetDueCount = computed(() => {
     ? Object.fromEntries(Object.entries(cetProgress.value).filter(([k]) => CET6_WORDS_BUNDLE.some((p) => p[0] === k)))
     : Object.fromEntries(Object.entries(cetProgress.value).filter(([k]) => MASTER_WORDS_BUNDLE.some((p) => p[0] === k)))
   )
-  return countDueToday(items, prog, 15)
+  return countDueToday(items, prog, cetSettings.value.newPerDay)
 })
 const cetNewToday = computed(() => {
   const bundle = (cetLevel.value === 'cet6' ? CET6_WORDS_BUNDLE : MASTER_WORDS_BUNDLE) as PrepWord[]
@@ -551,8 +653,56 @@ const cetNewToday = computed(() => {
     ? Object.fromEntries(Object.entries(cetProgress.value).filter(([k]) => CET6_WORDS_BUNDLE.some((p) => p[0] === k)))
     : Object.fromEntries(Object.entries(cetProgress.value).filter(([k]) => MASTER_WORDS_BUNDLE.some((p) => p[0] === k)))
   )
-  return countNewToday(items, prog, 15)
+  return countNewToday(items, prog, cetSettings.value.newPerDay)
 })
+const cetGraduated = computed(() => {
+  const bundle = (cetLevel.value === 'cet6' ? CET6_WORDS_BUNDLE : MASTER_WORDS_BUNDLE) as PrepWord[]
+  const keys = new Set(bundle.map((p) => p[0]))
+  let g = 0
+  for (const [k, p] of Object.entries(cetProgress.value)) {
+    if (keys.has(k) && p.status === 'graduated') g++
+  }
+  return g
+})
+const cetTotal = computed(() => (cetLevel.value === 'cet6' ? CET6_WORDS_BUNDLE.length : MASTER_WORDS_BUNDLE.length))
+
+// 看板可视化：掌握度百分比 + 进度环弧长
+const degreeMastery = computed(() => {
+  const total = degreeItems.value.length || 1
+  return Math.round((degreeGraduated.value / total) * 100)
+})
+const degreeRing = computed(() => (degreeMastery.value / 100) * 314)
+const cetMastery = computed(() => {
+  const total = cetTotal.value || 1
+  return Math.round((cetGraduated.value / total) * 100)
+})
+const cetRing = computed(() => (cetMastery.value / 100) * 314)
+
+// 学习设置弹窗（三模块各自独立）
+const learnSettingsVisible = ref(false)
+const cetSettingsVisible = ref(false)
+const learnDraft = ref({ newPerDay: 15, remindDue: true, graduatedReturn: false })
+const cetDraft = ref({ newPerDay: 15, remindDue: true, graduatedReturn: false })
+function openLearnSettings() {
+  const s = getStudySettings('learn')
+  learnDraft.value = { ...s }
+  learnSettingsVisible.value = true
+}
+function openCetSettings() {
+  const s = getStudySettings('cet')
+  cetDraft.value = { ...s }
+  cetSettingsVisible.value = true
+}
+function saveLearnSettings() {
+  saveStudySettings('learn', { ...learnDraft.value })
+  learnSettingsVisible.value = false
+  void loadWordStats()
+}
+function saveCetSettings() {
+  saveStudySettings('cet', { ...cetDraft.value })
+  cetSettingsVisible.value = false
+  void loadWordStats()
+}
 
 function openReviewOnly(source: 'degree' | 'cet'): void {
   if (source === 'degree') wordSub.value = 'review'
@@ -1016,6 +1166,10 @@ onMounted(async () => {
   void loadWordStats()
 })
 onUnmounted(() => { if (clockTimer) window.clearInterval(clockTimer) })
+
+// 从训练面板返回首页时刷新看板（今日新学/待复习/已掌握/连续学习天数）
+watch(wordSub, (v) => { if (v === 'home') void loadWordStats() })
+watch(cetSub, (v) => { if (v === 'home') void loadWordStats() })
 </script>
 
 <style scoped>
@@ -1056,6 +1210,30 @@ onUnmounted(() => { if (clockTimer) window.clearInterval(clockTimer) })
 .le-phon { font-size: 13px; color: var(--text-faint); margin-left: 8px; }
 .le-mean { margin-bottom: 8px; }
 .le-pos { font-size: 12px; font-style: italic; color: var(--brand, #378add); margin-right: 6px; }
+
+/* 单词模块可视化看板 */
+.le-dash {
+  position: relative; display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+  background: linear-gradient(135deg, #f6f4ff, #eef3ff); border: 1px solid var(--border);
+  border-radius: 14px; padding: 14px 16px; margin-bottom: 10px;
+}
+.le-dash-ring { flex-shrink: 0; text-align: center; }
+.le-dash-ring-cap { font-size: 11px; color: var(--text-faint); margin-top: 2px; }
+.le-dash-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; flex: 1; min-width: 240px; }
+.le-dash-stat { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 8px 10px; text-align: center; }
+.le-dash-stat.wide { grid-column: span 4; }
+.le-dash-stat b { display: block; font-size: 20px; font-weight: 800; line-height: 1.2; }
+.le-dash-stat span { font-size: 11px; color: var(--text-faint); }
+.le-dash-stat b.blue { color: #0ea5e9; }
+.le-dash-stat b.orange { color: #f59e0b; }
+.le-dash-stat b.green { color: #2e9e6b; }
+.le-dash-stat b.purple { color: #534ab7; }
+.le-dash-gear { position: absolute; top: 8px; right: 8px; color: var(--text-muted); }
+.le-set-hint { font-size: 11px; color: var(--text-faint); margin-left: 8px; }
+@media (max-width: 640px) {
+  .le-dash-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .le-dash-stat.wide { grid-column: span 2; }
+}
 .le-ex { color: var(--text-faint); font-size: 12px; }
 .le-tip { font-size: 12px; color: var(--text-faint); margin-top: 8px; }
 .le-answer { margin-top: 14px; padding: 12px; background: var(--surface-soft); border-radius: 8px; white-space: pre-wrap; line-height: 1.7; font-size: 13px; color: var(--text); }

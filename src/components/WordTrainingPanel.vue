@@ -150,7 +150,6 @@ import { allDegreeQuestions } from '../prep/degreeQuestionBank'
 import { speakEn } from '../prep/degreeSpeech'
 import { MASTER_WORDS_BUNDLE } from '../prep/masterWordsBundle'
 import { CET6_WORDS_BUNDLE } from '../prep/cet6WordsBundle'
-import * as degreeSvc from '../prep/degreeService'
 import { loadCetProgress, saveCetProgress, type CetWordProgress } from '../services/cetProgressService'
 import {
   loadLearnWordProgress,
@@ -162,6 +161,12 @@ import {
   todayStr,
   type SrsGrade
 } from '../prep/trainingSrs'
+import {
+  getStudySettings,
+  saveStudySettings,
+  bumpStreak,
+  type StudyModule
+} from '../services/studySettingsService'
 import type { DegreeWord, DegreePhrase, DegreeQuestion, WordProgress } from '../prep/degreeTypes'
 import type { PrepWord } from '../services/cetPrepService'
 
@@ -204,6 +209,10 @@ const correct = ref(false)
 const sessionReviewed = ref(0)
 const lastSchedule = ref('')
 const newPerDay = ref(15)
+// 已掌握词回流开关（来自模块独立设置，不串）
+const graduatedReturn = ref(false)
+// 当前模块 key（用于连续学习天数记录）：学习中心背单词卡=learn，四六级=cet
+const moduleKey = computed<StudyModule>(() => (props.source === 'cet' ? 'cet' : 'learn'))
 
 const titleText = computed(() => {
   const suffix = props.reviewOnly ? ' · 待复习' : ''
@@ -279,8 +288,9 @@ async function loadItems(): Promise<void> {
       const bundle = (props.cetLevel === 'cet6' ? CET6_WORDS_BUNDLE : MASTER_WORDS_BUNDLE) as PrepWord[]
       items.value = bundle.map(prepToTrain)
     } else {
-      const [w, ph] = await Promise.all([loadWords(), loadPhrases()])
-      items.value = [...w.map(wordToTrain), ...ph.map(phraseToTrain)]
+      // 学习中心背单词卡 = 单词 ONLY（与词组模块严格隔离，不混为一起）
+      const w = await loadWords()
+      items.value = w.map(wordToTrain)
     }
   } catch {
     items.value = []
@@ -293,14 +303,14 @@ async function loadProgress(): Promise<void> {
   try {
     if (props.source === 'cet') {
       progress.value = await loadCetProgress(props.cetLevel || 'cet4')
-      newPerDay.value = 15
+      const s = getStudySettings('cet')
+      newPerDay.value = s.newPerDay
+      graduatedReturn.value = s.graduatedReturn
     } else {
-      const [prog, settings] = await Promise.all([
-        loadLearnWordProgress(),
-        degreeSvc.loadDegreeSettings()
-      ])
-      progress.value = prog
-      newPerDay.value = settings.newPerDay || 15
+      progress.value = await loadLearnWordProgress()
+      const s = getStudySettings('learn')
+      newPerDay.value = s.newPerDay
+      graduatedReturn.value = s.graduatedReturn
     }
   } catch {
     progress.value = {}
@@ -314,7 +324,8 @@ function rebuildQueue(_forceNew = false) {
   // 本轮已评分的词已通过 saveProgress 落库，rebuild 后会正确按最新 due 重新入队。
   queue.value = buildReviewQueue(items.value, progress.value as Record<string, WordProgress>, {
     newPerDay: newPerDay.value,
-    dueOnly: props.reviewOnly
+    dueOnly: props.reviewOnly,
+    includeGraduated: graduatedReturn.value
   })
   idx.value = 0
   sessionReviewed.value = 0
@@ -325,7 +336,8 @@ function shuffleQueue() {
   if (innerMode.value === 'translate') return
   queue.value = buildReviewQueue(items.value, progress.value as Record<string, WordProgress>, {
     newPerDay: newPerDay.value,
-    dueOnly: props.reviewOnly
+    dueOnly: props.reviewOnly,
+    includeGraduated: graduatedReturn.value
   })
   idx.value = 0
   lastSchedule.value = ''
@@ -365,6 +377,7 @@ async function gradeCurrent(grade: SrsGrade) {
   const prev = progress.value[w.word]
   const next = reviewWord(prev as WordProgress | undefined, grade)
   await saveProgress(w.word, next)
+  bumpStreak(moduleKey.value)
   sessionReviewed.value++
   lastSchedule.value = scheduleText(w.word, next)
   // 遗忘：本轮队尾再练一次；其它：正常出队
@@ -389,6 +402,7 @@ async function afterCheck(autoNext = true) {
   const prev = progress.value[w.word]
   const next = reviewWord(prev as WordProgress | undefined, grade)
   await saveProgress(w.word, next)
+  bumpStreak(moduleKey.value)
   sessionReviewed.value++
   lastSchedule.value = scheduleText(w.word, next)
   if (grade === 'again') {
