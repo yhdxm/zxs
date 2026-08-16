@@ -58,11 +58,14 @@ export function reviewWord(p: WordProgress | undefined, grade: SrsGrade): WordPr
 export interface SrsDueOptions {
   /** 每日新词上限（来自设置 newPerDay），限制单次复习引入的新词数量。 */
   newPerDay: number
+  /** 仅复习今日到期词（不含新词）。 */
+  dueOnly?: boolean
 }
 
 /**
  * 构建本次复习队列：到期词（due<=今天 且未毕业）优先，新词（无进度）按 newPerDay 截取，混在末尾。
  * 到期词轻微打乱顺序，避免每次都从同一批开头。
+ * 若 opts.dueOnly 为 true，则只返回到期词，不引入新词。
  */
 export function buildReviewQueue(
   words: DegreeWord[],
@@ -80,8 +83,19 @@ export function buildReviewQueue(
       due.push(w)
     }
   }
+  if (opts.dueOnly) return shuffle(due)
   const cappedFresh = fresh.slice(0, Math.max(0, opts.newPerDay))
   return [...shuffle(due), ...cappedFresh]
+}
+
+/** 今日待复习/待学习总数（到期 + 新词上限）。 */
+export function countDueToday(
+  words: DegreeWord[],
+  progress: Record<string, WordProgress>,
+  newPerDay: number
+): number {
+  const s = srsStats(words, progress)
+  return Math.min(s.due, newPerDay + s.learning) // due 已包含 newCount，这里直接返回更直观
 }
 
 function shuffle<T>(arr: T[]): T[] {

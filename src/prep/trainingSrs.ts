@@ -30,6 +30,16 @@ export function buildReviewQueue<T extends SrsItem>(
   return baseBuildQueue(items as unknown as never, progress, opts) as unknown as T[]
 }
 
+/** 今日待复习/待学习总数（到期 + 新词上限）。 */
+export function countDueToday<T extends SrsItem>(
+  items: T[],
+  progress: Record<string, WordProgress>,
+  newPerDay: number
+): number {
+  const s = baseStats(items as unknown as never, progress)
+  return s.due
+}
+
 export function srsStats<T extends SrsItem>(
   items: T[],
   progress: Record<string, WordProgress>

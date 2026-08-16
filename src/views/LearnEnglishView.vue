@@ -81,7 +81,7 @@
           </div>
 
           <h3 class="le-h" style="margin-top:22px;">背单词卡训练</h3>
-          <p class="le-sub">以三本 PDF 中的单词与词组为数据来源，强化听写、拼写、跟读与翻译。</p>
+          <p class="le-sub">以三本 PDF 中的单词与词组为数据来源，强化听写、拼写、跟读与翻译。今日待复习/待学 <b>{{ degreeDueCount }}</b> 个。</p>
           <div class="le-training-grid">
             <button type="button" class="le-training-card" @click="wordSub = 'flash'">
               <span class="le-training-icon">🎴</span>
@@ -108,12 +108,17 @@
               <span class="le-training-name">翻译</span>
               <span class="le-training-desc">英译汉句子训练</span>
             </button>
+            <button type="button" class="le-training-card review" :disabled="degreeDueCount === 0" @click="openReviewOnly('degree')">
+              <span class="le-training-icon">🔁</span>
+              <span class="le-training-name">待复习</span>
+              <span class="le-training-desc">{{ degreeDueCount }} 个到期/待学</span>
+            </button>
           </div>
         </div>
 
         <!-- 背单词卡训练面板（内嵌，不跳转） -->
         <div v-else-if="active === 'word'" class="le-card">
-          <WordTrainingPanel source="degree" :mode="(wordSub as any)" @close="wordSub = 'home'" />
+          <WordTrainingPanel source="degree" :mode="(wordSub === 'review' ? 'flash' : wordSub as any)" :review-only="wordSub === 'review'" @close="wordSub = 'home'" />
         </div>
 
         <!-- 四六级单词：首页（级别 + 训练入口） -->
@@ -132,6 +137,7 @@
             title="六级词库待补充"
             description="将免费六级词表（如 KyleBing/english-vocabulary 的「6 六级-乱序.txt」，格式：单词<TAB>释义）保存到 scripts/cet6_words.csv，运行命令 node scripts/gen-cet6-bundle.mjs 即可生成内置六级词库。"
           />
+          <p class="le-sub">今日待复习/待学 <b>{{ cetDueCount }}</b> 个。</p>
           <div class="le-training-grid">
             <button type="button" class="le-training-card" @click="cetSub = 'flash'">
               <span class="le-training-icon">🎴</span><span class="le-training-name">闪卡</span><span class="le-training-desc">卡片式记忆</span>
@@ -145,12 +151,15 @@
             <button type="button" class="le-training-card" @click="cetSub = 'shadow'">
               <span class="le-training-icon">🎤</span><span class="le-training-name">跟读</span><span class="le-training-desc">听音跟读练习</span>
             </button>
+            <button type="button" class="le-training-card review" :disabled="cetDueCount === 0" @click="openReviewOnly('cet')">
+              <span class="le-training-icon">🔁</span><span class="le-training-name">待复习</span><span class="le-training-desc">{{ cetDueCount }} 个到期/待学</span>
+            </button>
           </div>
         </div>
 
         <!-- 四六级单词训练面板（内嵌） -->
         <div v-else-if="active === 'cet'" class="le-card">
-          <WordTrainingPanel source="cet" :cet-level="cetLevel" :mode="(cetSub as any)" @close="cetSub = 'home'" />
+          <WordTrainingPanel source="cet" :cet-level="cetLevel" :mode="(cetSub === 'review' ? 'flash' : cetSub as any)" :review-only="cetSub === 'review'" @close="cetSub = 'home'" />
         </div>
 
         <!-- 知识库：学习模块 -->
@@ -461,10 +470,15 @@ import {
 } from '../services/learnDb'
 import { loadMistakes } from '../prep/degreeService'
 import { buildWeaknessReport, WEAKNESS_MIN_SAMPLE } from '../prep/weakness'
-import type { MistakeRec } from '../prep/degreeTypes'
+import type { MistakeRec, WordProgress } from '../prep/degreeTypes'
 import WordTrainingPanel from '../components/WordTrainingPanel.vue'
 import { MASTER_WORDS_BUNDLE } from '../prep/masterWordsBundle'
 import { CET6_WORDS_BUNDLE } from '../prep/cet6WordsBundle'
+import { loadWords as loadDegreeWords, loadPhrases as loadDegreePhrases } from '../prep/degreeDb'
+import { countDueToday } from '../prep/trainingSrs'
+import { loadLearnWordProgress } from '../services/learnWordProgressService'
+import { loadCetProgress } from '../services/cetProgressService'
+import type { PrepWord } from '../services/cetPrepService'
 import {
   loadKnowledgeProgress,
   markLessonDone,
@@ -482,10 +496,58 @@ const MODULES = [
   { key: 'prep', label: '备考台', desc: '今日/刷题/错本/我的/模考', color: '#3c3489', icon: School }
 ]
 const active = ref('word')
-const wordSub = ref<'home' | 'flash' | 'dictation' | 'spelling' | 'shadow' | 'translate'>('home')
-const cetSub = ref<'home' | 'flash' | 'dictation' | 'spelling' | 'shadow'>('home')
+const wordSub = ref<'home' | 'flash' | 'dictation' | 'spelling' | 'shadow' | 'translate' | 'review'>('home')
+const cetSub = ref<'home' | 'flash' | 'dictation' | 'spelling' | 'shadow' | 'review'>('home')
 const cetLevel = ref<'cet4' | 'cet6'>('cet4')
 const router = useRouter()
+
+// 学习中心 · 背单词卡 / 四六级：待复习计数（云端优先+本地镜像）
+const wordProgress = ref<Record<string, WordProgress>>({})
+const cetProgress = ref<Record<string, WordProgress>>({})
+const degreeItems = ref<{ word: string; definition: string }[]>([])
+const wordStatsLoading = ref(false)
+
+async function loadWordStats(): Promise<void> {
+  wordStatsLoading.value = true
+  try {
+    const [words, phrases, prog, cet4, cet6] = await Promise.all([
+      loadDegreeWords(),
+      loadDegreePhrases(),
+      loadLearnWordProgress(),
+      loadCetProgress('cet4'),
+      loadCetProgress('cet6')
+    ])
+    degreeItems.value = [
+      ...words.map((w) => ({ word: w.word, definition: w.definition })),
+      ...phrases.map((p) => ({ word: p.en, definition: p.zh || p.extra || '' }))
+    ]
+    wordProgress.value = prog
+    cetProgress.value = { ...cet4, ...cet6 }
+  } catch {
+    /* ignore */
+  }
+  wordStatsLoading.value = false
+}
+
+const degreeDueCount = computed(() => {
+  const newPerDay = 15
+  return countDueToday(degreeItems.value, wordProgress.value, newPerDay)
+})
+
+const cetDueCount = computed(() => {
+  const bundle = (cetLevel.value === 'cet6' ? CET6_WORDS_BUNDLE : MASTER_WORDS_BUNDLE) as PrepWord[]
+  const items = bundle.map((p) => ({ word: p[0], definition: p[3] }))
+  const prog = (cetLevel.value === 'cet6'
+    ? Object.fromEntries(Object.entries(cetProgress.value).filter(([k]) => CET6_WORDS_BUNDLE.some((p) => p[0] === k)))
+    : Object.fromEntries(Object.entries(cetProgress.value).filter(([k]) => MASTER_WORDS_BUNDLE.some((p) => p[0] === k)))
+  )
+  return countDueToday(items, prog, 15)
+})
+
+function openReviewOnly(source: 'degree' | 'cet'): void {
+  if (source === 'degree') wordSub.value = 'review'
+  else cetSub.value = 'review'
+}
 
 const nowText = ref('')
 let clockTimer: number | undefined
@@ -505,10 +567,14 @@ function switchModule(key: string): void {
   if (key === 'cet') {
     active.value = 'cet'
     cetSub.value = 'home'
+    void loadWordStats()
     return
   }
   active.value = key
-  if (key === 'word' && !words.value.length) void loadWords()
+  if (key === 'word') {
+    if (!words.value.length) void loadWords()
+    void loadWordStats()
+  }
   if (key === 'outline') void loadKbProgress()
   if (key === 'plan' && !savedPlans.value.length) void loadPlans()
   if (key === 'weakness') void loadWeakness()
@@ -681,7 +747,11 @@ async function toggleDone(id: string): Promise<void> {
       kbProgress.done = kbProgress.done.filter((x) => x !== id)
     }
   } catch (e) {
-    ElMessage.error('标记完成失败：' + (e as Error).message)
+    const msg = (e as Error).message || ''
+    ElMessage.error('标记完成失败：' + msg)
+    if (msg.includes('row-level security')) {
+      ElMessage.warning('请让管理员在 Supabase SQL Editor 执行 scripts/fix-learn-progress-rls.sql')
+    }
   }
 }
 async function startLesson(bookId: string, chapterId: string, lessonId: string): Promise<void> {
@@ -694,7 +764,11 @@ async function startLesson(bookId: string, chapterId: string, lessonId: string):
       await markLessonDoing(lessonId, true)
       kbProgress.doing = [...kbProgress.doing, lessonId]
     } catch (e) {
-      ElMessage.error('开始学习失败：' + (e as Error).message)
+      const msg = (e as Error).message || ''
+      ElMessage.error('开始学习失败：' + msg)
+      if (msg.includes('row-level security')) {
+        ElMessage.warning('请让管理员在 Supabase SQL Editor 执行 scripts/fix-learn-progress-rls.sql')
+      }
     }
   }
   gotoLesson(bookId, chapterId, lessonId)
@@ -929,6 +1003,7 @@ onMounted(async () => {
   await loadWords()
   await lookup()
   await loadPlans()
+  void loadWordStats()
 })
 onUnmounted(() => { if (clockTimer) window.clearInterval(clockTimer) })
 </script>
@@ -1107,6 +1182,9 @@ onUnmounted(() => { if (clockTimer) window.clearInterval(clockTimer) })
   background: var(--surface-soft); cursor: pointer; transition: transform .16s ease, border-color .16s ease;
 }
 .le-training-card:hover { transform: translateY(-2px); border-color: var(--brand, #378add); }
+.le-training-card.review { border-color: #f59e0b; background: color-mix(in srgb, #f59e0b 8%, var(--surface-soft)); }
+.le-training-card.review:hover { border-color: #f59e0b; }
+.le-training-card.review:disabled { opacity: .55; cursor: not-allowed; }
 .le-training-icon { font-size: 24px; }
 .le-training-name { font-size: 13px; font-weight: 600; color: var(--text-strong); }
 .le-training-desc { font-size: 11px; color: var(--text-faint); text-align: center; }

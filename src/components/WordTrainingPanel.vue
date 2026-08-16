@@ -177,6 +177,8 @@ const props = defineProps<{
   mode: 'flash' | 'dictation' | 'spelling' | 'shadow' | 'translate'
   source?: 'degree' | 'cet'
   cetLevel?: 'cet4' | 'cet6'
+  /** 仅复习今日到期词（不引入新词）。 */
+  reviewOnly?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -204,8 +206,9 @@ const lastSchedule = ref('')
 const newPerDay = ref(15)
 
 const titleText = computed(() => {
-  if (props.source === 'cet') return props.cetLevel === 'cet6' ? '六级单词卡训练' : '四级单词卡训练'
-  return '背单词卡训练'
+  const suffix = props.reviewOnly ? ' · 待复习' : ''
+  if (props.source === 'cet') return (props.cetLevel === 'cet6' ? '六级单词卡训练' : '四级单词卡训练') + suffix
+  return '背单词卡训练' + suffix
 })
 const emptyText = computed(() => {
   if (props.source === 'cet' && props.cetLevel === 'cet6') return '六级词库待补充：将免费六级词表放入 scripts/cet6_words.csv 后运行生成脚本'
@@ -318,7 +321,8 @@ function rebuildQueue(forceNew = false) {
     }
   }
   queue.value = buildReviewQueue(items.value, progress.value as Record<string, WordProgress>, {
-    newPerDay: newPerDay.value
+    newPerDay: newPerDay.value,
+    dueOnly: props.reviewOnly
   })
   idx.value = 0
   sessionReviewed.value = 0
@@ -328,7 +332,8 @@ function rebuildQueue(forceNew = false) {
 function shuffleQueue() {
   if (innerMode.value === 'translate') return
   queue.value = buildReviewQueue(items.value, progress.value as Record<string, WordProgress>, {
-    newPerDay: newPerDay.value
+    newPerDay: newPerDay.value,
+    dueOnly: props.reviewOnly
   })
   idx.value = 0
   lastSchedule.value = ''

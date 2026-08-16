@@ -251,9 +251,14 @@
         <p style="color: var(--text-muted); margin: 0 0 16px; font-size: 13.5px">
           共 <b>{{ filteredWords.length }}</b> 词 · 今日新学 {{ settings.newPerDay }} · 待复习 {{ cardDueCount }} · 已掌握 {{ graduatedCount }}
         </p>
-        <el-button type="primary" size="large" round :icon="VideoPlay" @click="startCardMode">
-          开始背单词
-        </el-button>
+        <div class="card-start-actions">
+          <el-button type="primary" size="large" round :icon="VideoPlay" @click="startCardMode">
+            开始背单词
+          </el-button>
+          <el-button size="large" round type="warning" :disabled="cardDueCount === 0" @click="startCardReviewMode">
+            待复习 {{ cardDueCount }} 个
+          </el-button>
+        </div>
       </div>
 
       <template v-else>
@@ -339,7 +344,72 @@
         <el-input v-model="phraseQuery" placeholder="搜索英文 / 中文" clearable style="max-width: 300px" />
         <el-tag type="info" effect="plain">共 {{ filteredPhrases.length }} 条</el-tag>
       </div>
-      <div v-if="filteredPhrases.length" class="phrase-list">
+
+      <!-- 词组卡片训练入口 -->
+      <div v-if="!phraseStarted" class="card-start-screen" style="padding: 30px 20px;">
+        <div class="card-start-icon">🗣️</div>
+        <h3 style="margin: 0 0 8px">词组 / 语句 逐个背</h3>
+        <p style="color: var(--text-muted); margin: 0 0 16px; font-size: 13.5px">
+          共 <b>{{ filteredPhrases.length }}</b> 条 · 今日新学 {{ settings.newPerDay }} · 待复习 {{ phraseDueCount }} · 已掌握 {{ phraseGraduatedCount }}
+        </p>
+        <div class="card-start-actions">
+          <el-button type="primary" size="large" round :icon="VideoPlay" @click="startPhraseMode(false)">开始背词组</el-button>
+          <el-button size="large" round type="warning" :disabled="phraseDueCount === 0" @click="startPhraseMode(true)">待复习 {{ phraseDueCount }} 条</el-button>
+        </div>
+        <el-link type="primary" style="margin-top: 16px" @click="showPhraseList = true">查看完整词组表</el-link>
+      </div>
+
+      <!-- 词组卡片训练 -->
+      <template v-else>
+        <div class="flashcard-progress">
+          <span class="flashcard-pos">已学 {{ phraseReviewedCount }} · 剩余 {{ phraseQueue.length }} · 已掌握 {{ phraseGraduatedCount }}</span>
+          <div class="flashcard-bar"><div class="flashcard-fill" :style="{ width: phrasePercent + '%' }"></div></div>
+          <button class="flashcard-exit" @click="exitPhraseMode" title="退出">✕</button>
+        </div>
+
+        <template v-if="phraseQueue.length">
+          <div class="flashcard" :class="{ flipped: phraseFlipped }" @click="phraseFlipped = !phraseFlipped">
+            <div class="flashcard-inner">
+              <div class="flashcard-front">
+                <div class="fc-word-row">
+                  <span class="fc-word">{{ currentPhrase!.en }}</span>
+                  <button class="speak-btn fc-speak" @click.stop="speakPhrase(currentPhrase!.en)" title="朗读">🔊</button>
+                </div>
+                <div class="fc-hint">点击翻转查看释义 / 翻译</div>
+              </div>
+              <div class="flashcard-back">
+                <div class="fc-def">{{ currentPhrase!.zh || '（暂无中文释义）' }}</div>
+                <div class="fc-def" v-if="currentPhrase!.extra" style="font-size: 13px; color: var(--text-muted);">
+                  {{ currentPhrase!.category === 'irregular' ? '过去式 / 过去分词：' : currentPhrase!.category === 'affix' ? '例词：' : '' }}{{ currentPhrase!.extra }}
+                </div>
+                <div class="fc-example" v-if="phraseTranslations[currentPhrase!.en]">📝 {{ phraseTranslations[currentPhrase!.en] }}</div>
+                <button class="trans-btn" @click.stop="translatePhrase(currentPhrase!)" :disabled="phraseTranslating[currentPhrase!.en]">
+                  {{ phraseTranslations[currentPhrase!.en] ? '已翻译' : '翻译' }}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="flashcard-ops">
+            <div class="fc-actions">
+              <el-button size="small" type="danger" @click="gradePhrase('again')">忘记</el-button>
+              <el-button size="small" type="primary" @click="gradePhrase('good')">认识</el-button>
+              <el-button size="small" type="success" @click="gradePhrase('easy')">简单</el-button>
+              <el-button size="small" @click="skipPhrase">跳过 →</el-button>
+            </div>
+          </div>
+        </template>
+
+        <el-result v-else icon="success" title="本轮词组已学完" :sub-title="`今日已学 ${phraseReviewedCount} 条`">
+          <template #extra>
+            <el-button type="primary" @click="startPhraseMode(false)">再来一轮</el-button>
+            <el-button @click="exitPhraseMode">返回</el-button>
+          </template>
+        </el-result>
+      </template>
+
+      <!-- 词组表（未开始学习时可通过「查看完整词组表」展开） -->
+      <div v-if="showPhraseList && !phraseStarted" class="phrase-list">
         <div v-for="p in filteredPhrases" :key="p.id" class="phrase-item" :class="p.category">
           <div class="phrase-top">
             <span class="phrase-en">{{ p.en }}<span v-if="p.productive" class="star">*</span></span>
@@ -351,7 +421,7 @@
           </div>
         </div>
       </div>
-      <el-empty v-else description="没有匹配的词组 / 语句，换个关键词试试" />
+      <el-empty v-if="!filteredPhrases.length && !phraseStarted" description="没有匹配的词组 / 语句，换个关键词试试" />
     </section>
 
     <!-- 题型训练 -->
@@ -683,11 +753,12 @@ import type { DegreeSettings, WordProgress, MistakeRec, FavoriteRec, PracticeRec
 import * as svc from '../prep/degreeService'
 import { ensureContentSeeded } from '../prep/degreeDb'
 import {
-  buildReviewQueue,
+  buildReviewQueue as buildDegreeReviewQueue,
   reviewWord,
   todayStr,
   type SrsGrade
 } from '../prep/degreeSrs'
+import { buildReviewQueue as buildGenericReviewQueue } from '../prep/trainingSrs'
 
 // 资料库：三本 PDF 正文切分后的可读文章（确保内容不遗漏）
 const allArticles: DegreeArticle[] = [...syllabusProse, ...guideArticles]
@@ -1022,6 +1093,77 @@ const filteredPhrases = computed(() => {
   return list.slice(0, 300)
 })
 
+// ===== 词组/语句 卡片训练（与背单词卡一致：语音+翻译+逐个背+待复习） =====
+const phraseStarted = ref(false)
+const phraseQueue = ref<DegreePhrase[]>([])
+const phraseReviewedCount = ref(0)
+const phraseFlipped = ref(false)
+const phraseTranslations = ref<Record<string, string>>({})
+const phraseTranslating = ref<Record<string, boolean>>({})
+const showPhraseList = ref(false)
+
+const phraseDueCount = computed(() => {
+  const today = todayStr()
+  let due = 0
+  for (const p of filteredPhrases.value) {
+    const prog = wordProgress.value[p.en]
+    if (!prog) continue
+    if (prog.status !== 'graduated' && (prog.due ?? today) <= today) due++
+  }
+  const fresh = filteredPhrases.value.filter((p) => !wordProgress.value[p.en]).length
+  return due + Math.min(fresh, settings.value.newPerDay || 15)
+})
+const currentPhrase = computed(() => phraseQueue.value[0] ?? null)
+const phrasePercent = computed(() => {
+  const total = phraseQueue.value.length + phraseReviewedCount.value
+  if (!total) return 0
+  return Math.round((phraseReviewedCount.value / total) * 100)
+})
+
+function buildPhraseQueue(dueOnly = false) {
+  const phraseItems = filteredPhrases.value.map((p) => ({ ...p, word: p.en }))
+  phraseQueue.value = buildGenericReviewQueue(phraseItems, wordProgress.value, {
+    newPerDay: settings.value.newPerDay || 15,
+    dueOnly
+  })
+  phraseReviewedCount.value = 0
+}
+function startPhraseMode(dueOnly = false) {
+  buildPhraseQueue(dueOnly)
+  phraseStarted.value = true
+  phraseFlipped.value = false
+}
+function exitPhraseMode() {
+  phraseStarted.value = false
+  phraseFlipped.value = false
+}
+async function gradePhrase(g: SrsGrade) {
+  const p = currentPhrase.value
+  if (!p) return
+  const prev = wordProgress.value[p.en]
+  const next = reviewWord(prev, g)
+  wordProgress.value = { ...wordProgress.value, [p.en]: next }
+  await svc.saveWordProgress(p.en, next)
+  phraseReviewedCount.value++
+  if (g === 'again') phraseQueue.value.push(p)
+  phraseQueue.value.shift()
+  phraseFlipped.value = false
+}
+function skipPhrase() {
+  const p = currentPhrase.value
+  if (!p) return
+  phraseQueue.value.shift()
+  phraseFlipped.value = false
+}
+function speakPhrase(text: string) { speak(text) }
+async function translatePhrase(p: DegreePhrase) {
+  if (phraseTranslations.value[p.en] || phraseTranslating.value[p.en]) return
+  phraseTranslating.value = { ...phraseTranslating.value, [p.en]: true }
+  phraseTranslations.value = { ...phraseTranslations.value, [p.en]: await translateText(p.en) }
+  phraseTranslating.value = { ...phraseTranslating.value, [p.en]: false }
+}
+
+const phraseGraduatedCount = computed(() => filteredPhrases.value.filter((p) => wordProgress.value[p.en]?.status === 'graduated').length)
 const graduatedCount = computed(() => Object.values(wordProgress.value).filter((p) => p.status === 'graduated').length)
 const reviewCount = computed(() => Object.values(wordProgress.value).filter((p) => p.status === 'learning' || p.weak).length)
 const masteryPercent = computed(() => {
@@ -1231,15 +1373,24 @@ const cardPercent = computed(() => {
   return Math.round((cardReviewedCount.value / total) * 100)
 })
 
-function buildCardQueue() {
-  cardQueue.value = buildReviewQueue(filteredWords.value, wordProgress.value, {
-    newPerDay: settings.value.newPerDay || 15
+function buildCardQueue(dueOnly = false) {
+  cardQueue.value = buildDegreeReviewQueue(filteredWords.value, wordProgress.value, {
+    newPerDay: settings.value.newPerDay || 15,
+    dueOnly
   })
   cardReviewedCount.value = 0
 }
 
 function startCardMode() {
-  buildCardQueue()
+  buildCardQueue(false)
+  cardStarted.value = true
+  cardFlipped.value = false
+  const w = currentCardWord.value
+  if (w && !examples.value[w.word]) loadExample(w.word)
+}
+
+function startCardReviewMode() {
+  buildCardQueue(true)
   cardStarted.value = true
   cardFlipped.value = false
   const w = currentCardWord.value
@@ -2074,6 +2225,7 @@ onBeforeUnmount(() => {
   text-align: center;
 }
 .card-start-icon { font-size: 56px; margin-bottom: 16px; }
+.card-start-actions { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
 
 .flashcard-progress {
   display: flex;
