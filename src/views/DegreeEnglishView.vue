@@ -108,7 +108,7 @@
             <div class="card-title">今日学习计划</div>
             <ul class="plan-list">
               <li>新学单词 <b>{{ settings.newPerDay }}</b> 个</li>
-              <li>复习待巩固词 <b>{{ reviewCount }}</b> 个</li>
+              <li>今日待复习 <b>{{ reviewCount }}</b> 个</li>
               <li>题型训练：<b>{{ EXAM_SECTIONS.find((s) => s.key === trainingType)?.name || '词汇和语法' }}</b></li>
               <li v-if="settings.examDate">距考试还有 <b>{{ daysToExam }}</b> 天</li>
             </ul>
@@ -249,7 +249,7 @@
         <div class="card-start-icon">📚</div>
         <h3 style="margin: 0 0 8px">学位英语背单词</h3>
         <p style="color: var(--text-muted); margin: 0 0 16px; font-size: 13.5px">
-          共 <b>{{ filteredWords.length }}</b> 词 · 今日新学 {{ cardNewToday }} · 待复习 {{ cardDueCount }} · 已掌握 {{ graduatedCount }}
+          共 <b>{{ degreeWords.length }}</b> 词 · 今日新学 {{ cardNewToday }} · 待复习 {{ cardDueCount }} · 已掌握 {{ graduatedCount }}
         </p>
         <div class="card-start-actions">
           <el-button type="primary" size="large" round :icon="VideoPlay" @click="startCardMode">
@@ -350,7 +350,7 @@
         <div class="card-start-icon">🗣️</div>
         <h3 style="margin: 0 0 8px">词组 / 语句 逐个背</h3>
         <p style="color: var(--text-muted); margin: 0 0 16px; font-size: 13.5px">
-          共 <b>{{ filteredPhrases.length }}</b> 条 · 今日新学 {{ phraseNewToday }} · 待复习 {{ phraseDueCount }} · 已掌握 {{ phraseGraduatedCount }}
+          共 <b>{{ allDegreePhrases.length }}</b> 条 · 今日新学 {{ phraseNewToday }} · 待复习 {{ phraseDueCount }} · 已掌握 {{ phraseGraduatedCount }}
         </p>
         <div class="card-start-actions">
           <el-button type="primary" size="large" round :icon="VideoPlay" @click="startPhraseMode(false)">开始背词组</el-button>
@@ -631,7 +631,7 @@
         </div>
         <div class="mine-stat-card">
           <div class="mine-stat-num blue">{{ reviewCount }}</div>
-          <div class="mine-stat-label">待巩固</div>
+          <div class="mine-stat-label">待复习</div>
         </div>
         <div class="mine-stat-card">
           <div class="mine-stat-num green">{{ degreeWords.length }}</div>
@@ -1102,15 +1102,16 @@ const phraseTranslations = ref<Record<string, string>>({})
 const phraseTranslating = ref<Record<string, boolean>>({})
 const showPhraseList = ref(false)
 
+// 词组进度统一使用 'ph:' 前缀 key，与单词（裸英文 key）隔离，避免同名词/词组互相覆盖（C2 修复）
 const phraseNewToday = computed(() => {
-  const fresh = filteredPhrases.value.filter((p) => !wordProgress.value[p.en]).length
+  const fresh = allDegreePhrases.filter((p) => !wordProgress.value['ph:' + p.en]).length
   return Math.min(fresh, settings.value.newPerDay || 15)
 })
 const phraseDueCount = computed(() => {
   const today = todayStr()
   let due = 0
-  for (const p of filteredPhrases.value) {
-    const prog = wordProgress.value[p.en]
+  for (const p of allDegreePhrases) {
+    const prog = wordProgress.value['ph:' + p.en]
     if (!prog) continue
     if (prog.status !== 'graduated' && (prog.due ?? today) <= today) due++
   }
@@ -1124,7 +1125,7 @@ const phrasePercent = computed(() => {
 })
 
 function buildPhraseQueue(dueOnly = false) {
-  const phraseItems = filteredPhrases.value.map((p) => ({ ...p, word: p.en }))
+  const phraseItems = allDegreePhrases.map((p) => ({ ...p, word: 'ph:' + p.en }))
   phraseQueue.value = buildGenericReviewQueue(phraseItems, wordProgress.value, {
     newPerDay: settings.value.newPerDay || 15,
     dueOnly
@@ -1143,10 +1144,11 @@ function exitPhraseMode() {
 async function gradePhrase(g: SrsGrade) {
   const p = currentPhrase.value
   if (!p) return
-  const prev = wordProgress.value[p.en]
+  const key = 'ph:' + p.en
+  const prev = wordProgress.value[key]
   const next = reviewWord(prev, g)
-  wordProgress.value = { ...wordProgress.value, [p.en]: next }
-  await svc.saveWordProgress(p.en, next)
+  wordProgress.value = { ...wordProgress.value, [key]: next }
+  await svc.saveWordProgress(key, next)
   phraseReviewedCount.value++
   if (g === 'again') phraseQueue.value.push(p)
   phraseQueue.value.shift()
@@ -1166,9 +1168,11 @@ async function translatePhrase(p: DegreePhrase) {
   phraseTranslating.value = { ...phraseTranslating.value, [p.en]: false }
 }
 
-const phraseGraduatedCount = computed(() => filteredPhrases.value.filter((p) => wordProgress.value[p.en]?.status === 'graduated').length)
-const graduatedCount = computed(() => Object.values(wordProgress.value).filter((p) => p.status === 'graduated').length)
-const reviewCount = computed(() => Object.values(wordProgress.value).filter((p) => p.status === 'learning' || p.weak).length)
+const phraseGraduatedCount = computed(() => allDegreePhrases.filter((p) => wordProgress.value['ph:' + p.en]?.status === 'graduated').length)
+// 已掌握单词：只统计裸英文 key（单词），排除 'ph:' 前缀的词组进度，口径与分母 degreeWords 对齐（A2 修复）
+const graduatedCount = computed(() => Object.entries(wordProgress.value).filter(([k, p]) => !k.startsWith('ph:') && p.status === 'graduated').length)
+// 待复习（今日到期）：单词 + 词组 的到期数合计，与今日页「今日待复习」口径一致（B2 修复）
+const reviewCount = computed(() => cardDueCount.value + phraseDueCount.value)
 const masteryPercent = computed(() => {
   const total = degreeWords.length || VOCAB_REQUIREMENT.receptive
   return Math.round((graduatedCount.value / total) * 100)
@@ -1357,14 +1361,15 @@ const cardQueue = ref<(typeof degreeWords)[number][]>([])
 const cardReviewedCount = ref(0)
 const cardFlipped = ref(false)
 const isMobileDevice = ref(typeof window !== 'undefined' && window.innerWidth <= 768)
+// 注意：卡片统计与训练队列统一基于「全量词库」，不随词书筛选器变化（B1 修复：避免切 tab 后统计漂移）
 const cardNewToday = computed(() => {
-  const fresh = filteredWords.value.filter((w) => !wordProgress.value[w.word]).length
+  const fresh = degreeWords.filter((w) => !wordProgress.value[w.word]).length
   return Math.min(fresh, settings.value.newPerDay || 15)
 })
 const cardDueCount = computed(() => {
   const today = todayStr()
   let due = 0
-  for (const w of filteredWords.value) {
+  for (const w of degreeWords) {
     const p = wordProgress.value[w.word]
     if (!p) continue
     if (p.status !== 'graduated' && (p.due ?? today) <= today) due++
@@ -1380,7 +1385,7 @@ const cardPercent = computed(() => {
 })
 
 function buildCardQueue(dueOnly = false) {
-  cardQueue.value = buildDegreeReviewQueue(filteredWords.value, wordProgress.value, {
+  cardQueue.value = buildDegreeReviewQueue(degreeWords, wordProgress.value, {
     newPerDay: settings.value.newPerDay || 15,
     dueOnly
   })

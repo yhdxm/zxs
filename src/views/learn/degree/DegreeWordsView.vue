@@ -10,6 +10,7 @@
       </el-radio-group>
       <div class="dw-stats" v-if="mode === 'review'">
         <span>待复习 <b>{{ stats.due }}</b></span>
+        <span>今日新词 <b>{{ stats.newToday }}</b></span>
         <span>学习中 <b>{{ stats.learning }}</b></span>
         <span>已掌握 <b>{{ stats.graduated }}</b></span>
         <span v-if="stats.weak">薄弱 <b>{{ stats.weak }}</b></span>

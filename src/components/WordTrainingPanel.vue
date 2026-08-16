@@ -260,7 +260,7 @@ function wordToTrain(w: DegreeWord): TrainItem {
 }
 function phraseToTrain(p: DegreePhrase): TrainItem {
   return {
-    word: p.en,
+    word: 'ph:' + p.en,
     definition: p.zh || p.extra || '（口语/词缀，无固定中文释义）',
     phonetic: '',
     kind: 'phrase',
@@ -308,18 +308,10 @@ async function loadProgress(): Promise<void> {
   loadingProgress.value = false
 }
 
-function rebuildQueue(forceNew = false) {
+function rebuildQueue(_forceNew = false) {
   if (innerMode.value === 'translate') return
-  if (forceNew) {
-    // 再来一轮：把未毕业词的 due 重置到今天，让本轮能继续
-    const today = todayStr()
-    for (const w of items.value) {
-      const p = progress.value[w.word]
-      if (p && p.status !== 'graduated' && p.due && p.due > today) {
-        p.due = today
-      }
-    }
-  }
+  // 干净重建：直接基于当前已落库进度重新排队列（不再伪造 due 到今天）。
+  // 本轮已评分的词已通过 saveProgress 落库，rebuild 后会正确按最新 due 重新入队。
   queue.value = buildReviewQueue(items.value, progress.value as Record<string, WordProgress>, {
     newPerDay: newPerDay.value,
     dueOnly: props.reviewOnly
