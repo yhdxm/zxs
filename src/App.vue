@@ -377,7 +377,6 @@ const toggleGroup = (key: string) => {
 const isMenuActive = (key: string) => {
   if (key === 'learn-english') return route.path.startsWith('/degree') || route.path === '/learn/english'
   if (key === 'degree-legacy') return route.path === '/learn/english' || route.path.startsWith('/degree')
-  if (key.startsWith('degree-') && key !== 'degree-legacy') return route.path === '/degree/' + key.slice('degree-'.length)
   if (key === 'welcome') return route.path === '/welcome'
   if (key === 'database') return route.path === '/database'
   if (key === 'lianzhicang') return route.path === '/ai' || route.path === '/models' || route.path === '/aimodels'

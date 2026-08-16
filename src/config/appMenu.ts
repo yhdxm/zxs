@@ -23,10 +23,7 @@ import {
   User,
   Cpu,
   ChatLineSquare,
-  Notebook,
-  Odometer,
-  VideoPlay,
-  Medal
+  Notebook
 } from '@element-plus/icons-vue'
 
 export interface SideItem {

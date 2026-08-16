@@ -10,19 +10,7 @@
 -- 执行位置：Supabase Dashboard → SQL Editor → New query → 粘贴 → Run
 -- ============================================================
 
--- ---------- 1. 资料元数据（三本 PDF / 题库版本等） ----------
-create table if not exists public.degree_materials (
-  id          text        primary key,
-  title       text        not null,
-  author      text,
-  kind        text        not null default 'pdf',   -- pdf | bank
-  pages       int,
-  file_path   text,                                  -- public/pdfs/degree/xxx.pdf
-  remark      text,
-  created_at  timestamptz not null default now()
-);
-
--- ---------- 2. 用户设置（目标院校 / 考试日 / 每日新词 / 连续天数） ----------
+-- ---------- 1. 用户设置（目标院校 / 考试日 / 每日新词 / 连续天数） ----------
 create table if not exists public.degree_settings (
   user_id       text        primary key,
   target_school text,                                 -- 目标院校，如 商丘师范学院继续教育学院
@@ -33,7 +21,7 @@ create table if not exists public.degree_settings (
   updated_at    timestamptz not null default now()
 );
 
--- ---------- 3. 单词进度（按 user_id 隔离，艾宾浩斯复习） ----------
+-- ---------- 2. 单词进度（按 user_id 隔离，艾宾浩斯复习） ----------
 create table if not exists public.degree_word_progress (
   user_id      text        not null,
   word         text        not null,
@@ -153,19 +141,6 @@ create table if not exists public.degree_exam_records (
 );
 create index if not exists degree_exam_records_user_idx on public.degree_exam_records (user_id, created_at);
 
--- ---------- 11. 学习计划（个人数据，按 user_id 隔离） ----------
-create table if not exists public.degree_study_plans (
-  id         text        primary key,
-  user_id    text        not null,
-  title      text        not null,
-  plan_type  text,                    -- daily | weekly | custom
-  content    jsonb,
-  done       boolean     not null default false,
-  due        date,
-  created_at timestamptz not null default now()
-);
-create index if not exists degree_study_plans_user_idx on public.degree_study_plans (user_id, due);
-
 -- ============================================================
 -- RLS（纯前端自建账号架构，与现有表一致）
 --   - 个人数据表（materials/settings/.../exam_records/study_plans）：
@@ -176,23 +151,21 @@ create index if not exists degree_study_plans_user_idx on public.degree_study_pl
 -- ============================================================
 
 -- 个人数据表：all + grant
-alter table public.degree_materials      enable row level security;
 alter table public.degree_settings       enable row level security;
 alter table public.degree_word_progress  enable row level security;
 alter table public.degree_practice       enable row level security;
 alter table public.degree_mistakes       enable row level security;
 alter table public.degree_favorites      enable row level security;
 alter table public.degree_exam_records   enable row level security;
-alter table public.degree_study_plans    enable row level security;
 
 do $$
 declare t text;
 begin
-  foreach t in array array[
-    'degree_materials','degree_settings','degree_word_progress',
-    'degree_practice','degree_mistakes','degree_favorites',
-    'degree_exam_records','degree_study_plans'
-  ]
+  foreach t in array     array[
+      'degree_settings','degree_word_progress',
+      'degree_practice','degree_mistakes','degree_favorites',
+      'degree_exam_records'
+    ]
   loop
     execute format('drop policy if exists %I on public.%I;', t || '_all', t);
     execute format(
@@ -202,14 +175,12 @@ begin
   end loop;
 end $$;
 
-grant select, insert, update, delete on public.degree_materials      to anon, authenticated;
 grant select, insert, update, delete on public.degree_settings       to anon, authenticated;
 grant select, insert, update, delete on public.degree_word_progress  to anon, authenticated;
 grant select, insert, update, delete on public.degree_practice       to anon, authenticated;
 grant select, insert, update, delete on public.degree_mistakes       to anon, authenticated;
 grant select, insert, update, delete on public.degree_favorites      to anon, authenticated;
 grant select, insert, update, delete on public.degree_exam_records   to anon, authenticated;
-grant select, insert, update, delete on public.degree_study_plans    to anon, authenticated;
 
 -- 内容数据表：select / insert / update（无 delete）
 alter table public.degree_words      enable row level security;

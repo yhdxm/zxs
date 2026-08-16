@@ -33,7 +33,7 @@
     <Transition name="le-fade" mode="out-in">
       <section :key="active" class="le-body">
         <!-- 查词收藏 -->
-        <div v-if="active === 'word'" class="le-card">
+        <div v-if="active === 'word' && wordSub === 'home'" class="le-card">
           <h3 class="le-h">查词 · 生词本</h3>
           <div class="le-row">
             <el-input v-model="word" placeholder="输入英文单词，如 vocabulary / sustainable" class="le-input" @keyup.enter="lookup" />
@@ -76,27 +76,37 @@
           <h3 class="le-h" style="margin-top:22px;">背单词卡训练</h3>
           <p class="le-sub">以生词本 + 三本 PDF 词表为数据来源，强化听写、拼写、跟读与翻译。</p>
           <div class="le-training-grid">
-            <button type="button" class="le-training-card" @click="goTraining('dictation')">
+            <button type="button" class="le-training-card" @click="wordSub = 'flash'">
+              <span class="le-training-icon">🎴</span>
+              <span class="le-training-name">闪卡</span>
+              <span class="le-training-desc">卡片式记忆</span>
+            </button>
+            <button type="button" class="le-training-card" @click="wordSub = 'dictation'">
               <span class="le-training-icon">🎧</span>
               <span class="le-training-name">听写</span>
               <span class="le-training-desc">听音频写单词</span>
             </button>
-            <button type="button" class="le-training-card" @click="goTraining('spelling')">
+            <button type="button" class="le-training-card" @click="wordSub = 'spelling'">
               <span class="le-training-icon">✏️</span>
               <span class="le-training-name">拼写</span>
               <span class="le-training-desc">看释义写单词</span>
             </button>
-            <button type="button" class="le-training-card" @click="goTraining('shadow')">
+            <button type="button" class="le-training-card" @click="wordSub = 'shadow'">
               <span class="le-training-icon">🎤</span>
               <span class="le-training-name">跟读</span>
               <span class="le-training-desc">听音跟读练习</span>
             </button>
-            <button type="button" class="le-training-card" @click="goTraining('translate')">
+            <button type="button" class="le-training-card" @click="wordSub = 'translate'">
               <span class="le-training-icon">📝</span>
               <span class="le-training-name">翻译</span>
               <span class="le-training-desc">英译汉句子训练</span>
             </button>
           </div>
+        </div>
+
+        <!-- 背单词卡训练面板（内嵌，不跳转） -->
+        <div v-else-if="active === 'word'" class="le-card">
+          <WordTrainingPanel :mode="(wordSub as any)" @close="wordSub = 'home'" />
         </div>
 
         <!-- 知识库：模块导航 + 逐讲精读 -->
@@ -350,6 +360,7 @@ import {
 import { loadMistakes } from '../prep/degreeService'
 import { buildWeaknessReport, WEAKNESS_MIN_SAMPLE } from '../prep/weakness'
 import type { MistakeRec } from '../prep/degreeTypes'
+import WordTrainingPanel from '../components/WordTrainingPanel.vue'
 
 const MODULES = [
   { key: 'word', label: '背单词卡', desc: '查词 · 生词本 · 听写/拼写/跟读/翻译', color: '#0891b2', icon: Reading },
@@ -359,6 +370,7 @@ const MODULES = [
   { key: 'weakness', label: '薄弱点分析', desc: '错题 · 练习 · 模考画像', color: '#534ab7', icon: Odometer }
 ]
 const active = ref('word')
+const wordSub = ref<'home' | 'flash' | 'dictation' | 'spelling' | 'shadow' | 'translate'>('home')
 const router = useRouter()
 
 const nowText = ref('')
@@ -416,10 +428,6 @@ async function addWord(): Promise<void> {
   ElMessage.success('已加入生词本')
 }
 async function removeWord(id: string): Promise<void> { await removeLearnBookmark(id); await loadWords() }
-
-function goTraining(mode: 'dictation' | 'spelling' | 'shadow' | 'translate'): void {
-  router.push({ path: '/degree/training', query: { mode } })
-}
 
 /* ================= 知识库 ================= */
 const outline = ENGLISH_OUTLINE

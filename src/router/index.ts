@@ -166,42 +166,12 @@ const router = createRouter({
       component: () => import('../views/CetPrepView.vue'),
       meta: { requirePermission: 'cet-prep' }
     },
-    {
-      path: '/learn/degree-english',
-      name: 'degree-english',
-      component: () => import('../views/DegreeEnglishView.vue'),
-      meta: { requirePermission: 'degree-legacy' }
-    },
     // ===== 学位英语备考台 2.0 模块（数据已落地数据库，见 scripts/degree-english-schema.sql） =====
-    {
-      path: '/degree/home',
-      name: 'degree-home',
-      component: () => import('../views/learn/degree/DegreePrepHome.vue'),
-      meta: { requirePermission: 'degree-home' }
-    },
-    {
-      path: '/degree/materials',
-      name: 'degree-materials',
-      component: () => import('../views/learn/degree/DegreeMaterialsView.vue'),
-      meta: { requirePermission: 'degree-materials' }
-    },
-    {
-      path: '/degree/reader',
-      name: 'degree-reader',
-      component: () => import('../views/learn/degree/DegreeReaderView.vue'),
-      meta: { requirePermission: 'degree-reader' }
-    },
     {
       path: '/degree/words',
       name: 'degree-words',
       component: () => import('../views/learn/degree/DegreeWordsView.vue'),
       meta: { requirePermission: 'degree-words' }
-    },
-    {
-      path: '/degree/training',
-      name: 'degree-training',
-      component: () => import('../views/learn/degree/DegreeTrainingView.vue'),
-      meta: { requirePermission: 'degree-training' }
     },
     {
       path: '/degree/practice',
@@ -214,12 +184,6 @@ const router = createRouter({
       name: 'degree-exam',
       component: () => import('../views/learn/degree/DegreeExamView.vue'),
       meta: { requirePermission: 'degree-exam' }
-    },
-    {
-      path: '/degree/mine',
-      name: 'degree-mine',
-      component: () => import('../views/learn/degree/DegreeMineView.vue'),
-      meta: { requirePermission: 'degree-mine' }
     },
     {
       path: '/degree/weakness',

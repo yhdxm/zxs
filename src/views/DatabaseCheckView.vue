@@ -228,7 +228,6 @@ const TABLE_DESC: Record<string, string> = {
   cet4_prep_mistakes: '四六级备考台·错题本表：题型/错因/正确思路与 1/3/7/15/30 天复习计划',
   cet4_prep_checkins: '四六级备考台·打卡表：按日期聚合的背词/刷题次数',
   cet4_prep_settings: '四六级备考台·设置表：每日新词数、考试日、手动连续天数、关联目标',
-  degree_materials: '学位英语备考台·资料表：三本 PDF（大纲/指南/模拟卷）元数据与站内路径',
   degree_settings: '学位英语备考台·设置表：目标院校、考试日、每日新词数、手动连续天数',
   degree_word_progress: '学位英语备考台·单词进度表：每用户每词的艾宾浩斯复习状态（status/level/due/weak）',
   degree_practice: '学位英语备考台·练习记录表：五大题型的做题数与正确数',
@@ -238,7 +237,6 @@ const TABLE_DESC: Record<string, string> = {
   degree_questions: '学位英语备考台·题库表：五大题型题目（题干/选项/答案/解析/来源溯源），首次运行 lazy-seed 注入',
   degree_phrases: '学位英语备考台·词组语句表：词组/口语表达/词缀/不规则动词（大纲附录二~八）',
   degree_exam_records: '学位英语备考台·模拟考试记录表：每套卷得分/用时/逐题作答，按 user_id 隔离',
-  degree_study_plans: '学位英语备考台·学习计划表：日/周/自定义计划的完成状态，按 user_id 隔离',
   push_subscriptions: '消息推送·订阅表：用户浏览器/设备推送订阅端点与公钥，按账号隔离',
   notifications: '消息推送·通知表：系统生成的站内通知与待推送消息（标题/正文/类型/已读状态）',
   push_reminder_log: '消息推送·发送日志表：每次提醒/推送的实际发送记录与结果，用于去重与排查'
@@ -268,10 +266,10 @@ const TABLE_GROUP: Record<string, string> = {
   learn_progress: 'learn', learn_bookmarks: 'learn', learn_reading: 'learn',
   third_party_apis: 'third', api_grants: 'third', api_usage_logs: 'third',
   feedbacks: 'feedback', feedback_replies: 'feedback',
-  degree_materials: 'degree', degree_settings: 'degree', degree_word_progress: 'degree',
+  degree_settings: 'degree', degree_word_progress: 'degree',
   degree_practice: 'degree', degree_mistakes: 'degree', degree_favorites: 'degree',
   degree_words: 'degree', degree_questions: 'degree', degree_phrases: 'degree',
-  degree_exam_records: 'degree', degree_study_plans: 'degree'
+  degree_exam_records: 'degree'
 }
 
 /** 业务域元信息：中文名 + 主题色（浅色主题下的柔和色，用于分组色条与标识） */

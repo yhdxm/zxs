@@ -522,7 +522,6 @@ export async function getDatabaseStats(): Promise<DatabaseStats> {
         'cet4_prep_mistakes',
         'cet4_prep_checkins',
         'cet4_prep_settings',
-        'degree_materials',
         'degree_settings',
         'degree_word_progress',
         'degree_practice',
@@ -531,8 +530,7 @@ export async function getDatabaseStats(): Promise<DatabaseStats> {
         'degree_words',
         'degree_questions',
         'degree_phrases',
-        'degree_exam_records',
-        'degree_study_plans'
+        'degree_exam_records'
       ]
       for (const name of tables) {
         try {
