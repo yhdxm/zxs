@@ -27,6 +27,10 @@ export interface EnglishLesson {
   examples?: EnglishExample[]
   /** 易错点 / 考点提醒 */
   traps?: string[]
+  /** 知识点标签，用于学习模块筛选 */
+  tags?: string[]
+  /** 预计学习时长（分钟） */
+  duration?: number
 }
 
 export interface EnglishOutlineItem {

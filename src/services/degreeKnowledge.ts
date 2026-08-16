@@ -33,7 +33,7 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
     "id": "dagang",
     "name": "《学位英语水平考试大纲》（第二版）",
     "pdf": "public/pdfs/degree/dagang.pdf",
-    "desc": "官方考试大纲：考试性质、要求、试卷结构、样卷、词汇表、词组表、常用表达等。",
+    "desc": "官方考试大纲，明确考试性质、要求、试卷结构、题型、分值与答题时间。",
     "chapters": [
       {
         "id": "dg-preface",
@@ -42,91 +42,20 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
           {
             "id": "sy000",
             "title": "考试大纲·正文",
-            "summary": "考试大纲·正文",
+            "summary": "官方考试大纲说明，包含考试性质、要求、试卷结构与评分标准。",
             "body": [
-              "成人高等教育本科生",
-              "学土学位",
-              "英语水平考试大纲",
-              "（非英语专业）",
-              "第二版",
-              "教育部学位与研究生教育发展中心",
-              "高等教育出版社",
-              "成人高等教育本科生学士学位英语水平考试大纲（非英语专业）第二版",
-              "成人高等教育本科生学士学位法语水平考试大纲（非法语专业）",
-              "成人高等教育本科生学士学位日语水平考试大纲（非日语专业）",
-              "成人高等教育本科生学士学位俄语水平考试大纲（非俄语专业）",
-              "成人高等教育本科生学士学位德语水平考试大纲（非德语专业）",
-              "7870 40114 6773 4l",
-              "蒸取增值服务",
-              "定价20.00元",
-              "成人高等教育本科生学士学位",
-              "英语水平",
-              "考试大纲",
-              "Chengren Gaodeng Jiaoyu Benkesheng Xueshi Xuewei",
-              "Yingyu Shuiping Kaoshi Dagang",
-              "(非英语专业)",
-              "第二版",
-              "教育部学位与研究生教育发展中心",
-              "高等教育出版社·北京",
-              "图书在版编目（CIP）数据",
-              "成人高等教育本科生学士学位英语水平考试大纲/",
-              "教育部学位与研究生教育发展中心组编.--2版.--北",
-              "京：高等教育出版社，2016.12（2024.1重印）",
-              "非英语专业",
-              "ISBN978-7-04-046773-4",
-              "I.①成I.①教Ⅲ.①英语水平考试一成人高",
-              "等教育-考试大纲IV.①H310.42-41",
-              "中国版本图书馆CIP数据核字（2016)第270978号",
-              "策划编辑王羽",
-              "责任编辑王羽",
-              "封面设计姜磊",
-              "版式设计童丹",
-              "责任校对陈旭颖",
-              "责任印制",
-              "田甜",
-              "出版发行",
-              "高等教育出版社",
-              "址http://www.hep.edu.cn",
-              "北京市西城区德外大街4号",
-              "http://www.hep.com.cn",
-              "邮政编码",
-              "100120",
-              "网上订购http：//www.hepmall.com.cn",
-              "北京市白帆印务有限公司",
-              "http://www.hepmall.com",
-              "880mmX1230mm32",
-              "http://www.hepmall.cn",
-              "7. 5",
-              "2013年5月第1版",
-              "200千字",
-              "2016年12月第2版",
-              "购书热线",
-              "010-58581118",
-              "2024年1月第34次印刷",
-              "咨询电话",
-              "400-810-0598",
-              "20.00元",
-              "本书如有缺页、倒页、脱页等质量问题，请到所购图书销售部门联系调换",
-              "版权所有",
-              "侵权必究",
-              "物料号",
-              "4677300",
-              "考试大纲·",
-              "考试样卷",
-              "样卷参考答案",
-              "词汇表",
-              "词组表",
-              "常用词缀表·",
-              "不规则动词表",
-              "常用缩略语表·",
-              "世界主要国家（或地区）、语言、形容词、",
-              "籍名或裔名表",
-              "常用地名·",
-              "常用口语表达用语",
+              "《成人学士学位英语水平考试大纲（非英语专业）》（第二版）是学位英语考试的官方指导性文件。",
+              "本大纲由教育部学位与研究生教育发展中心组编，高等教育出版社出版。",
+              "大纲规定了考试性质、考试要求、试卷结构、题型、题量、记分及答题时间。",
+              "考生应依据本大纲制定复习计划，重点掌握 4400 左右词汇及基本语法项目。"
+            ],
+            "tags": [
               "考试大纲"
-            ]
+            ],
+            "duration": 1
           }
-        ]
+        ],
+        "summary": "官方考试大纲说明，包含考试性质、要求、试卷结构与评分标准。"
       },
       {
         "id": "dg-nature",
@@ -135,15 +64,18 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
           {
             "id": "sy001",
             "title": "一、考试性质",
-            "summary": "一、考试性质",
+            "summary": "成人高等教育非英语专业学士学位英语水平考试是由各省级高等；教育主管部门组织的统一考试，其目的是为了客观地测试非英语专业",
             "body": [
               "成人高等教育非英语专业学士学位英语水平考试是由各省级高等",
               "教育主管部门组织的统一考试，其目的是为了客观地测试非英语专业",
               "成人本科毕业生申请学士学位者的英语语言知识和运用能力，考查其",
               "是否达到普通本科教育非英语专业英语教学的一般要求。"
-            ]
+            ],
+            "tags": [],
+            "duration": 1
           }
-        ]
+        ],
+        "summary": "成人高等教育非英语专业学士学位英语水平考试是由各省级高等；教育主管部门组织的统一考试，其目的是为了客观地测试非英语专业"
       },
       {
         "id": "dg-requirements",
@@ -152,7 +84,7 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
           {
             "id": "sy002",
             "title": "二、考试要求",
-            "summary": "二、考试要求",
+            "summary": "成人高等教育非英语专业学士学位英语水平考试要求考生能够较；用能力。考生在运用能力方面应分别达到以下要求：",
             "body": [
               "成人高等教育非英语专业学士学位英语水平考试要求考生能够较",
               "用能力。考生在运用能力方面应分别达到以下要求：",
@@ -201,9 +133,17 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
               "能够用英语撰写常见应用文，或能够按照所给提纲、情景或图表，",
               "说明或论述一般性的话题。所写短文要求主题明确，条理清楚，语言比",
               "较规范。"
-            ]
+            ],
+            "tags": [
+              "考试大纲",
+              "虚拟语气",
+              "时态",
+              "非谓语动词"
+            ],
+            "duration": 1
           }
-        ]
+        ],
+        "summary": "成人高等教育非英语专业学士学位英语水平考试要求考生能够较；用能力。考生在运用能力方面应分别达到以下要求："
       },
       {
         "id": "dg-structure",
@@ -212,7 +152,7 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
           {
             "id": "sy003",
             "title": "三、试卷结构",
-            "summary": "三、试卷结构",
+            "summary": "本考试试卷分试卷一和试卷二。试卷一为客观题，包括完成对话、；阅读理解及词汇和语法3个部分，考试时间为65分钟，满分为70分；",
             "body": [
               "本考试试卷分试卷一和试卷二。试卷一为客观题，包括完成对话、",
               "阅读理解及词汇和语法3个部分，考试时间为65分钟，满分为70分；",
@@ -245,9 +185,17 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
               "做提示，要求考生说明或论述一个一般性话题，文章长度不低于100个",
               "英文单词。",
               "本部分满分为15分，考试时间为30分钟。"
-            ]
+            ],
+            "tags": [
+              "完成对话",
+              "交际用语",
+              "阅读理解",
+              "词汇"
+            ],
+            "duration": 1
           }
-        ]
+        ],
+        "summary": "本考试试卷分试卷一和试卷二。试卷一为客观题，包括完成对话、；阅读理解及词汇和语法3个部分，考试时间为65分钟，满分为70分；"
       },
       {
         "id": "dg-format",
@@ -256,7 +204,7 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
           {
             "id": "sy004",
             "title": "四、试卷题型、题量、记分及答题时间",
-            "summary": "四、试卷题型、题量、记分及答题时间",
+            "summary": "成人高等教育非英语专业学士学位英语水平考试的题型、题量、记",
             "body": [
               "成人高等教育非英语专业学士学位英语水平考试的题型、题量、记",
               "分及答题时间如下：",
@@ -809,9 +757,17 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
               "Needless to say, working in an ideal work environment will",
               "benefit us a lot both physically and mentally. Only if we work in an",
               "environment as comfortable as possible can we enjoy a nice career."
-            ]
+            ],
+            "tags": [
+              "完成对话",
+              "交际用语",
+              "阅读理解",
+              "词汇"
+            ],
+            "duration": 13
           }
-        ]
+        ],
+        "summary": "成人高等教育非英语专业学士学位英语水平考试的题型、题量、记"
       }
     ]
   },
@@ -819,7 +775,7 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
     "id": "zhinan",
     "name": "《学位英语水平考试复习指南》（第二版）",
     "pdf": "public/pdfs/degree/zhinan.pdf",
-    "desc": "按题型逐章讲解：大纲要求、题型分析、备考须知、解题要领、专项练习及解析。",
+    "desc": "系统复习指南，覆盖完成对话、阅读理解、词汇语法、英译汉、短文写作五大题型。",
     "chapters": [
       {
         "id": "gd-preface",
@@ -828,7 +784,7 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
           {
             "id": "gu000",
             "title": "复习指南·正文",
-            "summary": "复习指南·正文",
+            "summary": "成人高等教育本科生学士学位；教育部学位与研究生教育发展中心组编",
             "body": [
               "成人高等教育本科生学士学位",
               "英语水平考试",
@@ -927,12 +883,19 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
               "考试介绍",
               "第二部分",
               "考试指南·"
-            ]
+            ],
+            "tags": [
+              "考试大纲",
+              "复习指南",
+              "考点",
+              "考点点睛"
+            ],
+            "duration": 1
           },
           {
             "id": "gu001",
             "title": "第五章",
-            "summary": "第五章",
+            "summary": "用于图表分析的表达方式·",
             "body": [
               "短文写作",
               "第三部分",
@@ -944,22 +907,28 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
               "常用口语表达用语",
               "用于图表分析的表达方式·",
               "第一部分考试介绍"
-            ]
+            ],
+            "tags": [
+              "写作"
+            ],
+            "duration": 1
           },
           {
             "id": "gu002",
             "title": "一、考试性质",
-            "summary": "一、考试性质",
+            "summary": "成人高等教育非英语专业学士学位英语水平考试是由各省级高等教育主管部门组织的统一；考试，其目的是为了客观地测试非英语专业成人本科毕业生申请学士学位者的英语语言知识和",
             "body": [
               "成人高等教育非英语专业学士学位英语水平考试是由各省级高等教育主管部门组织的统一",
               "考试，其目的是为了客观地测试非英语专业成人本科毕业生申请学士学位者的英语语言知识和",
               "运用能力，考查其是否达到普通本科教育非英语专业英语教学的一般要求。"
-            ]
+            ],
+            "tags": [],
+            "duration": 1
           },
           {
             "id": "gu003",
             "title": "二、考试要求",
-            "summary": "二、考试要求",
+            "summary": "成人高等教育非英语专业学士学位英语水平考试要求考生能够较熟练地掌握英语基本语法；和常用词汇，具有较强的阅读能力和综合运用能力。考生在运用能力方面应分别达到以下要求：",
             "body": [
               "成人高等教育非英语专业学士学位英语水平考试要求考生能够较熟练地掌握英语基本语法",
               "和常用词汇，具有较强的阅读能力和综合运用能力。考生在运用能力方面应分别达到以下要求：",
@@ -999,12 +968,19 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
               "顺，用词基本正确，无重大语法错误。英译汉的速度应达到每小时250词以上。",
               "（六）写作",
               "所写短文要求主题明确，条理清楚，语言比较规范。"
-            ]
+            ],
+            "tags": [
+              "考试大纲",
+              "英译汉",
+              "翻译",
+              "虚拟语气"
+            ],
+            "duration": 1
           },
           {
             "id": "gu004",
             "title": "三、试卷结构",
-            "summary": "三、试卷结构",
+            "summary": "成人学士学位考试分试卷一和试卷二。试卷一为客观题，包括完成对话、阅读理解及词汇和；语法3个部分，考试时间为65分钟，满分为70分；试卷二为英译汉和短文写作，考试时间为55",
             "body": [
               "成人学士学位考试分试卷一和试卷二。试卷一为客观题，包括完成对话、阅读理解及词汇和",
               "语法3个部分，考试时间为65分钟，满分为70分；试卷二为英译汉和短文写作，考试时间为55",
@@ -1031,12 +1007,19 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
               "本部分可要求考生写一篇常见的应用文，也可用提纲、情景或图表做提示，要求考生说明或",
               "论述一个一般性话题，文章长度不低于100个英文词。本部分满分为15分，考试时间为30",
               "分钟。"
-            ]
+            ],
+            "tags": [
+              "完成对话",
+              "交际用语",
+              "阅读理解",
+              "词汇"
+            ],
+            "duration": 1
           },
           {
             "id": "gu005",
             "title": "四、试卷题型、题量、记分及答题时间",
-            "summary": "四、试卷题型、题量、记分及答题时间",
+            "summary": "成人高等教育非英语专业学士学位英语水平考试的题型、题量、记分及答题时间如下：",
             "body": [
               "成人高等教育非英语专业学士学位英语水平考试的题型、题量、记分及答题时间如下：",
               "序号",
@@ -1056,12 +1039,19 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
               "2016年版新《大纲》与2013年版《大纲》相比，试卷难度略有降低，使该考试更加适合参加成",
               "人高等教育本科生学士学位英语水平考试的考生实际情况。",
               "本指南将按照新《大纲》的题型进行解析。"
-            ]
+            ],
+            "tags": [
+              "完成对话",
+              "交际用语",
+              "阅读理解",
+              "词汇"
+            ],
+            "duration": 1
           },
           {
             "id": "gu006",
             "title": "一、大纲要求和题型分析",
-            "summary": "一、大纲要求和题型分析",
+            "summary": "2016年版新《大纲》认为，成人高等教育非英语专业学士学位申请者应具有一定的英语口语；能力。这可以理解为，申请者能够听懂日常的英语会话，并能用英语进行一般性的交流。限于条",
             "body": [
               "2016年版新《大纲》认为，成人高等教育非英语专业学士学位申请者应具有一定的英语口语",
               "能力。这可以理解为，申请者能够听懂日常的英语会话，并能用英语进行一般性的交流。限于条",
@@ -1073,12 +1063,17 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
               "选一的选择题不同的是，本题所提供的选择项要求考生全部或部分填人不完整对话的空格。不",
               "分别填入对话中的空格，使之完整。第二段和第三段分别设3个空格，下面各有用来完成对话的",
               "4个选择项，要求考生选择其中的3个分别填入对话中的空格，使之完整。"
-            ]
+            ],
+            "tags": [
+              "完成对话",
+              "交际用语"
+            ],
+            "duration": 1
           },
           {
             "id": "gu007",
             "title": "二、备考须知和解题要领",
-            "summary": "二、备考须知和解题要领",
+            "summary": "考生备考与口语有关的测试，应着重提高自已对英语日常口语和会话的理解能力。英语口；语不同于书面语，有很多俗语和习惯用语，一般较少出现或甚至不出现在阅读材料中。因此考生",
             "body": [
               "考生备考与口语有关的测试，应着重提高自已对英语日常口语和会话的理解能力。英语口",
               "语不同于书面语，有很多俗语和习惯用语，一般较少出现或甚至不出现在阅读材料中。因此考生",
@@ -1097,24 +1092,28 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
               "格的正确性直接影响到后填空格的正确性，解题的关键是建立意义上的连贯。如上所述，第一段",
               "对话要求将选项全部填人。当前3个选项正确填人后，考生只需要观察第四个选项填入最后一",
               "个空格是否符合逻辑即可。第二段和第三段对话都设有一个干扰项，解题难度稍大。"
-            ]
+            ],
+            "tags": [],
+            "duration": 1
           },
           {
             "id": "gu008",
             "title": "三、常考会话类型",
-            "summary": "三、常考会话类型",
+            "summary": "学士学位英语水平考试测试的英语口语通常只涉及日常会话，一般会涵盖Eating（饮食）、；Housing（居住）、Work（工作）、Life（生活）、Health（健康）、Shopping（购物）、Money（金钱）、Fashion",
             "body": [
               "学士学位英语水平考试测试的英语口语通常只涉及日常会话，一般会涵盖Eating（饮食）、",
               "Housing（居住）、Work（工作）、Life（生活）、Health（健康）、Shopping（购物）、Money（金钱）、Fashion",
               "（时尚）、Traveling（旅行）、Vacation（度假）、Traffic（交通）、Emotions（情感）、Friendship（友谊）、",
               "Romance（浪漫恋情）、Weather（天气）、Time（时间）、LocationsandDirections（方位方向）等方面。",
               "会话中常用表达方式见附录一。"
-            ]
+            ],
+            "tags": [],
+            "duration": 1
           },
           {
             "id": "gu009",
             "title": "四、专项练习及解析",
-            "summary": "四、专项练习及解析",
+            "summary": "1. Manager: When are you gonna take your vacation?；Woman:1My husband and I haven't had a chance to have a vacation over the past three",
             "body": [
               "【练习一】",
               "1. Manager: When are you gonna take your vacation?",
@@ -1182,9 +1181,12 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
               "但意义显然与下文的问句Whathappened不合。再看其他3个选项，选项A意思不沾边，选项D",
               "是问句，也不合适，只有B最为合适，既承接上文又意联下文，因此空格5答案为B。再看空格",
               "6，选项C和D都不合意，唯有A可以引出下面Gary表示认可的Yeah，sheis，因此空格6的答案"
-            ]
+            ],
+            "tags": [],
+            "duration": 2
           }
-        ]
+        ],
+        "summary": "成人高等教育本科生学士学位；教育部学位与研究生教育发展中心组编 用于图表分析的表达方式·"
       },
       {
         "id": "gd-ch1",
@@ -1193,7 +1195,7 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
           {
             "id": "gu010",
             "title": "第一章完成对话",
-            "summary": "第一章完成对话",
+            "summary": "为A。空格7前的“Oh?!”表达了Gary的没想到，空格后的I'vetried，but.，.itdidn'twork像是对；某个问题的回答，只有选项D是问句，且与上下文吻合，因此空格7的答案是D。至此本题解答",
             "body": [
               "为A。空格7前的“Oh?!”表达了Gary的没想到，空格后的I'vetried，but.，.itdidn'twork像是对",
               "某个问题的回答，只有选项D是问句，且与上下文吻合，因此空格7的答案是D。至此本题解答",
@@ -1268,12 +1270,17 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
               "完全符合上下文意义。至此解题完毕。",
               "项中有1个问句，3个陈述句。空格5前面是个一般疑问句，这个空格的内容是Justine对Luthy",
               "问题的回答。选项中有A.No，that'sshocking，符合回答的要求，意义上也符合情景：车祸自然是"
-            ]
+            ],
+            "tags": [
+              "完成对话",
+              "交际用语"
+            ],
+            "duration": 1
           },
           {
             "id": "gu011",
             "title": "第一章完成对话",
-            "summary": "第一章完成对话",
+            "summary": "“令人震惊的”。空格6看起来是Luthy挑起的另一个话头，须看选项后确定内容。选项B.Oh，；whatarelief(“哦，正是大幸”）意义和语气都不对，可排除。选项C与下面的句子连不上。只有",
             "body": [
               "“令人震惊的”。空格6看起来是Luthy挑起的另一个话头，须看选项后确定内容。选项B.Oh，",
               "whatarelief(“哦，正是大幸”）意义和语气都不对，可排除。选项C与下面的句子连不上。只有",
@@ -1290,12 +1297,17 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
               "些什么？”的回答，联系Mary上面大谈她婚姻的幸福，这个回答只有选项A最合适，即刚才说过",
               "的“我真希望我们早点结婚”。这一回答与下文也完全吻合，因此选项A是答案。至此本题解答",
               "完毕。"
-            ]
+            ],
+            "tags": [
+              "完成对话",
+              "交际用语"
+            ],
+            "duration": 1
           },
           {
             "id": "gu012",
             "title": "一、大纲要求和题型分析",
-            "summary": "一、大纲要求和题型分析",
+            "summary": "阅读理解能力是英语知识和能力重要的方面之一，是各类英语考试必考的内容。；2016年版新《大纲》要求考生“能够读懂难度适中的一般性题材（经济、社会、政法、历史、科",
             "body": [
               "阅读理解能力是英语知识和能力重要的方面之一，是各类英语考试必考的内容。",
               "2016年版新《大纲》要求考生“能够读懂难度适中的一般性题材（经济、社会、政法、历史、科",
@@ -1303,12 +1315,16 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
               "个词”。",
               "本部分共设4篇短文，每篇短文后设5道题，共20题。考生需在理解文章的基础上从为每",
               "个问题提供的4个选项中选出最佳答案。本部分满分为40分，每题2分。考试时间为35分钟。"
-            ]
+            ],
+            "tags": [
+              "阅读理解"
+            ],
+            "duration": 1
           },
           {
             "id": "gu013",
             "title": "二、备考须知和解题要领",
-            "summary": "二、备考须知和解题要领",
+            "summary": "英语书面语题材和体裁多样，涵盖的领域广，所要求的知识面宽。通常一般性的英语水平考；试，因为针对的是普通而非某个专业的考生，所以阅读文章的题材和体裁必须具有普适性，即能",
             "body": [
               "英语书面语题材和体裁多样，涵盖的领域广，所要求的知识面宽。通常一般性的英语水平考",
               "试，因为针对的是普通而非某个专业的考生，所以阅读文章的题材和体裁必须具有普适性，即能",
@@ -1325,12 +1341,16 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
               "一般来说，解题的第一步是浏览文章，抓取大意。第二步是浏览文章下面的试题，从题目反",
               "观文章的内容和要旨，也为下一步细读时的取舍做好准备。第三步是带着问题细读文章，特别留",
               "意题目问及的细节。"
-            ]
+            ],
+            "tags": [
+              "阅读理解"
+            ],
+            "duration": 1
           },
           {
             "id": "gu014",
             "title": "三、常见阅读文章体裁和题材分析",
-            "summary": "三、常见阅读文章体裁和题材分析",
+            "summary": "2008年至2012年成人学士学位考试的阅读试题共40篇文章，其中说明文和论述文有38；篇，只有2篇是故事（记叙文）。即便是这两篇故事，也是通过讲故事引出寓意或道理，其目的仍",
             "body": [
               "2008年至2012年成人学士学位考试的阅读试题共40篇文章，其中说明文和论述文有38",
               "篇，只有2篇是故事（记叙文）。即便是这两篇故事，也是通过讲故事引出寓意或道理，其目的仍",
@@ -1339,9 +1359,12 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
               "就题材而言，因考生专业背景广泛，阅读文章的内容只能是宽泛的，专业性不是很强。上述",
               "40篇文章以一般考生熟悉的社会科学或称文科的内容为主，兼有科普内容。其中以围绕人的题",
               "材为最多，按数量多少，依次为人性、人生、教育、健康、情感和情绪、职业、生活，具体如抚养和扶"
-            ]
+            ],
+            "tags": [],
+            "duration": 1
           }
-        ]
+        ],
+        "summary": "为A。空格7前的“Oh?!”表达了Gary的没想到，空格后的I'vetried，but.，.itdidn'twork像是对；某个问题的回答，只有选项D是问句，且与上下文吻合，因此空格7的答案是D。至此本题解答 “令人震惊的”。空格6看起来是Luthy挑起的另一个话头，须看选项后确定内容。选项B.Oh，；whatarelief(“哦，正是大幸”）意义和语气都不对，可排除。选项C与下面的句子连不上。只有"
       },
       {
         "id": "gd-ch2",
@@ -1350,16 +1373,20 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
           {
             "id": "gu015",
             "title": "第二章阅读理解",
-            "summary": "第二章阅读理解",
+            "summary": "养、父子关系、尊老、慈善、灾难和友谊、性别和对挫折的反应、旅游和度假等。其他题材分别涵盖；技术进步、环保和动物、文化、民族、经济等。",
             "body": [
               "养、父子关系、尊老、慈善、灾难和友谊、性别和对挫折的反应、旅游和度假等。其他题材分别涵盖",
               "技术进步、环保和动物、文化、民族、经济等。"
-            ]
+            ],
+            "tags": [
+              "阅读理解"
+            ],
+            "duration": 1
           },
           {
             "id": "gu016",
             "title": "四、专项练习及解析",
-            "summary": "四、专项练习及解析",
+            "summary": "Passage One；The following is an African folktale:",
             "body": [
               "【练习一】",
               "Passage One",
@@ -1435,12 +1462,14 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
               "就是粮食。这也是整个故事的中心思想。",
               "Passage Two",
               "Each year over 6o0 million people travel internationally.Hundreds of millions more journey within"
-            ]
+            ],
+            "tags": [],
+            "duration": 2
           },
           {
             "id": "gu017",
             "title": "第二章阅读理解",
-            "summary": "第二章阅读理解",
+            "summary": "their home country, doing so for both work and pleasure. As a result, the tourist industryincluding；hotels, scenic spots, airlines, travel agencies, and other b",
             "body": [
               "their home country, doing so for both work and pleasure. As a result, the tourist industryincluding",
               "hotels, scenic spots, airlines, travel agencies, and other businesses-is described as “the world's",
@@ -1515,12 +1544,17 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
               "也就是说酒店的出现主要是为了满足日益增长的旅游者的需要，即答案A。",
               "20.答案：C",
               "解析：最后一段讲到Gladstone的话：“由于Cook先生发明的随团旅游，人们第一次能够方便"
-            ]
+            ],
+            "tags": [
+              "阅读理解",
+              "强调句"
+            ],
+            "duration": 2
           },
           {
             "id": "gu018",
             "title": "第二章阅读理解",
-            "summary": "第二章阅读理解",
+            "summary": "地到达外国，并对这些国家有了一定的了解，这使人们变得友好，而不是蔑视别人。”因此答案是；C：“随团旅游能够消除不同国家之间的误解。”",
             "body": [
               "地到达外国，并对这些国家有了一定的了解，这使人们变得友好，而不是蔑视别人。”因此答案是",
               "C：“随团旅游能够消除不同国家之间的误解。”",
@@ -1600,12 +1634,16 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
               "murdered someone not in self-defense or because he was reacting to anger or fear. He seemed to kill for",
               "no reason and with no emotion as if taking someone's life meant nothing.",
               "Cold can affect other parts of the body, the feet, for example. Heavy socks can warm your feet if"
-            ]
+            ],
+            "tags": [
+              "阅读理解"
+            ],
+            "duration": 2
           },
           {
             "id": "gu019",
             "title": "第二章阅读理解",
-            "summary": "第二章阅读理解",
+            "summary": "your feet are really cold. But there is an expression “\"to get cold feet\" that has nothing to do with cold；or your feet. The expression means being afraid to do",
             "body": [
               "your feet are really cold. But there is an expression “\"to get cold feet\" that has nothing to do with cold",
               "or your feet. The expression means being afraid to do something you have decided to do. For example,",
@@ -1684,12 +1722,16 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
               "Be the one to make a resolution to reduce the strain on Mother Nature and look good in the",
               "process. To make the earth a better place to live in and to know more about long-lasting and",
               "fashionable eco-friendly bags, please visit http://www.kariwala: com."
-            ]
+            ],
+            "tags": [
+              "阅读理解"
+            ],
+            "duration": 2
           },
           {
             "id": "gu020",
             "title": "第二章阅读理解",
-            "summary": "第二章阅读理解",
+            "summary": "11. The phrase“to come up with\"(Para.1)means\"；A. to replace",
             "body": [
               "11. The phrase“to come up with\"(Para.1)means\"",
               "A. to replace",
@@ -1767,12 +1809,16 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
               "A. studied the health conditions of the subjects",
               "B. conducted experimental human trials",
               "C. made long-term studies of human subjects"
-            ]
+            ],
+            "tags": [
+              "阅读理解"
+            ],
+            "duration": 2
           },
           {
             "id": "gu021",
             "title": "第二章阅读理解",
-            "summary": "第二章阅读理解",
+            "summary": "D.reviewed other researchersstudies；18.According to the studies on university students and Catholic nuns,who are more likely to live",
             "body": [
               "D.reviewed other researchersstudies",
               "18.According to the studies on university students and Catholic nuns,who are more likely to live",
@@ -1852,12 +1898,16 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
               "24. Which of the following can be learned from the passage?",
               "A. Smaller groups are better for a variety of reasons.",
               "B. A book club involves more than intellectual activities."
-            ]
+            ],
+            "tags": [
+              "阅读理解"
+            ],
+            "duration": 2
           },
           {
             "id": "gu022",
             "title": "第二章阅读理解",
-            "summary": "第二章阅读理解",
+            "summary": "C. Starting your own book club is better than joining an existing one.；D.A casual approach to starting a book club is risky.",
             "body": [
               "C. Starting your own book club is better than joining an existing one.",
               "D.A casual approach to starting a book club is risky.",
@@ -1933,12 +1983,16 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
               "A.maybe moreharmful to children",
               "B. are unnecessary in food production",
               "C. are less poisonous than pesticides"
-            ]
+            ],
+            "tags": [
+              "阅读理解"
+            ],
+            "duration": 2
           },
           {
             "id": "gu023",
             "title": "第二章阅读理解",
-            "summary": "第二章阅读理解",
+            "summary": "D. do not improve the flavour；30. Which of the following best describes the author's attitude towards the food we eat?",
             "body": [
               "D. do not improve the flavour",
               "30. Which of the following best describes the author's attitude towards the food we eat?",
@@ -1971,24 +2025,34 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
               "30.答案：D",
               "解析：从作者的描述中可以看出，作者对食品安全问题非常关注，并且对此表示担忧。文章",
               "最后一句代表了作者的态度：到底还有什么食物是安全的呢？"
-            ]
+            ],
+            "tags": [
+              "阅读理解",
+              "强调句"
+            ],
+            "duration": 1
           },
           {
             "id": "gu024",
             "title": "一、大纲要求和题型分析",
-            "summary": "一、大纲要求和题型分析",
+            "summary": "词汇和语法结合，构成了语言大厦的基本结构。考生英语的综合知识和能力是以词汇和语；法知识为基础的。两者的重要性不言而喻，几乎所有英语考试都把它们作为必考内容。",
             "body": [
               "词汇和语法结合，构成了语言大厦的基本结构。考生英语的综合知识和能力是以词汇和语",
               "法知识为基础的。两者的重要性不言而喻，几乎所有英语考试都把它们作为必考内容。",
               "本部分共设20道题，其中10题为词汇题，10题为语法题。每一题题干部分设有一个空白，",
               "要求考生在理解句意的基础上在4个选项中选择一个可填人空格的最佳答案。本部分满分为",
               "20分，每题1分。考试时间为20分钟。"
-            ]
+            ],
+            "tags": [
+              "词汇",
+              "语法"
+            ],
+            "duration": 1
           },
           {
             "id": "gu025",
             "title": "二、词汇备考须知和常见考点分析",
-            "summary": "二、词汇备考须知和常见考点分析",
+            "summary": "词汇和语法无法截然两分。考词汇的时候涉及用法，而用法很多与语法有关，如动词都在一；定的句型中使用，句型就是语法；再如短语动词及各种常用熟语都涉及小品词（即介副词），后者",
             "body": [
               "词汇和语法无法截然两分。考词汇的时候涉及用法，而用法很多与语法有关，如动词都在一",
               "定的句型中使用，句型就是语法；再如短语动词及各种常用熟语都涉及小品词（即介副词），后者",
@@ -2019,9 +2083,17 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
               "account for",
               "abandon(2次）",
               "adapt"
-            ]
+            ],
+            "tags": [
+              "词汇",
+              "语法",
+              "考点",
+              "考点点睛"
+            ],
+            "duration": 1
           }
-        ]
+        ],
+        "summary": "养、父子关系、尊老、慈善、灾难和友谊、性别和对挫折的反应、旅游和度假等。其他题材分别涵盖；技术进步、环保和动物、文化、民族、经济等。 Passage One；The following is an African folktale:"
       },
       {
         "id": "gd-ch3",
@@ -2030,7 +2102,7 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
           {
             "id": "gu026",
             "title": "第三章",
-            "summary": "第三章",
+            "summary": "词汇和语法<<<29",
             "body": [
               "词汇和语法<<<29",
               "adopt（2次）",
@@ -2184,12 +2256,17 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
               "take on",
               "occasions",
               "take up"
-            ]
+            ],
+            "tags": [
+              "词汇",
+              "语法"
+            ],
+            "duration": 1
           },
           {
             "id": "gu027",
             "title": "第三章",
-            "summary": "第三章",
+            "summary": "词汇和语法<<<31；percentage",
             "body": [
               "词汇和语法<<<31",
               "pain",
@@ -2336,12 +2413,19 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
               "应各占一半，但本书编者把原先作为语法题的现在确定为词汇题，因此词汇题的数目就大于一",
               "半了。",
               "在520个题目中，考查动词及其有关的短语和搭配的共135题次（包括单个动词61题次，动"
-            ]
+            ],
+            "tags": [
+              "词汇",
+              "语法",
+              "考点",
+              "考点点睛"
+            ],
+            "duration": 1
           },
           {
             "id": "gu028",
             "title": "第三章词汇和语法",
-            "summary": "第三章词汇和语法",
+            "summary": "词短语及搭配74题次），形容词56题次，名词54题次，副词11题次，介词短语和其他短语46题；次。以上词汇点被考到并非纯属偶然，考生有必要关注各个类别（不同词类和短语类）的比例，",
             "body": [
               "词短语及搭配74题次），形容词56题次，名词54题次，副词11题次，介词短语和其他短语46题",
               "次。以上词汇点被考到并非纯属偶然，考生有必要关注各个类别（不同词类和短语类）的比例，",
@@ -2452,12 +2536,19 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
               "A. worth",
               "B. value",
               "D. valuable"
-            ]
+            ],
+            "tags": [
+              "词汇",
+              "语法",
+              "时态",
+              "被动语态"
+            ],
+            "duration": 1
           },
           {
             "id": "gu029",
             "title": "第三章词汇和语法",
-            "summary": "第三章词汇和语法",
+            "summary": "（2010年11月）；It is worth",
             "body": [
               "（2010年11月）",
               "It is worth",
@@ -2512,12 +2603,19 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
               "报，而是某种承认，最好是可以度量的承认。”前半句的意思已足以让我们选出正确答案D。前3",
               "个选项几乎没有干扰性。",
               "36>>>第二部分考试指南"
-            ]
+            ],
+            "tags": [
+              "词汇",
+              "语法",
+              "被动语态",
+              "考点"
+            ],
+            "duration": 1
           },
           {
             "id": "gu030",
             "title": "三、语法备考须知和常见考点分析",
-            "summary": "三、语法备考须知和常见考点分析",
+            "summary": "如上所述，语言的词汇和语法无法截然两分。就学士学位考试而言，有的题目很难区分是考；了语法还是词汇。据编者统计，在2008年至2015年的16次考试的520道词汇和语法题中，约",
             "body": [
               "如上所述，语言的词汇和语法无法截然两分。就学士学位考试而言，有的题目很难区分是考",
               "了语法还是词汇。据编者统计，在2008年至2015年的16次考试的520道词汇和语法题中，约",
@@ -2569,12 +2667,19 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
               "值得考生注意的是，学士学位考试对as的用法情有独钟，涉及as用法的试题共16题次。",
               "真题中语法考查项目的比重值得考生备考时关注，以便有所侧重。下面我们按类型举一些",
               "例子并做解析。"
-            ]
+            ],
+            "tags": [
+              "词汇",
+              "语法",
+              "虚拟语气",
+              "定语从句"
+            ],
+            "duration": 1
           },
           {
             "id": "gu031",
             "title": "第三章词汇和语法",
-            "summary": "第三章词汇和语法",
+            "summary": "16次学士学位考试考过6次倒装句型，包括Onlywhen、Notuntil、Scarcelyhad、Nosooner；had、Littledid开头的句型，还不包括neither等引导的倒装结构。倒装句是各类英语考试必考的",
             "body": [
               "（一）句型",
               "倒装句",
@@ -2690,12 +2795,19 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
               "（2009年6月）",
               "过去完成时是各类英语考试常考的考点。考生须知道，当有必要报告或区分两件事情发生",
               "的先后顺序时，常用过去完成时，发生在先的事情用过去完成时haddone形式描述。如本题说"
-            ]
+            ],
+            "tags": [
+              "词汇",
+              "语法",
+              "时态",
+              "倒装"
+            ],
+            "duration": 1
           },
           {
             "id": "gu032",
             "title": "第三章词汇和语法",
-            "summary": "第三章词汇和语法",
+            "summary": "theythoughtwewerelate（“他们认为我们晚到了”），而事实上myhusbandandI\"已在火车站了”。；两件事情比较，后者先于前者，因此后者用过去完成时形式，B是答案。",
             "body": [
               "theythoughtwewerelate（“他们认为我们晚到了”），而事实上myhusbandandI\"已在火车站了”。",
               "两件事情比较，后者先于前者，因此后者用过去完成时形式，B是答案。",
@@ -2810,12 +2922,19 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
               "The demand made by the workers is that their salaries",
               "to cover the increased cost of",
               "living."
-            ]
+            ],
+            "tags": [
+              "词汇",
+              "语法",
+              "虚拟语气",
+              "时态"
+            ],
+            "duration": 1
           },
           {
             "id": "gu033",
             "title": "第三章词汇和语法",
-            "summary": "第三章词汇和语法",
+            "summary": "A. increased；B. be increased",
             "body": [
               "A. increased",
               "B. be increased",
@@ -2933,12 +3052,19 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
               "B. Until",
               "C. After",
               "D. While"
-            ]
+            ],
+            "tags": [
+              "词汇",
+              "语法",
+              "时态",
+              "被动语态"
+            ],
+            "duration": 1
           },
           {
             "id": "gu034",
             "title": "第三章词汇和语法",
-            "summary": "第三章词汇和语法",
+            "summary": "（2008年11月）；she always did well on her math tests, her parents were not surprised that she got",
             "body": [
               "（2008年11月）",
               "she always did well on her math tests, her parents were not surprised that she got",
@@ -3050,12 +3176,19 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
               "D. whenever",
               "（2011年6月）",
               "本句分号后的意思是：“她追求并几乎总是能得到她想要的一切。”本题whichever有一定干"
-            ]
+            ],
+            "tags": [
+              "词汇",
+              "语法",
+              "定语从句",
+              "考点"
+            ],
+            "duration": 1
           },
           {
             "id": "gu035",
             "title": "第三章词汇和语法",
-            "summary": "第三章词汇和语法",
+            "summary": "扰性，因为它的意义是“任何一个/种”，但在没有上下文的情况下，whatever是最佳选择。；what之外，名词从句还可由whoever、where、how等关系代词或关系副词引导。例如：",
             "body": [
               "扰性，因为它的意义是“任何一个/种”，但在没有上下文的情况下，whatever是最佳选择。",
               "what之外，名词从句还可由whoever、where、how等关系代词或关系副词引导。例如：",
@@ -3166,12 +3299,19 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
               "项A.what和B.that虽是关系代词，但不能加介词引导定语从句，可以排除。选项D.which有一",
               "定干扰性，但它仅仅指代前面的sofas，所构成的定语从句缺少介词来与前面的名词形成表地点",
               "的关联，因此也不对。答案只能选where。where具有双料性质，等价于onwhich，这才能够连接"
-            ]
+            ],
+            "tags": [
+              "词汇",
+              "语法",
+              "定语从句",
+              "被动语态"
+            ],
+            "duration": 1
           },
           {
             "id": "gu036",
             "title": "第三章词汇和语法",
-            "summary": "第三章词汇和语法",
+            "summary": "从句与其修饰的名词。全句的意思是：“这是一间可爱的房间，里面配备有大号椅子和沙发，那；种可以把脚搁上去的沙发。”",
             "body": [
               "从句与其修饰的名词。全句的意思是：“这是一间可爱的房间，里面配备有大号椅子和沙发，那",
               "种可以把脚搁上去的沙发。”",
@@ -3296,12 +3436,19 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
               "A. As",
               "D. When",
               "（2010年6月）"
-            ]
+            ],
+            "tags": [
+              "词汇",
+              "语法",
+              "定语从句",
+              "考点"
+            ],
+            "duration": 1
           },
           {
             "id": "gu037",
             "title": "第三章词汇和语法",
-            "summary": "第三章词汇和语法",
+            "summary": "情态动词意义丰富，用法复杂，各类英语考试都乐于用作考点。虚拟语气等语法现象涉及情；态动词，上面已有讨论。此外情态动词有一些特殊的用法，如用于推断。例如：",
             "body": [
               "（八）情态动词",
               "情态动词意义丰富，用法复杂，各类英语考试都乐于用作考点。虚拟语气等语法现象涉及情",
@@ -3367,12 +3514,19 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
               "等复数概念时，这些名词不用复数形式，如fourdozen、threethousand。但本题中的quarter要用复",
               "数形式，即选项A是答案。这是因为quarters在这里可看作是分词表达所需要的分母，因为",
               "quarter是“四分之一”的意思。根据上述分数表达规则，需要用复数形式表达复数概念。"
-            ]
+            ],
+            "tags": [
+              "词汇",
+              "语法",
+              "虚拟语气",
+              "考点"
+            ],
+            "duration": 1
           },
           {
             "id": "gu038",
             "title": "四、专项练习及解析",
-            "summary": "四、专项练习及解析",
+            "summary": "1. Flood-stricken villagers are rescued by a helicopter after the roads were；B. cut short",
             "body": [
               "【练习】",
               "1. Flood-stricken villagers are rescued by a helicopter after the roads were",
@@ -3454,12 +3608,14 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
               "D. on",
               "14.The way",
               "such research impacts on us may not be immediately obvious."
-            ]
+            ],
+            "tags": [],
+            "duration": 1
           },
           {
             "id": "gu039",
             "title": "第三章词汇和语法",
-            "summary": "第三章词汇和语法",
+            "summary": "A. in which；C. in that",
             "body": [
               "A. in which",
               "B. which",
@@ -3559,12 +3715,19 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
               "intheway表示“以这样的方式”。当way作为名词后带定语从句时，关系代词which须由in引",
               "导，因此本题的答案是A。全句的意思是：“这样的研究影响我们的方式也许不会马上显现。”以",
               "Theway为中心语的短语是句子的主语。"
-            ]
+            ],
+            "tags": [
+              "词汇",
+              "语法",
+              "定语从句",
+              "被动语态"
+            ],
+            "duration": 1
           },
           {
             "id": "gu040",
             "title": "第三章词汇和语法",
-            "summary": "第三章词汇和语法",
+            "summary": "解析：本题的考的是形容词作主语补足语。英语中有几个动词常用被动形式加补语来描述；主语的状况，如create、bear等。全句意思是：“这孩子生下来时身体很弱，但这不妨碍他在学校",
             "body": [
               "15.答案：A",
               "解析：本题的考的是形容词作主语补足语。英语中有几个动词常用被动形式加补语来描述",
@@ -3719,12 +3882,19 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
               "B. whatever",
               "A. however",
               "D. whenever"
-            ]
+            ],
+            "tags": [
+              "词汇",
+              "语法",
+              "虚拟语气",
+              "被动语态"
+            ],
+            "duration": 2
           },
           {
             "id": "gu041",
             "title": "第三章词汇和语法",
-            "summary": "第三章词汇和语法",
+            "summary": "解析：本题考的是beexposedto（“暴露于”）的用法。其余3个选项虽然也能搁人beV-edto；的结构，但意义不合题意。bedevotedto是指“贡献于/忠诚于”，bereduced to是指“降低/减少",
             "body": [
               "【答案及解析】",
               "1.答案：A",
@@ -3796,12 +3966,19 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
               "用被动形式是因为书的出版含被动的意义。",
               "16.答案：D",
               "语表述被说服的人，名词从句表达说服的内容。4个选项中，that起语法关联作用，没有意义，其"
-            ]
+            ],
+            "tags": [
+              "词汇",
+              "语法",
+              "虚拟语气",
+              "定语从句"
+            ],
+            "duration": 1
           },
           {
             "id": "gu042",
             "title": "第三章词汇和语法",
-            "summary": "第三章词汇和语法",
+            "summary": "余3个不仅起关联作用，还在从句中表达一定的意义。what可先行排除，因为从句中没有需要；它填充的主语或宾语位置。whether（“是否”）也可排除，因不符合“说服”的意义。how（“如",
             "body": [
               "余3个不仅起关联作用，还在从句中表达一定的意义。what可先行排除，因为从句中没有需要",
               "它填充的主语或宾语位置。whether（“是否”）也可排除，因不符合“说服”的意义。how（“如",
@@ -3822,12 +3999,19 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
               "解析：本题考查whatever引导的名词从句作直接宾语。选项A，however和D.whenever不能",
               "引导名词从句，可先行排除。选项C.whichever可以引导名词从句，但不符合题意。whichever是",
               "指若干事物中的任一件。句子并未说有很多东西可选，而只是泛泛地指“任何东西”。"
-            ]
+            ],
+            "tags": [
+              "词汇",
+              "语法",
+              "虚拟语气",
+              "考点"
+            ],
+            "duration": 1
           },
           {
             "id": "gu043",
             "title": "一、大纲要求和题型分析",
-            "summary": "一、大纲要求和题型分析",
+            "summary": "本部分要求考生“能够在不借助词典的情况下把一般难度、非专业性题材的英文句子或短；文译成汉语，译文通顺，用词基本正确，无重大语法错误。英译汉的速度应达到每小时250词以",
             "body": [
               "本部分要求考生“能够在不借助词典的情况下把一般难度、非专业性题材的英文句子或短",
               "文译成汉语，译文通顺，用词基本正确，无重大语法错误。英译汉的速度应达到每小时250词以",
@@ -3836,12 +4020,17 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
               "分钟。",
               "英译汉作为传统的英语测试题型，首次进人学士学位英语水平考试，是此次大纲修订的最大",
               "变化，符合注重综合运用能力的测试原则，也符合翻译需求增加的社会发展趋势。"
-            ]
+            ],
+            "tags": [
+              "英译汉",
+              "翻译"
+            ],
+            "duration": 1
           },
           {
             "id": "gu044",
             "title": "二、备考须知和解题要领",
-            "summary": "二、备考须知和解题要领",
+            "summary": "任何一种考试，从根本上说都是知识水平的考查和发挥。一个只有3000左右词汇量的考；生来考学士学位考试，任何所谓“策略”恐怕都不管用。只有刻苦钻研、提高水平才是正道。因",
             "body": [
               "任何一种考试，从根本上说都是知识水平的考查和发挥。一个只有3000左右词汇量的考",
               "生来考学士学位考试，任何所谓“策略”恐怕都不管用。只有刻苦钻研、提高水平才是正道。因",
@@ -3863,9 +4052,16 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
               "可能的意义。英语学习者绝不能靠记住这些词语的一个意义就包打天下。",
               "题型的备考。备考翻译，可在考前多做练习。一练精度，做到落笔即能得分，而不能提笔忘字，或",
               "者错别字连篇；二练速度，在保证正确、准确的前提下在规定时间内完成答题；三练清晰度，行文"
-            ]
+            ],
+            "tags": [
+              "阅读理解",
+              "英译汉",
+              "翻译"
+            ],
+            "duration": 1
           }
-        ]
+        ],
+        "summary": "词汇和语法<<<29 词汇和语法<<<31；percentage"
       },
       {
         "id": "gd-ch4",
@@ -3874,7 +4070,7 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
           {
             "id": "gu045",
             "title": "第四章英译汉",
-            "summary": "第四章英译汉",
+            "summary": "字迹清晰工整、不滚草、不涂改，保证卷面整洁美观。从各种英语考试的评卷情况看，主观题，包；括翻译题的得分往往不高，缺乏练习可能是部分原因。所以，加强翻译题的考前练习应该具有一",
             "body": [
               "字迹清晰工整、不滚草、不涂改，保证卷面整洁美观。从各种英语考试的评卷情况看，主观题，包",
               "括翻译题的得分往往不高，缺乏练习可能是部分原因。所以，加强翻译题的考前练习应该具有一",
@@ -3948,12 +4144,19 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
               "从城市及其文化底蕴转向了科技产品：洗衣机、集中供暖、自动炊具、电视机、电脑和定制的地毯",
               "等。现时的人类陶醉于政治民主，过着殷实的生活，开着自已的汽车，生活从未如此美好。”",
               "总之，翻译中的代词，应尽量避免照搬。"
-            ]
+            ],
+            "tags": [
+              "阅读理解",
+              "英译汉",
+              "翻译",
+              "强调句"
+            ],
+            "duration": 1
           },
           {
             "id": "gu046",
             "title": "第四章英译汉",
-            "summary": "第四章英译汉",
+            "summary": "再看句子结构的分析。在句子结构比较复杂的情况下，句法分析的过程不可忽略。考生要；关注3点：句子基本结构、“陷式”句型及句型的变化。",
             "body": [
               "再看句子结构的分析。在句子结构比较复杂的情况下，句法分析的过程不可忽略。考生要",
               "关注3点：句子基本结构、“陷式”句型及句型的变化。",
@@ -4030,12 +4233,19 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
               "(18)I ②was just walking out of the local library,having unsuccessfully sought employment",
               "there, when I saw a man walking across the road with the obvious intension of talking to me.",
               "本句将最先发生的动作通过现在分词的完成体放到了第一个动作和第三个动作中间，翻译"
-            ]
+            ],
+            "tags": [
+              "英译汉",
+              "翻译",
+              "定语从句",
+              "时态"
+            ],
+            "duration": 1
           },
           {
             "id": "gu047",
             "title": "第四章英译汉",
-            "summary": "第四章英译汉",
+            "summary": "时应采取“中间开花”的落笔方式，译成：；“我①去一家当地的图书馆找活干，无果而返，②刚刚走出图书馆，就③看到一个人穿过马",
             "body": [
               "时应采取“中间开花”的落笔方式，译成：",
               "“我①去一家当地的图书馆找活干，无果而返，②刚刚走出图书馆，就③看到一个人穿过马",
@@ -4112,12 +4322,18 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
               "莲·西梦思在一次出国长途飞行中所获得的“经常乘客优惠里程”的时候，她就找到了“经常乘",
               "客优惠里程”活动的负责人。“她要我把所有的材料都给她送去，西梦思回忆道，“我有她需要",
               "的一切材料，在审看了这些材料后，她就奖给了我应得的优惠里程。，”"
-            ]
+            ],
+            "tags": [
+              "阅读理解",
+              "英译汉",
+              "翻译"
+            ],
+            "duration": 1
           },
           {
             "id": "gu048",
             "title": "第四章英译汉",
-            "summary": "第四章英译汉",
+            "summary": "前辈的风趣论述：有时，““当…..·时候”非但多余，而且在中间夹了那样一长串文学后，两头远得；简直要害相思病。”殊不知该作者自已就犯了他批评的毛病。此外，将Ihad everythingshe needed",
             "body": [
               "前辈的风趣论述：有时，““当…..·时候”非但多余，而且在中间夹了那样一长串文学后，两头远得",
               "简直要害相思病。”殊不知该作者自已就犯了他批评的毛病。此外，将Ihad everythingshe needed",
@@ -4151,12 +4367,18 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
               "掉、或改用其他表达。",
               "总之，翻译表达的要求是尽量避免翻译腔，努力使译文句式符合中文规范，以使译文读起来",
               "上口、明晰、流畅。"
-            ]
+            ],
+            "tags": [
+              "英译汉",
+              "翻译",
+              "被动语态"
+            ],
+            "duration": 1
           },
           {
             "id": "gu049",
             "title": "三、常见英译汉题型和译法分析",
-            "summary": "三、常见英译汉题型和译法分析",
+            "summary": "学士学位英语考试英译汉试题分值占总分值的15%。新大纲规定了两种备选题型：“可以；66>>>第二部分考试指南",
             "body": [
               "学士学位英语考试英译汉试题分值占总分值的15%。新大纲规定了两种备选题型：“可以",
               "66>>>第二部分考试指南",
@@ -4197,12 +4419,17 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
               "primetime，有可能把那两个prime time理解成“人生的黄金时间”，例如“中年时期”，同时对",
               "perform in primetime的意义感到不解。即便勉强把句子译成中文，我们仍心存狐疑。",
               "回到句子所在的全文，仔细阅读后才发现，我们的理解有误，疑惑也顿时化解。原来文章讲"
-            ]
+            ],
+            "tags": [
+              "英译汉",
+              "翻译"
+            ],
+            "duration": 2
           },
           {
             "id": "gu050",
             "title": "第四章英译汉",
-            "summary": "第四章英译汉",
+            "summary": "的primetime是它的本意“晚间的黄金时段”，文章的主题是规劝人们不要把晚间的黄金时间浪；费在观看电视上，而应利用这段时间做更有价值的事情。这时我们才恍然大悟，原来刚才句子中",
             "body": [
               "的primetime是它的本意“晚间的黄金时段”，文章的主题是规劝人们不要把晚间的黄金时间浪",
               "费在观看电视上，而应利用这段时间做更有价值的事情。这时我们才恍然大悟，原来刚才句子中",
@@ -4279,12 +4506,18 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
               "[4］我们的广泛文化，像我们的社会等级一样，已成为我们整个生活的一个部分，因而我们",
               "往往意识不到它的影响。「5］但是，一且我们体验到一种外来文化，我们不自觉地接受这种文化",
               "就会变成一种自觉的认识。[6」这样，我们就能够开始理解以上所提到的各种文化的异同。"
-            ]
+            ],
+            "tags": [
+              "英译汉",
+              "翻译",
+              "定语从句"
+            ],
+            "duration": 1
           },
           {
             "id": "gu051",
             "title": "第四章英译汉",
-            "summary": "第四章英译汉",
+            "summary": "[7］忽略那些细微而重要的文化差异可能在国际市场上引起严重的误解。”；乍看起来，这个译文没有太大问题，但深人阅读即可发现，译文在标注下画线的几处理解和",
             "body": [
               "[7］忽略那些细微而重要的文化差异可能在国际市场上引起严重的误解。”",
               "乍看起来，这个译文没有太大问题，但深人阅读即可发现，译文在标注下画线的几处理解和",
@@ -4312,12 +4545,17 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
               "[6］“这时，我们即开始理解上面所说的各种文化异同。”",
               "[7]】“无视这些微妙却重要的文化差异可能在国际上引起严重的误会。”",
               "请考生将改译的译文去掉序号和分析，形成连贯语篇，看看效果如何。"
-            ]
+            ],
+            "tags": [
+              "英译汉",
+              "翻译"
+            ],
+            "duration": 1
           },
           {
             "id": "gu052",
             "title": "四、专项练习及解析",
-            "summary": "四、专项练习及解析",
+            "summary": "【练习一】阅读下文，并将其中画线部分译成中文。；In this media-focused world, the things we see and hear in the movies, on TV, and on the radio",
             "body": [
               "【练习一】阅读下文，并将其中画线部分译成中文。",
               "In this media-focused world, the things we see and hear in the movies, on TV, and on the radio",
@@ -4365,12 +4603,16 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
               "相当于stupid，查一下词典或者通过上下文即可确定。",
               "【参考译文】“出现在这些节目中的明星们在向年轻人——尤其是女孩子们——表明，纯朴",
               "无知多么讨人喜欢。”"
-            ]
+            ],
+            "tags": [
+              "被动语态"
+            ],
+            "duration": 2
           },
           {
             "id": "gu053",
             "title": "第四章英译汉",
-            "summary": "第四章英译汉",
+            "summary": "[3]J Paris Hilton has readily admitted that she is not familiar with common knowledge, including；the function of the Walmart stores and the capital city of Engl",
             "body": [
               "[3]J Paris Hilton has readily admitted that she is not familiar with common knowledge, including",
               "the function of the Walmart stores and the capital city of England.",
@@ -4445,12 +4687,17 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
               "[4］“更何况菜品的品种相当单调，菜品的外观并不总能招人喜欢。”",
               "第[5]句对acheapormediumpricerestaurant的翻译，译文一的译法“中低档餐馆”显然较为",
               "贴切。综合两个译文，本句可精译如下："
-            ]
+            ],
+            "tags": [
+              "英译汉",
+              "翻译"
+            ],
+            "duration": 1
           },
           {
             "id": "gu054",
             "title": "第四章英译汉",
-            "summary": "第四章英译汉",
+            "summary": "里从容就餐总要比公务环境下匆忙就餐惬意得多。”；改译后的译文，至少准确性有所增强，同时行文字数进一步得到压缩。本段分析和改译旨在",
             "body": [
               "里从容就餐总要比公务环境下匆忙就餐惬意得多。”",
               "改译后的译文，至少准确性有所增强，同时行文字数进一步得到压缩。本段分析和改译旨在",
@@ -4459,12 +4706,17 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
               "同时，以上各例的分析也旨在向考生们阐明，翻译之难度，既不在生词，也不在难句，而是我",
               "们平时熟悉的平常词、普通句，只要有充分的翻译意识，一般都能使自已的翻译能力和水平上一",
               "个新台阶。"
-            ]
+            ],
+            "tags": [
+              "英译汉",
+              "翻译"
+            ],
+            "duration": 1
           },
           {
             "id": "gu055",
             "title": "一、大纲要求和题型分析",
-            "summary": "一、大纲要求和题型分析",
+            "summary": "2016年版新《大纲》对写作的规定与2013年版《大纲》相同。具体为：“要求考生写篇常；见的应用文，也可用提纲、情景或图表做提示，要求考生说明或论述一个一般性话题，文章长度不",
             "body": [
               "2016年版新《大纲》对写作的规定与2013年版《大纲》相同。具体为：“要求考生写篇常",
               "见的应用文，也可用提纲、情景或图表做提示，要求考生说明或论述一个一般性话题，文章长度不",
@@ -4497,9 +4749,15 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
               "次涉及人生目标，1次涉及节能，1次涉及怎样做个好领导，1次涉及当年的热点奥运会。这些题",
               "目从论题上说都很大众化，考生一般来说都有话可说，可发挥的空间较大。为避免出现偏冷致使",
               "考生无法答题，有些考题还提供了不止一种选择。例如，2010年11月的考题Theproblem（s）I"
-            ]
+            ],
+            "tags": [
+              "写作",
+              "被动语态"
+            ],
+            "duration": 1
           }
-        ]
+        ],
+        "summary": "字迹清晰工整、不滚草、不涂改，保证卷面整洁美观。从各种英语考试的评卷情况看，主观题，包；括翻译题的得分往往不高，缺乏练习可能是部分原因。所以，加强翻译题的考前练习应该具有一 再看句子结构的分析。在句子结构比较复杂的情况下，句法分析的过程不可忽略。考生要；关注3点：句子基本结构、“陷式”句型及句型的变化。"
       },
       {
         "id": "gd-ch5",
@@ -4508,7 +4766,7 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
           {
             "id": "gu056",
             "title": "第五章短文写作",
-            "summary": "第五章短文写作",
+            "summary": "face(d）onmy job可让考生就现在或过去工作中的一个或多个问题进行阐述；再如2011年6月；的考题可让考生选择工作或者学习中引以为豪的事情进行描述。",
             "body": [
               "face(d）onmy job可让考生就现在或过去工作中的一个或多个问题进行阐述；再如2011年6月",
               "的考题可让考生选择工作或者学习中引以为豪的事情进行描述。",
@@ -4557,12 +4815,19 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
               "语那么简单。假如考生只会看浅显的英语文章，只能解答英语词汇和语法题，而不会使用英语，",
               "特别是用英语说明或论述一般性的话题，写作就不可能取得好的成绩。因此，写好作文的首要前",
               "提是提高英语运用能力。"
-            ]
+            ],
+            "tags": [
+              "词汇",
+              "语法",
+              "写作",
+              "被动语态"
+            ],
+            "duration": 1
           },
           {
             "id": "gu057",
             "title": "三、文章类型分析和写作要领",
-            "summary": "三、文章类型分析和写作要领",
+            "summary": "对写作的一般要求，可归纳为：内容充实，结构合理，语言通顺，用词恰当，表达得体。对学士；学位考试写作的要求，实际上没那么全面，标准也要低一些。比如，应用文的内容是固定的，只要",
             "body": [
               "对写作的一般要求，可归纳为：内容充实，结构合理，语言通顺，用词恰当，表达得体。对学士",
               "学位考试写作的要求，实际上没那么全面，标准也要低一些。比如，应用文的内容是固定的，只要",
@@ -4605,12 +4870,14 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
               "顶格书写，如下面的格式一。",
               "非官方的通知或启事，格式可以简单一些。而官方的通知或启事，格式要正规得多，比如标",
               "题应给出具体的名称，不能是简单的Notice。下面格式一和格式二中的例子可以说都是官方的"
-            ]
+            ],
+            "tags": [],
+            "duration": 1
           },
           {
             "id": "gu058",
             "title": "第五章短文写作",
-            "summary": "第五章短文写作",
+            "summary": "通知或启事，然而格式二因是政府机关发出，形式上更为正规。；KUNDAN INTERNATIONAL SCHOOL",
             "body": [
               "通知或启事，然而格式二因是政府机关发出，形式上更为正规。",
               "格式一",
@@ -4643,12 +4910,16 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
               "H.M.Swinson",
               "Medical Health Officer",
               "Georgia"
-            ]
+            ],
+            "tags": [
+              "写作"
+            ],
+            "duration": 1
           },
           {
             "id": "gu059",
             "title": "第四节将举一个通知的例子并加以解析。",
-            "summary": "第四节将举一个通知的例子并加以解析。",
+            "summary": "78>>>第二部分考试指南；（二）说明文和论述文一一以图表解读为例",
             "body": [
               "78>>>第二部分考试指南",
               "（二）说明文和论述文一一以图表解读为例",
@@ -4704,12 +4975,14 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
               "步挖掘这张图所能反映的信息，测此图所能解答的问题以及它的实用价值。这些内容实际上",
               "是考生需要思考并整理后写出来的东西。一般来说，试卷的答题指示会给出一些提示，以便考生",
               "写作时有所依据。假如没有提示，写作的难度就会大大增加。"
-            ]
+            ],
+            "tags": [],
+            "duration": 1
           },
           {
             "id": "gu060",
             "title": "第五章短文写作",
-            "summary": "第五章短文写作",
+            "summary": "浏览此图，发现是一张条形图。图的标题说：“按下列用途，印刷书和电子书一一哪一种更；书更合适的百分比。”再从图的横轴看，共有“与孩子一起看书”、“与其他人共享图书”、“床上看",
             "body": [
               "浏览此图，发现是一张条形图。图的标题说：“按下列用途，印刷书和电子书一一哪一种更",
               "书更合适的百分比。”再从图的横轴看，共有“与孩子一起看书”、“与其他人共享图书”、“床上看",
@@ -4761,12 +5034,16 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
               "上面范文的长度已远远超过了100个单词。考生应注意，100词是写作长度的最低要求，即",
               "词数不能少于100，但不是最高要求。考生有能力的话，文章写得长一些无妨。",
               "本书附录二列举了一些分析图表时常用的英文句型和结构，供考生备考复习使用。"
-            ]
+            ],
+            "tags": [
+              "写作"
+            ],
+            "duration": 1
           },
           {
             "id": "gu061",
             "title": "四、专项练习及解析",
-            "summary": "四、专项练习及解析",
+            "summary": "Directions: You are to write in no less than 1oo words a notice about an upcoming campus；cultural festival. You may base.your composition on the Chinese outline",
             "body": [
               "【练习一】通知",
               "Directions: You are to write in no less than 1oo words a notice about an upcoming campus",
@@ -4788,12 +5065,14 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
               "意题目要求至少列举5项），考生可能对这些活动的说法不甚清楚。规避的做法是：并不一定全",
               "部按答题指示所列举的项目来翻译，可选择自已知道的来写，即可添加别的项目。",
               "撰写本通知的另一个注意事项是格式和语言。格式应力求规范，语言应力求地道。"
-            ]
+            ],
+            "tags": [],
+            "duration": 1
           },
           {
             "id": "gu062",
             "title": "第五章短文写作",
-            "summary": "第五章短文写作",
+            "summary": "May 10, 2016；Dear schoolmates,this is to notify that the Annual Campus Cultural Festival is to take place from",
             "body": [
               "下面的范文供参考。",
               "【参考作文】",
@@ -4866,12 +5145,16 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
               "interaction plays a vital role in our every day life.",
               "Through communication, we get to know those we meet as strangers at first. Communication",
               "enables us to exchange what we think and establish or maintain good contacts with one another.Based"
-            ]
+            ],
+            "tags": [
+              "写作"
+            ],
+            "duration": 2
           },
           {
             "id": "gu063",
             "title": "第五章短文写作",
-            "summary": "第五章短文写作",
+            "summary": "on interaction,mutual trust can be built and common interests may befound.And we can even hope to；develop a long-lasting friendship.",
             "body": [
               "on interaction,mutual trust can be built and common interests may befound.And we can even hope to",
               "develop a long-lasting friendship.",
@@ -7751,9 +8034,17 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
               "伪查询网页，获得所购图书详细信息。",
               "防伪客服电话",
               "(010) 58582300"
-            ]
+            ],
+            "tags": [
+              "完成对话",
+              "交际用语",
+              "阅读理解",
+              "词汇"
+            ],
+            "duration": 30
           }
-        ]
+        ],
+        "summary": "face(d）onmy job可让考生就现在或过去工作中的一个或多个问题进行阐述；再如2011年6月；的考题可让考生选择工作或者学习中引以为豪的事情进行描述。 对写作的一般要求，可归纳为：内容充实，结构合理，语言通顺，用词恰当，表达得体。对学士；学位考试写作的要求，实际上没那么全面，标准也要低一些。比如，应用文的内容是固定的，只要"
       }
     ]
   },
@@ -7761,7 +8052,7 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
     "id": "moni",
     "name": "《全真模拟试卷及考点点睛》",
     "pdf": "public/pdfs/degree/moni.pdf",
-    "desc": "5 套全真模拟试卷 + 考点点睛，覆盖完成对话、阅读、词汇语法、英译汉、写作五大题型。",
+    "desc": "全真模拟试卷与考点点睛，提供 5 套完整模拟题及逐题解析。",
     "chapters": [
       {
         "id": "mk-intro",
@@ -7777,9 +8068,17 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
               "客观题含：完成对话（10 分）、阅读理解（40 分）、词汇和语法（20 分）。",
               "主观题含：英译汉（15 分）、短文写作（15 分）。",
               "建议按正式考试时间 120 分钟完整做完一套，再对照答案与解析复盘。"
-            ]
+            ],
+            "tags": [
+              "考试大纲",
+              "完成对话",
+              "交际用语",
+              "阅读理解"
+            ],
+            "duration": 1
           }
-        ]
+        ],
+        "summary": "按考试大纲题型与分值编写，共 3 套全真模拟卷，每套 100 分/120 分钟。"
       },
       {
         "id": "mk-paper1",
@@ -7802,7 +8101,12 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
               "答案：B",
               "解析：对道歉的回应用 It doesn't matter.",
               ""
-            ]
+            ],
+            "tags": [
+              "完成对话",
+              "交际用语"
+            ],
+            "duration": 1
           },
           {
             "id": "mk-p1-reading",
@@ -7817,7 +8121,11 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
               "答案：B",
               "解析：文中明确提到 safe and comfortable。",
               ""
-            ]
+            ],
+            "tags": [
+              "阅读理解"
+            ],
+            "duration": 1
           },
           {
             "id": "mk-p1-vocab",
@@ -7836,7 +8144,14 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
               "答案：B",
               "解析：lie（躺/位于）的现在分词是 lying。",
               ""
-            ]
+            ],
+            "tags": [
+              "词汇",
+              "语法",
+              "虚拟语气",
+              "时态"
+            ],
+            "duration": 1
           },
           {
             "id": "mk-p1-trans",
@@ -7849,7 +8164,12 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
               "答案：政府正在采取有效措施保护环境。",
               "解析：take measures to do sth. 采取措施做某事。",
               ""
-            ]
+            ],
+            "tags": [
+              "英译汉",
+              "翻译"
+            ],
+            "duration": 1
           },
           {
             "id": "mk-p1-writing",
@@ -7862,9 +8182,14 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
               "答案：（略）",
               "解析：建议三段式：引入健康重要性；给出饮食、运动、睡眠建议；总结。",
               ""
-            ]
+            ],
+            "tags": [
+              "写作"
+            ],
+            "duration": 1
           }
-        ]
+        ],
+        "summary": "3 段对话，10 题，10 分。 4 篇短文，20 题，40 分。"
       },
       {
         "id": "mk-paper2",
@@ -7887,7 +8212,12 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
               "答案：A",
               "解析：同意对方使用，用 Sure, go ahead.",
               ""
-            ]
+            ],
+            "tags": [
+              "完成对话",
+              "交际用语"
+            ],
+            "duration": 1
           },
           {
             "id": "mk-p2-reading",
@@ -7902,7 +8232,11 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
               "答案：B",
               "解析：主旨是运动有益健康。",
               ""
-            ]
+            ],
+            "tags": [
+              "阅读理解"
+            ],
+            "duration": 1
           },
           {
             "id": "mk-p2-vocab",
@@ -7921,7 +8255,14 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
               "答案：C",
               "解析：与现在事实相反的虚拟语气，be 动词用 were。",
               ""
-            ]
+            ],
+            "tags": [
+              "词汇",
+              "语法",
+              "虚拟语气",
+              "时态"
+            ],
+            "duration": 1
           },
           {
             "id": "mk-p2-trans",
@@ -7934,7 +8275,12 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
               "答案：阅读好书是丰富我们思想的最佳方式之一。",
               "解析：one of + 复数名词，表示“……之一”。",
               ""
-            ]
+            ],
+            "tags": [
+              "英译汉",
+              "翻译"
+            ],
+            "duration": 1
           },
           {
             "id": "mk-p2-writing",
@@ -7947,9 +8293,15 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
               "答案：（略）",
               "解析：建议写清爱好是什么、为什么喜欢、带来的收获。",
               ""
-            ]
+            ],
+            "tags": [
+              "写作",
+              "时态"
+            ],
+            "duration": 1
           }
-        ]
+        ],
+        "summary": "3 段对话，10 题，10 分。 4 篇短文，20 题，40 分。"
       },
       {
         "id": "mk-paper3",
@@ -7972,7 +8324,12 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
               "答案：A",
               "解析：接受邀请用 Yes, I'd love to.",
               ""
-            ]
+            ],
+            "tags": [
+              "完成对话",
+              "交际用语"
+            ],
+            "duration": 1
           },
           {
             "id": "mk-p3-reading",
@@ -7987,7 +8344,11 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
               "答案：B",
               "解析：文中明确提到 safe and comfortable。",
               ""
-            ]
+            ],
+            "tags": [
+              "阅读理解"
+            ],
+            "duration": 1
           },
           {
             "id": "mk-p3-vocab",
@@ -8006,7 +8367,14 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
               "答案：B",
               "解析：It is no use doing sth. 做某事无用。",
               ""
-            ]
+            ],
+            "tags": [
+              "词汇",
+              "语法",
+              "虚拟语气",
+              "时态"
+            ],
+            "duration": 1
           },
           {
             "id": "mk-p3-trans",
@@ -8019,7 +8387,12 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
               "答案：政府正在采取有效措施保护环境。",
               "解析：take measures to do sth. 采取措施做某事。",
               ""
-            ]
+            ],
+            "tags": [
+              "英译汉",
+              "翻译"
+            ],
+            "duration": 1
           },
           {
             "id": "mk-p3-writing",
@@ -8032,9 +8405,14 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
               "答案：（略）",
               "解析：建议三段式：引入健康重要性；给出饮食、运动、睡眠建议；总结。",
               ""
-            ]
+            ],
+            "tags": [
+              "写作"
+            ],
+            "duration": 1
           }
-        ]
+        ],
+        "summary": "3 段对话，10 题，10 分。 4 篇短文，20 题，40 分。"
       },
       {
         "id": "mk-keypoints",
@@ -8048,7 +8426,14 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
               "高频场景：问候、介绍、感谢、道歉、邀请、建议、请求、称赞、告别、电话用语等。",
               "礼貌梯度：对陌生人/上级用更委婉表达；拒绝用\"致歉+理由+替代\"。",
               "常见陷阱：Never mind 只回应道歉；You're welcome 只回应感谢；Would you mind… 肯定回答用否定形式。"
-            ]
+            ],
+            "tags": [
+              "完成对话",
+              "交际用语",
+              "考点",
+              "考点点睛"
+            ],
+            "duration": 1
           },
           {
             "id": "mk-kp-reading",
@@ -8056,7 +8441,11 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
             "summary": "主旨、细节、推断、词义、态度。",
             "body": [
               "主旨题关注首尾段与各段首句；细节题回原文定位；推断题不选原文直接陈述；词义题看上下文；态度题注意褒贬形容词。"
-            ]
+            ],
+            "tags": [
+              "阅读理解"
+            ],
+            "duration": 1
           },
           {
             "id": "mk-kp-vocab",
@@ -8064,15 +8453,27 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
             "summary": "时态、从句、非谓语、虚拟、倒装。",
             "body": [
               "时态：过去完成、将来完成、现在完成进行；从句：定语从句关系词、名词性从句、状语从句；非谓语：不定式、动名词、分词区别；虚拟语气：if 虚拟、wish、建议类从句；倒装：否定词开头、only 开头、so/neither。"
-            ]
+            ],
+            "tags": [
+              "虚拟语气",
+              "定语从句",
+              "时态",
+              "非谓语动词"
+            ],
+            "duration": 1
           },
           {
             "id": "mk-kp-trans",
             "title": "英译汉评分要点",
-            "summary": "准确、通顺、完整。",
+            "summary": "先译主干，再译修饰；固定搭配按中文习惯转换；专有名词常见译法需记忆；避免漏译与过度发挥。",
             "body": [
               "先译主干，再译修饰；固定搭配按中文习惯转换；专有名词常见译法需记忆；避免漏译与过度发挥。"
-            ]
+            ],
+            "tags": [
+              "英译汉",
+              "翻译"
+            ],
+            "duration": 1
           },
           {
             "id": "mk-kp-writing",
@@ -8080,9 +8481,14 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
             "summary": "书信、通知、议论文、图表作文。",
             "body": [
               "书信：注意称呼、正文三段式、结束语；通知：写明时间地点事件与联系方式；议论文：开头表态、中间论证、结尾总结；图表作文：描述数据+分析原因+得出结论。"
-            ]
+            ],
+            "tags": [
+              "写作"
+            ],
+            "duration": 1
           }
-        ]
+        ],
+        "summary": "场景、功能、礼貌梯度。 主旨、细节、推断、词义、态度。"
       },
       {
         "id": "mk-paper4",
@@ -8104,7 +8510,12 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
               "答案：B",
               "解析：对道歉的回应用 It doesn't matter.",
               ""
-            ]
+            ],
+            "tags": [
+              "完成对话",
+              "交际用语"
+            ],
+            "duration": 1
           },
           {
             "id": "mk-p4-reading",
@@ -8118,7 +8529,11 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
               "答案：B",
               "解析：主旨是运动有益健康。",
               ""
-            ]
+            ],
+            "tags": [
+              "阅读理解"
+            ],
+            "duration": 1
           },
           {
             "id": "mk-p4-vocab",
@@ -8136,7 +8551,13 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
               "答案：B",
               "解析：lie（躺/位于）的现在分词是 lying。",
               ""
-            ]
+            ],
+            "tags": [
+              "词汇",
+              "语法",
+              "虚拟语气"
+            ],
+            "duration": 1
           },
           {
             "id": "mk-p4-trans",
@@ -8148,7 +8569,12 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
               "答案：阅读好书是丰富我们思想的最佳方式之一。",
               "解析：one of + 复数名词，表示“……之一”。",
               ""
-            ]
+            ],
+            "tags": [
+              "英译汉",
+              "翻译"
+            ],
+            "duration": 1
           },
           {
             "id": "mk-p4-writing",
@@ -8160,9 +8586,14 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
               "答案：（略）",
               "解析：建议写清爱好是什么、为什么喜欢、带来的收获。",
               ""
-            ]
+            ],
+            "tags": [
+              "写作"
+            ],
+            "duration": 1
           }
-        ]
+        ],
+        "summary": "3 段对话，10 题，10 分。 4 篇短文，20 题，40 分。"
       },
       {
         "id": "mk-paper5",
@@ -8184,7 +8615,12 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
               "答案：A",
               "解析：同意对方使用，用 Sure, go ahead.",
               ""
-            ]
+            ],
+            "tags": [
+              "完成对话",
+              "交际用语"
+            ],
+            "duration": 1
           },
           {
             "id": "mk-p5-reading",
@@ -8198,7 +8634,11 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
               "答案：B",
               "解析：文中明确提到 safe and comfortable。",
               ""
-            ]
+            ],
+            "tags": [
+              "阅读理解"
+            ],
+            "duration": 1
           },
           {
             "id": "mk-p5-vocab",
@@ -8216,7 +8656,13 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
               "答案：C",
               "解析：与现在事实相反的虚拟语气，be 动词用 were。",
               ""
-            ]
+            ],
+            "tags": [
+              "词汇",
+              "语法",
+              "虚拟语气"
+            ],
+            "duration": 1
           },
           {
             "id": "mk-p5-trans",
@@ -8228,7 +8674,12 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
               "答案：政府正在采取有效措施保护环境。",
               "解析：take measures to do sth. 采取措施做某事。",
               ""
-            ]
+            ],
+            "tags": [
+              "英译汉",
+              "翻译"
+            ],
+            "duration": 1
           },
           {
             "id": "mk-p5-writing",
@@ -8240,9 +8691,14 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
               "答案：（略）",
               "解析：建议三段式：引入健康重要性；给出饮食、运动、睡眠建议；总结。",
               ""
-            ]
+            ],
+            "tags": [
+              "写作"
+            ],
+            "duration": 1
           }
-        ]
+        ],
+        "summary": "3 段对话，10 题，10 分。 4 篇短文，20 题，40 分。"
       }
     ]
   }

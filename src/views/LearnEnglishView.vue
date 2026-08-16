@@ -109,37 +109,68 @@
           <WordTrainingPanel :mode="(wordSub as any)" @close="wordSub = 'home'" />
         </div>
 
-        <!-- 知识库：按三本 PDF 分册浏览 -->
-        <div v-else-if="active === 'outline'" class="le-card">
-          <!-- 书的列表页 -->
-          <template v-if="!kbBook">
-            <div class="le-kb-head">
-              <div class="le-kb-headtext">
-                <h3 class="le-h">学位英语知识库 · 三本 PDF 分册</h3>
-                <p class="le-sub">严格按官方考试用书拆分：考试大纲、复习指南、全真模拟试卷；点开即可学，断网也能看。</p>
+        <!-- 知识库：学习模块 -->
+        <div v-else-if="active === 'outline'" class="le-card le-kb">
+          <!-- 头部 -->
+          <div class="le-kb-head">
+            <div class="le-kb-headtext">
+              <template v-if="!kbBook">
+                <h3 class="le-h">学位英语知识库</h3>
+                <p class="le-sub">按官方三本 PDF 分册系统学习：考试大纲 → 复习指南 → 全真模拟试卷</p>
+              </template>
+              <template v-else-if="!kbChapter">
+                <el-button text :icon="ArrowLeft" @click="backToBooks">返回图书列表</el-button>
+                <h3 class="le-h" style="margin-top:8px;">{{ currentBook?.name }}</h3>
+                <p class="le-sub">{{ currentBook?.desc }}</p>
+              </template>
+              <template v-else>
+                <el-button text :icon="ArrowLeft" @click="backToChapters">返回章列表</el-button>
+                <h3 class="le-h" style="margin-top:8px;">{{ currentChapter?.title }}</h3>
+                <p class="le-sub">{{ currentChapter?.summary }}</p>
+              </template>
+            </div>
+            <el-input v-model="kbSearch" clearable :placeholder="kbBook ? '在当前图书中搜索…' : '搜索知识点：虚拟语气 / 定语从句 / 婉拒…'" class="le-kb-search" />
+          </div>
+
+          <!-- 搜索结果 -->
+          <div v-if="kbSearch.trim()" class="le-kb-results">
+            <p class="le-sub">匹配到 {{ searchResults.length }} 讲</p>
+            <button
+              v-for="r in searchResults"
+              :key="r.id"
+              type="button"
+              class="le-kb-rescard"
+              @click="startLesson(r._bookId || 'dagang', r._chapterId || '', r.id)"
+            >
+              <span class="le-kb-resmod">{{ r._book }} · {{ r._chapter }}</span>
+              <span class="le-kb-restitle">{{ r.title }}</span>
+              <span class="le-kb-ressum">{{ r.summary }}</span>
+            </button>
+            <p v-if="!searchResults.length" class="le-empty">没有匹配的知识点，换个关键词试试（如 时态、被动、翻译、作文）。</p>
+          </div>
+
+          <!-- 图书列表页 -->
+          <template v-else-if="!kbBook">
+            <!-- 继续学习 -->
+            <div v-if="continueLesson" class="le-continue" @click="startLesson(continueLesson.bookId, continueLesson.chapterId, continueLesson.lesson.id)">
+              <div class="le-continue-main">
+                <span class="le-continue-tag">继续学习</span>
+                <span class="le-continue-title">{{ continueLesson.lesson.title }}</span>
+                <span class="le-continue-meta">{{ continueLesson.book }} · {{ continueLesson.chapter }}</span>
+                <span class="le-continue-sum">{{ continueLesson.lesson.summary }}</span>
               </div>
-              <el-input v-model="kbSearch" clearable placeholder="搜索知识点：虚拟语气 / 定语从句 / 婉拒 / 熟词生义…" class="le-kb-search" />
+              <div class="le-continue-btn">继续学习 →</div>
             </div>
 
-            <!-- 搜索结果 -->
-            <div v-if="kbSearch.trim()" class="le-kb-results">
-              <p class="le-sub">匹配到 {{ searchResults.length }} 讲</p>
-              <button
-                v-for="r in searchResults"
-                :key="r.id"
-                type="button"
-                class="le-kb-rescard"
-                @click="gotoLesson(r._bookId || 'dagang', r._chapterId || '', r.id)"
-              >
-                <span class="le-kb-resmod">{{ r._book }} · {{ r._chapter }}</span>
-                <span class="le-kb-restitle">{{ r.title }}</span>
-                <span class="le-kb-ressum">{{ r.summary }}</span>
-              </button>
-              <p v-if="!searchResults.length" class="le-empty">没有匹配的知识点，换个关键词试试（如 时态、被动、翻译、作文）。</p>
+            <!-- 学习统计 -->
+            <div class="le-kb-stats">
+              <div class="le-kb-stat"><b>{{ kbTotalLessons }}</b><span>总讲数</span></div>
+              <div class="le-kb-stat"><b>{{ kbDoneCount }}</b><span>已完成</span></div>
+              <div class="le-kb-stat"><b>{{ kbTotalProgress }}%</b><span>总进度</span></div>
             </div>
 
             <!-- 三本书入口 -->
-            <div v-else class="le-book-grid">
+            <div class="le-book-grid">
               <button
                 v-for="b in DEGREE_BOOKS"
                 :key="b.id"
@@ -150,123 +181,101 @@
                 <span class="le-book-icon">📖</span>
                 <span class="le-book-name">{{ b.name }}</span>
                 <span class="le-book-desc">{{ b.desc }}</span>
-                <span class="le-book-meta">{{ b.chapters.length }} 章 / {{ b.chapters.reduce((s, c) => s + c.lessons.length, 0) }} 讲</span>
+                <span class="le-book-meta">{{ b.chapters.length }} 章 / {{ totalLessons(b) }} 讲</span>
+                <div class="le-book-progress"><div class="le-book-progress-bar" :style="{ width: bookProgress(b) + '%' }"></div><span>{{ bookProgress(b) }}%</span></div>
               </button>
             </div>
           </template>
 
-          <!-- 单本书浏览页 -->
-          <template v-else>
-            <div class="le-kb-head">
-              <div class="le-kb-headtext">
-                <el-button text :icon="ArrowLeft" @click="backToBooks">返回图书列表</el-button>
-                <h3 class="le-h" style="margin-top:8px;">{{ currentBook?.name }}</h3>
-                <p class="le-sub">{{ currentBook?.desc }}</p>
-              </div>
-              <el-input v-model="kbSearch" clearable placeholder="在当前图书中搜索…" class="le-kb-search" />
-            </div>
-
-            <!-- 搜索结果 -->
-            <div v-if="kbSearch.trim()" class="le-kb-results">
-              <p class="le-sub">匹配到 {{ searchResults.length }} 讲</p>
+          <!-- 章列表页 -->
+          <template v-else-if="!kbChapter">
+            <div class="le-chapter-grid">
               <button
-                v-for="r in searchResults"
-                :key="r.id"
+                v-for="(c, i) in currentBook?.chapters"
+                :key="c.id"
                 type="button"
-                class="le-kb-rescard"
-                @click="gotoLesson(r._bookId || kbBook, r._chapterId || '', r.id)"
+                class="le-chapter-card"
+                :class="{ done: chapterProgress(c) === 100 }"
+                @click="selectChapter(c.id)"
               >
-                <span class="le-kb-resmod">{{ r._chapter }}</span>
-                <span class="le-kb-restitle">{{ r.title }}</span>
-                <span class="le-kb-ressum">{{ r.summary }}</span>
+                <span class="le-chapter-no">{{ i + 1 }}</span>
+                <span class="le-chapter-title">{{ c.title }}</span>
+                <span class="le-chapter-sum">{{ c.summary }}</span>
+                <span class="le-chapter-meta">{{ c.lessons.length }} 讲 · 进度 {{ chapterProgress(c) }}%</span>
+                <div class="le-chapter-progress"><div class="le-chapter-progress-bar" :style="{ width: chapterProgress(c) + '%' }"></div></div>
               </button>
-              <p v-if="!searchResults.length" class="le-empty">没有匹配的知识点，换个关键词试试。</p>
             </div>
+          </template>
 
-            <div v-else class="le-kb-main">
-              <!-- 左侧章节导航 -->
-              <aside class="le-kb-nav">
-                <button
-                  v-for="c in currentBook?.chapters"
-                  :key="c.id"
-                  type="button"
-                  class="le-kb-navi"
-                  :class="{ on: kbChapter === c.id }"
-                  @click="selectChapter(c.id)"
-                >
-                  <span class="le-kb-navname">{{ c.title }}</span>
-                  <span class="le-kb-navnum">{{ c.lessons.length }} 讲</span>
-                </button>
-              </aside>
-
-              <!-- 右侧内容 -->
-              <div class="le-kb-content">
-                <div class="le-kb-intro">
-                  <div class="le-kb-title">{{ currentChapter?.title }}</div>
-                  <p class="le-kb-desc">{{ currentChapter?.summary || '本章内容来自对应 PDF 的 OCR 正文切分。' }}</p>
-                  <div class="le-row">
-                    <button class="le-mini" @click="expandAll(true)">展开全部</button>
-                    <button class="le-mini" @click="expandAll(false)">收起全部</button>
-                    <button v-if="currentChapter" class="le-mini" @click="explainChapter(currentChapter)">AI 讲透本章</button>
+          <!-- 课列表页 -->
+          <template v-else>
+            <div class="le-lesson-grid">
+              <article
+                v-for="(l, i) in currentChapter?.lessons"
+                :id="'les-' + l.id"
+                :key="l.id"
+                class="le-lesson-card"
+                :class="{ done: isDone(l.id), doing: isDoing(l.id) && !isDone(l.id) }"
+              >
+                <div class="le-lesson-top">
+                  <span class="le-lesson-no">{{ i + 1 }}</span>
+                  <div class="le-lesson-tags">
+                    <span v-for="t in (l.tags || []).slice(0, 3)" :key="t" class="le-tag">{{ t }}</span>
+                    <span v-if="l.duration" class="le-tag time">{{ l.duration }}min</span>
                   </div>
-                  <div v-if="currentChapter && moduleAi[currentChapter.id]" class="le-know-explain">{{ moduleAi[currentChapter.id] }}</div>
+                </div>
+                <h4 class="le-lesson-title">{{ l.title }}</h4>
+                <p class="le-lesson-sum">{{ l.summary }}</p>
+                <div class="le-lesson-actions">
+                  <el-button type="primary" size="small" @click="startLesson(kbBook, kbChapter, l.id)">
+                    {{ isDone(l.id) ? '再次学习' : (isDoing(l.id) ? '继续学习' : '开始学习') }}
+                  </el-button>
+                  <el-button :type="isDone(l.id) ? 'success' : 'default'" size="small" :icon="isDone(l.id) ? CircleCheck : undefined" @click="toggleDone(l.id)">
+                    {{ isDone(l.id) ? '已完成' : '标记完成' }}
+                  </el-button>
+                  <el-button text size="small" @click="toggleLesson(l.id)">
+                    {{ openMap[l.id] ? '收起' : '展开' }}正文
+                  </el-button>
                 </div>
 
-                <article
-                  v-for="(l, i) in currentChapter?.lessons"
-                  :id="'les-' + l.id"
-                  :key="l.id"
-                  class="le-lesson"
-                  :class="{ open: !!openMap[l.id] }"
-                >
-                  <header class="le-lesson-h" @click="toggleLesson(l.id)">
-                    <span class="le-lesson-no">{{ i + 1 }}</span>
-                    <span class="le-lesson-hh">
-                      <span class="le-lesson-t">{{ l.title }}</span>
-                      <span class="le-lesson-s">{{ l.summary }}</span>
-                    </span>
-                    <el-icon class="le-lesson-arrow"><ArrowDown /></el-icon>
-                  </header>
+                <div v-show="openMap[l.id]" class="le-lesson-body">
+                  <p v-for="(p, pi) in l.body" :key="'p' + pi" class="le-p">{{ p }}</p>
 
-                  <div v-show="openMap[l.id]" class="le-lesson-b">
-                    <p v-for="(p, pi) in l.body" :key="'p' + pi" class="le-p">{{ p }}</p>
-
-                    <div v-for="(t, ti) in (l.tables || [])" :key="'t' + ti" class="le-tbl-wrap">
-                      <div v-if="t.title" class="le-tbl-title">{{ t.title }}</div>
-                      <div class="le-tbl-scroll">
-                        <table class="le-tbl">
-                          <thead><tr><th v-for="(h, hi) in t.head" :key="hi">{{ h }}</th></tr></thead>
-                          <tbody>
-                            <tr v-for="(r, ri) in t.rows" :key="ri">
-                              <td v-for="(c, ci) in r" :key="ci">{{ c }}</td>
-                            </tr>
-                          </tbody>
-                        </table>
-                      </div>
+                  <div v-for="(t, ti) in (l.tables || [])" :key="'t' + ti" class="le-tbl-wrap">
+                    <div v-if="t.title" class="le-tbl-title">{{ t.title }}</div>
+                    <div class="le-tbl-scroll">
+                      <table class="le-tbl">
+                        <thead><tr><th v-for="(h, hi) in t.head" :key="hi">{{ h }}</th></tr></thead>
+                        <tbody>
+                          <tr v-for="(r, ri) in t.rows" :key="ri">
+                            <td v-for="(c, ci) in r" :key="ci">{{ c }}</td>
+                          </tr>
+                        </tbody>
+                      </table>
                     </div>
-
-                    <div v-if="l.examples && l.examples.length" class="le-exs">
-                      <div class="le-block-h">例句</div>
-                      <div v-for="(e, ei) in l.examples" :key="'e' + ei" class="le-ex-item">
-                        <div class="le-ex-en">{{ e.en }}</div>
-                        <div class="le-ex-zh">{{ e.zh }}</div>
-                        <div v-if="e.note" class="le-ex-note">提示：{{ e.note }}</div>
-                      </div>
-                    </div>
-
-                    <div v-if="l.traps && l.traps.length" class="le-traps">
-                      <div class="le-block-h warn">易错点 / 考点提醒</div>
-                      <ul><li v-for="(t, ti2) in l.traps" :key="'tr' + ti2">{{ t }}</li></ul>
-                    </div>
-
-                    <div class="le-row">
-                      <button class="le-mini" @click="explainLesson(l)">AI 换种说法再讲一遍</button>
-                      <button class="le-mini" @click="quizLesson(l)">AI 出 3 道练习题</button>
-                    </div>
-                    <div v-if="lessonAi[l.id]" class="le-know-explain">{{ lessonAi[l.id] }}</div>
                   </div>
-                </article>
-              </div>
+
+                  <div v-if="l.examples && l.examples.length" class="le-exs">
+                    <div class="le-block-h">例句</div>
+                    <div v-for="(e, ei) in l.examples" :key="'e' + ei" class="le-ex-item">
+                      <div class="le-ex-en">{{ e.en }}</div>
+                      <div class="le-ex-zh">{{ e.zh }}</div>
+                      <div v-if="e.note" class="le-ex-note">提示：{{ e.note }}</div>
+                    </div>
+                  </div>
+
+                  <div v-if="l.traps && l.traps.length" class="le-traps">
+                    <div class="le-block-h warn">易错点 / 考点提醒</div>
+                    <ul><li v-for="(t, ti2) in l.traps" :key="'tr' + ti2">{{ t }}</li></ul>
+                  </div>
+
+                  <div class="le-row">
+                    <button class="le-mini" @click="explainLesson(l)">AI 换种说法再讲一遍</button>
+                    <button class="le-mini" @click="quizLesson(l)">AI 出 3 道练习题</button>
+                  </div>
+                  <div v-if="lessonAi[l.id]" class="le-know-explain">{{ lessonAi[l.id] }}</div>
+                </div>
+              </article>
             </div>
           </template>
         </div>
@@ -378,7 +387,7 @@
 import { computed, nextTick, onMounted, onUnmounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { School, Reading, Collection, Calendar, ChatDotRound, ArrowDown, ArrowLeft, Odometer } from '@element-plus/icons-vue'
+import { School, Reading, Collection, Calendar, ChatDotRound, ArrowDown, ArrowLeft, Odometer, CircleCheck } from '@element-plus/icons-vue'
 import PageHeader from '../components/PageHeader.vue'
 import { loadAiConfig, callAi, type AiConfig } from '../services/aiService'
 import {
@@ -413,10 +422,11 @@ import WordTrainingPanel from '../components/WordTrainingPanel.vue'
 
 const MODULES = [
   { key: 'word', label: '背单词卡', desc: '查词 · 生词本 · 听写/拼写/跟读/翻译', color: '#0891b2', icon: Reading },
-  { key: 'outline', label: '知识库', desc: '40+ 讲精读', color: '#7c3aed', icon: Collection },
+  { key: 'outline', label: '知识库', desc: '按三本 PDF 精读', color: '#7c3aed', icon: Collection },
   { key: 'plan', label: '学习计划', desc: '资料→AI 计划', color: '#e08a00', icon: Calendar },
   { key: 'ai', label: 'AI 答疑', desc: '语法/备考', color: '#0ea5e9', icon: ChatDotRound },
-  { key: 'weakness', label: '薄弱点分析', desc: '错题 · 练习 · 模考画像', color: '#534ab7', icon: Odometer }
+  { key: 'weakness', label: '薄弱点分析', desc: '错题 · 练习 · 模考画像', color: '#534ab7', icon: Odometer },
+  { key: 'prep', label: '备考台', desc: '今日/刷题/错本/我的/模考', color: '#3c3489', icon: School }
 ]
 const active = ref('word')
 const wordSub = ref<'home' | 'flash' | 'dictation' | 'spelling' | 'shadow' | 'translate'>('home')
@@ -433,6 +443,10 @@ function updateClock(): void {
 const cfg = ref<AiConfig | null>(null)
 
 function switchModule(key: string): void {
+  if (key === 'prep') {
+    router.push('/learn/english/prep')
+    return
+  }
   active.value = key
   if (key === 'word' && !words.value.length) void loadWords()
   if (key === 'plan' && !savedPlans.value.length) void loadPlans()
@@ -478,13 +492,73 @@ async function addWord(): Promise<void> {
 }
 async function removeWord(id: string): Promise<void> { await removeLearnBookmark(id); await loadWords() }
 
-/* ================= 知识库（按三本 PDF 分册） ================= */
+/* ================= 知识库（按三本 PDF 分册 · 学习模块） ================= */
 const kbSearch = ref('')
 const kbBook = ref('')
 const kbChapter = ref('')
 const openMap = reactive<Record<string, boolean>>({})
 const moduleAi = reactive<Record<string, string>>({})
 const lessonAi = reactive<Record<string, string>>({})
+
+const KB_PROGRESS_KEY = 'degree_kb_progress_v1'
+const KB_LAST_KEY = 'degree_kb_last_v1'
+
+interface KbProgress {
+  done: string[]
+  doing: string[]
+  lastBook?: string
+  lastChapter?: string
+  lastLesson?: string
+}
+
+const kbProgress = reactive<KbProgress>({ done: [], doing: [] })
+
+function loadKbProgress(): void {
+  try {
+    const raw = localStorage.getItem(KB_PROGRESS_KEY)
+    if (raw) {
+      const p = JSON.parse(raw) as KbProgress
+      kbProgress.done = p.done || []
+      kbProgress.doing = p.doing || []
+    }
+    const last = localStorage.getItem(KB_LAST_KEY)
+    if (last) {
+      const l = JSON.parse(last)
+      kbProgress.lastBook = l.lastBook
+      kbProgress.lastChapter = l.lastChapter
+      kbProgress.lastLesson = l.lastLesson
+    }
+  } catch { /* ignore */ }
+}
+function saveKbProgress(): void {
+  localStorage.setItem(KB_PROGRESS_KEY, JSON.stringify({ done: kbProgress.done, doing: kbProgress.doing }))
+  localStorage.setItem(KB_LAST_KEY, JSON.stringify({
+    lastBook: kbProgress.lastBook,
+    lastChapter: kbProgress.lastChapter,
+    lastLesson: kbProgress.lastLesson
+  }))
+}
+function isDone(id: string): boolean { return kbProgress.done.includes(id) }
+function isDoing(id: string): boolean { return kbProgress.doing.includes(id) }
+function toggleDone(id: string): void {
+  if (isDone(id)) {
+    kbProgress.done = kbProgress.done.filter((x) => x !== id)
+  } else {
+    kbProgress.done = [...kbProgress.done, id]
+    kbProgress.doing = kbProgress.doing.filter((x) => x !== id)
+  }
+  saveKbProgress()
+}
+function startLesson(bookId: string, chapterId: string, lessonId: string): void {
+  kbProgress.lastBook = bookId
+  kbProgress.lastChapter = chapterId
+  kbProgress.lastLesson = lessonId
+  if (!isDone(lessonId) && !isDoing(lessonId)) {
+    kbProgress.doing = [...kbProgress.doing, lessonId]
+  }
+  saveKbProgress()
+  gotoLesson(bookId, chapterId, lessonId)
+}
 
 const currentBook = computed<DegreeKnowledgeBook | null>(
   () => DEGREE_BOOKS.find((b) => b.id === kbBook.value) ?? null
@@ -493,10 +567,41 @@ const currentChapter = computed<DegreeKnowledgeChapter | null>(
   () => currentBook.value?.chapters.find((c) => c.id === kbChapter.value) ?? null
 )
 
+function totalLessons(book: DegreeKnowledgeBook): number {
+  return book.chapters.reduce((s, c) => s + c.lessons.length, 0)
+}
+function bookProgress(book: DegreeKnowledgeBook): number {
+  const total = totalLessons(book)
+  if (!total) return 0
+  const done = book.chapters.flatMap((c) => c.lessons).filter((l) => isDone(l.id)).length
+  return Math.round((done / total) * 100)
+}
+function chapterProgress(chapter: DegreeKnowledgeChapter): number {
+  if (!chapter.lessons.length) return 0
+  const done = chapter.lessons.filter((l) => isDone(l.id)).length
+  return Math.round((done / chapter.lessons.length) * 100)
+}
+
+const continueLesson = computed(() => {
+  if (!kbProgress.lastLesson) return null
+  const lesson = DEGREE_KNOWLEDGE_FLAT.find((l) => l.id === kbProgress.lastLesson)
+  if (!lesson) return null
+  return {
+    book: lesson._book || '',
+    chapter: lesson._chapter || '',
+    bookId: lesson._bookId || '',
+    chapterId: lesson._chapterId || '',
+    lesson
+  }
+})
+
+const kbTotalLessons = computed(() => DEGREE_BOOKS.reduce((s, b) => s + totalLessons(b), 0))
+const kbDoneCount = computed(() => DEGREE_BOOKS.reduce((s, b) => s + b.chapters.flatMap((c) => c.lessons).filter((l) => isDone(l.id)).length, 0))
+const kbTotalProgress = computed(() => (kbTotalLessons.value ? Math.round((kbDoneCount.value / kbTotalLessons.value) * 100) : 0))
+
 function selectBook(id: string): void {
   kbBook.value = id
-  kbChapter.value = DEGREE_BOOKS.find((b) => b.id === id)?.chapters[0]?.id ?? ''
-  openMap[ currentChapter.value?.lessons[0]?.id ?? '' ] = true
+  kbChapter.value = ''
 }
 function backToBooks(): void {
   kbBook.value = ''
@@ -505,8 +610,10 @@ function backToBooks(): void {
 }
 function selectChapter(id: string): void {
   kbChapter.value = id
-  const first = currentChapter.value?.lessons[0]
-  if (first) openMap[first.id] = true
+  Object.keys(openMap).forEach((k) => { delete openMap[k] })
+}
+function backToChapters(): void {
+  kbChapter.value = ''
 }
 function toggleLesson(id: string): void { openMap[id] = !openMap[id] }
 function expandAll(v: boolean): void {
@@ -677,6 +784,7 @@ async function loadWeakness(): Promise<void> {
 onMounted(async () => {
   updateClock()
   clockTimer = window.setInterval(updateClock, 1000)
+  loadKbProgress()
   try { cfg.value = await loadAiConfig() } catch { /* ignore */ }
   await loadWords()
   await lookup()
@@ -694,7 +802,7 @@ onUnmounted(() => { if (clockTimer) window.clearInterval(clockTimer) })
 .le-clock { font-variant-numeric: tabular-nums; font-size: 13px; color: var(--text-strong); }
 .le-clock-hint { font-size: 11px; color: var(--text-faint); }
 
-.le-entries { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 18px; }
+.le-entries { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px; margin-bottom: 18px; }
 .le-entry-degree { border-color: rgba(83, 74, 183, 0.45); box-shadow: 0 0 0 1px rgba(83, 74, 183, 0.15) inset; }
 .le-entry {
   position: relative; display: flex; align-items: center; gap: 10px; padding: 12px 14px 12px 16px;
@@ -817,8 +925,11 @@ onUnmounted(() => { if (clockTimer) window.clearInterval(clockTimer) })
 .le-fade-enter-from { opacity: 0; transform: translateY(6px); }
 .le-fade-leave-to { opacity: 0; transform: translateY(-6px); }
 
+@media (max-width: 1200px) {
+  .le-entries { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .le-lesson-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
 @media (max-width: 1100px) {
-  .le-entries { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .le-kb-main { grid-template-columns: 1fr; }
   .le-kb-nav { position: static; max-height: none; flex-direction: row; overflow-x: auto; padding-bottom: 4px; }
   .le-kb-navi { flex-shrink: 0; }
@@ -862,6 +973,60 @@ onUnmounted(() => { if (clockTimer) window.clearInterval(clockTimer) })
 .le-book-name { font-size: 15px; font-weight: 700; color: var(--text-strong); }
 .le-book-desc { font-size: 12.5px; color: var(--text-muted); line-height: 1.6; }
 .le-book-meta { font-size: 11px; color: #7c3aed; background: color-mix(in srgb, #7c3aed 10%, transparent); border-radius: 999px; padding: 2px 10px; margin-top: 4px; }
+.le-book-progress { margin-top: auto; width: 100%; display: flex; align-items: center; gap: 8px; }
+.le-book-progress::before { content: ''; flex: 1; height: 6px; border-radius: 999px; background: var(--border); }
+.le-book-progress-bar { height: 6px; border-radius: 999px; background: #7c3aed; }
+.le-book-progress span { font-size: 12px; color: var(--text-faint); }
+
+/* ---------- 学习模块：继续学习与统计 ---------- */
+.le-continue { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 14px 16px; border: 1px solid #7c3aed; border-radius: 12px; background: color-mix(in srgb, #7c3aed 7%, var(--surface)); cursor: pointer; transition: transform .16s ease, box-shadow .16s ease; margin-bottom: 14px; }
+.le-continue:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(124,58,237,.1); }
+.le-continue-main { display: flex; flex-direction: column; gap: 5px; min-width: 0; flex: 1; }
+.le-continue-tag { align-self: flex-start; font-size: 11px; color: #fff; background: #7c3aed; border-radius: 999px; padding: 2px 9px; }
+.le-continue-title { font-size: 15px; font-weight: 700; color: var(--text-strong); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.le-continue-meta { font-size: 12px; color: #7c3aed; }
+.le-continue-sum { font-size: 12.5px; color: var(--text-muted); line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.le-continue-btn { flex-shrink: 0; font-size: 13px; font-weight: 600; color: #7c3aed; white-space: nowrap; }
+
+.le-kb-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-bottom: 14px; }
+.le-kb-stat { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-soft); }
+.le-kb-stat b { font-size: 20px; color: var(--text-strong); }
+.le-kb-stat span { font-size: 12px; color: var(--text-faint); }
+
+/* ---------- 章列表 ---------- */
+.le-chapter-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; margin-top: 8px; }
+.le-chapter-card {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 8px;
+  padding: 16px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-soft);
+  cursor: pointer; text-align: left; transition: transform .16s ease, border-color .16s ease;
+}
+.le-chapter-card:hover { transform: translateY(-2px); border-color: #7c3aed; }
+.le-chapter-card.done { border-color: #16a34a; background: color-mix(in srgb, #16a34a 6%, var(--surface-soft)); }
+.le-chapter-no { width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; font-size: 13px; font-weight: 700; color: #fff; background: #7c3aed; }
+.le-chapter-card.done .le-chapter-no { background: #16a34a; }
+.le-chapter-title { font-size: 14px; font-weight: 700; color: var(--text-strong); }
+.le-chapter-sum { font-size: 12px; color: var(--text-muted); line-height: 1.6; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.le-chapter-meta { font-size: 11px; color: var(--text-faint); }
+.le-chapter-progress { width: 100%; height: 5px; border-radius: 999px; background: var(--border); margin-top: auto; }
+.le-chapter-progress-bar { height: 5px; border-radius: 999px; background: #7c3aed; }
+.le-chapter-card.done .le-chapter-progress-bar { background: #16a34a; }
+
+/* ---------- 课列表 ---------- */
+.le-lesson-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; margin-top: 8px; }
+.le-lesson-card { display: flex; flex-direction: column; gap: 10px; padding: 14px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-soft); transition: border-color .16s ease, box-shadow .16s ease; }
+.le-lesson-card:hover { border-color: #7c3aed; box-shadow: 0 4px 12px rgba(124,58,237,.06); }
+.le-lesson-card.done { border-color: #16a34a; background: color-mix(in srgb, #16a34a 5%, var(--surface-soft)); }
+.le-lesson-card.doing { border-color: #0891b2; background: color-mix(in srgb, #0891b2 5%, var(--surface-soft)); }
+.le-lesson-top { display: flex; align-items: center; gap: 8px; }
+.le-lesson-no { width: 24px; height: 24px; border-radius: 6px; display: grid; place-items: center; font-size: 12px; font-weight: 600; color: #fff; background: #7c3aed; flex-shrink: 0; }
+.le-lesson-card.done .le-lesson-no { background: #16a34a; }
+.le-lesson-tags { display: flex; flex-wrap: wrap; gap: 5px; flex: 1; }
+.le-tag { font-size: 11px; color: #7c3aed; background: color-mix(in srgb, #7c3aed 10%, transparent); border-radius: 999px; padding: 2px 8px; }
+.le-tag.time { color: #0891b2; background: color-mix(in srgb, #0891b2 10%, transparent); }
+.le-lesson-title { font-size: 14px; font-weight: 700; color: var(--text-strong); line-height: 1.4; margin: 0; }
+.le-lesson-sum { font-size: 12.5px; color: var(--text-muted); line-height: 1.6; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; margin: 0; }
+.le-lesson-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+.le-lesson-body { border-top: 1px dashed var(--border); padding-top: 12px; margin-top: 4px; }
 
 /* ---------- 薄弱点 ---------- */
 .le-weak-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
@@ -875,6 +1040,11 @@ onUnmounted(() => { if (clockTimer) window.clearInterval(clockTimer) })
 @media (max-width: 768px) {
   .le-training-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .le-weak-grid { grid-template-columns: 1fr; }
+  .le-book-grid { grid-template-columns: 1fr; }
+  .le-chapter-grid { grid-template-columns: 1fr; }
+  .le-lesson-grid { grid-template-columns: 1fr; }
+  .le-kb-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .le-continue { flex-direction: column; align-items: flex-start; }
 }
 @media (max-width: 460px) { .le-entries { grid-template-columns: 1fr; } }
 </style>

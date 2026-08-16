@@ -136,18 +136,18 @@ const router = createRouter({
       meta: { requirePermission: 'aimodels' }
     },
     {
-      // 原版学位英语备考台（今日 / 刷题 / 错本 / 我的 / 全真模拟考试）
+      // 学位英语统一入口：学习中心（背单词卡训练 / 知识库三本PDF / 学习计划 / AI答疑 / 薄弱点分析 / 备考台）
       path: '/learn/english',
       name: 'learn-english',
-      component: () => import('../views/DegreeEnglishView.vue'),
+      component: () => import('../views/LearnEnglishView.vue'),
       meta: { requirePermission: 'degree-legacy' }
     },
     {
-      // 学位英语学习中心（背单词卡训练 / 知识库三本PDF / 学习计划 / AI答疑 / 薄弱点分析）
-      path: '/learn/english-study',
-      name: 'learn-english-study',
-      component: () => import('../views/LearnEnglishView.vue'),
-      meta: { requirePermission: 'degree-study' }
+      // 备考台内容页：在学习中心内点击「备考台」卡片后进入，不单独出现在菜单
+      path: '/learn/english/prep',
+      name: 'learn-english-prep',
+      component: () => import('../views/DegreeEnglishView.vue'),
+      meta: { requirePermission: 'degree-legacy' }
     },
     {
       path: '/learn/industry',

@@ -13,22 +13,12 @@
           </div>
         </div>
         <div class="ph-actions">
-          <el-button :icon="ArrowLeft" @click="router.push('/learn/cet-prep')">返回四级</el-button>
+          <el-button :icon="ArrowLeft" @click="router.push('/learn/english')">返回学习中心</el-button>
           <el-button text :icon="Setting" @click="settingsVisible = true">设置</el-button>
           <el-button type="primary" round :icon="VideoPlay" @click="startStudy">开始学习</el-button>
         </div>
       </div>
     </header>
-
-    <!-- 2.0 备考台入口引导（非破坏性，原功能全部保留） -->
-    <div class="deg-v2-banner" @click="router.push('/degree/home')">
-      <span class="deg-v2-ico"><el-icon :size="20"><Star /></el-icon></span>
-      <div class="deg-v2-text">
-        <strong>学位英语备考台 2.0 已上线</strong>
-        <span>学习中心 · 资料中心 · 生词词库(SRS) · 高级训练 · 专项练习 · 模拟考试，内容数据已落地云端</span>
-      </div>
-      <el-button type="primary" round :icon="ArrowRight" @click.stop="router.push('/degree/home')">进入 2.0</el-button>
-    </div>
 
     <!-- 顶部导航栏（PC端：与 AI/四六级模块风格完全一致） -->
     <nav class="de-topnav">
