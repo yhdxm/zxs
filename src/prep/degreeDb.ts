@@ -182,23 +182,26 @@ async function doSeed(onProgress?: (p: SeedProgress) => void): Promise<boolean> 
     { table: 'degree_phrases', rows: allPhrases().map(phraseToRow) as unknown as Record<string, unknown>[] }
   ]
 
-  // 任一内容表已非空 → 视为已初始化，仅置 flag，避免重复写入
-  for (const job of jobs) {
-    const c = await tableCount(job.table)
-    if (c > 0) {
-      try {
-        localStorage.setItem(SEED_FLAG, '1')
-      } catch {
-        /* ignore */
-      }
-      return false
+  // 先查各表现状：全满→置 flag 直接返回；部分有数据→只补空的，避免中断后永远缺表。
+  const counts = await Promise.all(jobs.map((job) => tableCount(job.table)))
+  const allFilled = counts.every((c) => c > 0)
+  if (allFilled) {
+    try {
+      localStorage.setItem(SEED_FLAG, '1')
+    } catch {
+      /* ignore */
     }
+    return false
   }
 
-  for (const job of jobs) {
+  let anySeeded = false
+  for (let i = 0; i < jobs.length; i++) {
+    const job = jobs[i]!
+    if (counts[i]! > 0) continue // 已有数据，跳过
     onProgress?.({ table: job.table, total: job.rows.length, done: false })
     try {
       await batchUpsert(job.table, job.rows)
+      anySeeded = true
       onProgress?.({ table: job.table, total: job.rows.length, done: true })
     } catch (e) {
       onProgress?.({
@@ -207,15 +210,17 @@ async function doSeed(onProgress?: (p: SeedProgress) => void): Promise<boolean> 
         done: true,
         error: e instanceof Error ? e.message : String(e)
       })
-      return false
+      return false // 出错不置 flag，下次继续补
     }
   }
+
+  // 全部成功才置 flag
   try {
     localStorage.setItem(SEED_FLAG, '1')
   } catch {
     /* ignore */
   }
-  return true
+  return anySeeded
 }
 
 // 模块级 memo：并发/多次调用只注入一次

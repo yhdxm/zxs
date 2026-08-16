@@ -20,6 +20,16 @@
       </div>
     </header>
 
+    <!-- 2.0 备考台入口引导（非破坏性，原功能全部保留） -->
+    <div class="deg-v2-banner" @click="router.push('/degree/home')">
+      <span class="deg-v2-ico"><el-icon :size="20"><Star /></el-icon></span>
+      <div class="deg-v2-text">
+        <strong>学位英语备考台 2.0 已上线</strong>
+        <span>学习中心 · 资料中心 · 生词词库(SRS) · 高级训练 · 专项练习 · 模拟考试，内容数据已落地云端</span>
+      </div>
+      <el-button type="primary" round :icon="ArrowRight" @click.stop="router.push('/degree/home')">进入 2.0</el-button>
+    </div>
+
     <!-- 顶部导航栏（PC端：与 AI/四六级模块风格完全一致） -->
     <nav class="de-topnav">
       <button class="de-nav-item" :class="{ active: topNav === 'today' }" @click="topNav = 'today'">
@@ -643,7 +653,7 @@
 <script setup lang="ts">
 import { ref, computed, reactive, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
-import { Reading, Setting, VideoPlay, Picture, ArrowLeft } from '@element-plus/icons-vue'
+import { Reading, Setting, VideoPlay, Picture, ArrowLeft, ArrowRight, Star } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import EChart from '../components/EChart.vue'
 import MockExamDialog from '../components/degree/MockExamDialog.vue'
@@ -1411,6 +1421,67 @@ onBeforeUnmount(() => {
   border-radius: var(--radius);
   box-shadow: 0 2px 12px rgba(34, 48, 78, 0.06);
   margin-bottom: 14px;
+}
+/* 2.0 备考台入口引导卡 */
+.deg-v2-banner {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 18px;
+  margin-bottom: 14px;
+  border-radius: var(--radius, 14px);
+  background: linear-gradient(135deg, rgba(124, 111, 214, 0.10), rgba(83, 74, 183, 0.06));
+  border: 1px solid rgba(83, 74, 183, 0.18);
+  cursor: pointer;
+  transition: box-shadow 0.18s ease, transform 0.18s ease;
+}
+.deg-v2-banner:hover {
+  box-shadow: 0 6px 18px rgba(83, 74, 183, 0.16);
+  transform: translateY(-1px);
+}
+.deg-v2-ico {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  background: linear-gradient(135deg, #7c6fd6, #534ab7);
+  box-shadow: 0 6px 16px rgba(83, 74, 183, 0.3);
+}
+.deg-v2-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.deg-v2-text strong {
+  font-size: 15px;
+  color: var(--text-strong, #1a1a2e);
+  font-weight: 600;
+}
+.deg-v2-text span {
+  font-size: 12.5px;
+  color: var(--text-muted, #8a86a8);
+  line-height: 1.45;
+}
+.deg-v2-banner .el-button {
+  flex-shrink: 0;
+}
+@media (max-width: 768px) {
+  .deg-v2-banner {
+    flex-wrap: wrap;
+    padding: 12px 14px;
+  }
+  .deg-v2-text {
+    flex-basis: 100%;
+    order: 3;
+  }
+  .deg-v2-banner .el-button {
+    margin-left: auto;
+  }
 }
 /* 学位英语品牌色：紫色渐变图标 */
 .deg-header-main .ph-icon {

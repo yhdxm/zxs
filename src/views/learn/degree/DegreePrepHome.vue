@@ -8,10 +8,23 @@
         </p>
       </div>
       <div class="dp-hero-right">
-        <el-tag v-if="seededFromCloud" type="success" effect="light" round>云端数据已同步</el-tag>
+        <el-tag v-if="seeding" type="primary" effect="light" round>
+          <el-icon class="is-loading"><Loading /></el-icon> 正在同步云端…
+        </el-tag>
+        <el-tag v-else-if="seededFromCloud" type="success" effect="light" round>云端数据已同步</el-tag>
         <el-tag v-else type="info" effect="light" round>使用本地内置内容</el-tag>
       </div>
     </header>
+
+    <div v-if="seeding" class="dp-seeding">
+      <p>首次打开正在把词库 / 题库 / 词组写入 Supabase，约需几十秒，请勿关闭页面。</p>
+      <div class="dp-seed-items">
+        <span v-for="p in seedProgress" :key="p.table" :class="{ done: p.done, err: !!p.error }">
+          {{ tableLabel(p.table) }} {{ p.done ? (p.error ? '失败' : '完成') : '注入中…' }}
+          <template v-if="!p.done && p.total">({{ p.total }})</template>
+        </span>
+      </div>
+    </div>
 
     <!-- 内容数据概况 -->
     <section class="dp-section">
@@ -96,15 +109,34 @@ import {
   List,
   Medal,
   User,
-  DataBoard
+  DataBoard,
+  Loading
 } from '@element-plus/icons-vue'
-import { loadWords, loadQuestions, loadPhrases, ensureContentSeeded } from '../../../prep/degreeDb'
+import {
+  loadWords,
+  loadQuestions,
+  loadPhrases,
+  ensureContentSeeded,
+  type SeedProgress
+} from '../../../prep/degreeDb'
 import * as svc from '../../../prep/degreeService'
 import { MATERIALS } from '../../../prep/degreeExamStructure'
 
 const seededFromCloud = ref(false)
+const seeding = ref(false)
+const seedProgress = reactive<SeedProgress[]>([])
 const stats = reactive({ words: 0, productive: 0, questions: 0, phrases: 0, materials: MATERIALS.length })
 const progress = reactive({ learned: 0, streak: 0, accuracy: 0, mistakes: 0 })
+
+function tableLabel(table: string) {
+  return (
+    {
+      degree_words: '词库',
+      degree_questions: '题库',
+      degree_phrases: '词组'
+    } as Record<string, string>
+  )[table] || table
+}
 
 const modules = [
   { name: '资料中心', desc: '三本 PDF 预览与下载', to: '/degree/materials', icon: Document, color: '#534ab7' },
@@ -119,8 +151,14 @@ const modules = [
 
 onMounted(async () => {
   // 触发内容落地（首次打开自动注入云端），并读取真实计数
-  const seeded = await ensureContentSeeded().catch(() => false)
+  seeding.value = true
+  const seeded = await ensureContentSeeded((p) => {
+    const idx = seedProgress.findIndex((x) => x.table === p.table)
+    if (idx >= 0) seedProgress[idx] = p
+    else seedProgress.push(p)
+  }).catch(() => false)
   seededFromCloud.value = !!seeded
+  seeding.value = false
   try {
     const [words, questions, phrases] = await Promise.all([loadWords(), loadQuestions(), loadPhrases()])
     stats.words = words.length
@@ -263,6 +301,39 @@ onMounted(async () => {
   font-size: 12px;
   color: #8a8aa0;
   line-height: 1.5;
+}
+.dp-seeding {
+  background: #f7f6ff;
+  border: 1px solid #e6e3ff;
+  border-radius: 12px;
+  padding: 14px 16px;
+  margin-bottom: 18px;
+  font-size: 13px;
+  color: #4a4a5a;
+}
+.dp-seeding p {
+  margin: 0 0 8px;
+}
+.dp-seed-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.dp-seed-items span {
+  background: #fff;
+  border: 1px solid #eceaff;
+  border-radius: 8px;
+  padding: 4px 10px;
+  font-size: 12px;
+  color: #6a6a80;
+}
+.dp-seed-items span.done {
+  color: #2e9e6b;
+  border-color: #bfe9d6;
+}
+.dp-seed-items span.err {
+  color: #b23b5b;
+  border-color: #f0c8d3;
 }
 @media (max-width: 768px) {
   .dp-hero {
