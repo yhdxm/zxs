@@ -28,18 +28,18 @@ export const FREE_LLM_RESOURCES: FreeResource[] = [
     id: 'google-ai-studio',
     name: 'Google AI Studio（Gemini）',
     category: 'api',
-    freeNote: '永久免费层，无需信用卡。Gemini 3.6/3.5 Flash + Gemma，1M 上下文、多模态，约 10 RPM / 250 RPD（Flash）。（Gemini Pro 系列自 2026-04 起已移除免费层。）',
+    freeNote: '永久免费层，无需信用卡。Gemini 3.6/3.5 Flash + Gemma，1M 上下文、多模态；Gemini 3.6 Flash 已于 2026-07 上线并保留 $0 免费层。（注意：Google 已不再公开逐模型 RPM/配额，具体限额以 AI Studio 控制台显示为准。Gemini Pro 系列自 2026-04 起已移除免费层。）',
     url: 'https://aistudio.google.com',
-    lastChecked: '2026-08-15',
+    lastChecked: '2026-08-16',
     tags: ['Gemini', '多模态', '无需信用卡']
   },
   {
     id: 'groq',
     name: 'Groq',
     category: 'api',
-    freeNote: '开发者免费层，无需信用卡。LPU 极速推理，约 30 RPM：Llama、Qwen、DeepSeek、Whisper 等。',
+    freeNote: 'Free 计划，无需信用卡。LPU 极速推理（约 300+ tok/s）：Llama 4 / Qwen3 / DeepSeek-R1-Distill / Whisper 等。限额 30 RPM、12,000 tokens/min、1,000 请求/天、100,000 tokens/天（每日重置）。',
     url: 'https://console.groq.com',
-    lastChecked: '2026-08-02',
+    lastChecked: '2026-08-16',
     tags: ['极速推理', 'Llama', '无需信用卡']
   },
   {
@@ -73,18 +73,18 @@ export const FREE_LLM_RESOURCES: FreeResource[] = [
     id: 'mistral',
     name: 'Mistral AI',
     category: 'api',
-    freeNote: '免费「Experiment」层，无需信用卡（需手机号验证）。约 10 亿 tokens/月（~1 RPS / 500K TPM），Large / Medium / Small / Codestral / Devstral 全模型可用。',
+    freeNote: '免费「Experiment」层，无需信用卡（需手机号验证），Large / Medium / Small / Codestral / Devstral 全模型可用。注：Mistral 已不再官方公布逐模型免费限额（此前约 10 亿 tokens/月量级），实际以账户控制台为准。',
     url: 'https://mistral.ai',
-    lastChecked: '2026-08-11',
+    lastChecked: '2026-08-16',
     tags: ['欧洲', '代码模型', '无需信用卡']
   },
   {
     id: 'huggingface-inference',
     name: 'Hugging Face Inference API',
     category: 'api',
-    freeNote: '数千开源模型经统一 OpenAI 兼容端点免费调用，无需信用卡。共享配额约 300 次/小时。平台亦托管 Meta Muse Glimmer、Kimi K3 等最新 Apache 2.0 开源权重，可免费下载自部署。',
+    freeNote: '数千开源模型经统一 OpenAI 兼容路由器端点（router.huggingface.co/v1，支持 Chat Completions）免费调用，无需信用卡。免费额度为共享配额（约数百次/小时量级，含 10 万级月度 credits）；平台亦托管最新 Apache 2.0 开源权重，可免费下载自部署。',
     url: 'https://huggingface.co',
-    lastChecked: '2026-08-11',
+    lastChecked: '2026-08-16',
     tags: ['模型最全', '开源', '无需信用卡']
   },
   {
@@ -222,15 +222,33 @@ export const FREE_LLM_RESOURCES: FreeResource[] = [
     lastChecked: '2026-08-15',
     tags: ['高速推理', '开源', '无需信用卡']
   },
+  {
+    id: 'sensenova',
+    name: '商汤日日新 SenseNova（Token Plan）',
+    category: 'api',
+    freeNote: 'Token Plan 公测期完全免费，无需信用卡、不用绑卡，注册即拿 Key。每 5 小时刷新额度：DeepSeek-V4-Flash（500 次/5h，1M 上下文、支持思考模式与工具调用）、SenseNova 6.7 Flash-Lite（1500 次/5h，多模态图文理解）、SenseNova U1 Fast（1500 次/5h）。OpenAI 兼容端点 token.sensenova.cn/v1，国内直连友好。',
+    url: 'https://platform.sensenova.cn',
+    lastChecked: '2026-08-16',
+    tags: ['国内可用', 'DeepSeek', '无需信用卡']
+  },
+  {
+    id: 'opencode-zen',
+    name: 'OpenCode Zen',
+    category: 'api',
+    freeNote: '免费模型档，无需信用卡，国内可用。提供 deepseek-v4-flash-free、minimax、ring、nemotron、big-pickle 等多个免费模型，OpenAI 兼容端点（opencode.ai/zen/v1），适合个人项目与原型。（额度以官方实时为准。）',
+    url: 'https://opencode.ai/zen',
+    lastChecked: '2026-08-16',
+    tags: ['国内可用', '开源', '无需信用卡', 'OpenAI兼容']
+  },
 
   /* ===================== 评测 / 信息查询平台 ===================== */
   {
     id: 'lmarena',
     name: 'LMArena / Arena（Chatbot Arena）',
     category: 'eval',
-    freeNote: '完全免费，无需注册。前身 Chatbot Arena，2026 年初更名 Arena；全球引用最广的人类偏好盲测榜单，覆盖文本/代码/视觉/视频等 9 大类别。',
+    freeNote: '完全免费，无需注册。前身 Chatbot Arena，2026 年初更名 Arena；全球引用最广的人类偏好盲测榜单，累计 82M+ 真实投票，覆盖文本/代码/视觉/视频/智能体等类别。2026 年新增 AutoEval（即时校准评分）与 Factuality（事实性）榜单、Fullstack Code Arena。',
     url: 'https://arena.ai',
-    lastChecked: '2026-08-15',
+    lastChecked: '2026-08-16',
     tags: ['人类偏好', '盲测', '免费']
   },
   {
@@ -345,9 +363,9 @@ export const FREE_LLM_RESOURCES: FreeResource[] = [
     id: 'llm-stats',
     name: 'LLM-Stats Benchmarks',
     category: 'eval',
-    freeNote: '完全免费。汇总 600+ AI/LLM 基准（推理 / 代码 / 数学 / 视觉 / 工具调用等），每条基准直连实时排行榜与独立验证分数，持续更新。',
+    freeNote: '完全免费。汇总 665+ AI/LLM 基准（推理 / 代码 / 数学 / 视觉 / 工具调用 / 智能体等），每条基准直连实时排行榜与独立验证分数，持续更新。',
     url: 'https://llm-stats.com',
-    lastChecked: '2026-08-11',
+    lastChecked: '2026-08-16',
     tags: ['基准索引', '实时榜单', '免费']
   },
   {
@@ -540,5 +558,14 @@ export const FREE_LLM_RESOURCES: FreeResource[] = [
     url: 'https://introtodeeplearning.com',
     lastChecked: '2026-08-11',
     tags: ['大学级', '免费']
+  },
+  {
+    id: 'google-ai-research-foundations',
+    name: 'Google DeepMind · AI Research Foundations',
+    category: 'learn',
+    freeNote: '完全免费（Google Skills 平台），Google DeepMind 与 UCL 合办的大学级课程。8 门循序渐进：从分词/嵌入、神经网络、Transformer 到微调、对齐、规模化训练与 Capstone；动手实验在 Google Cloud 控制台运行，完成得技能徽章。面向有 Python 基础的技术学习者，开源材料（Apache 2.0 / CC-BY 4.0）。',
+    url: 'https://www.skills.google/collections/deepmind',
+    lastChecked: '2026-08-16',
+    tags: ['大学级', '微调', '免费', 'Google']
   }
 ]
