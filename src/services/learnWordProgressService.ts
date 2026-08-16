@@ -34,6 +34,8 @@ async function seedCloudFromLocal(userId: string, state: Record<string, WordProg
     due: p.due,
     weak: p.weak,
     wrong_streak: p.wrongStreak ?? 0,
+    first_learned: p.firstLearned ?? null,
+    last_studied: p.lastStudied ?? null,
     updated_at: new Date().toISOString()
   }))
   if (!rows.length) return
@@ -58,7 +60,9 @@ export async function loadLearnWordProgress(): Promise<Record<string, WordProgre
         level: r.level,
         due: r.due ?? null,
         weak: r.weak ?? false,
-        wrongStreak: r.wrong_streak ?? 0
+        wrongStreak: r.wrong_streak ?? 0,
+        firstLearned: r.first_learned ?? undefined,
+        lastStudied: r.last_studied ?? undefined
       }
     }
     // 云端有数据则以云端为准，并回写本地镜像
@@ -97,6 +101,8 @@ export async function saveLearnWordProgress(word: string, p: WordProgress): Prom
         due: p.due,
         weak: p.weak,
         wrong_streak: p.wrongStreak ?? 0,
+        first_learned: p.firstLearned ?? null,
+        last_studied: p.lastStudied ?? null,
         updated_at: new Date().toISOString()
       },
       { onConflict: 'user_id,word' }

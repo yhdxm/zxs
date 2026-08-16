@@ -9,6 +9,10 @@ export interface CetWordProgress {
   due: string | null
   weak: boolean
   wrongStreak?: number
+  /** 首次学习日期 YYYY-MM-DD（cet_word_progress.first_learned 列）。云端派生「今日已学」与「连续天数」，跨端同步。 */
+  firstLearned?: string
+  /** 最近一次学习日期 YYYY-MM-DD（cet_word_progress.last_studied 列）。 */
+  lastStudied?: string
 }
 
 function lsKey(level: string, userId: string) {
@@ -47,6 +51,8 @@ async function seedCloudFromLocal(
     due: p.due,
     weak: p.weak,
     wrong_streak: p.wrongStreak ?? 0,
+    first_learned: p.firstLearned ?? null,
+    last_studied: p.lastStudied ?? null,
     updated_at: new Date().toISOString()
   }))
   if (!rows.length) return
@@ -73,7 +79,9 @@ export async function loadCetProgress(level: 'cet4' | 'cet6'): Promise<Record<st
         level: r.score ?? 0,
         due: r.due ?? null,
         weak: r.weak ?? false,
-        wrongStreak: r.wrong_streak ?? 0
+        wrongStreak: r.wrong_streak ?? 0,
+        firstLearned: r.first_learned ?? undefined,
+        lastStudied: r.last_studied ?? undefined
       }
     }
     // 云端有数据则以云端为准，并回写本地镜像
@@ -118,6 +126,8 @@ export async function saveCetProgress(
         due: p.due,
         weak: p.weak,
         wrong_streak: p.wrongStreak ?? 0,
+        first_learned: p.firstLearned ?? null,
+        last_studied: p.lastStudied ?? null,
         updated_at: new Date().toISOString()
       },
       { onConflict: 'user_id,level,word' }

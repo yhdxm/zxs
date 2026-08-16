@@ -1,5 +1,5 @@
 // 学位英语备考台 · SRS 间隔重复引擎（Leitner 盒子式）
-// 复用 degree_word_progress 既有列：status / level / due / weak / wrong_streak，无需新增数据库列。
+// 复用 degree_word_progress 既有列：status / level / due / weak / wrong_streak，并写入 first_learned / last_studied 派生学习指标。
 // 设计：level 即「盒子序号」，答对升级（间隔拉长），答错降级（回到短期盒子），达到 SRS_MAX_LEVEL 视为毕业（已掌握）。
 import type { DegreeWord, WordProgress } from './degreeTypes'
 
@@ -52,7 +52,11 @@ export function reviewWord(p: WordProgress | undefined, grade: SrsGrade): WordPr
   const due = addDays(todayStr(), srsInterval(level))
   const status: WordProgress['status'] =
     level >= SRS_MAX_LEVEL ? 'graduated' : level === 0 ? 'new' : 'learning'
-  return { status, level, due, weak, wrongStreak }
+  const today = todayStr()
+  // 学习日期写入进度本身：首次学习记 firstLearned，每次评分记 lastStudied。
+  // 指标（今日已学 / 连续天数）全部从云端进度派生，PC 与手机读同一份数据自然同步。
+  const firstLearned = cur.firstLearned ?? today
+  return { status, level, due, weak, wrongStreak, firstLearned, lastStudied: today }
 }
 
 export interface SrsDueOptions {

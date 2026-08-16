@@ -150,7 +150,9 @@ export async function loadWordProgress(): Promise<Record<string, WordProgress>> 
         level: r.level,
         due: r.due ?? null,
         weak: r.weak ?? false,
-        wrongStreak: r.wrong_streak ?? 0
+        wrongStreak: r.wrong_streak ?? 0,
+        firstLearned: r.first_learned ?? undefined,
+        lastStudied: r.last_studied ?? undefined
       }
     }
     // 云端有数据则以云端为准，并回写本地镜像
@@ -169,6 +171,8 @@ export async function loadWordProgress(): Promise<Record<string, WordProgress>> 
           due: p.due,
           weak: p.weak,
           wrong_streak: p.wrongStreak ?? 0,
+          first_learned: p.firstLearned ?? null,
+          last_studied: p.lastStudied ?? null,
           updated_at: new Date().toISOString()
         }, 'user_id,word')
       }
@@ -193,6 +197,8 @@ export async function saveWordProgress(word: string, p: WordProgress): Promise<v
     due: p.due,
     weak: p.weak,
     wrong_streak: p.wrongStreak ?? 0,
+    first_learned: p.firstLearned ?? null,
+    last_studied: p.lastStudied ?? null,
     updated_at: new Date().toISOString()
   }, 'user_id,word')
 }

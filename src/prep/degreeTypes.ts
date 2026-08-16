@@ -75,6 +75,10 @@ export interface WordProgress {
   weak: boolean
   /** 连续答错次数（SRS 薄弱度参考，degree_word_progress.wrong_streak 列）。 */
   wrongStreak?: number
+  /** 首次学习日期 YYYY-MM-DD（degree_word_progress.first_learned 列）。用于云端派生「今日已学」与「连续天数」，使 PC/手机跨端同步。 */
+  firstLearned?: string
+  /** 最近一次学习日期 YYYY-MM-DD（degree_word_progress.last_studied 列）。 */
+  lastStudied?: string
 }
 
 export interface PracticeRec {

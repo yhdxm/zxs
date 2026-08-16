@@ -783,7 +783,7 @@ import {
   type SrsGrade
 } from '../prep/degreeSrs'
 import { buildReviewQueue as buildGenericReviewQueue } from '../prep/trainingSrs'
-import { getStudySettings, saveStudySettings, getStreak, bumpStreak, getTodayLearned, bumpTodayLearned } from '../services/studySettingsService'
+import { getStudySettings, saveStudySettings, countLearnedToday, computeStreakFromDates, collectStudyDates } from '../services/studySettingsService'
 
 // 资料库：三本 PDF 正文切分后的可读文章（确保内容不遗漏）
 const allArticles: DegreeArticle[] = [...syllabusProse, ...guideArticles]
@@ -969,11 +969,9 @@ const manualStreakInput = ref(0)
 // 备考台单词学习设置（与学习中心两模块各自独立，本地存储）
 const degreeRemindDue = ref(true)
 const degreeGraduatedReturn = ref(false)
-// 备考台本地连续学习天数：背单词卡/词组评分时推进，保证「只刷词不刷题」也累计连续学习（与学习中心两模块口径一致）
-const degreeLocalStreak = ref(0)
-// 今日已学新词数：背单词卡 / 词组 各自独立累计（当天保留，次日归零）
-const degreeTodayLearned = ref(0)
-const phraseTodayLearned = ref(0)
+// 今日已学新词数（从云端进度派生，跨端同步）：背单词卡 / 词组 各自独立统计
+const degreeTodayLearned = computed(() => countLearnedToday(wordProgress.value, undefined, { onlyPhrase: false }))
+const phraseTodayLearned = computed(() => countLearnedToday(wordProgress.value, undefined, { onlyPhrase: true }))
 const wordProgress = ref<Record<string, WordProgress>>({})
 const mistakes = ref<MistakeRec[]>([])
 const notes = ref<FavoriteRec[]>([])
@@ -1184,8 +1182,6 @@ async function gradePhrase(g: SrsGrade) {
   wordProgress.value = { ...wordProgress.value, [key]: next }
   await svc.saveWordProgress(key, next)
   phraseReviewedCount.value++
-  degreeLocalStreak.value = bumpStreak('degree')
-  if (!prev || prev.status === 'new') phraseTodayLearned.value = bumpTodayLearned('degree_phrase')
   if (g === 'again') phraseQueue.value.push(p)
   phraseQueue.value.shift()
   phraseFlipped.value = false
@@ -1225,23 +1221,17 @@ const masteryPercent = computed(() => {
   return Math.round((graduatedCount.value / total) * 100)
 })
 const ringLen = computed(() => (masteryPercent.value / 100) * 314)
-// 连续学习天数：优先由云端练习/错题实际日期推算，回退到手动校准值（多端一致）
+// 连续学习天数：由云端练习/错题/背词日期共同推算（跨端同步），回退到手动校准值。
+// 背词或刷题任一发生都推进连续天数，与旧本地计数口径一致。
 const streakDays = computed(() => {
-  const days = new Set<string>()
-  for (const p of practice.value) if (p.date) days.add(p.date)
-  for (const m of mistakes.value) if (m.createdAt) days.add(String(m.createdAt).slice(0, 10))
+  const dates: string[] = []
+  for (const p of practice.value) if (p.date) dates.push(p.date)
+  for (const m of mistakes.value) if (m.createdAt) dates.push(String(m.createdAt).slice(0, 10))
+  // 合并背单词卡 + 词组的 lastStudied，保证「只刷词不刷题」也累计连续学习
+  dates.push(...collectStudyDates(wordProgress.value))
   const manual = settings.value.manualStreak ?? 0
-  if (!days.size) return Math.max(manual, degreeLocalStreak.value)
-  let streak = 0
-  const d = new Date()
-  for (;;) {
-    const key = d.toISOString().slice(0, 10)
-    if (days.has(key)) {
-      streak++
-      d.setDate(d.getDate() - 1)
-    } else break
-  }
-  return Math.max(streak, manual, degreeLocalStreak.value)
+  const derived = computeStreakFromDates(dates)
+  return Math.max(derived, manual)
 })
 const daysToExam = computed(() => {
   if (!settings.value.examDate) return null
@@ -1394,9 +1384,6 @@ async function loadAll() {
   const ds = getStudySettings('degree')
   degreeRemindDue.value = ds.remindDue
   degreeGraduatedReturn.value = ds.graduatedReturn
-  degreeLocalStreak.value = getStreak('degree')
-  degreeTodayLearned.value = getTodayLearned('degree')
-  phraseTodayLearned.value = getTodayLearned('degree_phrase')
   wordProgress.value = progressData
   mistakes.value = mistakesData
   practice.value = practiceData
@@ -1479,8 +1466,6 @@ async function gradeCard(g: SrsGrade) {
   wordProgress.value = { ...wordProgress.value, [w.word]: next }
   await svc.saveWordProgress(w.word, next)
   cardReviewedCount.value++
-  degreeLocalStreak.value = bumpStreak('degree')
-  if (!prev || prev.status === 'new') degreeTodayLearned.value = bumpTodayLearned('degree')
   if (g === 'again') {
     cardQueue.value.push(w)
   }

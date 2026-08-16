@@ -1,8 +1,9 @@
-// 三模块（学习中心背单词卡 / 学习中心四六级 / 备考台）各自的「单词学习设置」+「连续学习天数」。
-// 采用 localStorage 镜像：免费、离线可用、无需新增数据库表。
-// 备注：degree 模块的 newPerDay 仍以云端 degree_settings 为准（备考设置里改），其余两项（remindDue / graduatedReturn）
-//       与本服务统一存本地，保证三模块设置各自独立、互不串。
+// 三模块（学习中心背单词卡 / 学习中心四六级 / 备考台）各自的「单词学习设置」+「连续学习天数 / 今日已学」。
+// 设置项（newPerDay / remindDue / graduatedReturn）仍用 localStorage 镜像，免费、离线可用、无需新增数据库表。
+// 「连续天数」与「今日已学」改为【从云端单词进度派生】：单词每次评分都会把 firstLearned/lastStudied 写入
+//   public.learn_word_progress / cet_word_progress / degree_word_progress，PC 与手机读同一份云端数据，自然同步。
 import { todayStr, addDays } from '../prep/trainingSrs'
+import type { WordProgress } from '../prep/degreeTypes'
 
 /** 三个独立单词模块：学习中心背单词卡 / 学习中心四六级 / 备考台（背单词卡+词组共用进度库，靠 key 前缀隔离）。 */
 export type StudyModule = 'learn' | 'cet' | 'degree'
@@ -17,11 +18,8 @@ export interface StudySettings {
 }
 
 const SETTINGS_KEY = 'study_module_settings_v1'
-const STREAK_KEY = 'study_module_streak_v1'
-const TODAY_LEARNED_KEY = 'study_today_learned_v1'
 
 type SettingsMap = Record<string, StudySettings>
-type StreakMap = Record<string, { streak: number; lastDate: string }>
 
 const DEFAULTS: StudySettings = { newPerDay: 15, remindDue: true, graduatedReturn: false }
 
@@ -63,56 +61,55 @@ export function saveStudySettings(module: StudyModule, partial: Partial<StudySet
 }
 
 /**
- * 连续学习天数：每次评分调用。
- * - 今天已记过 → 不变；
- * - 昨天记过 → +1；
- * - 否则（断签或首次）→ 归 1。
+ * 今日已学新词数（从云端进度派生，跨端同步）。
+ * 统计 progress 中 firstLearned === today 的条目数。
+ * - opts.onlyPhrase 省略 → 统计所有条目（learn / cet 模块用）。
+ * - opts.onlyPhrase = true → 只统计 key 以 'ph:' 开头的词组（备考台词组卡）。
+ * - opts.onlyPhrase = false → 只统计 key 不以 'ph:' 开头的单词（备考台单词卡）。
  */
-export function bumpStreak(module: StudyModule): number {
-  const map = lsGet<StreakMap>(STREAK_KEY, {})
-  const today = todayStr()
-  const cur = map[module] ?? { streak: 0, lastDate: '' }
-  let streak = cur.streak
-  if (cur.lastDate === today) {
-    /* 今天已计入，保持不变 */
-  } else if (cur.lastDate === addDays(today, -1)) {
-    streak += 1
-  } else {
-    streak = 1
+export function countLearnedToday(
+  progress: Record<string, WordProgress>,
+  today: string = todayStr(),
+  opts?: { onlyPhrase?: boolean }
+): number {
+  let n = 0
+  for (const [key, p] of Object.entries(progress)) {
+    if (opts?.onlyPhrase !== undefined) {
+      const isPhrase = key.startsWith('ph:')
+      if (opts.onlyPhrase && !isPhrase) continue
+      if (!opts.onlyPhrase && isPhrase) continue
+    }
+    if (p.firstLearned === today) n += 1
   }
-  map[module] = { streak, lastDate: today }
-  lsSet(STREAK_KEY, map)
-  return streak
-}
-
-/** 读取当前连续学习天数（用于看板展示）。 */
-export function getStreak(module: StudyModule): number {
-  const map = lsGet<StreakMap>(STREAK_KEY, {})
-  return map[module]?.streak ?? 0
+  return n
 }
 
 /**
- * 今日已学新词数（按 key 区分模块，跨会话保留当天累计；次日自动归零）。
- * key 不拘泥于 StudyModule 三值：备考台单词卡用 'degree'、词组用 'degree_phrase'，以便两处看板各自独立显示。
+ * 从一组学习日期集合计算「连续学习天数」（从云端进度派生，跨端同步）。
+ * 规则：今天或昨天有记录才算连续；从最近一天往回逐日计数，断一天即止。
+ * degree 模块调用时，应把 practice 日期、mistakes 日期、单词 lastStudied 日期全部并入 dates。
  */
-interface TodayLearnedStore {
-  date: string
-  counts: Record<string, number>
-}
-export function getTodayLearned(key: string): number {
-  const data = lsGet<TodayLearnedStore>(TODAY_LEARNED_KEY, { date: '', counts: {} })
-  if (!data || data.date !== todayStr()) return 0
-  return data.counts[key] || 0
+export function computeStreakFromDates(dates: string[], today: string = todayStr()): number {
+  const set = new Set(dates)
+  let cursor = today
+  if (!set.has(cursor)) {
+    const y = addDays(today, -1)
+    if (!set.has(y)) return 0 // 今天和昨天都没学 → 连续中断
+    cursor = y
+  }
+  let streak = 0
+  while (set.has(cursor)) {
+    streak += 1
+    cursor = addDays(cursor, -1)
+  }
+  return streak
 }
 
-/** 今日新学一个词时调用（prev 为 undefined 或 status==='new'），累计今日已学数，返回最新值。 */
-export function bumpTodayLearned(key: string): number {
-  const data = lsGet<TodayLearnedStore>(TODAY_LEARNED_KEY, { date: '', counts: {} })
-  if (!data || data.date !== todayStr()) {
-    data.date = todayStr()
-    data.counts = {}
+/** 收集进度中所有非空的 lastStudied 日期（供计算连续天数并入日期集合）。 */
+export function collectStudyDates(progress: Record<string, WordProgress>): string[] {
+  const out: string[] = []
+  for (const p of Object.values(progress)) {
+    if (p.lastStudied) out.push(p.lastStudied)
   }
-  data.counts[key] = (data.counts[key] || 0) + 1
-  lsSet(TODAY_LEARNED_KEY, data)
-  return data.counts[key]
+  return out
 }

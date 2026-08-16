@@ -565,7 +565,7 @@ import { MASTER_WORDS_BUNDLE } from '../prep/masterWordsBundle'
 import { CET6_WORDS_BUNDLE } from '../prep/cet6WordsBundle'
 import { loadWords as loadDegreeWords } from '../prep/degreeDb'
 import { countDueToday, countNewToday } from '../prep/trainingSrs'
-import { getStreak, getStudySettings, saveStudySettings, getTodayLearned } from '../services/studySettingsService'
+import { getStudySettings, saveStudySettings, countLearnedToday, computeStreakFromDates, collectStudyDates } from '../services/studySettingsService'
 import { loadLearnWordProgress } from '../services/learnWordProgressService'
 import { loadCetProgress } from '../services/cetProgressService'
 import type { PrepWord } from '../services/cetPrepService'
@@ -597,7 +597,7 @@ const cetProgress = ref<Record<string, WordProgress>>({})
 // 学习中心背单词卡 = 学位英语单词 ONLY（与词组严格隔离，不混为一起）
 const degreeItems = ref<{ word: string; definition: string }[]>([])
 const wordStatsLoading = ref(false)
-// 三模块连续学习天数（本地记录，各自独立）
+// 三模块连续学习天数 / 今日已学（从云端进度派生，PC 与手机读同一份数据自动同步）
 const learnStreak = ref(0)
 const cetStreak = ref(0)
 const learnTodayLearned = ref(0)
@@ -615,10 +615,11 @@ async function loadWordStats(): Promise<void> {
     degreeItems.value = words.map((w) => ({ word: w.word, definition: w.definition }))
     wordProgress.value = prog
     cetProgress.value = { ...cet4, ...cet6 }
-    learnStreak.value = getStreak('learn')
-    cetStreak.value = getStreak('cet')
-    learnTodayLearned.value = getTodayLearned('learn')
-    cetTodayLearned.value = getTodayLearned('cet')
+    // 指标从云端进度派生，而非本地计数 → 跨端一致
+    learnStreak.value = computeStreakFromDates(collectStudyDates(prog))
+    cetStreak.value = computeStreakFromDates(collectStudyDates(cetProgress.value))
+    learnTodayLearned.value = countLearnedToday(prog)
+    cetTodayLearned.value = countLearnedToday(cetProgress.value)
   } catch {
     /* ignore */
   }

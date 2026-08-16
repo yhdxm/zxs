@@ -164,8 +164,6 @@ import {
 import {
   getStudySettings,
   saveStudySettings,
-  bumpStreak,
-  bumpTodayLearned,
   type StudyModule
 } from '../services/studySettingsService'
 import type { DegreeWord, DegreePhrase, DegreeQuestion, WordProgress } from '../prep/degreeTypes'
@@ -378,8 +376,8 @@ async function gradeCurrent(grade: SrsGrade) {
   const prev = progress.value[w.word]
   const next = reviewWord(prev as WordProgress | undefined, grade)
   await saveProgress(w.word, next)
-  bumpStreak(moduleKey.value)
-  if (!prev || prev.status === 'new') bumpTodayLearned(moduleKey.value)
+  // 学习日期由 reviewWord 写入 next.firstLearned/lastStudied 并经 saveProgress 落云端，
+  // 看板的「今日已学 / 连续天数」改为从云端进度派生（跨端同步），此处无需本地计数。
   sessionReviewed.value++
   lastSchedule.value = scheduleText(w.word, next)
   // 遗忘：本轮队尾再练一次；其它：正常出队
@@ -404,8 +402,6 @@ async function afterCheck(autoNext = true) {
   const prev = progress.value[w.word]
   const next = reviewWord(prev as WordProgress | undefined, grade)
   await saveProgress(w.word, next)
-  bumpStreak(moduleKey.value)
-  if (!prev || prev.status === 'new') bumpTodayLearned(moduleKey.value)
   sessionReviewed.value++
   lastSchedule.value = scheduleText(w.word, next)
   if (grade === 'again') {
