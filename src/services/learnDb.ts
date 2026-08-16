@@ -87,15 +87,18 @@ export async function listLearnBookmarks(kind?: string): Promise<LearnBookmark[]
   const u = await uid()
   let q = supabase.from('learn_bookmarks').select('*').eq('user_id', u).order('created_at', { ascending: false })
   if (kind) q = q.eq('kind', kind)
-  const { data } = await q
+  const { data, error } = await q
+  if (error) throw error
   return (data as LearnBookmark[] | null) || []
 }
 export async function addLearnBookmark(kind: string, refId: string, title: string, note = ''): Promise<void> {
   const u = await uid()
-  await supabase.from('learn_bookmarks').insert({ user_id: u, kind, ref_id: refId, title, note })
+  const { error } = await supabase.from('learn_bookmarks').insert({ user_id: u, kind, ref_id: refId, title, note })
+  if (error) throw error
 }
 export async function removeLearnBookmark(id: string): Promise<void> {
-  await supabase.from('learn_bookmarks').delete().eq('id', id)
+  const { error } = await supabase.from('learn_bookmarks').delete().eq('id', id)
+  if (error) throw error
 }
 
 /* ---------- 学习中心：进度 ---------- */

@@ -249,7 +249,7 @@
         <div class="card-start-icon">📚</div>
         <h3 style="margin: 0 0 8px">学位英语背单词</h3>
         <p style="color: var(--text-muted); margin: 0 0 16px; font-size: 13.5px">
-          共 <b>{{ filteredWords.length }}</b> 词 · 今日新学 {{ settings.newPerDay }} · 待复习 {{ reviewCount }}
+          共 <b>{{ filteredWords.length }}</b> 词 · 今日新学 {{ settings.newPerDay }} · 待复习 {{ cardDueCount }} · 已掌握 {{ graduatedCount }}
         </p>
         <el-button type="primary" size="large" round :icon="VideoPlay" @click="startCardMode">
           开始背单词
@@ -259,61 +259,70 @@
       <template v-else>
         <!-- 闪卡进度条 -->
         <div class="flashcard-progress">
-          <span class="flashcard-pos">{{ cardIndex + 1 }} / {{ filteredWords.length }}</span>
+          <span class="flashcard-pos">已学 {{ cardReviewedCount }} · 剩余 {{ cardQueue.length }} · 已掌握 {{ graduatedCount }}</span>
           <div class="flashcard-bar"><div class="flashcard-fill" :style="{ width: cardPercent + '%' }"></div></div>
           <button v-if="immersive" class="flashcard-exit immersive-exit" @click="exitImmersiveOnly" title="退出沉浸式">⛶ 退出沉浸</button>
           <button class="flashcard-exit" @click="exitCardMode" title="退出背词">✕</button>
         </div>
 
-        <!-- 单张闪卡 -->
-        <div v-if="currentCardWord" class="flashcard" :class="{ flipped: cardFlipped }" @click="cardFlipped = !cardFlipped" @touchstart="onCardTouchStart" @touchend="onCardTouchEnd">
-          <div class="flashcard-inner">
-            <!-- 正面：单词 -->
-            <div class="flashcard-front">
-              <div class="fc-word-row">
-                <span class="fc-word">{{ currentCardWord.word }}<span v-if="currentCardWord.productive" class="star">*</span></span>
-                <button class="speak-btn fc-speak" @click.stop="speak(currentCardWord.word)" title="朗读">🔊</button>
+        <template v-if="cardQueue.length">
+          <!-- 单张闪卡 -->
+          <div class="flashcard" :class="{ flipped: cardFlipped }" @click="cardFlipped = !cardFlipped" @touchstart="onCardTouchStart" @touchend="onCardTouchEnd">
+            <div class="flashcard-inner">
+              <!-- 正面：单词 -->
+              <div class="flashcard-front">
+                <div class="fc-word-row">
+                  <span class="fc-word">{{ currentCardWord!.word }}<span v-if="currentCardWord!.productive" class="star">*</span></span>
+                  <button class="speak-btn fc-speak" @click.stop="speak(currentCardWord!.word)" title="朗读">🔊</button>
+                </div>
+                <div v-if="wordPhonetic(currentCardWord!.word)" class="fc-phonetic">{{ wordPhonetic(currentCardWord!.word) }}</div>
+                <div class="fc-hint">点击翻转查看释义</div>
               </div>
-              <div v-if="wordPhonetic(currentCardWord.word)" class="fc-phonetic">{{ wordPhonetic(currentCardWord.word) }}</div>
-              <div class="fc-hint">点击翻转查看释义</div>
+              <!-- 背面：释义+例句 -->
+              <div class="flashcard-back">
+                <div class="fc-def">{{ currentCardWord!.definition }}</div>
+                <div class="fc-src" v-if="currentCardWord!.sourceBooks?.length">
+                  <el-tag v-for="b in currentCardWord!.sourceBooks" :key="b" size="small" :type="srcTagType(b)" effect="plain">{{ b }}</el-tag>
+                </div>
+                <div class="fc-example" v-if="examples[currentCardWord!.word]">
+                  <span class="ex-label">例句</span> {{ examples[currentCardWord!.word] }}
+                  <button class="trans-btn" @click.stop="translateExample(currentCardWord!.word)" :disabled="translating[currentCardWord!.word]">
+                    {{ translations[currentCardWord!.word] ? '已翻译' : '翻译' }}
+                  </button>
+                  <div class="fc-translation" v-if="translations[currentCardWord!.word]">📝 {{ translations[currentCardWord!.word] }}</div>
+                </div>
+                <button class="fc-load-ex" v-if="!examples[currentCardWord!.word] && !exampleLoading[currentCardWord!.word]" @click.stop="loadExample(currentCardWord!.word)">📖 加载例句</button>
+              </div>
             </div>
-            <!-- 背面：释义+例句 -->
-            <div class="flashcard-back">
-              <div class="fc-def">{{ currentCardWord.definition }}</div>
-              <div class="fc-src" v-if="currentCardWord.sourceBooks?.length">
-                <el-tag v-for="b in currentCardWord.sourceBooks" :key="b" size="small" :type="srcTagType(b)" effect="plain">{{ b }}</el-tag>
-              </div>
-              <div class="fc-example" v-if="examples[currentCardWord.word]">
-                <span class="ex-label">例句</span> {{ examples[currentCardWord.word] }}
-                <button class="trans-btn" @click.stop="translateExample(currentCardWord.word)" :disabled="translating[currentCardWord.word]">
-                  {{ translations[currentCardWord.word] ? '已翻译' : '翻译' }}
-                </button>
-                <div class="fc-translation" v-if="translations[currentCardWord.word]">📝 {{ translations[currentCardWord.word] }}</div>
-              </div>
-              <button class="fc-load-ex" v-if="!examples[currentCardWord.word] && !exampleLoading[currentCardWord.word]" @click.stop="loadExample(currentCardWord.word)">📖 加载例句</button>
+          </div>
+
+          <!-- 操作栏 -->
+          <div class="flashcard-ops">
+            <button class="fc-nav-btn immersible-btn" :class="{ on: immersive }" @click="toggleImmersive">{{ immersive ? '📱 退出沉浸' : '⛶ 沉浸式' }}</button>
+            <div class="fc-accent">
+              <span class="accent-label">读音</span>
+              <button class="accent-opt" :class="{ on: voiceAccent === 'en-US' }" @click="voiceAccent = 'en-US'">美</button>
+              <button class="accent-opt" :class="{ on: voiceAccent === 'en-GB' }" @click="voiceAccent = 'en-GB'">英</button>
+            </div>
+            <div class="fc-actions">
+              <el-button size="small" type="danger" @click="gradeCard('again')">忘记</el-button>
+              <el-button size="small" type="warning" @click="addWordBook(currentCardWord!)">生词本</el-button>
+              <el-button size="small" type="primary" @click="gradeCard('good')">认识</el-button>
+              <el-button size="small" type="success" @click="gradeCard('easy')">简单</el-button>
+              <el-button size="small" @click="skipCard">跳过 →</el-button>
             </div>
           </div>
-        </div>
 
-        <!-- 操作栏 -->
-        <div class="flashcard-ops">
-          <button class="fc-nav-btn" :disabled="cardIndex <= 0" @click="prevCard">← 上一个</button>
-          <button class="fc-nav-btn immersible-btn" :class="{ on: immersive }" @click="toggleImmersive">{{ immersive ? '📱 退出沉浸' : '⛶ 沉浸式' }}</button>
-          <div class="fc-accent">
-            <span class="accent-label">读音</span>
-            <button class="accent-opt" :class="{ on: voiceAccent === 'en-US' }" @click="voiceAccent = 'en-US'">美</button>
-            <button class="accent-opt" :class="{ on: voiceAccent === 'en-GB' }" @click="voiceAccent = 'en-GB'">英</button>
-          </div>
-          <div class="fc-actions">
-            <el-button size="small" type="success" @click="cycleWord(currentCardWord!.word); nextCard()">掌握 ✓</el-button>
-            <el-button size="small" type="warning" @click="addWordBook(currentCardWord!)">生词本</el-button>
-            <el-button size="small" @click="nextCard()">跳过 →</el-button>
-          </div>
-          <button class="fc-nav-btn" :disabled="cardIndex >= filteredWords.length - 1" @click="nextCard">下一个 →</button>
-        </div>
+          <!-- 快捷键提示 -->
+          <div class="fc-shortcuts" v-if="!isMobileDevice">空格 翻转 · 1 忘记 · 2 认识 · 3 简单 · S 跳过</div>
+        </template>
 
-        <!-- 快捷键提示 -->
-        <div class="fc-shortcuts" v-if="!isMobileDevice">← → 翻页 · 空格 翻转 · ✓ 掌握并下一张</div>
+        <el-result v-else icon="success" title="本轮背词完成" :sub-title="`今日已学 ${cardReviewedCount} 词`">
+          <template #extra>
+            <el-button type="primary" @click="startCardMode">再来一轮</el-button>
+            <el-button @click="exitCardMode">返回</el-button>
+          </template>
+        </el-result>
       </template>
     </section>
 
@@ -673,6 +682,12 @@ import { syllabusProse } from '../prep/degreeSyllabusProse'
 import type { DegreeSettings, WordProgress, MistakeRec, FavoriteRec, PracticeRec, QuestionType, DegreeQuestion, DegreePhrase, PhraseCategory, SourceBook, DegreeArticle } from '../prep/degreeTypes'
 import * as svc from '../prep/degreeService'
 import { ensureContentSeeded } from '../prep/degreeDb'
+import {
+  buildReviewQueue,
+  reviewWord,
+  todayStr,
+  type SrsGrade
+} from '../prep/degreeSrs'
 
 // 资料库：三本 PDF 正文切分后的可读文章（确保内容不遗漏）
 const allArticles: DegreeArticle[] = [...syllabusProse, ...guideArticles]
@@ -1141,10 +1156,10 @@ function onCardTouchEnd(e: TouchEvent) {
   if (!t) return
   const dx = t.clientX - touchStartX
   const dy = t.clientY - touchStartY
-  // 横向滑动翻卡；纵向滑动忽略（防止误触）
+  // 横向滑动：左滑=认识，右滑=忘记；纵向滑动忽略（防止误触）
   if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)) {
-    if (dx < 0) nextCard()
-    else prevCard()
+    if (dx < 0) void gradeCard('good')
+    else void gradeCard('again')
   }
 }
 
@@ -1191,26 +1206,44 @@ function startStudy() {
   activeTab.value = 'cards'
 }
 
-// ===== 闪卡模式（逐个背单词） =====
+// ===== 闪卡模式（SRS 复习队列：到期词优先 + 每日新词上限） =====
 const cardStarted = ref(false)
-const cardIndex = ref(0)
+const cardQueue = ref<(typeof degreeWords)[number][]>([])
+const cardReviewedCount = ref(0)
 const cardFlipped = ref(false)
 const isMobileDevice = ref(typeof window !== 'undefined' && window.innerWidth <= 768)
-
-const currentCardWord = computed(() => filteredWords.value[cardIndex.value] ?? null)
-const cardPercent = computed(() => {
-  const total = Math.max(filteredWords.value.length, 1)
-  return Math.round(((cardIndex.value + 1) / total) * 100)
+const cardDueCount = computed(() => {
+  const today = todayStr()
+  let due = 0
+  for (const w of filteredWords.value) {
+    const p = wordProgress.value[w.word]
+    if (!p) continue
+    if (p.status !== 'graduated' && (p.due ?? today) <= today) due++
+  }
+  const fresh = filteredWords.value.filter((w) => !wordProgress.value[w.word]).length
+  return due + Math.min(fresh, settings.value.newPerDay || 15)
 })
 
+const currentCardWord = computed(() => cardQueue.value[0] ?? null)
+const cardPercent = computed(() => {
+  const total = cardQueue.value.length + cardReviewedCount.value
+  if (!total) return 0
+  return Math.round((cardReviewedCount.value / total) * 100)
+})
+
+function buildCardQueue() {
+  cardQueue.value = buildReviewQueue(filteredWords.value, wordProgress.value, {
+    newPerDay: settings.value.newPerDay || 15
+  })
+  cardReviewedCount.value = 0
+}
+
 function startCardMode() {
+  buildCardQueue()
   cardStarted.value = true
-  cardIndex.value = 0
   cardFlipped.value = false
-  // 自动加载当前词的例句
-  if (currentCardWord.value && !examples.value[currentCardWord.value.word]) {
-    loadExample(currentCardWord.value.word)
-  }
+  const w = currentCardWord.value
+  if (w && !examples.value[w.word]) loadExample(w.word)
 }
 
 function exitCardMode() {
@@ -1222,29 +1255,41 @@ function exitCardMode() {
   cardFlipped.value = false
 }
 
-function nextCard() {
-  if (cardIndex.value < filteredWords.value.length - 1) {
-    cardIndex.value++
-    cardFlipped.value = false
-    const w = currentCardWord.value
-    if (w && !examples.value[w.word]) loadExample(w.word)
+async function gradeCard(g: SrsGrade) {
+  const w = currentCardWord.value
+  if (!w) return
+  const prev = wordProgress.value[w.word]
+  const next = reviewWord(prev, g)
+  wordProgress.value = { ...wordProgress.value, [w.word]: next }
+  await svc.saveWordProgress(w.word, next)
+  cardReviewedCount.value++
+  if (g === 'again') {
+    cardQueue.value.push(w)
   }
+  cardQueue.value.shift()
+  cardFlipped.value = false
+  const nextW = currentCardWord.value
+  if (nextW && !examples.value[nextW.word]) loadExample(nextW.word)
 }
 
-function prevCard() {
-  if (cardIndex.value > 0) {
-    cardIndex.value--
-    cardFlipped.value = false
-  }
+function skipCard() {
+  const w = currentCardWord.value
+  if (!w) return
+  cardQueue.value.shift()
+  cardFlipped.value = false
+  const nextW = currentCardWord.value
+  if (nextW && !examples.value[nextW.word]) loadExample(nextW.word)
 }
 
 // 键盘快捷键（PC端）
 if (typeof window !== 'undefined') {
   window.addEventListener('keydown', (e: KeyboardEvent) => {
     if (!cardStarted.value) return
-    if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); nextCard() }
-    else if (e.key === 'ArrowLeft') { e.preventDefault(); prevCard() }
-    else if (e.key === 'Enter') { e.preventDefault(); cardFlipped.value = !cardFlipped.value }
+    if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); cardFlipped.value = !cardFlipped.value }
+    else if (e.key === '1') { e.preventDefault(); void gradeCard('again') }
+    else if (e.key === '2') { e.preventDefault(); void gradeCard('good') }
+    else if (e.key === '3') { e.preventDefault(); void gradeCard('easy') }
+    else if (e.key === 's' || e.key === 'S') { e.preventDefault(); skipCard() }
   })
 }
 

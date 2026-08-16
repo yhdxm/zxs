@@ -113,7 +113,7 @@
 
         <!-- 背单词卡训练面板（内嵌，不跳转） -->
         <div v-else-if="active === 'word'" class="le-card">
-          <WordTrainingPanel :mode="(wordSub as any)" @close="wordSub = 'home'" />
+          <WordTrainingPanel source="degree" :mode="(wordSub as any)" @close="wordSub = 'home'" />
         </div>
 
         <!-- 四六级单词：首页（级别 + 训练入口） -->
@@ -539,7 +539,14 @@ const words = ref<LearnBookmark[]>([])
 const transMap = reactive<Record<string, { text: string; loading: boolean }>>({})
 const cet6Ready = CET6_WORDS_BUNDLE.length > 0
 
-async function loadWords(): Promise<void> { words.value = await listLearnBookmarks('word') }
+async function loadWords(): Promise<void> {
+  try {
+    words.value = await listLearnBookmarks('word')
+  } catch (e) {
+    ElMessage.error('生词本读取失败：' + (e as Error).message)
+    words.value = []
+  }
+}
 
 function wordMeaning(): string {
   if (def.value) {
@@ -556,9 +563,25 @@ function wordMeaning(): string {
 async function addWord(): Promise<void> {
   const w = word.value.trim().toLowerCase()
   if (!w) return
-  await addLearnBookmark('word', w, w, wordMeaning())
-  await loadWords()
-  ElMessage.success('已加入生词本')
+  let meaning = wordMeaning()
+  // 如果用户直接输入未查询，自动查一次，把释义一起存进去
+  if (!meaning) {
+    try {
+      const r = await fetchDefinitionSafe(w)
+      meaning = r.def
+        ? r.def.meanings.map((m) => `${m.partOfSpeech} ${m.definitions.map((d) => d.definition).join('；')}`).join('；')
+        : r.builtin
+          ? `${r.builtin.pos} ${r.builtin.def}${r.builtin.example ? ' — ' + r.builtin.example : ''}`
+          : ''
+    } catch { /* 留空，后续点翻译再联网补 */ }
+  }
+  try {
+    await addLearnBookmark('word', w, w, meaning)
+    await loadWords()
+    ElMessage.success('已加入生词本' + (meaning ? '（已保存释义）' : ''))
+  } catch (e) {
+    ElMessage.error('加入生词本失败：' + (e as Error).message)
+  }
 }
 
 async function translateWord(b: LearnBookmark, forceOnline = false): Promise<void> {
@@ -568,7 +591,8 @@ async function translateWord(b: LearnBookmark, forceOnline = false): Promise<voi
     return
   }
   if (transMap[b.id]?.loading) return
-  transMap[b.id] = { text: transMap[b.id]?.text || '', loading: true }
+  const existing = transMap[b.id]?.text || ''
+  transMap[b.id] = { text: existing, loading: true }
   try {
     const r = await fetchDefinitionSafe(b.title)
     const t = r.def
@@ -577,12 +601,20 @@ async function translateWord(b: LearnBookmark, forceOnline = false): Promise<voi
         ? `${r.builtin.pos} ${r.builtin.def}${r.builtin.example ? ' — ' + r.builtin.example : ''}`
         : '未找到释义'
     transMap[b.id] = { text: t, loading: false }
-  } catch {
-    transMap[b.id] = { text: '翻译失败，请稍后重试', loading: false }
+  } catch (e) {
+    transMap[b.id] = { text: '翻译失败：' + (e as Error).message, loading: false }
   }
 }
 
-async function removeWord(id: string): Promise<void> { await removeLearnBookmark(id); await loadWords() }
+async function removeWord(id: string): Promise<void> {
+  try {
+    await removeLearnBookmark(id)
+    await loadWords()
+    ElMessage.success('已删除')
+  } catch (e) {
+    ElMessage.error('删除失败：' + (e as Error).message)
+  }
+}
 
 /* ================= 知识库（按三本 PDF 分册 · 学习模块） ================= */
 const kbSearch = ref('')
