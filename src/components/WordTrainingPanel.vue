@@ -249,7 +249,7 @@ const stats = computed(() => {
   const newToday = Math.min(fresh, newPerDay.value)
   return {
     total: items.value.length,
-    due: due + newToday,
+    due, // 仅今日到期复习（不含新词）
     graduated,
     newToday
   }

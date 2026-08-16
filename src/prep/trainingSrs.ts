@@ -30,14 +30,24 @@ export function buildReviewQueue<T extends SrsItem>(
   return baseBuildQueue(items as unknown as never, progress, opts) as unknown as T[]
 }
 
-/** 今日待复习/待学习总数（到期 + 新词上限）。 */
+/** 今日到期复习数（仅含已学且 due<=today 的项，不含新项）。 */
 export function countDueToday<T extends SrsItem>(
   items: T[],
   progress: Record<string, WordProgress>,
   newPerDay: number
 ): number {
-  const s = baseStats(items as unknown as never, progress)
+  const s = baseStats(items as unknown as never, progress, newPerDay)
   return s.due
+}
+
+/** 今日新项数（min(未学项, newPerDay)）。 */
+export function countNewToday<T extends SrsItem>(
+  items: T[],
+  progress: Record<string, WordProgress>,
+  newPerDay: number
+): number {
+  const s = baseStats(items as unknown as never, progress, newPerDay)
+  return s.newToday
 }
 
 export function srsStats<T extends SrsItem>(

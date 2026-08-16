@@ -88,14 +88,24 @@ export function buildReviewQueue(
   return [...shuffle(due), ...cappedFresh]
 }
 
-/** 今日待复习/待学习总数（到期 + 新词上限）。 */
+/** 今日到期复习数（仅含已学且 due<=today 的词，不含新词）。 */
 export function countDueToday(
+  words: DegreeWord[],
+  progress: Record<string, WordProgress>,
+  _newPerDay: number
+): number {
+  const s = srsStats(words, progress, _newPerDay)
+  return s.due
+}
+
+/** 今日新词数（min(未学词, newPerDay)）。 */
+export function countNewToday(
   words: DegreeWord[],
   progress: Record<string, WordProgress>,
   newPerDay: number
 ): number {
-  const s = srsStats(words, progress)
-  return Math.min(s.due, newPerDay + s.learning) // due 已包含 newCount，这里直接返回更直观
+  const s = srsStats(words, progress, newPerDay)
+  return s.newToday
 }
 
 function shuffle<T>(arr: T[]): T[] {
@@ -114,13 +124,21 @@ export interface SrsStats {
   total: number
   learning: number
   graduated: number
-  /** 今日待复习（到期 + 新词待学）。 */
+  /** 今日到期复习数（仅含已学且 due<=today 的词，不含新词）。 */
   due: number
+  /** 未学习的新词总数。 */
+  newCount: number
+  /** 今日新词数（min(未学词, newPerDay)）。 */
+  newToday: number
   weak: number
 }
 
 /** 词库整体学习态统计，供复习面板总览。 */
-export function srsStats(words: DegreeWord[], progress: Record<string, WordProgress>): SrsStats {
+export function srsStats(
+  words: DegreeWord[],
+  progress: Record<string, WordProgress>,
+  newPerDay?: number
+): SrsStats {
   const today = todayStr()
   let learning = 0
   let graduated = 0
@@ -139,5 +157,6 @@ export function srsStats(words: DegreeWord[], progress: Record<string, WordProgr
     }
   }
   const newCount = words.length - hasProgress
-  return { total: words.length, learning, graduated, due: due + newCount, weak }
+  const newToday = newPerDay !== undefined ? Math.min(newCount, Math.max(0, newPerDay)) : newCount
+  return { total: words.length, learning, graduated, due, newCount, newToday, weak }
 }

@@ -81,7 +81,7 @@
           </div>
 
           <h3 class="le-h" style="margin-top:22px;">背单词卡训练</h3>
-          <p class="le-sub">以三本 PDF 中的单词与词组为数据来源，强化听写、拼写、跟读与翻译。今日待复习/待学 <b>{{ degreeDueCount }}</b> 个。</p>
+          <p class="le-sub">以三本 PDF 中的单词与词组为数据来源，强化听写、拼写、跟读与翻译。今日新学 <b>{{ degreeNewToday }}</b> 个 · 待复习 <b>{{ degreeDueCount }}</b> 个。</p>
           <div class="le-training-grid">
             <button type="button" class="le-training-card" @click="wordSub = 'flash'">
               <span class="le-training-icon">🎴</span>
@@ -111,7 +111,7 @@
             <button type="button" class="le-training-card review" :disabled="degreeDueCount === 0" @click="openReviewOnly('degree')">
               <span class="le-training-icon">🔁</span>
               <span class="le-training-name">待复习</span>
-              <span class="le-training-desc">{{ degreeDueCount }} 个到期/待学</span>
+              <span class="le-training-desc">{{ degreeDueCount }} 个到期</span>
             </button>
           </div>
         </div>
@@ -137,7 +137,7 @@
             title="六级词库待补充"
             description="将免费六级词表（如 KyleBing/english-vocabulary 的「6 六级-乱序.txt」，格式：单词<TAB>释义）保存到 scripts/cet6_words.csv，运行命令 node scripts/gen-cet6-bundle.mjs 即可生成内置六级词库。"
           />
-          <p class="le-sub">今日待复习/待学 <b>{{ cetDueCount }}</b> 个。</p>
+          <p class="le-sub">今日新学 <b>{{ cetNewToday }}</b> 个 · 待复习 <b>{{ cetDueCount }}</b> 个。</p>
           <div class="le-training-grid">
             <button type="button" class="le-training-card" @click="cetSub = 'flash'">
               <span class="le-training-icon">🎴</span><span class="le-training-name">闪卡</span><span class="le-training-desc">卡片式记忆</span>
@@ -152,7 +152,7 @@
               <span class="le-training-icon">🎤</span><span class="le-training-name">跟读</span><span class="le-training-desc">听音跟读练习</span>
             </button>
             <button type="button" class="le-training-card review" :disabled="cetDueCount === 0" @click="openReviewOnly('cet')">
-              <span class="le-training-icon">🔁</span><span class="le-training-name">待复习</span><span class="le-training-desc">{{ cetDueCount }} 个到期/待学</span>
+              <span class="le-training-icon">🔁</span><span class="le-training-name">待复习</span><span class="le-training-desc">{{ cetDueCount }} 个到期</span>
             </button>
           </div>
         </div>
@@ -475,7 +475,7 @@ import WordTrainingPanel from '../components/WordTrainingPanel.vue'
 import { MASTER_WORDS_BUNDLE } from '../prep/masterWordsBundle'
 import { CET6_WORDS_BUNDLE } from '../prep/cet6WordsBundle'
 import { loadWords as loadDegreeWords, loadPhrases as loadDegreePhrases } from '../prep/degreeDb'
-import { countDueToday } from '../prep/trainingSrs'
+import { countDueToday, countNewToday } from '../prep/trainingSrs'
 import { loadLearnWordProgress } from '../services/learnWordProgressService'
 import { loadCetProgress } from '../services/cetProgressService'
 import type { PrepWord } from '../services/cetPrepService'
@@ -533,6 +533,7 @@ const degreeDueCount = computed(() => {
   const newPerDay = 15
   return countDueToday(degreeItems.value, wordProgress.value, newPerDay)
 })
+const degreeNewToday = computed(() => countNewToday(degreeItems.value, wordProgress.value, 15))
 
 const cetDueCount = computed(() => {
   const bundle = (cetLevel.value === 'cet6' ? CET6_WORDS_BUNDLE : MASTER_WORDS_BUNDLE) as PrepWord[]
@@ -542,6 +543,15 @@ const cetDueCount = computed(() => {
     : Object.fromEntries(Object.entries(cetProgress.value).filter(([k]) => MASTER_WORDS_BUNDLE.some((p) => p[0] === k)))
   )
   return countDueToday(items, prog, 15)
+})
+const cetNewToday = computed(() => {
+  const bundle = (cetLevel.value === 'cet6' ? CET6_WORDS_BUNDLE : MASTER_WORDS_BUNDLE) as PrepWord[]
+  const items = bundle.map((p) => ({ word: p[0], definition: p[3] }))
+  const prog = (cetLevel.value === 'cet6'
+    ? Object.fromEntries(Object.entries(cetProgress.value).filter(([k]) => CET6_WORDS_BUNDLE.some((p) => p[0] === k)))
+    : Object.fromEntries(Object.entries(cetProgress.value).filter(([k]) => MASTER_WORDS_BUNDLE.some((p) => p[0] === k)))
+  )
+  return countNewToday(items, prog, 15)
 })
 
 function openReviewOnly(source: 'degree' | 'cet'): void {

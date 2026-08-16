@@ -186,12 +186,13 @@ async function toggleGraduated(w: DegreeWord) {
 
 // ---------- 复习模式 ----------
 const mode = ref<'browse' | 'review'>('browse')
-const stats = ref<SrsStats>({ total: 0, learning: 0, graduated: 0, due: 0, weak: 0 })
+const stats = ref<SrsStats>({ total: 0, learning: 0, graduated: 0, due: 0, newCount: 0, newToday: 0, weak: 0 })
 const reviewStarted = ref(false)
 const queue = ref<DegreeWord[]>([])
 const reviewedCount = ref(0)
 const showAnswer = ref(false)
 const current = computed(() => queue.value[0] ?? null)
+const reviewNewPerDay = ref(15)
 
 async function startReview() {
   try {
@@ -203,7 +204,8 @@ async function startReview() {
     words.value = ws
     progressMap.value = prog
     const newPerDay = settings.newPerDay || 15
-    stats.value = srsStats(ws, prog)
+    reviewNewPerDay.value = newPerDay
+    stats.value = srsStats(ws, prog, newPerDay)
     queue.value = buildReviewQueue(ws, prog, { newPerDay })
     reviewedCount.value = 0
     showAnswer.value = false
@@ -226,7 +228,7 @@ async function grade(g: SrsGrade) {
   // 遗忘：本轮稍后再出现，强化记忆
   if (g === 'again') queue.value.push(w)
   showAnswer.value = false
-  stats.value = srsStats(words.value, progressMap.value)
+  stats.value = srsStats(words.value, progressMap.value, reviewNewPerDay.value)
 }
 
 onMounted(async () => {

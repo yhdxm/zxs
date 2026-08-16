@@ -72,10 +72,10 @@
     <template v-if="topNav === 'today'">
     <!-- 统计行 -->
     <div class="dh-stats">
-      <div class="dh-stat"><span class="dh-stat-label">今日新词</span><span class="dh-stat-val purple">{{ settings.newPerDay }}</span></div>
+      <div class="dh-stat"><span class="dh-stat-label">今日新词</span><span class="dh-stat-val purple">{{ cardNewToday + phraseNewToday }}</span></div>
+      <div class="dh-stat"><span class="dh-stat-label">今日待复习</span><span class="dh-stat-val orange">{{ cardDueCount + phraseDueCount }}</span></div>
       <div class="dh-stat"><span class="dh-stat-label">连续学习</span><span class="dh-stat-val blue">{{ streakDays }}<small>天</small></span></div>
       <div class="dh-stat"><span class="dh-stat-label">词汇掌握</span><span class="dh-stat-val green">{{ graduatedCount }}<small>/{{ degreeWords.length || VOCAB_REQUIREMENT.receptive }}</small></span></div>
-      <div class="dh-stat"><span class="dh-stat-label">题库总量</span><span class="dh-stat-val orange">{{ allDegreeQuestions.length }}</span></div>
     </div>
 
     <!-- 导航 tab（nav-item 圆角按钮风格，与系统其他模块统一） -->
@@ -249,7 +249,7 @@
         <div class="card-start-icon">📚</div>
         <h3 style="margin: 0 0 8px">学位英语背单词</h3>
         <p style="color: var(--text-muted); margin: 0 0 16px; font-size: 13.5px">
-          共 <b>{{ filteredWords.length }}</b> 词 · 今日新学 {{ settings.newPerDay }} · 待复习 {{ cardDueCount }} · 已掌握 {{ graduatedCount }}
+          共 <b>{{ filteredWords.length }}</b> 词 · 今日新学 {{ cardNewToday }} · 待复习 {{ cardDueCount }} · 已掌握 {{ graduatedCount }}
         </p>
         <div class="card-start-actions">
           <el-button type="primary" size="large" round :icon="VideoPlay" @click="startCardMode">
@@ -350,7 +350,7 @@
         <div class="card-start-icon">🗣️</div>
         <h3 style="margin: 0 0 8px">词组 / 语句 逐个背</h3>
         <p style="color: var(--text-muted); margin: 0 0 16px; font-size: 13.5px">
-          共 <b>{{ filteredPhrases.length }}</b> 条 · 今日新学 {{ settings.newPerDay }} · 待复习 {{ phraseDueCount }} · 已掌握 {{ phraseGraduatedCount }}
+          共 <b>{{ filteredPhrases.length }}</b> 条 · 今日新学 {{ phraseNewToday }} · 待复习 {{ phraseDueCount }} · 已掌握 {{ phraseGraduatedCount }}
         </p>
         <div class="card-start-actions">
           <el-button type="primary" size="large" round :icon="VideoPlay" @click="startPhraseMode(false)">开始背词组</el-button>
@@ -1102,6 +1102,10 @@ const phraseTranslations = ref<Record<string, string>>({})
 const phraseTranslating = ref<Record<string, boolean>>({})
 const showPhraseList = ref(false)
 
+const phraseNewToday = computed(() => {
+  const fresh = filteredPhrases.value.filter((p) => !wordProgress.value[p.en]).length
+  return Math.min(fresh, settings.value.newPerDay || 15)
+})
 const phraseDueCount = computed(() => {
   const today = todayStr()
   let due = 0
@@ -1110,8 +1114,7 @@ const phraseDueCount = computed(() => {
     if (!prog) continue
     if (prog.status !== 'graduated' && (prog.due ?? today) <= today) due++
   }
-  const fresh = filteredPhrases.value.filter((p) => !wordProgress.value[p.en]).length
-  return due + Math.min(fresh, settings.value.newPerDay || 15)
+  return due // 仅到期复习（不含新词）
 })
 const currentPhrase = computed(() => phraseQueue.value[0] ?? null)
 const phrasePercent = computed(() => {
@@ -1354,6 +1357,10 @@ const cardQueue = ref<(typeof degreeWords)[number][]>([])
 const cardReviewedCount = ref(0)
 const cardFlipped = ref(false)
 const isMobileDevice = ref(typeof window !== 'undefined' && window.innerWidth <= 768)
+const cardNewToday = computed(() => {
+  const fresh = filteredWords.value.filter((w) => !wordProgress.value[w.word]).length
+  return Math.min(fresh, settings.value.newPerDay || 15)
+})
 const cardDueCount = computed(() => {
   const today = todayStr()
   let due = 0
@@ -1362,8 +1369,7 @@ const cardDueCount = computed(() => {
     if (!p) continue
     if (p.status !== 'graduated' && (p.due ?? today) <= today) due++
   }
-  const fresh = filteredWords.value.filter((w) => !wordProgress.value[w.word]).length
-  return due + Math.min(fresh, settings.value.newPerDay || 15)
+  return due // 仅到期复习（不含新词）
 })
 
 const currentCardWord = computed(() => cardQueue.value[0] ?? null)
