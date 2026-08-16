@@ -465,6 +465,12 @@ import type { MistakeRec } from '../prep/degreeTypes'
 import WordTrainingPanel from '../components/WordTrainingPanel.vue'
 import { MASTER_WORDS_BUNDLE } from '../prep/masterWordsBundle'
 import { CET6_WORDS_BUNDLE } from '../prep/cet6WordsBundle'
+import {
+  loadKnowledgeProgress,
+  markLessonDone,
+  markLessonDoing,
+  type KnowledgeProgressState
+} from '../services/learnKnowledgeProgressService'
 
 const MODULES = [
   { key: 'word', label: '背单词卡', desc: '查词 · 生词本 · 听写/拼写/跟读/翻译', color: '#0891b2', icon: Reading },
@@ -503,6 +509,7 @@ function switchModule(key: string): void {
   }
   active.value = key
   if (key === 'word' && !words.value.length) void loadWords()
+  if (key === 'outline') void loadKbProgress()
   if (key === 'plan' && !savedPlans.value.length) void loadPlans()
   if (key === 'weakness') void loadWeakness()
 }
@@ -624,27 +631,23 @@ const openMap = reactive<Record<string, boolean>>({})
 const moduleAi = reactive<Record<string, string>>({})
 const lessonAi = reactive<Record<string, string>>({})
 
-const KB_PROGRESS_KEY = 'degree_kb_progress_v1'
 const KB_LAST_KEY = 'degree_kb_last_v1'
 
-interface KbProgress {
-  done: string[]
-  doing: string[]
+interface KbProgress extends KnowledgeProgressState {
   lastBook?: string
   lastChapter?: string
   lastLesson?: string
 }
 
 const kbProgress = reactive<KbProgress>({ done: [], doing: [] })
+const kbLoading = ref(false)
 
-function loadKbProgress(): void {
+async function loadKbProgress(): Promise<void> {
+  kbLoading.value = true
   try {
-    const raw = localStorage.getItem(KB_PROGRESS_KEY)
-    if (raw) {
-      const p = JSON.parse(raw) as KbProgress
-      kbProgress.done = p.done || []
-      kbProgress.doing = p.doing || []
-    }
+    const p = await loadKnowledgeProgress()
+    kbProgress.done = p.done
+    kbProgress.doing = p.doing
     const last = localStorage.getItem(KB_LAST_KEY)
     if (last) {
       const l = JSON.parse(last)
@@ -652,10 +655,13 @@ function loadKbProgress(): void {
       kbProgress.lastChapter = l.lastChapter
       kbProgress.lastLesson = l.lastLesson
     }
-  } catch { /* ignore */ }
+  } catch (e) {
+    ElMessage.error('知识库进度读取失败：' + (e as Error).message)
+  } finally {
+    kbLoading.value = false
+  }
 }
-function saveKbProgress(): void {
-  localStorage.setItem(KB_PROGRESS_KEY, JSON.stringify({ done: kbProgress.done, doing: kbProgress.doing }))
+function saveKbLast(): void {
   localStorage.setItem(KB_LAST_KEY, JSON.stringify({
     lastBook: kbProgress.lastBook,
     lastChapter: kbProgress.lastChapter,
@@ -664,23 +670,33 @@ function saveKbProgress(): void {
 }
 function isDone(id: string): boolean { return kbProgress.done.includes(id) }
 function isDoing(id: string): boolean { return kbProgress.doing.includes(id) }
-function toggleDone(id: string): void {
-  if (isDone(id)) {
-    kbProgress.done = kbProgress.done.filter((x) => x !== id)
-  } else {
-    kbProgress.done = [...kbProgress.done, id]
-    kbProgress.doing = kbProgress.doing.filter((x) => x !== id)
+async function toggleDone(id: string): Promise<void> {
+  const next = !isDone(id)
+  try {
+    await markLessonDone(id, next)
+    if (next) {
+      kbProgress.done = [...kbProgress.done, id]
+      kbProgress.doing = kbProgress.doing.filter((x) => x !== id)
+    } else {
+      kbProgress.done = kbProgress.done.filter((x) => x !== id)
+    }
+  } catch (e) {
+    ElMessage.error('标记完成失败：' + (e as Error).message)
   }
-  saveKbProgress()
 }
-function startLesson(bookId: string, chapterId: string, lessonId: string): void {
+async function startLesson(bookId: string, chapterId: string, lessonId: string): Promise<void> {
   kbProgress.lastBook = bookId
   kbProgress.lastChapter = chapterId
   kbProgress.lastLesson = lessonId
+  saveKbLast()
   if (!isDone(lessonId) && !isDoing(lessonId)) {
-    kbProgress.doing = [...kbProgress.doing, lessonId]
+    try {
+      await markLessonDoing(lessonId, true)
+      kbProgress.doing = [...kbProgress.doing, lessonId]
+    } catch (e) {
+      ElMessage.error('开始学习失败：' + (e as Error).message)
+    }
   }
-  saveKbProgress()
   gotoLesson(bookId, chapterId, lessonId)
 }
 
@@ -908,7 +924,7 @@ async function loadWeakness(): Promise<void> {
 onMounted(async () => {
   updateClock()
   clockTimer = window.setInterval(updateClock, 1000)
-  loadKbProgress()
+  await loadKbProgress()
   try { cfg.value = await loadAiConfig() } catch { /* ignore */ }
   await loadWords()
   await lookup()

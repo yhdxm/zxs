@@ -253,10 +253,14 @@ function statusOf(name: string): string { const p = progressMap.value[name]; ret
 function isBooked(name: string): boolean { return bookmarks.value.some((b) => b.ref_id === name) }
 
 async function loadState(): Promise<void> {
-  bookmarks.value = await listLearnBookmarks('topic')
-  for (const t of topics) {
-    const p = await getProgress('industry', t.name)
-    if (p) progressMap.value[t.name] = p
+  try {
+    bookmarks.value = await listLearnBookmarks('topic')
+    for (const t of topics) {
+      const p = await getProgress('industry', t.name)
+      if (p) progressMap.value[t.name] = p
+    }
+  } catch (e) {
+    ElMessage.error('加载学习状态失败：' + (e as Error).message)
   }
 }
 
@@ -307,9 +311,13 @@ async function toggleBookmark(t: IndustryTopic): Promise<void> {
   await loadState()
 }
 async function markDone(t: IndustryTopic): Promise<void> {
-  await setProgress('industry', t.name, 'done', 100)
-  await loadState()
-  ElMessage.success(`已标记「${t.name}」为已掌握`)
+  try {
+    await setProgress('industry', t.name, 'done', 100)
+    await loadState()
+    ElMessage.success(`已标记「${t.name}」为已掌握`)
+  } catch (e) {
+    ElMessage.error('标记失败：' + (e as Error).message)
+  }
 }
 
 /* 维基百科在线补充（兜底增强，失败静默） */
