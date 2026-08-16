@@ -136,9 +136,11 @@ const router = createRouter({
       meta: { requirePermission: 'aimodels' }
     },
     {
-      // 旧版学位英语备考台已合并进「学位英语备考台 2.0」(/degree/*)，此处重定向以保留旧书签。
+      // 原版学位英语备考台（PDF 预览 / 词库 / 题库 / TTS / 划词翻译），作为「学位英语」分组第一项保留；2.0 模块作为子项加在其下。
       path: '/learn/english',
-      redirect: '/degree/home'
+      name: 'learn-english',
+      component: () => import('../views/LearnEnglishView.vue'),
+      meta: { requirePermission: 'learn-english' }
     },
     {
       path: '/learn/industry',
