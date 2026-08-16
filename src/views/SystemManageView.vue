@@ -209,7 +209,7 @@ const isAdmin = computed(() => currentUser.value?.role === 'admin')
 
 const canManage = (row: AccountRecord) => {
   if (isSuperAdmin.value) return true
-  if (isAdmin.value) return row.role === 'user'
+  if (isAdmin.value) return row.role !== 'superadmin' && row.role !== 'admin'
   return false
 }
 const manageableAccounts = computed(() => accounts.value.filter((row) => canManage(row)))

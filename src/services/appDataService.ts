@@ -7,7 +7,8 @@ export { supabase }
 
 import { APP_MENU, type SideItem } from '../config/appMenu'
 
-export type UserRole = 'superadmin' | 'admin' | 'user'
+/** 角色 key：保留 superadmin/admin/user 作为内置角色，同时允许自定义角色 */
+export type UserRole = 'superadmin' | 'admin' | 'user' | string
 
 /** 权限平台：pc 或 mobile */
 export type PermissionPlatform = 'pc' | 'mobile'
@@ -720,6 +721,9 @@ function mapAuthError(error: { message?: string }): string {
 
 function normalizeRole(value: unknown): UserRole {
   if (value === 'superadmin' || value === 'admin' || value === 'user') return value
+  // 自定义角色（如「学英语」）保留原 key，不在此处强制降级为 user，
+  // 否则账号管理表格会把自定义角色显示成「普通用户」。
+  if (typeof value === 'string' && value.trim().length > 0) return value.trim()
   return 'user'
 }
 
