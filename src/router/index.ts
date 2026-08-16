@@ -143,6 +143,13 @@ const router = createRouter({
       meta: { requirePermission: 'degree-legacy' }
     },
     {
+      // 学位英语学习中心（背单词卡训练 / 知识库三本PDF / 学习计划 / AI答疑 / 薄弱点分析）
+      path: '/learn/english-study',
+      name: 'learn-english-study',
+      component: () => import('../views/LearnEnglishView.vue'),
+      meta: { requirePermission: 'degree-study' }
+    },
+    {
       path: '/learn/industry',
       name: 'learn-industry',
       component: () => import('../views/LearnIndustryView.vue'),

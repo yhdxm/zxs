@@ -100,7 +100,8 @@ export const APP_MENU: SideItem[] = [
         expanded: true,
         permissionKey: 'learn-english',
         children: [
-          { key: 'degree-legacy', label: '备考台', icon: Document, permissionKey: 'degree-legacy', to: '/learn/english' }
+          { key: 'degree-legacy', label: '备考台', icon: Document, permissionKey: 'degree-legacy', to: '/learn/english' },
+          { key: 'degree-study', label: '学习中心', icon: Reading, permissionKey: 'degree-study', to: '/learn/english-study' }
         ]
       },
       { key: 'learn-industry', label: '各行业知识', icon: DataBoard, permissionKey: 'learn-industry', to: '/learn/industry' },
