@@ -1163,9 +1163,20 @@ function skipPhrase() {
 function speakPhrase(text: string) { speak(text) }
 async function translatePhrase(p: DegreePhrase) {
   if (phraseTranslations.value[p.en] || phraseTranslating.value[p.en]) return
+  // 优先使用词组表自带中文释义（本地、免费、即时），避免联网失败时翻译不生效
+  if (p.zh && p.zh.trim()) {
+    phraseTranslations.value = { ...phraseTranslations.value, [p.en]: p.zh.trim() }
+    return
+  }
   phraseTranslating.value = { ...phraseTranslating.value, [p.en]: true }
-  phraseTranslations.value = { ...phraseTranslations.value, [p.en]: await translateText(p.en) }
-  phraseTranslating.value = { ...phraseTranslating.value, [p.en]: false }
+  try {
+    const t = await translateText(p.en)
+    phraseTranslations.value = { ...phraseTranslations.value, [p.en]: t || '（翻译暂不可用）' }
+  } catch {
+    phraseTranslations.value = { ...phraseTranslations.value, [p.en]: '（翻译暂不可用）' }
+  } finally {
+    phraseTranslating.value = { ...phraseTranslating.value, [p.en]: false }
+  }
 }
 
 const phraseGraduatedCount = computed(() => allDegreePhrases.filter((p) => wordProgress.value['ph:' + p.en]?.status === 'graduated').length)

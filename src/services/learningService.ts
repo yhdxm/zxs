@@ -6,6 +6,8 @@
 
 import { fetchCorsJson, fetchCorsText } from './freeApi'
 import { callAi, type AiConfig } from './aiService'
+import { degreeWords } from '../prep/degreeWords'
+import { MASTER_WORDS_BUNDLE } from '../prep/masterWordsBundle'
 
 /* ===================== 学位英语 ===================== */
 
@@ -313,12 +315,35 @@ export const BUILTIN_WORDS: Record<string, { phonetic: string; pos: string; def:
   benefit: { phonetic: '/ˈbenɪfɪt/', pos: 'n./v.', def: '好处；受益。', example: 'Exercise benefits health.' }
 }
 
-/** 带兜底地查词：API 不可达时返回内置高频词释义 */
+/** 从 degreeWords 解析出 pos + def（definition 字段已含 pos 前缀，如 "n.单词"） */
+function parseDegreeDefinition(raw: string): { pos: string; def: string } {
+  const m = raw.match(/^([a-z]+\.|n\.|v\.|a\.|ad\.|prep\.|conj\.|pron\.|art\.|num\.|int\.|vt\.|vi\.|t\.|ut\.|ot\.)(.*)$/)
+  if (m) return { pos: m[1]!, def: m[2]! }
+  return { pos: '', def: raw }
+}
+
+/** 带兜底地查词：先 Free Dictionary，再内置高频词，再学位英语词库，再四级词库 */
 export async function fetchDefinitionSafe(word: string): Promise<{ def: WordDefinition | null; builtin?: { phonetic: string; pos: string; def: string; example?: string } }> {
   const def = await fetchDefinition(word)
   if (def) return { def }
   const key = word.trim().toLowerCase()
   if (BUILTIN_WORDS[key]) return { def: null, builtin: BUILTIN_WORDS[key] }
+  const degree = degreeWords.find((w) => w.word.toLowerCase() === key)
+  if (degree) {
+    const parsed = parseDegreeDefinition(degree.definition)
+    return {
+      def: null,
+      builtin: { phonetic: degree.phonetic || '', pos: parsed.pos || ' ', def: parsed.def || degree.definition }
+    }
+  }
+  const master = MASTER_WORDS_BUNDLE.find((row) => row[0].toLowerCase() === key)
+  if (master) {
+    const [_w, phonetic, pos, meaning, example] = master
+    return {
+      def: null,
+      builtin: { phonetic: phonetic || '', pos: `${pos}.`, def: meaning, example: example || undefined }
+    }
+  }
   return { def: null }
 }
 
