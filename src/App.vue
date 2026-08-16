@@ -32,41 +32,12 @@
       </div>
 
       <nav class="side-nav">
-        <template v-for="item in filteredSideMenu" :key="item.key">
-          <button
-            v-if="!item.children"
-            class="side-item"
-            :class="{ active: isMenuActive(item.key) }"
-            @click="goMenu(item)"
-          >
-            <el-icon><component :is="item.icon" /></el-icon>
-            <span>{{ item.label }}</span>
-          </button>
-
-          <div v-else class="side-group">
-            <button
-              class="side-item side-group-title"
-              :class="{ active: isMenuActive(item.key), expanded: item.expanded }"
-              @click="toggleGroup(item.key)"
-            >
-              <el-icon><component :is="item.icon" /></el-icon>
-              <span>{{ item.label }}</span>
-              <el-icon class="group-arrow"><ArrowDown /></el-icon>
-            </button>
-            <div v-show="item.expanded" class="side-group-children">
-              <button
-                v-for="child in item.children"
-                :key="child.key"
-                class="side-item side-child"
-                :class="{ active: isMenuActive(child.key) }"
-                @click="goMenu(child)"
-              >
-                <span class="child-dot"></span>
-                <span>{{ child.label }}</span>
-              </button>
-            </div>
-          </div>
-        </template>
+        <SideNavNode
+          :items="filteredSideMenu"
+          :is-active="isMenuActive"
+          :navigate="goMenu"
+          :toggle="toggleGroup"
+        />
       </nav>
 
       <div class="side-footer">
@@ -175,41 +146,12 @@
         </el-input>
       </div>
       <nav class="side-nav">
-        <template v-for="item in filteredSideMenu" :key="item.key">
-          <button
-            v-if="!item.children"
-            class="side-item"
-            :class="{ active: isMenuActive(item.key) }"
-            @click="goMenu(item)"
-          >
-            <el-icon><component :is="item.icon" /></el-icon>
-            <span>{{ item.label }}</span>
-          </button>
-
-          <div v-else class="side-group">
-            <button
-              class="side-item side-group-title"
-              :class="{ active: isMenuActive(item.key), expanded: item.expanded }"
-              @click="toggleGroup(item.key)"
-            >
-              <el-icon><component :is="item.icon" /></el-icon>
-              <span>{{ item.label }}</span>
-              <el-icon class="group-arrow"><ArrowDown /></el-icon>
-            </button>
-            <div v-show="item.expanded" class="side-group-children">
-              <button
-                v-for="child in item.children"
-                :key="child.key"
-                class="side-item side-child"
-                :class="{ active: isMenuActive(child.key) }"
-                @click="goMenu(child)"
-              >
-                <span class="child-dot"></span>
-                <span>{{ child.label }}</span>
-              </button>
-            </div>
-          </div>
-        </template>
+        <SideNavNode
+          :items="filteredSideMenu"
+          :is-active="isMenuActive"
+          :navigate="goMenu"
+          :toggle="toggleGroup"
+        />
       </nav>
       <div class="drawer-footer">
         <button class="theme-toggle" @click="toggleTheme" :title="theme === 'dark' ? '切换到浅色模式' : '切换到深色模式'">
@@ -246,7 +188,6 @@ import {
   SwitchButton,
   Menu,
   Search,
-  ArrowDown,
   Sunny,
   Moon,
   Loading,
@@ -261,6 +202,7 @@ import {
 } from './services/appDataService'
 import { APP_MENU, canManageSystem, type SideItem } from './config/appMenu'
 import CompassLogo from './components/CompassLogo.vue'
+import SideNavNode from './components/SideNavNode.vue'
 import { clearRouterUserCache } from './router'
 import {
   isPushSupported,
@@ -380,11 +322,12 @@ const roleLabel = computed(() => {
 
 /* ===== 已登录：左侧全局侧边栏菜单（由全局菜单配置 APP_MENU 派生，与权限树自动同步） ===== */
 // 保留可变的 expanded 状态，同时保留 visible 函数引用（APP_MENU 已内联 canManageSystem）
-function cloneMenu(items: SideItem[]): SideItem[] {
+function cloneMenu(items: SideItem[], depth = 0): SideItem[] {
   return items.map((it) => ({
     ...it,
-    children: it.children ? cloneMenu(it.children) : undefined,
-    expanded: false // 强制默认闭合，不受数据源影响
+    // 顶层分组默认闭合；嵌套分组（如「学习中心 → 学位英语」）保留数据源展开态，减少点击层级
+    expanded: depth === 0 ? false : (it.expanded ?? false),
+    children: it.children ? cloneMenu(it.children, depth + 1) : undefined
   }))
 }
 const sideMenu = reactive(cloneMenu(APP_MENU))
@@ -430,7 +373,7 @@ const toggleGroup = (key: string) => {
 }
 
 const isMenuActive = (key: string) => {
-  if (key === 'degree2') return route.path.startsWith('/degree')
+  if (key === 'learn-english') return route.path.startsWith('/degree')
   if (key.startsWith('degree-')) return route.path === '/degree/' + key.slice('degree-'.length)
   if (key === 'welcome') return route.path === '/welcome'
   if (key === 'database') return route.path === '/database'
@@ -440,12 +383,10 @@ const isMenuActive = (key: string) => {
   if (key === 'aimodels') return route.path === '/aimodels'
   if (key === 'fanjingzhixie') return ['/news', '/weather', '/map', '/automation', '/yingcang', '/xingyu', '/third-api'].includes(route.path)
   if (key === 'xingyu') return route.path === '/xingyu'
-  if (key === 'learncenter') return route.path.startsWith('/learn')
-  if (key === 'learn-english') return route.path === '/learn/english' || route.path === '/learn/degree-english'
+  if (key === 'learncenter') return route.path.startsWith('/learn') || route.path.startsWith('/degree')
   if (key === 'learn-industry') return route.path === '/learn/industry'
   if (key === 'learn-books') return route.path === '/learn/books'
   if (key === 'learn-goals') return route.path === '/learn/goals'
-  if (key === 'weakness') return route.path === '/learn/weakness'
   if (key === 'news') return route.path === '/news' || route.path === '/yingcang'
   if (key === 'news-main') return route.path === '/news'
   if (key === 'yingcang') return route.path === '/yingcang'
@@ -846,88 +787,8 @@ onUnmounted(() => {
   position: relative;
   z-index: 1;
 }
-.side-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  border: none;
-  background: transparent;
-  padding: 10px 14px;
-  border-radius: 12px;
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--text);
-  cursor: pointer;
-  text-align: left;
-  transition: all 0.2s ease;
-  position: relative;
-}
-.side-item :deep(svg) { font-size: 17px; }
-.side-item:hover {
-  background: var(--nav-hover);
-  color: var(--text-strong);
-}
-.side-item.active {
-  background: var(--nav-active-bg);
-  color: var(--nav-active-text);
-  font-weight: 600;
-  box-shadow: 0 0 18px var(--nav-active-glow), inset 0 0 0 1px var(--border-strong);
-}
-.side-item:active {
-  transform: scale(0.96);
-}
-.side-child:active {
-  transform: scale(0.96);
-}
-.side-item.active::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 3px;
-  height: 20px;
-  border-radius: 0 3px 3px 0;
-  background: linear-gradient(180deg, var(--primary-2), var(--primary));
-  box-shadow: 0 0 10px var(--accent-glow-2);
-}
-.side-group-title {
-  justify-content: flex-start;
-}
-.side-group-title .group-arrow {
-  margin-left: auto;
-  font-size: 12px;
-  transition: transform 0.2s;
-  color: var(--text-faint);
-}
-.side-group-title.expanded .group-arrow {
-  transform: rotate(180deg);
-}
-.side-group-children {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding-left: 12px;
-  margin-top: 2px;
-}
-.side-child {
-  padding: 8px 14px;
-  font-size: 13px;
-  color: var(--text-muted);
-}
-.side-child .child-dot {
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: var(--text-faint);
-  flex-shrink: 0;
-}
-.side-child.active .child-dot {
-  background: var(--primary-2);
-}
-.side-child.active {
-  color: var(--text);
-}
+/* 侧边栏导航项（.side-item / .side-child / .side-group* / .child-dot 等样式已迁移至
+   src/components/SideNavNode.vue，因递归组件需各自作用域内的 scoped 样式） */
 
 /* 路由切换淡入淡出过渡 */
 .fade-enter-active,

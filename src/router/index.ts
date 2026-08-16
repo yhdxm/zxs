@@ -136,10 +136,9 @@ const router = createRouter({
       meta: { requirePermission: 'aimodels' }
     },
     {
+      // 旧版学位英语备考台已合并进「学位英语备考台 2.0」(/degree/*)，此处重定向以保留旧书签。
       path: '/learn/english',
-      name: 'learn-english',
-      component: () => import('../views/LearnEnglishView.vue'),
-      meta: { requirePermission: 'learn-english' }
+      redirect: '/degree/home'
     },
     {
       path: '/learn/industry',
@@ -227,10 +226,9 @@ const router = createRouter({
       meta: { requirePermission: 'learn-english' }
     },
     {
+      // 旧版薄弱点分析已并入「学位英语备考台 2.0」的薄弱点分析 (/degree/weakness)，此处重定向。
       path: '/learn/weakness',
-      name: 'weakness',
-      component: () => import('../views/WeaknessView.vue'),
-      meta: { requirePermission: 'weakness' }
+      redirect: '/degree/weakness'
     },
     {
       path: '/third-api',
