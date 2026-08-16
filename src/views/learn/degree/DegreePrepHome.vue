@@ -8,11 +8,19 @@
         </p>
       </div>
       <div class="dp-hero-right">
-        <el-tag v-if="seeding" type="primary" effect="light" round>
+        <el-tag v-if="seeding || reseeding" type="primary" effect="light" round>
           <el-icon class="is-loading"><Loading /></el-icon> 正在同步云端…
         </el-tag>
         <el-tag v-else-if="seededFromCloud" type="success" effect="light" round>云端数据已同步</el-tag>
         <el-tag v-else type="info" effect="light" round>使用本地内置内容</el-tag>
+        <el-button
+          v-if="!seeding && !reseeding"
+          size="small"
+          text
+          type="primary"
+          :icon="Refresh"
+          @click="reseed"
+        >重新注入</el-button>
       </div>
     </header>
 
@@ -110,13 +118,15 @@ import {
   Medal,
   User,
   DataBoard,
-  Loading
+  Loading,
+  Refresh
 } from '@element-plus/icons-vue'
 import {
   loadWords,
   loadQuestions,
   loadPhrases,
   ensureContentSeeded,
+  reseedContent,
   type SeedProgress
 } from '../../../prep/degreeDb'
 import * as svc from '../../../prep/degreeService'
@@ -124,6 +134,7 @@ import { MATERIALS } from '../../../prep/degreeExamStructure'
 
 const seededFromCloud = ref(false)
 const seeding = ref(false)
+const reseeding = ref(false)
 const seedProgress = reactive<SeedProgress[]>([])
 const stats = reactive({ words: 0, productive: 0, questions: 0, phrases: 0, materials: MATERIALS.length })
 const progress = reactive({ learned: 0, streak: 0, accuracy: 0, mistakes: 0 })
@@ -148,6 +159,19 @@ const modules = [
   { name: '我的', desc: '设置 · 笔记 · 错题 · 同步', to: '/degree/mine', icon: User, color: '#7a5cc2' },
   { name: '综合训练', desc: '原版一站式备考台', to: '/learn/degree-english', icon: DataBoard, color: '#555' }
 ]
+
+async function reseed() {
+  if (reseeding.value) return
+  reseeding.value = true
+  seedProgress.splice(0, seedProgress.length)
+  const ok = await reseedContent((p) => {
+    const idx = seedProgress.findIndex((x) => x.table === p.table)
+    if (idx >= 0) seedProgress[idx] = p
+    else seedProgress.push(p)
+  }).catch(() => false)
+  seededFromCloud.value = !!ok
+  reseeding.value = false
+}
 
 onMounted(async () => {
   // 触发内容落地（首次打开自动注入云端），并读取真实计数
