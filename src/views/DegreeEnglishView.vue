@@ -664,6 +664,7 @@ import { guideArticles } from '../prep/degreeGuide'
 import { syllabusProse } from '../prep/degreeSyllabusProse'
 import type { DegreeSettings, WordProgress, MistakeRec, FavoriteRec, PracticeRec, QuestionType, DegreeQuestion, DegreePhrase, PhraseCategory, SourceBook, DegreeArticle } from '../prep/degreeTypes'
 import * as svc from '../prep/degreeService'
+import { ensureContentSeeded } from '../prep/degreeDb'
 
 // 资料库：三本 PDF 正文切分后的可读文章（确保内容不遗漏）
 const allArticles: DegreeArticle[] = [...syllabusProse, ...guideArticles]
@@ -1376,6 +1377,8 @@ onMounted(() => {
   window.matchMedia('(max-width: 768px)').addEventListener('change', onMobileChange)
   // 进入页面即补发离线队列中未成功的删除/写入（数据可靠性兜底）
   svc.flushQueue().catch((e) => console.warn('[DegreeEnglish] 离线队列重试失败', e))
+  // 内容数据落地数据库：首次进入且云端内容表为空时，后台批量注入词库/题库/词组（不阻塞 UI，失败静默兜底）
+  ensureContentSeeded().catch((e) => console.warn('[DegreeEnglish] 内容 lazy-seed 失败', e))
   // 划词翻译浮层：监听选区变化（桌面 mouseup / 移动端 touchend）
   if (typeof document !== 'undefined') {
     document.addEventListener('mouseup', onTextSelected)

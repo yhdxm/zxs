@@ -532,7 +532,12 @@ export async function getDatabaseStats(): Promise<DatabaseStats> {
         'degree_word_progress',
         'degree_practice',
         'degree_mistakes',
-        'degree_favorites'
+        'degree_favorites',
+        'degree_words',
+        'degree_questions',
+        'degree_phrases',
+        'degree_exam_records',
+        'degree_study_plans'
       ]
       for (const name of tables) {
         try {

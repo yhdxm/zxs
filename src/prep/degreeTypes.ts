@@ -73,6 +73,8 @@ export interface WordProgress {
   level: number
   due: string | null
   weak: boolean
+  /** 连续答错次数（SRS 薄弱度参考，degree_word_progress.wrong_streak 列）。 */
+  wrongStreak?: number
 }
 
 export interface PracticeRec {

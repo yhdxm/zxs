@@ -143,7 +143,13 @@ export async function loadWordProgress(): Promise<Record<string, WordProgress>> 
     if (error) throw error
     const out: Record<string, WordProgress> = {}
     for (const r of (data as any[]) || []) {
-      out[r.word] = { status: r.status, level: r.level, due: r.due ?? null, weak: r.weak ?? false }
+      out[r.word] = {
+        status: r.status,
+        level: r.level,
+        due: r.due ?? null,
+        weak: r.weak ?? false,
+        wrongStreak: r.wrong_streak ?? 0
+      }
     }
     lsSet('words', userId, out) // 云端快照回写本地镜像
     return out
@@ -165,6 +171,7 @@ export async function saveWordProgress(word: string, p: WordProgress): Promise<v
     level: p.level,
     due: p.due,
     weak: p.weak,
+    wrong_streak: p.wrongStreak ?? 0,
     updated_at: new Date().toISOString()
   }, 'user_id,word')
 }
@@ -394,5 +401,27 @@ export async function flushQueue(): Promise<void> {
 if (typeof window !== 'undefined') {
   window.addEventListener('online', () => {
     flushQueue().catch(() => {})
+  })
+}
+
+/** 模拟考试记录（写入 degree_exam_records，按 user_id 隔离）。幂等 id 便于离线重试。 */
+export async function recordExam(
+  paperId: string,
+  total: number,
+  correct: number,
+  duration: number,
+  answers: Record<string, string>
+): Promise<void> {
+  const userId = await getUserId()
+  if (!userId) return
+  const id = `exam_${userId}_${paperId}_${Date.now()}`
+  await cloudInsert('degree_exam_records', {
+    id,
+    user_id: userId,
+    paper_id: paperId,
+    total,
+    correct,
+    duration,
+    answers
   })
 }

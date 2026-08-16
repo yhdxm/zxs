@@ -430,6 +430,8 @@ const toggleGroup = (key: string) => {
 }
 
 const isMenuActive = (key: string) => {
+  if (key === 'degree2') return route.path.startsWith('/degree')
+  if (key.startsWith('degree-')) return route.path === '/degree/' + key.slice('degree-'.length)
   if (key === 'welcome') return route.path === '/welcome'
   if (key === 'database') return route.path === '/database'
   if (key === 'lianzhicang') return route.path === '/ai' || route.path === '/models' || route.path === '/aimodels'

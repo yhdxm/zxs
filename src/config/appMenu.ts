@@ -24,7 +24,9 @@ import {
   Cpu,
   ChatLineSquare,
   Notebook,
-  Odometer
+  Odometer,
+  VideoPlay,
+  Medal
 } from '@element-plus/icons-vue'
 
 export interface SideItem {
@@ -100,6 +102,23 @@ export const APP_MENU: SideItem[] = [
       { key: 'learn-goals', label: '学习目标', icon: Aim, permissionKey: 'learn-goals', to: '/learn/goals' },
       { key: 'cet-prep', label: '四六级备考台', icon: Notebook, permissionKey: 'cet-prep', to: '/learn/cet-prep' },
       { key: 'weakness', label: '薄弱点分析', icon: Odometer, permissionKey: 'weakness', to: '/learn/weakness' }
+    ]
+  },
+  {
+    key: 'degree2',
+    label: '学位英语备考台 2.0',
+    icon: Document,
+    expanded: true,
+    permissionKey: 'learn-english',
+    children: [
+      { key: 'degree-home', label: '学习中心', icon: HomeFilled, permissionKey: 'learn-english', to: '/degree/home' },
+      { key: 'degree-materials', label: '资料中心', icon: Document, permissionKey: 'learn-english', to: '/degree/materials' },
+      { key: 'degree-reader', label: '阅读器', icon: Reading, permissionKey: 'learn-english', to: '/degree/reader' },
+      { key: 'degree-words', label: '生词词库', icon: Notebook, permissionKey: 'learn-english', to: '/degree/words' },
+      { key: 'degree-training', label: '高级训练', icon: VideoPlay, permissionKey: 'learn-english', to: '/degree/training' },
+      { key: 'degree-practice', label: '专项练习', icon: List, permissionKey: 'learn-english', to: '/degree/practice' },
+      { key: 'degree-exam', label: '模拟考试', icon: Medal, permissionKey: 'learn-english', to: '/degree/exam' },
+      { key: 'degree-mine', label: '我的', icon: User, permissionKey: 'learn-english', to: '/degree/mine' }
     ]
   },
   {

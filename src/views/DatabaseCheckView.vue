@@ -234,6 +234,11 @@ const TABLE_DESC: Record<string, string> = {
   degree_practice: '学位英语备考台·练习记录表：五大题型的做题数与正确数',
   degree_mistakes: '学位英语备考台·错题本表：题号/错因/正确思路与复习计划',
   degree_favorites: '学位英语备考台·收藏笔记表：笔记/好句收藏/生词本（kind 区分）',
+  degree_words: '学位英语备考台·词库表：大纲词汇（含音标/词性/释义/复用式标记/来源 PDF 标签），首次运行 lazy-seed 注入',
+  degree_questions: '学位英语备考台·题库表：五大题型题目（题干/选项/答案/解析/来源溯源），首次运行 lazy-seed 注入',
+  degree_phrases: '学位英语备考台·词组语句表：词组/口语表达/词缀/不规则动词（大纲附录二~八）',
+  degree_exam_records: '学位英语备考台·模拟考试记录表：每套卷得分/用时/逐题作答，按 user_id 隔离',
+  degree_study_plans: '学位英语备考台·学习计划表：日/周/自定义计划的完成状态，按 user_id 隔离',
   push_subscriptions: '消息推送·订阅表：用户浏览器/设备推送订阅端点与公钥，按账号隔离',
   notifications: '消息推送·通知表：系统生成的站内通知与待推送消息（标题/正文/类型/已读状态）',
   push_reminder_log: '消息推送·发送日志表：每次提醒/推送的实际发送记录与结果，用于去重与排查'
@@ -264,7 +269,9 @@ const TABLE_GROUP: Record<string, string> = {
   third_party_apis: 'third', api_grants: 'third', api_usage_logs: 'third',
   feedbacks: 'feedback', feedback_replies: 'feedback',
   degree_materials: 'degree', degree_settings: 'degree', degree_word_progress: 'degree',
-  degree_practice: 'degree', degree_mistakes: 'degree', degree_favorites: 'degree'
+  degree_practice: 'degree', degree_mistakes: 'degree', degree_favorites: 'degree',
+  degree_words: 'degree', degree_questions: 'degree', degree_phrases: 'degree',
+  degree_exam_records: 'degree', degree_study_plans: 'degree'
 }
 
 /** 业务域元信息：中文名 + 主题色（浅色主题下的柔和色，用于分组色条与标识） */
