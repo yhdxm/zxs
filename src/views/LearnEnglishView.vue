@@ -28,26 +28,28 @@
           <span class="le-desc">{{ m.desc }}</span>
         </span>
       </button>
-      <!-- 备考台：跳转独立学位英语备考模块（与 CET 内卡片同源，移除卡片后由此进入） -->
-      <button
-        type="button"
-        class="le-entry le-entry-degree"
-        :style="{ '--c': '#534AB7' }"
-        @click="goDegreePrep"
-      >
-        <span class="le-bar"></span>
-        <span class="le-icon"><el-icon><School /></el-icon></span>
-        <span class="le-text">
-          <span class="le-label">备考台</span>
-          <span class="le-desc">背词卡 · 5 大题型 · 模拟考</span>
-        </span>
-      </button>
     </nav>
 
     <Transition name="le-fade" mode="out-in">
       <section :key="active" class="le-body">
         <!-- 查词收藏 -->
         <div v-if="active === 'word'" class="le-card">
+          <h3 class="le-h">备考模块 · 单词</h3>
+          <p class="le-sub">原版查词收藏 + 2.0 词库与训练，已整合进「单词」板块。</p>
+          <div class="le-links">
+            <button
+              v-for="l in wordLinks"
+              :key="l.label"
+              type="button"
+              class="le-link"
+              :style="{ '--c': l.color }"
+              @click="goDegree(l.to)"
+            >
+              <span class="le-link-icon"><el-icon><component :is="l.icon" /></el-icon></span>
+              <span class="le-link-text"><b>{{ l.label }}</b><i>{{ l.desc }}</i></span>
+            </button>
+          </div>
+
           <h3 class="le-h">查词 · 生词本</h3>
           <div class="le-row">
             <el-input v-model="word" placeholder="输入英文单词，如 vocabulary / sustainable" class="le-input" @keyup.enter="lookup" />
@@ -90,6 +92,22 @@
 
         <!-- 知识库：模块导航 + 逐讲精读 -->
         <div v-else-if="active === 'outline'" class="le-card">
+          <h3 class="le-h">备考模块 · 学习英语</h3>
+          <p class="le-sub">原版知识库精读 + 2.0 备考工具，已整合进「学习英语」板块。</p>
+          <div class="le-links">
+            <button
+              v-for="l in studyLinks"
+              :key="l.label"
+              type="button"
+              class="le-link"
+              :style="{ '--c': l.color }"
+              @click="goDegree(l.to)"
+            >
+              <span class="le-link-icon"><el-icon><component :is="l.icon" /></el-icon></span>
+              <span class="le-link-text"><b>{{ l.label }}</b><i>{{ l.desc }}</i></span>
+            </button>
+          </div>
+
           <div class="le-kb-head">
             <div class="le-kb-headtext">
               <h3 class="le-h">学位英语知识库 · {{ ENGLISH_KB_STATS.modules }} 个模块 / {{ ENGLISH_KB_STATS.lessons }} 讲</h3>
@@ -273,6 +291,25 @@
           </div>
           <div v-if="qaAnswer" class="le-answer">{{ qaAnswer }}</div>
         </div>
+
+        <!-- 我的 -->
+        <div v-else-if="active === 'mine'" class="le-card">
+          <h3 class="le-h">我的备考档案</h3>
+          <p class="le-sub">笔记、错题、设置与数据同步（来自 2.0 备考台，已整合进「我的」模块）。</p>
+          <div class="le-links">
+            <button
+              v-for="l in mineLinks"
+              :key="l.label"
+              type="button"
+              class="le-link"
+              :style="{ '--c': l.color }"
+              @click="goDegree(l.to)"
+            >
+              <span class="le-link-icon"><el-icon><component :is="l.icon" /></el-icon></span>
+              <span class="le-link-text"><b>{{ l.label }}</b><i>{{ l.desc }}</i></span>
+            </button>
+          </div>
+        </div>
       </section>
     </Transition>
   </div>
@@ -282,7 +319,7 @@
 import { computed, nextTick, onMounted, onUnmounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { School, Reading, Collection, Calendar, ChatDotRound, ArrowDown } from '@element-plus/icons-vue'
+import { School, Reading, Collection, Calendar, ChatDotRound, ArrowDown, Document, Notebook, VideoPlay, List, Medal, Odometer, User, Setting } from '@element-plus/icons-vue'
 import PageHeader from '../components/PageHeader.vue'
 import { loadAiConfig, callAi, type AiConfig } from '../services/aiService'
 import {
@@ -310,16 +347,36 @@ import {
 } from '../services/learnDb'
 
 const MODULES = [
-  { key: 'word', label: '查词收藏', desc: '词典 + 生词本', color: '#0891b2', icon: Reading },
-  { key: 'outline', label: '知识库', desc: '40+ 讲精读', color: '#7c3aed', icon: Collection },
+  { key: 'outline', label: '学习英语', desc: '知识库 · 资料 · 练习 · 模考', color: '#7c3aed', icon: Collection },
+  { key: 'word', label: '单词', desc: '查词 · 词库 · 训练', color: '#0891b2', icon: Reading },
   { key: 'plan', label: '学习计划', desc: '资料→AI 计划', color: '#e08a00', icon: Calendar },
-  { key: 'ai', label: 'AI 答疑', desc: '语法/备考', color: '#0ea5e9', icon: ChatDotRound }
+  { key: 'ai', label: 'AI 答疑', desc: '语法/备考', color: '#0ea5e9', icon: ChatDotRound },
+  { key: 'mine', label: '我的', desc: '笔记 · 错题 · 设置', color: '#534ab7', icon: User }
 ]
-const active = ref('word')
+const active = ref('outline')
 const router = useRouter()
-function goDegreePrep(): void {
-  router.push('/learn/degree-english')
+function goDegree(path: string): void {
+  router.push(path)
 }
+
+/* 2.0 模块整合入口：归入对应的原版板块 */
+const studyLinks = [
+  { label: '资料中心', desc: '三本 PDF 教材', to: '/degree/materials', icon: Document, color: '#7c3aed' },
+  { label: '阅读器', desc: 'PDF 精读对照', to: '/degree/reader', icon: Reading, color: '#0891b2' },
+  { label: '专项练习', desc: '5 大题型', to: '/degree/practice', icon: List, color: '#e08a00' },
+  { label: '模拟考试', desc: '5 套全真卷', to: '/degree/exam', icon: Medal, color: '#dc2626' },
+  { label: '薄弱点分析', desc: '错题·练习·模考画像', to: '/degree/weakness', icon: Odometer, color: '#534ab7' }
+]
+const wordLinks = [
+  { label: '生词词库', desc: 'PDF 词表（已落地）', to: '/degree/words', icon: Notebook, color: '#0891b2' },
+  { label: '高级训练', desc: '闪卡·听写·拼写', to: '/degree/training', icon: VideoPlay, color: '#7c3aed' },
+  { label: '单词薄弱', desc: 'SRS 间隔复习', to: '/degree/weakness', icon: Odometer, color: '#dc2626' }
+]
+const mineLinks = [
+  { label: '学习笔记', desc: '我的标注收藏', to: '/degree/mine', icon: Document, color: '#534ab7' },
+  { label: '错题本', desc: '薄弱记录汇总', to: '/degree/mine', icon: Collection, color: '#dc2626' },
+  { label: '设置 · 同步', desc: '偏好与数据同步', to: '/degree/mine', icon: Setting, color: '#0ea5e9' }
+]
 
 const nowText = ref('')
 let clockTimer: number | undefined
@@ -544,7 +601,21 @@ onUnmounted(() => { if (clockTimer) window.clearInterval(clockTimer) })
 .le-clock-hint { font-size: 11px; color: var(--text-faint); }
 
 .le-entries { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 18px; }
-.le-entry-degree { border-color: rgba(83, 74, 183, 0.45); box-shadow: 0 0 0 1px rgba(83, 74, 183, 0.15) inset; }
+
+/* ---------- 板块内整合入口卡片 ---------- */
+.le-links { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; margin-bottom: 16px; }
+.le-link {
+  display: flex; align-items: center; gap: 10px; padding: 10px 12px;
+  border: 1px solid var(--border); border-radius: 12px; background: var(--surface);
+  cursor: pointer; text-align: left; min-width: 0; transition: transform .16s ease, border-color .16s ease, background .16s ease;
+}
+.le-link:hover { border-color: var(--c); transform: translateY(-2px); background: color-mix(in srgb, var(--c) 6%, var(--surface)); }
+.le-link-icon { width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; flex-shrink: 0; background: color-mix(in srgb, var(--c) 12%, transparent); color: var(--c); }
+.le-link-icon :deep(svg) { font-size: 16px; }
+.le-link-text { display: flex; flex-direction: column; line-height: 1.35; min-width: 0; }
+.le-link-text b { font-size: 13px; color: var(--text-strong); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.le-link-text i { font-size: 11px; color: var(--text-faint); font-style: normal; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+@media (max-width: 760px) { .le-links { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .le-entry {
   position: relative; display: flex; align-items: center; gap: 10px; padding: 12px 14px 12px 16px;
   background: var(--surface); border: 1px solid var(--border); border-radius: 14px; box-shadow: var(--shadow-card);
