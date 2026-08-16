@@ -132,5 +132,24 @@ export async function saveCetProgress(
       },
       { onConflict: 'user_id,level,word' }
     )
-  } catch { /* 本地镜像已更新，云端失败由 syncWatcher 不兜底（cet 目前未接入 reliability 队列）；但本地可用 */ }
+  } catch {
+    // 云端写入失败：多为 Supabase 尚未执行 add-word-progress-dates.sql（缺 first_learned/last_studied 列）。
+    // 回退到不含新列的 upsert，保证核心进度仍可跨端同步，日期列待迁移后自动生效。
+    try {
+      await supabase.from('cet_word_progress').upsert(
+        {
+          user_id: userId,
+          level,
+          word,
+          status: p.status,
+          score: p.level,
+          due: p.due,
+          weak: p.weak,
+          wrong_streak: p.wrongStreak ?? 0,
+          updated_at: new Date().toISOString()
+        },
+        { onConflict: 'user_id,level,word' }
+      )
+    } catch { /* 本地镜像已更新，云端不可用时至少本机可用 */ }
+  }
 }

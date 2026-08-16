@@ -107,5 +107,23 @@ export async function saveLearnWordProgress(word: string, p: WordProgress): Prom
       },
       { onConflict: 'user_id,word' }
     )
-  } catch { /* 本地镜像已更新，云端失败时至少本机可用 */ }
+  } catch {
+    // 云端写入失败：多为 Supabase 尚未执行 add-word-progress-dates.sql（缺 first_learned/last_studied 列）。
+    // 回退到不含新列的 upsert，保证核心进度仍可跨端同步，日期列待迁移后自动生效。
+    try {
+      await supabase.from('learn_word_progress').upsert(
+        {
+          user_id: userId,
+          word,
+          status: p.status,
+          level: p.level,
+          due: p.due,
+          weak: p.weak,
+          wrong_streak: p.wrongStreak ?? 0,
+          updated_at: new Date().toISOString()
+        },
+        { onConflict: 'user_id,word' }
+      )
+    } catch { /* 本地镜像已更新，云端不可用时至少本机可用 */ }
+  }
 }
