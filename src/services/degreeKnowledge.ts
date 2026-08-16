@@ -7761,7 +7761,7 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
     "id": "moni",
     "name": "《全真模拟试卷及考点点睛》",
     "pdf": "public/pdfs/degree/moni.pdf",
-    "desc": "3 套全真模拟试卷 + 考点点睛，覆盖完成对话、阅读、词汇语法、英译汉、写作五大题型。",
+    "desc": "5 套全真模拟试卷 + 考点点睛，覆盖完成对话、阅读、词汇语法、英译汉、写作五大题型。",
     "chapters": [
       {
         "id": "mk-intro",
@@ -7790,7 +7790,18 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
             "title": "Part I 完成对话",
             "summary": "3 段对话，10 题，10 分。",
             "body": [
-              "完成对话部分主要考查日常交际中的得体应答。建议先读上下文，判断说话人关系、场景与功能，再排除中式英语或不礼貌选项。"
+              "完成对话部分主要考查日常交际中的得体应答。建议先读上下文，判断说话人关系、场景与功能，再排除中式英语或不礼貌选项。",
+              "—— 示例题（已手工补录）——",
+              "题 1. — I wonder if I could use your computer tonight?\n— _______ I'm not using it right now.",
+              "A. Sure, go ahead.    B. I don't know.    C. It doesn't matter.    D. Who cares?",
+              "答案：A",
+              "解析：同意对方使用，用 Sure, go ahead.",
+              "",
+              "题 2. — I'm sorry I broke your cup.\n— _______.",
+              "A. You're welcome.    B. It doesn't matter.    C. With pleasure.    D. That's right.",
+              "答案：B",
+              "解析：对道歉的回应用 It doesn't matter.",
+              ""
             ]
           },
           {
@@ -7798,7 +7809,14 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
             "title": "Part II 阅读理解",
             "summary": "4 篇短文，20 题，40 分。",
             "body": [
-              "阅读理解题材多涉及社会生活、文化教育、科普知识等。做题顺序：先看题干 → 扫读定位 → 对比选项。"
+              "阅读理解题材多涉及社会生活、文化教育、科普知识等。做题顺序：先看题干 → 扫读定位 → 对比选项。",
+              "—— 示例题（已手工补录）——",
+              "【原文】Many people like to travel by plane because it is fast. But I like to take a train. I think trains are safe and comfortable. I can read books, listen to music, or just enjoy the beautiful scenery outside the window.",
+              "题 1. Why does the writer like to take a train?",
+              "A. Because it is fast.    B. Because it is safe and comfortable.    C. Because it is cheap.    D. Because he can sleep well.",
+              "答案：B",
+              "解析：文中明确提到 safe and comfortable。",
+              ""
             ]
           },
           {
@@ -7806,7 +7824,18 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
             "title": "Part III 词汇和语法",
             "summary": "20 题，20 分。",
             "body": [
-              "词汇题重点考查大纲词表中的常用词、词组与搭配；语法题覆盖时态、语态、从句、非谓语、虚拟语气、倒装等核心考点。"
+              "词汇题重点考查大纲词表中的常用词、词组与搭配；语法题覆盖时态、语态、从句、非谓语、虚拟语气、倒装等核心考点。",
+              "—— 示例题（已手工补录）——",
+              "题 1. If I _______ you, I would accept the offer.",
+              "A. am    B. was    C. were    D. be",
+              "答案：C",
+              "解析：与现在事实相反的虚拟语气，be 动词用 were。",
+              "",
+              "题 2. The book _______ on the desk belongs to my brother.",
+              "A. laying    B. lying    C. laid    D. lain",
+              "答案：B",
+              "解析：lie（躺/位于）的现在分词是 lying。",
+              ""
             ]
           },
           {
@@ -7814,7 +7843,12 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
             "title": "Part IV 英译汉",
             "summary": "5 句或短文翻译，15 分。",
             "body": [
-              "英译汉以通顺准确为主，先抓主干，再处理从句与固定搭配，注意中英文表达习惯差异。"
+              "英译汉以通顺准确为主，先抓主干，再处理从句与固定搭配，注意中英文表达习惯差异。",
+              "—— 示例题（已手工补录）——",
+              "题 1. 英译汉：The government is taking effective measures to protect the environment.",
+              "答案：政府正在采取有效措施保护环境。",
+              "解析：take measures to do sth. 采取措施做某事。",
+              ""
             ]
           },
           {
@@ -7822,7 +7856,12 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
             "title": "Part V 短文写作",
             "summary": "15 分，不低于 100 词。",
             "body": [
-              "写作需审题清楚、结构完整、语言规范。常见题型：书信/通知/议论文/图表作文。"
+              "写作需审题清楚、结构完整、语言规范。常见题型：书信/通知/议论文/图表作文。",
+              "—— 示例题（已手工补录）——",
+              "题 1. 写作：请以 \"How to Keep Healthy\" 为题，写一篇约 120 词的短文。",
+              "答案：（略）",
+              "解析：建议三段式：引入健康重要性；给出饮食、运动、睡眠建议；总结。",
+              ""
             ]
           }
         ]
@@ -7836,7 +7875,18 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
             "title": "Part I 完成对话",
             "summary": "3 段对话，10 题，10 分。",
             "body": [
-              "完成对话部分主要考查日常交际中的得体应答。"
+              "完成对话部分主要考查日常交际中的得体应答。",
+              "—— 示例题（已手工补录）——",
+              "题 1. — Would you like to come to our party this Saturday?\n— _______.",
+              "A. Yes, I'd love to.    B. No, I don't.    C. Why not?    D. What a pity!",
+              "答案：A",
+              "解析：接受邀请用 Yes, I'd love to.",
+              "",
+              "题 2. — I wonder if I could use your computer tonight?\n— _______ I'm not using it right now.",
+              "A. Sure, go ahead.    B. I don't know.    C. It doesn't matter.    D. Who cares?",
+              "答案：A",
+              "解析：同意对方使用，用 Sure, go ahead.",
+              ""
             ]
           },
           {
@@ -7844,7 +7894,14 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
             "title": "Part II 阅读理解",
             "summary": "4 篇短文，20 题，40 分。",
             "body": [
-              "阅读理解做题顺序：先看题干 → 扫读定位 → 对比选项。"
+              "阅读理解做题顺序：先看题干 → 扫读定位 → 对比选项。",
+              "—— 示例题（已手工补录）——",
+              "【原文】Regular exercise is good for your health. It can help you control your weight, reduce the risk of heart disease, and improve your mood. You don't have to run a marathon. Walking for 30 minutes a day is enough.",
+              "题 1. What is the main idea of the passage?",
+              "A. Running a marathon is necessary.    B. Exercise is good for health.    C. Walking is boring.    D. Heart disease cannot be prevented.",
+              "答案：B",
+              "解析：主旨是运动有益健康。",
+              ""
             ]
           },
           {
@@ -7852,7 +7909,18 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
             "title": "Part III 词汇和语法",
             "summary": "20 题，20 分。",
             "body": [
-              "词汇与语法覆盖大纲核心词组、时态语态、从句、非谓语、虚拟语气等。"
+              "词汇与语法覆盖大纲核心词组、时态语态、从句、非谓语、虚拟语气等。",
+              "—— 示例题（已手工补录）——",
+              "题 1. It is no use _______ over spilt milk.",
+              "A. cry    B. crying    C. to cry    D. cried",
+              "答案：B",
+              "解析：It is no use doing sth. 做某事无用。",
+              "",
+              "题 2. If I _______ you, I would accept the offer.",
+              "A. am    B. was    C. were    D. be",
+              "答案：C",
+              "解析：与现在事实相反的虚拟语气，be 动词用 were。",
+              ""
             ]
           },
           {
@@ -7860,7 +7928,12 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
             "title": "Part IV 英译汉",
             "summary": "5 句或短文翻译，15 分。",
             "body": [
-              "英译汉注意先译主干，再处理修饰成分，保证语句通顺。"
+              "英译汉注意先译主干，再处理修饰成分，保证语句通顺。",
+              "—— 示例题（已手工补录）——",
+              "题 1. 英译汉：Reading good books is one of the best ways to enrich our minds.",
+              "答案：阅读好书是丰富我们思想的最佳方式之一。",
+              "解析：one of + 复数名词，表示“……之一”。",
+              ""
             ]
           },
           {
@@ -7868,7 +7941,12 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
             "title": "Part V 短文写作",
             "summary": "15 分，不低于 100 词。",
             "body": [
-              "写作注意格式、时态、连接词与字数要求。"
+              "写作注意格式、时态、连接词与字数要求。",
+              "—— 示例题（已手工补录）——",
+              "题 1. 写作：请以 \"My Favorite Hobby\" 为题，写一篇约 120 词的短文。",
+              "答案：（略）",
+              "解析：建议写清爱好是什么、为什么喜欢、带来的收获。",
+              ""
             ]
           }
         ]
@@ -7882,7 +7960,18 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
             "title": "Part I 完成对话",
             "summary": "3 段对话，10 题，10 分。",
             "body": [
-              "完成对话部分主要考查日常交际中的得体应答。"
+              "完成对话部分主要考查日常交际中的得体应答。",
+              "—— 示例题（已手工补录）——",
+              "题 1. — I'm sorry I broke your cup.\n— _______.",
+              "A. You're welcome.    B. It doesn't matter.    C. With pleasure.    D. That's right.",
+              "答案：B",
+              "解析：对道歉的回应用 It doesn't matter.",
+              "",
+              "题 2. — Would you like to come to our party this Saturday?\n— _______.",
+              "A. Yes, I'd love to.    B. No, I don't.    C. Why not?    D. What a pity!",
+              "答案：A",
+              "解析：接受邀请用 Yes, I'd love to.",
+              ""
             ]
           },
           {
@@ -7890,7 +7979,14 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
             "title": "Part II 阅读理解",
             "summary": "4 篇短文，20 题，40 分。",
             "body": [
-              "阅读理解题材涉及社会生活、文化教育、科普知识等。"
+              "阅读理解题材涉及社会生活、文化教育、科普知识等。",
+              "—— 示例题（已手工补录）——",
+              "【原文】Many people like to travel by plane because it is fast. But I like to take a train. I think trains are safe and comfortable. I can read books, listen to music, or just enjoy the beautiful scenery outside the window.",
+              "题 1. Why does the writer like to take a train?",
+              "A. Because it is fast.    B. Because it is safe and comfortable.    C. Because it is cheap.    D. Because he can sleep well.",
+              "答案：B",
+              "解析：文中明确提到 safe and comfortable。",
+              ""
             ]
           },
           {
@@ -7898,7 +7994,18 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
             "title": "Part III 词汇和语法",
             "summary": "20 题，20 分。",
             "body": [
-              "词汇与语法覆盖大纲核心词组、时态语态、从句、非谓语、虚拟语气等。"
+              "词汇与语法覆盖大纲核心词组、时态语态、从句、非谓语、虚拟语气等。",
+              "—— 示例题（已手工补录）——",
+              "题 1. The book _______ on the desk belongs to my brother.",
+              "A. laying    B. lying    C. laid    D. lain",
+              "答案：B",
+              "解析：lie（躺/位于）的现在分词是 lying。",
+              "",
+              "题 2. It is no use _______ over spilt milk.",
+              "A. cry    B. crying    C. to cry    D. cried",
+              "答案：B",
+              "解析：It is no use doing sth. 做某事无用。",
+              ""
             ]
           },
           {
@@ -7906,7 +8013,12 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
             "title": "Part IV 英译汉",
             "summary": "5 句或短文翻译，15 分。",
             "body": [
-              "英译汉以准确通顺为评分核心。"
+              "英译汉以准确通顺为评分核心。",
+              "—— 示例题（已手工补录）——",
+              "题 1. 英译汉：The government is taking effective measures to protect the environment.",
+              "答案：政府正在采取有效措施保护环境。",
+              "解析：take measures to do sth. 采取措施做某事。",
+              ""
             ]
           },
           {
@@ -7914,7 +8026,12 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
             "title": "Part V 短文写作",
             "summary": "15 分，不低于 100 词。",
             "body": [
-              "写作注意审题、结构、连接词与字数。"
+              "写作注意审题、结构、连接词与字数。",
+              "—— 示例题（已手工补录）——",
+              "题 1. 写作：请以 \"How to Keep Healthy\" 为题，写一篇约 120 词的短文。",
+              "答案：（略）",
+              "解析：建议三段式：引入健康重要性；给出饮食、运动、睡眠建议；总结。",
+              ""
             ]
           }
         ]
@@ -7963,6 +8080,166 @@ export const DEGREE_BOOKS: DegreeKnowledgeBook[] = [
             "summary": "书信、通知、议论文、图表作文。",
             "body": [
               "书信：注意称呼、正文三段式、结束语；通知：写明时间地点事件与联系方式；议论文：开头表态、中间论证、结尾总结；图表作文：描述数据+分析原因+得出结论。"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "mk-paper4",
+        "title": "模拟试卷四",
+        "lessons": [
+          {
+            "id": "mk-p4-dialogue",
+            "title": "Part I 完成对话",
+            "summary": "3 段对话，10 题，10 分。",
+            "body": [
+              "—— 示例题（已手工补录）——",
+              "题 1. — I wonder if I could use your computer tonight?\n— _______ I'm not using it right now.",
+              "A. Sure, go ahead.    B. I don't know.    C. It doesn't matter.    D. Who cares?",
+              "答案：A",
+              "解析：同意对方使用，用 Sure, go ahead.",
+              "",
+              "题 2. — I'm sorry I broke your cup.\n— _______.",
+              "A. You're welcome.    B. It doesn't matter.    C. With pleasure.    D. That's right.",
+              "答案：B",
+              "解析：对道歉的回应用 It doesn't matter.",
+              ""
+            ]
+          },
+          {
+            "id": "mk-p4-reading",
+            "title": "Part II 阅读理解",
+            "summary": "4 篇短文，20 题，40 分。",
+            "body": [
+              "—— 示例题（已手工补录）——",
+              "【原文】Regular exercise is good for your health. It can help you control your weight, reduce the risk of heart disease, and improve your mood. You don't have to run a marathon. Walking for 30 minutes a day is enough.",
+              "题 1. What is the main idea of the passage?",
+              "A. Running a marathon is necessary.    B. Exercise is good for health.    C. Walking is boring.    D. Heart disease cannot be prevented.",
+              "答案：B",
+              "解析：主旨是运动有益健康。",
+              ""
+            ]
+          },
+          {
+            "id": "mk-p4-vocab",
+            "title": "Part III 词汇和语法",
+            "summary": "20 题，20 分。",
+            "body": [
+              "—— 示例题（已手工补录）——",
+              "题 1. If I _______ you, I would accept the offer.",
+              "A. am    B. was    C. were    D. be",
+              "答案：C",
+              "解析：与现在事实相反的虚拟语气，be 动词用 were。",
+              "",
+              "题 2. The book _______ on the desk belongs to my brother.",
+              "A. laying    B. lying    C. laid    D. lain",
+              "答案：B",
+              "解析：lie（躺/位于）的现在分词是 lying。",
+              ""
+            ]
+          },
+          {
+            "id": "mk-p4-trans",
+            "title": "Part IV 英译汉",
+            "summary": "短文翻译，15 分。",
+            "body": [
+              "—— 示例题（已手工补录）——",
+              "题 1. 英译汉：Reading good books is one of the best ways to enrich our minds.",
+              "答案：阅读好书是丰富我们思想的最佳方式之一。",
+              "解析：one of + 复数名词，表示“……之一”。",
+              ""
+            ]
+          },
+          {
+            "id": "mk-p4-writing",
+            "title": "Part V 短文写作",
+            "summary": "15 分，不低于 100 词。",
+            "body": [
+              "—— 示例题（已手工补录）——",
+              "题 1. 写作：请以 \"My Favorite Hobby\" 为题，写一篇约 120 词的短文。",
+              "答案：（略）",
+              "解析：建议写清爱好是什么、为什么喜欢、带来的收获。",
+              ""
+            ]
+          }
+        ]
+      },
+      {
+        "id": "mk-paper5",
+        "title": "模拟试卷五",
+        "lessons": [
+          {
+            "id": "mk-p5-dialogue",
+            "title": "Part I 完成对话",
+            "summary": "3 段对话，10 题，10 分。",
+            "body": [
+              "—— 示例题（已手工补录）——",
+              "题 1. — Would you like to come to our party this Saturday?\n— _______.",
+              "A. Yes, I'd love to.    B. No, I don't.    C. Why not?    D. What a pity!",
+              "答案：A",
+              "解析：接受邀请用 Yes, I'd love to.",
+              "",
+              "题 2. — I wonder if I could use your computer tonight?\n— _______ I'm not using it right now.",
+              "A. Sure, go ahead.    B. I don't know.    C. It doesn't matter.    D. Who cares?",
+              "答案：A",
+              "解析：同意对方使用，用 Sure, go ahead.",
+              ""
+            ]
+          },
+          {
+            "id": "mk-p5-reading",
+            "title": "Part II 阅读理解",
+            "summary": "4 篇短文，20 题，40 分。",
+            "body": [
+              "—— 示例题（已手工补录）——",
+              "【原文】Many people like to travel by plane because it is fast. But I like to take a train. I think trains are safe and comfortable. I can read books, listen to music, or just enjoy the beautiful scenery outside the window.",
+              "题 1. Why does the writer like to take a train?",
+              "A. Because it is fast.    B. Because it is safe and comfortable.    C. Because it is cheap.    D. Because he can sleep well.",
+              "答案：B",
+              "解析：文中明确提到 safe and comfortable。",
+              ""
+            ]
+          },
+          {
+            "id": "mk-p5-vocab",
+            "title": "Part III 词汇和语法",
+            "summary": "20 题，20 分。",
+            "body": [
+              "—— 示例题（已手工补录）——",
+              "题 1. It is no use _______ over spilt milk.",
+              "A. cry    B. crying    C. to cry    D. cried",
+              "答案：B",
+              "解析：It is no use doing sth. 做某事无用。",
+              "",
+              "题 2. If I _______ you, I would accept the offer.",
+              "A. am    B. was    C. were    D. be",
+              "答案：C",
+              "解析：与现在事实相反的虚拟语气，be 动词用 were。",
+              ""
+            ]
+          },
+          {
+            "id": "mk-p5-trans",
+            "title": "Part IV 英译汉",
+            "summary": "短文翻译，15 分。",
+            "body": [
+              "—— 示例题（已手工补录）——",
+              "题 1. 英译汉：The government is taking effective measures to protect the environment.",
+              "答案：政府正在采取有效措施保护环境。",
+              "解析：take measures to do sth. 采取措施做某事。",
+              ""
+            ]
+          },
+          {
+            "id": "mk-p5-writing",
+            "title": "Part V 短文写作",
+            "summary": "15 分，不低于 100 词。",
+            "body": [
+              "—— 示例题（已手工补录）——",
+              "题 1. 写作：请以 \"How to Keep Healthy\" 为题，写一篇约 120 词的短文。",
+              "答案：（略）",
+              "解析：建议三段式：引入健康重要性；给出饮食、运动、睡眠建议；总结。",
+              ""
             ]
           }
         ]
