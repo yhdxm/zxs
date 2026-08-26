@@ -22,7 +22,18 @@ const isNested = (depth?: number) => Boolean(depth && depth > 0)
 <template>
   <template v-for="item in items" :key="item.key">
     <button
-      v-if="!item.children"
+      v-if="!item.to && !item.href"
+      class="side-item side-item--disabled"
+      :class="[isNested(depth) ? 'side-child' : '']"
+      disabled
+    >
+      <el-icon v-if="item.icon"><component :is="item.icon" /></el-icon>
+      <span v-if="isNested(depth)" class="child-dot"></span>
+      <span>{{ item.label }}</span>
+    </button>
+
+    <button
+      v-else-if="!item.children"
       class="side-item"
       :class="[isNested(depth) ? 'side-child' : '', { active: isActive(item.key) }]"
       @click="handleNavigate(item)"
@@ -77,6 +88,14 @@ const isNested = (depth?: number) => Boolean(depth && depth > 0)
 .side-item:hover {
   background: var(--nav-hover);
   color: var(--text-strong);
+}
+.side-item--disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.side-item--disabled:hover {
+  background: transparent;
+  color: var(--text);
 }
 .side-item.active {
   background: var(--nav-active-bg);

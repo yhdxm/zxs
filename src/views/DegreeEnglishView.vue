@@ -754,6 +754,7 @@
 <script setup lang="ts">
 import { ref, computed, reactive, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
+import { MOBILE_MAX } from '../config/breakpoints'
 import { Reading, Setting, VideoPlay, Picture, ArrowLeft, ArrowRight, Star } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import EChart from '../components/EChart.vue'
@@ -945,7 +946,7 @@ watch(activeTab, (tab) => {
 const isMobile = ref(false)
 const memOpen = ref(true)
 function syncMobile() {
-  isMobile.value = window.matchMedia('(max-width: 768px)').matches
+  isMobile.value = window.matchMedia('(max-width: ' + MOBILE_MAX + 'px)').matches
 }
 function onMobileChange(e: MediaQueryListEvent) {
   isMobile.value = e.matches
@@ -1632,7 +1633,7 @@ onMounted(() => {
   // 移动端检测：窄屏默认折叠记忆区
   syncMobile()
   if (isMobile.value) memOpen.value = false
-  window.matchMedia('(max-width: 768px)').addEventListener('change', onMobileChange)
+  window.matchMedia('(max-width: ' + MOBILE_MAX + 'px)').addEventListener('change', onMobileChange)
   // 进入页面即补发离线队列中未成功的删除/写入（数据可靠性兜底）
   svc.flushQueue().catch((e) => console.warn('[DegreeEnglish] 离线队列重试失败', e))
   // 内容数据落地数据库：首次进入且云端内容表为空时，后台批量注入词库/题库/词组（不阻塞 UI，失败静默兜底）
@@ -1650,7 +1651,7 @@ function onFullscreenChange() {
   if (typeof document !== 'undefined' && !document.fullscreenElement) immersive.value = false
 }
 onBeforeUnmount(() => {
-  window.matchMedia('(max-width: 768px)').removeEventListener('change', onMobileChange)
+  window.matchMedia('(max-width: ' + MOBILE_MAX + 'px)').removeEventListener('change', onMobileChange)
   if (typeof document !== 'undefined') {
     document.removeEventListener('mouseup', onTextSelected)
     document.removeEventListener('touchend', onTextSelected)

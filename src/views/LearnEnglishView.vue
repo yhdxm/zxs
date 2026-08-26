@@ -1354,7 +1354,7 @@ watch(cetSub, (v) => { if (v === 'home') void loadWordStats() })
   .le-kb-navi { flex-shrink: 0; }
   .le-kb-navname { white-space: nowrap; }
 }
-@media (max-width: 760px) {
+@media (max-width: 768px) {
   .le-card { padding: 14px; }
   .le-entries { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
   .le-entry { padding: 10px 10px 10px 13px; gap: 8px; }

@@ -212,6 +212,8 @@ import {
 import { APP_MENU, canManageSystem, type SideItem } from './config/appMenu'
 import CompassLogo from './components/CompassLogo.vue'
 import SideNavNode from './components/SideNavNode.vue'
+import { useKeyboardAvoid } from './composables/useKeyboardAvoid'
+import { MOBILE_MAX } from './config/breakpoints'
 import { clearRouterUserCache } from './router'
 import {
   isPushSupported,
@@ -446,7 +448,13 @@ const goMenu = (item: SideItem) => {
     mobileNavVisible.value = false
     return
   }
-  if (!item.to) return
+  if (!item.to) {
+    // 防御：无跳转目标且无子菜单的菜单项点击时给出告警（正常配置不应出现）
+    if (!item.href && !(item.children && item.children.length)) {
+      console.warn('[菜单] 该项无跳转目标且无子菜单，已忽略点击:', item.key, item.label)
+    }
+    return
+  }
   mobileNavVisible.value = false
   router.push(item.to)
 }
@@ -534,8 +542,11 @@ const refreshUser = async () => {
 }
 
 const updatePlatform = () => {
-  isMobile.value = window.innerWidth <= 768
+  isMobile.value = window.innerWidth <= MOBILE_MAX
 }
+// 全局键盘避让：一次挂载，document focusin + visualViewport 覆盖全站所有输入框，
+// 移动端软键盘展开时自动把聚焦字段滚动到可视区域中央，消除遮挡。
+useKeyboardAvoid()
 
 const handleLogout = async () => {
   await logoutUser()
