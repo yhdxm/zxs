@@ -124,7 +124,7 @@
     <input ref="fileInput" type="file" accept=".csv,.json" class="hidden-file" @change="importFile" />
 
     <!-- ===== 统一编辑 / 新增弹框（横屏双列） ===== -->
-    <el-dialog v-model="editDialogVisible" :title="editTitle" width="720px" class="premium-dialog mm-dialog" align-center>
+    <el-dialog v-model="editDialogVisible" :title="editTitle" width="min(92vw, 720px)" class="premium-dialog mm-dialog" align-center>
       <el-form label-position="top" class="mm-form-grid">
         <template v-if="type === 'todos'">
           <el-form-item label="事项标题">

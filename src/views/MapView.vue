@@ -30,6 +30,7 @@ import PageHeader from '../components/PageHeader.vue'
 /* 让内部地图组件占满整页高度，交互更舒展 */
 .mp-page-body :deep(.map-panel) {
   height: calc(100vh - 210px);
+  height: calc(100dvh - 210px);
   min-height: 620px;
 }
 

@@ -688,7 +688,7 @@
     </el-dialog>
 
     <!-- 设置 -->
-    <el-dialog v-model="settingsVisible" title="备考设置" width="420px">
+    <el-dialog v-model="settingsVisible" title="备考设置" width="min(92vw, 420px)">
       <el-form label-width="92px">
         <el-form-item label="目标院校">
           <el-input v-model="settings.targetSchool" placeholder="如 商丘师范学院继续教育学院" />
@@ -718,7 +718,7 @@
     </el-dialog>
 
     <!-- 写笔记 -->
-    <el-dialog v-model="noteVisible" title="学习笔记" width="460px">
+    <el-dialog v-model="noteVisible" title="学习笔记" width="min(92vw, 460px)">
       <el-input v-model="noteTitleInput" placeholder="标题（可选）" style="margin-bottom: 10px" />
       <el-input v-model="noteInput" type="textarea" :rows="5" placeholder="写下你的笔记、好句、心得……" />
       <template #footer>

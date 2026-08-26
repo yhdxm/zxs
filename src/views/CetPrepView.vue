@@ -175,6 +175,7 @@ onUnmounted(() => {
   background: var(--bg);
   color: var(--ink);
   min-height: 100vh;
+  min-height: 100dvh;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB",
     "Microsoft YaHei", sans-serif;
   font-size: 15px;

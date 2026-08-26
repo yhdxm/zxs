@@ -502,9 +502,15 @@ function onBottomNav(item: BottomNavItem) {
   }
 }
 
-// 备考台（四六级）自带 fixed 底部导航（今日/刷题/错本/我的），层级较低；
-// 进入该路由时隐藏全局移动端底部导航，避免双导航重叠遮挡、点击不到备考台自身按钮。
-const isCetPrepRoute = computed(() => route.path === '/learn/cet-prep')
+// 这些路由的页面自带 fixed 底部导航（四六级备考台 / 学位英语 / 学习目标），
+// 进入时需隐藏全局移动端底部导航（z-index 更高，会盖住页面自带底栏导致点击失效），
+// 并去掉全局底部留白（页面自身已处理 safe-area 与留白），避免双层底栏重叠 + 留白叠加。
+const HIDDEN_GLOBAL_BOTTOM_ROUTES = new Set([
+  '/learn/cet-prep', // 四六级备考台
+  '/learn/english/prep', // 学位英语备考台（自带底部导航 z-index:40）
+  '/learn/goals' // 学习目标（自带底部导航 z-index:40）
+])
+const isCetPrepRoute = computed(() => HIDDEN_GLOBAL_BOTTOM_ROUTES.has(route.path))
 
 // 页面标题由各视图自身渲染（单一标题铁律），顶部 topbar 不再重复展示
 

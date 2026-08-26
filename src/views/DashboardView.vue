@@ -139,6 +139,7 @@ onBeforeUnmount(() => {
   font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
   background: var(--bg-app);
   min-height: calc(100vh - var(--nav-h, 56px));
+  min-height: calc(100dvh - var(--nav-h, 56px));
 }
 
 @media (max-width: 768px) {

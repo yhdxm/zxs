@@ -478,7 +478,7 @@
         </div>
 
         <!-- 背单词卡 学习设置 -->
-        <el-dialog v-model="learnSettingsVisible" title="背单词卡 · 学习设置" width="420px">
+        <el-dialog v-model="learnSettingsVisible" title="背单词卡 · 学习设置" width="min(92vw, 420px)">
           <el-form label-width="110px">
             <el-form-item label="每日学习单词">
               <el-input-number v-model="learnDraft.newPerDay" :min="1" :max="60" />
@@ -500,7 +500,7 @@
         </el-dialog>
 
         <!-- 四六级 学习设置 -->
-        <el-dialog v-model="cetSettingsVisible" title="四六级 · 学习设置" width="420px">
+        <el-dialog v-model="cetSettingsVisible" title="四六级 · 学习设置" width="min(92vw, 420px)">
           <el-form label-width="110px">
             <el-form-item label="每日学习单词">
               <el-input-number v-model="cetDraft.newPerDay" :min="1" :max="60" />
@@ -1279,7 +1279,7 @@ watch(cetSub, (v) => { if (v === 'home') void loadWordStats() })
 .le-kb-ressum { font-size: 12px; color: var(--text-muted); line-height: 1.5; }
 
 .le-kb-main { display: grid; grid-template-columns: 210px minmax(0, 1fr); gap: 16px; margin-top: 8px; }
-.le-kb-nav { display: flex; flex-direction: column; gap: 6px; position: sticky; top: 12px; align-self: start; max-height: calc(100vh - 120px); overflow: auto; }
+.le-kb-nav { display: flex; flex-direction: column; gap: 6px; position: sticky; top: 12px; align-self: start; max-height: calc(100vh - 120px); max-height: calc(100dvh - 120px); overflow: auto; }
 .le-kb-navi { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 9px 11px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface); cursor: pointer; text-align: left; transition: all .16s ease; }
 .le-kb-navi:hover { border-color: #7c3aed; }
 .le-kb-navi.on { border-color: #7c3aed; background: color-mix(in srgb, #7c3aed 8%, var(--surface)); }

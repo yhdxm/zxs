@@ -667,7 +667,7 @@ onBeforeUnmount(() => {
 .fa-batch-actions { display: flex; gap: 6px; flex-wrap: wrap; }
 
 /* ===== 列表 ===== */
-.fa-list { max-height: calc(100vh - 340px); overflow-y: auto; padding: 10px; min-height: 200px; }
+.fa-list { max-height: calc(100vh - 340px); max-height: calc(100dvh - 340px); overflow-y: auto; padding: 10px; min-height: 200px; }
 .fa-item {
   display: flex;
   gap: 8px;

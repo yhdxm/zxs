@@ -130,7 +130,7 @@
     </section>
 
     <!-- 新增 / 编辑账号 -->
-    <el-dialog v-model="dialogVisible" :title="dialogTitle" width="520px" class="premium-dialog" align-center>
+    <el-dialog v-model="dialogVisible" :title="dialogTitle" width="min(92vw, 520px)" class="premium-dialog" align-center>
       <el-form :model="form" label-position="top" :rules="formRules" ref="formRef">
         <el-form-item label="用户名" prop="username" v-if="!isEdit">
           <el-input v-model="form.username" placeholder="4-20 位字母、数字或下划线" maxlength="20" />

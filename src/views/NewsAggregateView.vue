@@ -281,7 +281,7 @@
     </div>
 
     <!-- 详情弹框 -->
-    <el-dialog v-model="showDetail" :title="detail?.title || ''" width="480px" append-to-body>
+    <el-dialog v-model="showDetail" :title="detail?.title || ''" width="min(92vw, 480px)" append-to-body>
       <div v-if="detail" class="np-dlg-body">
         <div class="np-dlg-meta">
           <span

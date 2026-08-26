@@ -890,6 +890,7 @@ watch(visible, (v) => {
   }
   .mock-exam-dialog :deep(.el-dialog__body) {
     max-height: calc(100vh - 60px);
+    max-height: calc(100dvh - 60px);
   }
   .mock-main {
     grid-template-columns: 1fr;
@@ -906,6 +907,7 @@ watch(visible, (v) => {
   }
   .mock-exam-body {
     height: calc(100vh - 120px);
+    height: calc(100dvh - 120px);
   }
   .mock-sections {
     grid-template-columns: 1fr;

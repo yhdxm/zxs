@@ -518,7 +518,7 @@
     </el-dialog>
 
     <!-- 调用详情弹框（SVG 自绘折线，不引入图表库） -->
-    <el-dialog v-model="callDetailVisible" title="模型调用详情" width="880px" class="mc-call-dialog" destroy-on-close>
+    <el-dialog v-model="callDetailVisible" title="模型调用详情" width="min(92vw, 880px)" class="mc-call-dialog" destroy-on-close>
       <div class="mc-call-stats">
         <div class="mc-call-stat">
           <div class="mc-call-num">{{ callDetail.modelCount }}</div>
@@ -594,7 +594,7 @@
     </el-dialog>
 
     <!-- 校准剩余 token 弹框 -->
-    <el-dialog v-model="calibrateVisible" title="校准模型剩余 Token" width="420px" :close-on-click-modal="false" destroy-on-close>
+    <el-dialog v-model="calibrateVisible" title="校准模型剩余 Token" width="min(92vw, 420px)" :close-on-click-modal="false" destroy-on-close>
       <div v-if="calibrateRow" class="mc-calib">
         <div class="mc-calib-model">{{ calibrateRow.model }}</div>
         <el-form label-position="top">

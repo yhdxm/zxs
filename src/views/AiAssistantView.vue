@@ -51,5 +51,6 @@ const onConfig = () => chatRef.value?.openConfig()
   position: relative;
   height: 100%;
   min-height: 100vh;
+  min-height: 100dvh;
 }
 </style>

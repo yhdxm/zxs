@@ -71,7 +71,7 @@
       </el-button>
     </div>
 
-    <el-dialog v-model="configVisible" title="AI 配置" width="640px" class="ai-config-dialog" align-center>
+    <el-dialog v-model="configVisible" title="AI 配置" width="min(92vw, 640px)" class="ai-config-dialog" align-center>
       <AiConfigPanel />
     </el-dialog>
   </div>
