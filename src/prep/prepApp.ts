@@ -12,6 +12,8 @@ import {
   newId
 } from '../services/cetPrepService'
 import { MASTER_WORDS_BUNDLE } from './masterWordsBundle'
+import { speakEn } from '../prep/degreeSpeech'
+import { getEmoji } from '../data/emojiDict'
 
 export interface PrepStorage {
   fetchMasterWords(): Promise<PrepWord[]>
@@ -256,15 +258,9 @@ function handleWrong(st: WordProgress, w: string) {
 const CAN_SPEAK = typeof window !== 'undefined' && 'speechSynthesis' in window
 function speak(word: string) {
   if (!CAN_SPEAK) return
-  try {
-    window.speechSynthesis.cancel()
-    const u = new SpeechSynthesisUtterance(word)
-    u.lang = 'en-US'
-    u.rate = 0.92
-    window.speechSynthesis.speak(u)
-  } catch (e) {
-    /* noop */
-  }
+  // 复用 degreeSpeech.speakEn：选英文 voice + 移动端 AudioContext 解锁 + pause/resume 兜底，
+  // 确保手机浏览器（iOS Safari / Android Chrome）能稳定播放英文读音。
+  speakEn(word)
 }
 
 /* ===================== 图标（内联 SVG，无 emoji） ===================== */
@@ -1081,6 +1077,7 @@ function renderCard(m: PrepWord, flipped: boolean) {
   if (!flipped) {
     card.innerHTML = `
       <div class="fc-kind ${current!.kind === 'review' ? 'review' : ''}">${current!.kind === 'review' ? '复习' : '新词'}</div>
+      <div class="fc-emoji">${getEmoji(m[0])}</div>
       <div class="fc-word">${esc(m[0])}</div>
       <div class="fc-ph">${esc(m[1])}</div>
       ${speakBtn}
@@ -1094,6 +1091,7 @@ function renderCard(m: PrepWord, flipped: boolean) {
   } else {
     card.innerHTML = `
       <div class="fc-kind ${current!.kind === 'review' ? 'review' : ''}">${current!.kind === 'review' ? '复习' : '新词'}</div>
+      <div class="fc-emoji">${getEmoji(m[0])}</div>
       <div class="fc-word">${esc(m[0])}</div>
       <div class="fc-ph">${esc(m[1])}</div>
       <div class="fc-divider"></div>

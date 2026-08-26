@@ -199,6 +199,12 @@ const router = createRouter({
       meta: { requirePermission: 'degree-weakness' }
     },
     {
+      path: '/degree/quiz',
+      name: 'degree-quiz',
+      component: () => import('../views/learn/degree/DegreeQuizView.vue'),
+      meta: { requirePermission: 'degree-words' }
+    },
+    {
       // 旧版薄弱点分析已并入「学位英语备考台 2.0」的薄弱点分析 (/degree/weakness)，此处重定向。
       path: '/learn/weakness',
       redirect: '/degree/weakness'

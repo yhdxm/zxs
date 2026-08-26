@@ -22,10 +22,10 @@ export default defineConfig({
     // 多线程共享同一 os.tmpdir 产生竞态。改用 forks 池 + 单 fork，
     // 让所有测试在单一进程串行执行，彻底消除跨线程临时目录冲突。
     pool: 'forks',
-    // Vitest 4：原 poolOptions.forks.* 已提升为顶层选项。
-    // 保持单 fork 串行，避免各测试文件挂载组件时实例化真实 Supabase Auth
-    // 客户端写 os.tmpdir 临时锁文件，多线程共享产生 ENOENT 竞态（管控/权限套件偶发飘红）。
-    singleFork: true,
+    // 单进程串行执行所有测试文件：避免各测试文件挂载组件时实例化真实 Supabase Auth
+    // 客户端写 os.tmpdir 临时锁文件，多进程共享产生 ENOENT 竞态（管控/权限套件偶发飘红）。
+    // Vitest 4 已移除 singleFork，改用 fileParallelism:false 强制单 worker（等价于 maxWorkers=1）。
+    fileParallelism: false,
     // 单测环境注入占位 Supabase 变量：仅为满足 createClient 的非空校验，
     // 不会发出真实请求（客户端在 setup.ts 中已整体桩化）。
     env: {

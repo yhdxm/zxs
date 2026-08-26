@@ -35,6 +35,7 @@
         <div v-for="w in paged" :key="w.word" class="dw-item" :class="{ prod: w.productive }">
           <div class="dw-item-main">
             <div class="dw-word-row">
+              <span class="dw-emoji" :title="'点击设置象形图标'" @click="editEmoji(w.word)">{{ emojiOf(w.word) }}</span>
               <span class="dw-word">{{ w.word }}</span>
               <span v-if="w.phonetic" class="dw-phon">/{{ w.phonetic }}/</span>
               <span v-if="w.pos" class="dw-pos">{{ w.pos }}</span>
@@ -90,6 +91,7 @@
             <span>今日已复习 {{ reviewedCount }}</span>
           </div>
           <div class="dw-card-word">
+            <span class="dw-emoji dw-emoji-lg" :title="'点击设置象形图标'" @click="editEmoji(current?.word || '')">{{ emojiOf(current?.word || '') }}</span>
             <span class="dw-word">{{ current?.word }}</span>
             <span v-if="current?.phonetic" class="dw-phon">/{{ current.phonetic }}/</span>
             <span v-if="current?.pos" class="dw-pos">{{ current.pos }}</span>
@@ -121,11 +123,12 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { Microphone, Collection, Select } from '@element-plus/icons-vue'
 import { loadWords } from '../../../prep/degreeDb'
 import * as svc from '../../../prep/degreeService'
 import { speakEn } from '../../../prep/degreeSpeech'
+import { getEmoji, setEmojiOverride } from '../../../data/emojiDict'
 import {
   reviewWord,
   buildReviewQueue,
@@ -163,6 +166,30 @@ function isGraduated(word: string) {
 }
 function speak(word: string) {
   speakEn(word)
+}
+
+// ---------- 英语象形 emoji ----------
+const emojiVersion = ref(0)
+function emojiOf(word: string) {
+  // 读取 emojiVersion 建立依赖，自定义覆盖变更即刷新
+  void emojiVersion.value
+  return getEmoji(word)
+}
+async function editEmoji(word: string) {
+  if (!word) return
+  try {
+    const { value } = await ElMessageBox.prompt('输入一个 emoji 作为该词的象形图标（留空恢复默认）', '设置象形图标', {
+      inputValue: getEmoji(word) === '🔤' ? '' : getEmoji(word),
+      confirmButtonText: '保存',
+      cancelButtonText: '取消',
+      inputPlaceholder: '例如 🐱 📘 🌟'
+    })
+    setEmojiOverride(word, value || '')
+    emojiVersion.value++
+    ElMessage.success('已更新象形图标')
+  } catch {
+    /* 用户取消 */
+  }
 }
 async function toggleWordBook(w: DegreeWord) {
   if (isWordBook(w.word)) {
@@ -324,6 +351,19 @@ onMounted(async () => {
   font-size: 16px;
   font-weight: 700;
   color: #2c2c3a;
+}
+.dw-emoji {
+  font-size: 20px;
+  cursor: pointer;
+  user-select: none;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.08));
+  transition: transform 0.12s;
+}
+.dw-emoji:hover {
+  transform: scale(1.15);
+}
+.dw-emoji-lg {
+  font-size: 30px;
 }
 .dw-phon {
   font-size: 12px;
