@@ -1067,7 +1067,14 @@ function nextCard() {
   }
   current = queueArr.shift() as { w: string; kind: string }
   const m = MASTER.find((x) => x[0] === current!.w)
-  renderCard(m as PrepWord, false)
+  // L5 修复：词库重拉（re-seed/导入）后队列里可能残留已不存在的词引用，
+  // 此时 m 为 undefined，直接 renderCard(m) 会读 m[0] 抛错导致白屏。跳过该失效卡片。
+  if (!m) {
+    current = null
+    render()
+    return
+  }
+  renderCard(m, false)
   updateProgress()
 }
 function renderCard(m: PrepWord, flipped: boolean) {

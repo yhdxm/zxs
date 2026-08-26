@@ -98,6 +98,7 @@
         热门个股
         <span class="yc-hint">演示标的 · 可自行在 tencentFinance.ts 替换</span>
       </div>
+      <div class="yc-table-wrap">
       <el-table
         :data="stocks"
         v-loading="loading"
@@ -132,6 +133,7 @@
           <template #default="{ row }">{{ row.time || '—' }}</template>
         </el-table-column>
       </el-table>
+      </div>
     </section>
 
     <p class="yc-foot">
@@ -359,6 +361,11 @@ onUnmounted(() => {
 .yc-card.flat .yc-card-price,
 .yc-card.flat .yc-card-sub {
   color: var(--text);
+}
+.yc-table-wrap {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 .yc-table {
   border-radius: 12px;

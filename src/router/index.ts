@@ -237,6 +237,11 @@ const router = createRouter({
       path: '/welcome',
       name: 'welcome',
       component: () => import('../views/WelcomeView.vue')
+    },
+    {
+      // N4：未知路由兜底，避免直接访问不存在的路径出现空白页（hash 模式下重定向到默认落地页）
+      path: '/:pathMatch(.*)*',
+      redirect: '/welcome'
     }
   ]
 })

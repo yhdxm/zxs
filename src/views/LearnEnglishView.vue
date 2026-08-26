@@ -526,7 +526,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onActivated, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { School, Reading, Collection, Calendar, ChatDotRound, ArrowDown, ArrowLeft, Odometer, CircleCheck, Notebook, Setting } from '@element-plus/icons-vue'
@@ -1171,6 +1171,10 @@ onMounted(async () => {
   void loadWordStats()
 })
 onUnmounted(() => { if (clockTimer) window.clearInterval(clockTimer) })
+
+// L6 修复：返回本看板页时强制刷新统计（今日新学/待复习/已掌握/连续天数）。
+// 既有 wordSub/cetSub 订阅在部分返回路径可能未触发，onActivated 作为兜底确保数据不陈旧。
+onActivated(() => { void loadWordStats() })
 
 // 从训练面板返回首页时刷新看板（今日新学/待复习/已掌握/连续学习天数）
 watch(wordSub, (v) => { if (v === 'home') void loadWordStats() })

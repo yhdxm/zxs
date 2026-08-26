@@ -3,7 +3,7 @@
     <PageHeader title="权限管理" subtitle="账号与角色权限统一管理" :icon="Lock" />
 
     <!-- ===== 账号管理 ===== -->
-    <section v-if="activeView === 'accounts'" class="sys-section">
+    <section v-if="canViewAccounts && activeView === 'accounts'" class="sys-section">
       <div class="section-head">
         <div>
           <h3>账号管理</h3>
@@ -56,6 +56,35 @@
         </el-table-column>
       </el-table>
 
+      <!-- 移动端卡片列表（M2：el-table 在窄屏横向溢出，桌面隐藏、移动端显示） -->
+      <div class="account-cards">
+        <div v-for="row in manageableAccounts" :key="row.id || row.username" class="account-card">
+          <div class="ac-top">
+            <span class="ac-name">{{ row.nickname || row.username }}</span>
+            <el-tag :type="roleTagType(row.role)" effect="light">{{ roleLabel(row.role) }}</el-tag>
+          </div>
+          <div class="ac-meta">
+            <span>用户名：{{ row.username }}</span>
+            <span>状态：<el-tag :type="row.disabled ? 'danger' : 'success'" effect="light">{{ row.disabled ? '已禁用' : '正常' }}</el-tag></span>
+            <span>创建：{{ formatDateTime(row.createdAt) }}</span>
+          </div>
+          <div class="ac-actions">
+            <el-button v-if="canManage(row)" text size="small" @click="openEdit(row)"><el-icon><Edit /></el-icon> 编辑</el-button>
+            <el-button
+              v-if="canManage(row)"
+              text
+              size="small"
+              :type="row.disabled ? 'success' : 'warning'"
+              @click="toggleDisabled(row)"
+            >
+              {{ row.disabled ? '启用' : '禁用' }}
+            </el-button>
+            <el-button v-if="canManage(row)" text size="small" type="danger" @click="remove(row)"><el-icon><Delete /></el-icon> 删除</el-button>
+            <span v-else class="perm-hint">无权限</span>
+          </div>
+        </div>
+      </div>
+
       <div v-if="accounts.length === 0 && !loading" class="section-empty">
         <el-icon><Document /></el-icon>
         <p>暂无账号数据</p>
@@ -63,7 +92,7 @@
     </section>
 
     <!-- ===== 角色权限 ===== -->
-    <section v-else class="sys-section role-section">
+    <section v-else-if="canViewRoles" class="sys-section role-section">
       <div class="role-layout">
         <!-- 左侧角色列表 -->
         <aside class="role-list-panel">
@@ -129,6 +158,14 @@
       </div>
     </section>
 
+    <!-- N2 兜底：无账号/角色子权限时（如仅拥有 'system' 总权限的用户深链接进入）给出明确提示，避免越权暴露管理界面 -->
+    <section v-else class="sys-section">
+      <div class="section-empty">
+        <el-icon><Lock /></el-icon>
+        <p>当前账号无「账号管理」或「角色权限」访问权限</p>
+      </div>
+    </section>
+
     <!-- 新增 / 编辑账号 -->
     <el-dialog v-model="dialogVisible" :title="dialogTitle" width="min(92vw, 520px)" class="premium-dialog" align-center>
       <el-form :model="form" label-position="top" :rules="formRules" ref="formRef">
@@ -176,6 +213,7 @@ import {
   refreshSavedUser,
   loadPermissionConfig,
   savePermissionConfig,
+  hasPermission,
   PERMISSION_TREE,
   DEFAULT_ROLE_CONFIG,
   type AccountRecord,
@@ -185,6 +223,7 @@ import {
   type RoleConfig,
   type PermissionNode
 } from '../services/appDataService'
+import { MOBILE_MAX } from '../config/breakpoints'
 import PageHeader from '../components/PageHeader.vue'
 
 const route = useRoute()
@@ -213,6 +252,11 @@ const canManage = (row: AccountRecord) => {
   return false
 }
 const manageableAccounts = computed(() => accounts.value.filter((row) => canManage(row)))
+
+// N2 修复：账号/角色子权限校验，防止仅拥有 'system' 总权限但无子权限的用户通过深链接 URL 越权访问。
+const platform = ref<'pc' | 'mobile'>(typeof window !== 'undefined' && window.innerWidth <= MOBILE_MAX ? 'mobile' : 'pc')
+const canViewAccounts = computed(() => hasPermission(currentUser.value, 'system.accounts', platform.value, permissionConfig.value))
+const canViewRoles = computed(() => hasPermission(currentUser.value, 'system.roles', platform.value, permissionConfig.value))
 
 const roleLabel = (role: UserRole | string) => {
   const found = permissionConfig.value.roles.find((r) => r.key === role)
@@ -562,6 +606,23 @@ onMounted(async () => {
 }
 .section-filter .el-input { width: 260px; }
 .account-table { width: 100%; }
+/* M2：移动端卡片（桌面隐藏，≤768px 显示，替代 el-table 横向溢出） */
+.account-cards { display: none; }
+.account-card {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px;
+  margin-bottom: 12px;
+  background: var(--surface);
+}
+.ac-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+.ac-name { font-size: 15px; font-weight: 700; color: var(--text-strong); }
+.ac-meta { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--text-muted); margin-bottom: 10px; }
+.ac-actions { display: flex; flex-wrap: wrap; gap: 4px; }
+@media (max-width: 768px) {
+  .account-table { display: none; }
+  .account-cards { display: block; }
+}
 .perm-hint {
   font-size: 12px;
   color: #94a3b8;

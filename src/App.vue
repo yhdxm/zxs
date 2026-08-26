@@ -81,8 +81,16 @@
       </button>
     </aside>
 
-    <!-- 移动端悬浮菜单按钮：放在 app-shell 直接子级，避免被侧边栏 display:none 隐藏 -->
-    <button class="mobile-menu-fab" @click="mobileNavVisible = true" title="打开菜单">
+    <!-- 移动端悬浮菜单按钮：放在 app-shell 直接子级，避免被侧边栏 display:none 隐藏。
+         仅在「三备考路由(隐藏全局底栏)」下显形(fab-visible)，作为离开该模块的菜单入口，
+         解决移动端进入备考台后无法跳转其他模块的导航陷阱(M1)。 -->
+    <button
+      class="mobile-menu-fab"
+      :class="{ 'fab-visible': isMobile && isCetPrepRoute }"
+      @click="mobileNavVisible = true"
+      title="打开菜单"
+      aria-label="打开菜单"
+    >
       <el-icon><Menu /></el-icon>
     </button>
 
@@ -114,8 +122,8 @@
       </button>
     </nav>
 
-    <!-- 消息中心抽屉 -->
-    <el-drawer v-model="notifDrawerVisible" direction="rtl" size="360px" :with-header="false" class="notif-drawer">
+    <!-- 消息中心抽屉（M3：移动端宽度改为 90vw，避免 ≤360px 小屏溢出视口） -->
+    <el-drawer v-model="notifDrawerVisible" direction="rtl" :size="isMobile ? '90vw' : '360px'" :with-header="false" class="notif-drawer">
       <div class="notif-header">
         <span class="notif-header-title">消息中心</span>
         <span class="notif-header-sub">{{ unread > 0 ? unread + ' 条未读' : '全部已读' }}</span>
@@ -417,7 +425,7 @@ const isMenuActive = (key: string) => {
   if (key === 'learn-industry') return route.path === '/learn/industry'
   if (key === 'learn-books') return route.path === '/learn/books'
   if (key === 'learn-goals') return route.path === '/learn/goals'
-  if (key === 'news') return route.path === '/news' || route.path === '/yingcang'
+  if (key === 'news') return route.path === '/news'
   if (key === 'news-main') return route.path === '/news'
   if (key === 'yingcang') return route.path === '/yingcang'
   if (key === 'weather') return route.path === '/weather'
@@ -425,7 +433,7 @@ const isMenuActive = (key: string) => {
   if (key === 'third-api') return route.path === '/third-api'
   if (key === 'requirements') return route.path === '/requirements'
   if (key === 'automation') return route.path === '/automation'
-  if (key === 'worktasks') return route.path === '/dashboard' && ['overview', 'todos', 'points', 'contents'].includes((route.query.view as string) || '')
+  if (key === 'worktasks') return route.path === '/dashboard' && ['', 'overview', 'todos', 'points', 'contents'].includes((route.query.view as string) || '')
   if (key === 'system') return route.path === '/system' || route.path === '/feedback-admin'
   if (key === 'system-accounts') return route.path === '/system' && (route.query.view || 'accounts') === 'accounts'
   if (key === 'system-roles') return route.path === '/system' && route.query.view === 'roles'
@@ -583,7 +591,11 @@ onMounted(async () => {
     ])
   } catch (err) {
     console.error('[App] init failed or timeout:', err)
-    currentUser.value = null
+    // N3 修复：弱网初始化超时不再强制置空 currentUser（避免已登录用户看到空白布局）；
+    // 若确实无任何用户态，则回登录页而非停留在无分支命中的空白页。
+    if (!currentUser.value) {
+      router.replace('/login').catch(() => {})
+    }
   } finally {
     initializing.value = false
     // 消息中心：未读轮询 + 自动提醒 + SW 点击跳转
@@ -1209,7 +1221,7 @@ onUnmounted(() => {
 }
 .mobile-bottom-nav .mbn-emoji { font-size: 19px; }
 .mobile-bottom-nav .mbn-icon :deep(svg) { font-size: 21px; }
-.mobile-bottom-nav .mbn-label { font-size: 11px; font-weight: 600; line-height: 1.1; }
+.mobile-bottom-nav .mbn-label { font-size: 12px; font-weight: 600; line-height: 1.1; }
 .mobile-bottom-nav .mbn-item.active .mbn-label { font-weight: 700; }
 
 /* ===== 响应式切换 ===== */
@@ -1227,7 +1239,11 @@ onUnmounted(() => {
   .sidebar { display: none; }
   .mobile-topbar { display: flex; }
   .mobile-bottom-nav { display: flex; }
-  .mobile-menu-fab { display: none; }
+  /* M1：三备考路由(隐藏全局底栏)下，悬浮菜单按钮显形为菜单入口，浮动在页面自带底栏之上 */
+  .mobile-menu-fab.fab-visible {
+    display: flex;
+    bottom: calc(72px + env(safe-area-inset-bottom));
+  }
   .app-shell.is-authed .app-main {
     height: 100vh;
     height: 100dvh;

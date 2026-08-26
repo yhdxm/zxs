@@ -103,8 +103,13 @@ select {
   pre,
   code,
   .el-table,
-  .markdown-body pre {
+  .markdown-body pre,
+  img {
     max-width: 100%;
+  }
+  /* M8：全局图片兜底，防止裸 img 撑破移动端布局 */
+  img {
+    height: auto;
   }
   .el-table {
     overflow-x: auto;
