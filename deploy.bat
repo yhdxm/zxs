@@ -175,13 +175,15 @@ if not "!PUSH_ERR!" == "0" (
   )
 )
 
-set "PUSH_URL="
-set "GH_TOKEN="
-
 if "!PUSH_ERR!" == "0" (
   echo.
-  echo [OK] Push finished. Check GitHub Actions for build status:
-  echo   https://github.com/YHDXM/ZXS/actions
+  echo [OK] Push finished.
+  echo.
+  echo ===== 自动配置 GitHub Pages (Source=GitHub Actions) =====
+  call :CONFIGURE_PAGES
+  echo.
+  echo 部署进度: https://github.com/YHDXM/ZXS/actions
+  echo 线上地址: https://yhdxm.github.io/ZXS/
 ) else (
   echo.
   echo [FAIL] Push failed on every route. Details:
@@ -193,11 +195,33 @@ if "!PUSH_ERR!" == "0" (
   echo   1. Network fully blocks GitHub right now - use phone hotspot / VPN.
   echo   2. Token lacks "repo" scope, or belongs to the wrong account.
 )
+set "PUSH_URL="
+set "GH_TOKEN="
 echo.
 pause
 exit /b 0
 
 REM ================= subroutine =================
+:CONFIGURE_PAGES
+set "API_BASE=https://api.github.com/repos/YHDXM/ZXS"
+echo   调用 GitHub API: 设置 Pages 源为 GitHub Actions ...
+curl -s -o "%TEMP%\zxs_pages.json" -w "   HTTP %%{http_code}\n" -X PUT ^
+  -H "Accept: application/vnd.github+json" ^
+  -H "Authorization: Bearer %GH_TOKEN%" ^
+  -H "X-GitHub-Api-Version: 2022-11-28" ^
+  "%API_BASE%/pages" ^
+  -d "{\"build_type\":\"workflow\"}"
+echo   若上方返回 200/204 表示已成功设为 GitHub Actions 自动部署。
+echo   正在重新触发一次部署任务 (Pages 设好后需重跑才会发布) ...
+for /f "delims=" %%i in ('powershell -NoProfile -Command "try{(Invoke-RestMethod -Uri 'https://api.github.com/repos/YHDXM/ZXS/actions/workflows/deploy.yml/runs?per_page=1' -Headers @{Authorization='Bearer %GH_TOKEN%'}).workflow_runs[0].id}catch{''}"') do set "RUN_ID=%%i"
+if defined RUN_ID (
+  curl -s -o nul -w "   re-run HTTP %%{http_code}\n" -X POST -H "Authorization: Bearer %GH_TOKEN%" "%API_BASE%/actions/runs/!RUN_ID!/rerun"
+  echo   已重新触发部署任务 #!RUN_ID!。
+) else (
+  echo   未能自动获取部署任务，请到 Actions 页面手动 Re-run 一次最新 Deploy。
+)
+exit /b 0
+
 :PROBE
 set "PROBE_CODE="
 for /f "usebackq delims=" %%c in (`"%CURL_BIN%" -s -o nul -w "%%{http_code}" --connect-timeout 4 --max-time 9 --resolve github.com:443:%~1 "https://github.com/YHDXM/ZXS.git/info/refs?service=git-upload-pack" 2^>nul`) do set "PROBE_CODE=%%c"
