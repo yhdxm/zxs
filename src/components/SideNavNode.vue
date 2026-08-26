@@ -22,7 +22,7 @@ const isNested = (depth?: number) => Boolean(depth && depth > 0)
 <template>
   <template v-for="item in items" :key="item.key">
     <button
-      v-if="!item.to && !item.href"
+      v-if="!item.to && !item.href && !item.children"
       class="side-item side-item--disabled"
       :class="[isNested(depth) ? 'side-child' : '']"
       disabled
