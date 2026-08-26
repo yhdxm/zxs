@@ -159,7 +159,7 @@ export async function loadAll(): Promise<PrepState> {
     const [w, p, m, c, s] = await Promise.all([
       supabase.from('cet4_prep_progress').select('*').eq('user_id', userId),
       supabase.from('cet4_prep_practice').select('*').eq('user_id', userId),
-      supabase.from('cet4_prep_mistakes').select('*').eq('user_id', userId),
+      supabase.from('cet4_prep_mistakes').select('*').eq('user_id', userId).eq('removed', false),
       supabase.from('cet4_prep_checkins').select('*').eq('user_id', userId),
       supabase.from('cet4_prep_settings').select('*').eq('user_id', userId).maybeSingle()
     ])
@@ -204,7 +204,7 @@ export async function loadAll(): Promise<PrepState> {
         sample: !!r.sample,
         date: r.date ?? null
       }))
-      .filter((x) => !reli.isDeleted(userId, 'cet4_prep_mistakes', x.id))
+      .filter((x) => !x.removed && !reli.isDeleted(userId, 'cet4_prep_mistakes', x.id))
     const checkins: Record<string, CheckinRec> = {}
     for (const r of (c.data as any[]) || []) {
       checkins[r.date] = { words: r.words ?? 0, practice: r.practice ?? 0 }
