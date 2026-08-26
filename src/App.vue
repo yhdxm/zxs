@@ -361,8 +361,8 @@ const roleLabel = computed(() => {
 function cloneMenu(items: SideItem[], depth = 0): SideItem[] {
   return items.map((it) => ({
     ...it,
-    // 顶层分组默认闭合；嵌套分组（如「学习中心 → 学位英语」）保留数据源展开态，减少点击层级
-    expanded: depth === 0 ? false : (it.expanded ?? false),
+    // 尊重 APP_MENU 里的 expanded 配置：未指定再按深度默认（顶层 false，嵌套 true）
+    expanded: it.expanded ?? (depth === 0 ? false : true),
     children: it.children ? cloneMenu(it.children, depth + 1) : undefined
   }))
 }
@@ -404,7 +404,17 @@ const filteredSideMenu = computed(() => {
 })
 
 const toggleGroup = (key: string) => {
-  const item = sideMenu.find((i) => i.key === key)
+  function findItem(items: SideItem[]): SideItem | undefined {
+    for (const it of items) {
+      if (it.key === key) return it
+      if (it.children) {
+        const found = findItem(it.children)
+        if (found) return found
+      }
+    }
+    return undefined
+  }
+  const item = findItem(sideMenu)
   if (item) {
     item.expanded = !item.expanded
   }
