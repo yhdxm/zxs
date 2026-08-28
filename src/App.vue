@@ -218,6 +218,7 @@ import {
   type AppUser
 } from './services/appDataService'
 import { APP_MENU, canManageSystem, type SideItem } from './config/appMenu'
+import { ElMessage } from 'element-plus'
 import CompassLogo from './components/CompassLogo.vue'
 import SideNavNode from './components/SideNavNode.vue'
 import { useKeyboardAvoid } from './composables/useKeyboardAvoid'
@@ -455,6 +456,13 @@ const isMenuActive = (key: string) => {
   return route.path === '/dashboard' && route.query.view === key
 }
 
+/** 把菜单的 to 规范化为完整路径，用于判断「是否已经在该页」 */
+function normalizeTo(to: NonNullable<SideItem['to']>): string {
+  if (typeof to === 'string') return to
+  const q = to.query ? new URLSearchParams(to.query).toString() : ''
+  return q ? `${to.path}?${q}` : to.path
+}
+
 const goMenu = (item: SideItem) => {
   // 外部独立页面（单文件 HTML）：在新标签打开，按部署 base 解析绝对路径
   if (item.href) {
@@ -467,14 +475,32 @@ const goMenu = (item: SideItem) => {
     return
   }
   if (!item.to) {
-    // 防御：无跳转目标且无子菜单的菜单项点击时给出告警（正常配置不应出现）
+    // 防御：无跳转目标且无子菜单的菜单项，给出用户可见反馈，避免「点了没反应」
     if (!item.href && !(item.children && item.children.length)) {
       console.warn('[菜单] 该项无跳转目标且无子菜单，已忽略点击:', item.key, item.label)
+      ElMessage.warning(`「${item.label}」暂不可用：未配置跳转地址`)
     }
     return
   }
+  // 已在当前页：关闭抽屉即可，不重复跳转也不提示
+  if (normalizeTo(item.to) === route.fullPath) {
+    mobileNavVisible.value = false
+    return
+  }
   mobileNavVisible.value = false
-  router.push(item.to)
+  const from = route.fullPath
+  router
+    .push(item.to)
+    .then(() => {
+      // 兜底：点击后页面未发生跳转（多为权限守卫重定向到当前页），
+      // 给出明确提示，避免用户以为「点击没反应」。
+      if (route.fullPath === from) {
+        ElMessage.warning(`无法打开「${item.label}」：可能没有该页面的访问权限`)
+      }
+    })
+    .catch(() => {
+      /* 路由跳转被中断（重复导航等），静默忽略 */
+    })
 }
 
 /* ===== 移动端底部导航（高频场景原生 Tab 模式，替代悬浮菜单按钮） ===== */

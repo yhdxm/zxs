@@ -23,6 +23,7 @@ const isNested = (depth?: number) => Boolean(depth && depth > 0)
   <template v-for="item in items" :key="item.key">
     <button
       v-if="!item.to && !item.href && !item.children"
+      type="button"
       class="side-item side-item--disabled"
       :class="[isNested(depth) ? 'side-child' : '']"
       disabled
@@ -34,6 +35,7 @@ const isNested = (depth?: number) => Boolean(depth && depth > 0)
 
     <button
       v-else-if="!item.children"
+      type="button"
       class="side-item"
       :class="[isNested(depth) ? 'side-child' : '', { active: isActive(item.key) }]"
       @click="handleNavigate(item)"
@@ -45,6 +47,7 @@ const isNested = (depth?: number) => Boolean(depth && depth > 0)
 
     <div v-else class="side-group">
       <button
+        type="button"
         class="side-item side-group-title"
         :class="{ active: isActive(item.key), expanded: item.expanded }"
         @click="handleToggle(item.key)"
@@ -75,6 +78,8 @@ const isNested = (depth?: number) => Boolean(depth && depth > 0)
   border: none;
   background: transparent;
   padding: 10px 14px;
+  /* 触控目标高度：移动端手指可靠点击下限约 44px */
+  min-height: 42px;
   border-radius: 12px;
   font-size: 14px;
   font-weight: 500;
@@ -141,7 +146,8 @@ const isNested = (depth?: number) => Boolean(depth && depth > 0)
   margin-top: 2px;
 }
 .side-child {
-  padding: 8px 14px;
+  padding: 10px 14px;
+  min-height: 40px;
   font-size: 13px;
   color: var(--text-muted);
 }
@@ -157,5 +163,18 @@ const isNested = (depth?: number) => Boolean(depth && depth > 0)
 }
 .side-child.active {
   color: var(--text);
+}
+
+/* 移动端：放大触控区，避免手指点空 / 点不动 */
+@media (max-width: 768px) {
+  .side-item {
+    min-height: 48px;
+    padding: 12px 14px;
+    font-size: 15px;
+  }
+  .side-child {
+    min-height: 46px;
+    font-size: 14px;
+  }
 }
 </style>

@@ -83,6 +83,31 @@
           <div v-if="subMsg" class="ac-tip">{{ subMsg }}</div>
         </template>
       </section>
+
+      <!-- 发音引擎（英语朗读） -->
+      <section class="account-card">
+        <header class="ac-head">
+          <span class="ac-ico"><el-icon><Microphone /></el-icon></span>
+          <div class="ac-head-txt">
+            <h3>发音引擎（英语朗读）</h3>
+            <p>手机点了朗读没声音时，请改用「在线发音」</p>
+          </div>
+        </header>
+        <div class="ac-row">
+          <span>本机状态：<b>{{ speechStatusText }}</b></span>
+        </div>
+        <el-radio-group v-model="speechEngine" class="ac-engine" @change="onEngineChange">
+          <el-radio value="auto">自动（推荐）</el-radio>
+          <el-radio value="online">在线发音（需联网，适合国产手机浏览器）</el-radio>
+          <el-radio value="local">系统语音（可离线，需手机装有英文引擎）</el-radio>
+        </el-radio-group>
+        <div class="ac-tip">
+          iQOO / vivo / 华为等手机自带浏览器通常没有英文语音引擎，点了朗读会「静默无声」。选「在线发音」即可正常朗读。
+        </div>
+        <div class="ac-actions">
+          <el-button :loading="testing" @click="testSpeak">试听</el-button>
+        </div>
+      </section>
     </div>
   </div>
 </template>
@@ -93,7 +118,7 @@ import { useKeyboardAvoid } from '../composables/useKeyboardAvoid'
 useKeyboardAvoid()
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import { User, Lock, Bell } from '@element-plus/icons-vue'
+import { User, Lock, Bell, Microphone } from '@element-plus/icons-vue'
 import {
   getSavedUser,
   updateAccount,
@@ -102,6 +127,12 @@ import {
   type AppUser
 } from '../services/appDataService'
 import PageHeader from '../components/PageHeader.vue'
+import {
+  speakEn,
+  getSpeechEngine,
+  setSpeechEngine,
+  type SpeechEngine
+} from '../prep/degreeSpeech'
 import {
   PUSH_MODULES,
   isPushSupported,
@@ -122,6 +153,41 @@ const form = reactive({
 })
 
 /* ===== 消息推送订阅 ===== */
+/* ===== 发音引擎（英语朗读）=====
+   国产手机浏览器（iQOO / vivo / 华为）常有 speechSynthesis 接口但无英文引擎，
+   点了朗读静默无声。此处暴露引擎选择，用户可强制改用在线发音。 */
+const speechEngine = ref<string>(getSpeechEngine())
+const testing = ref(false)
+const enVoice = ref<boolean | null>(null)
+function detectEnVoice() {
+  try {
+    const vs = window.speechSynthesis?.getVoices?.() || []
+    enVoice.value = vs.length ? vs.some((v) => /^en/i.test(v.lang || '')) : null
+  } catch {
+    enVoice.value = false
+  }
+}
+// getVoices() 首次常返回空数组，需在 voiceschanged 后二次探测
+detectEnVoice()
+window.setTimeout(detectEnVoice, 1200)
+
+const speechStatusText = computed(() => {
+  if (enVoice.value === null) return '检测中…'
+  return enVoice.value ? '系统英文语音可用' : '未检测到系统英文语音（建议用「在线发音」）'
+})
+function onEngineChange(v: unknown) {
+  setSpeechEngine((String(v) as SpeechEngine) || 'auto')
+  ElMessage.success('发音引擎已切换，可点「试听」验证')
+}
+async function testSpeak() {
+  testing.value = true
+  try {
+    await speakEn('pronunciation')
+  } finally {
+    testing.value = false
+  }
+}
+
 const pushSupported = isPushSupported()
 const perm = ref<NotificationPermission>('default')
 const subRow = ref<PushSubscriptionRow | null>(null)
