@@ -785,6 +785,7 @@ import {
 } from '../prep/degreeSrs'
 import { buildReviewQueue as buildGenericReviewQueue } from '../prep/trainingSrs'
 import { getStudySettings, saveStudySettings, countLearnedToday, computeStreakFromDates, collectStudyDates } from '../services/studySettingsService'
+import { speakEn } from '../prep/degreeSpeech'
 
 // 资料库：三本 PDF 正文切分后的可读文章（确保内容不遗漏）
 const allArticles: DegreeArticle[] = [...syllabusProse, ...guideArticles]
@@ -796,85 +797,18 @@ const libraryArticles = computed(() =>
 function openArticle(a: DegreeArticle) {
   activeArticle.value = a
 }
-// ===== 单词/例句读音（浏览器内置 TTS，离线可用） =====
-// 修复跨平台无声问题：
-// 1) iOS Safari 必须在 speak 前 getVoices() 且选中英文 voice，否则静默
-// 2) Chrome/Safari 经典 bug：cancel() 紧跟 speak() 会吞掉声音，需延迟一帧再 speak
-// 3) iOS 15+ 偶发 speak 后处于 paused 状态，需 resume() 保活才能出声
-// 4) 移动端 AudioContext 需用户手势解锁，首次点击时主动 unlock
-let voicesWarmed = false
-let currentUtterance: SpeechSynthesisUtterance | null = null
-function warmVoices() {
-  if (typeof window === 'undefined' || !('speechSynthesis' in window)) return
-  const synth = window.speechSynthesis
-  if (synth.getVoices().length) {
-    voicesWarmed = true
-    return
-  }
-  // iOS: voices 异步就绪，监听一次即可
-  synth.onvoiceschanged = () => {
-    if (synth.getVoices().length) voicesWarmed = true
-  }
-}
-function unlockAudioContext() {
-  if (typeof window === 'undefined') return
-  const AudioCtx = (window as any).AudioContext || (window as any).webkitAudioContext
-  if (!AudioCtx) return
-  const ctx = new AudioCtx()
-  if (ctx.state === 'suspended') {
-    void ctx.resume().catch(() => {})
-  }
-}
-// 美 / 英音切换（免费，纯浏览器 TTS）
+// ===== 单词/例句读音 =====
+// 统一复用 degreeSpeech.speakEn 的双通道实现（本地 TTS → 在线发音自动降级），
+// 解决 iQOO / vivo 等国产浏览器「有 speechSynthesis 接口却无英文引擎、点了朗读静默无声」的问题。
+// 备考台原有的「美 / 英」切换通过第三个参数 accent 透传，功能完整保留。
 const voiceAccent = ref<'en-US' | 'en-GB'>('en-US')
-function pickEnVoice(): SpeechSynthesisVoice | undefined {
-  if (typeof window === 'undefined' || !('speechSynthesis' in window)) return undefined
-  const vs = window.speechSynthesis.getVoices()
-  if (!vs.length) return undefined
-  const pattern = voiceAccent.value === 'en-GB' ? /en[-_]GB/i : /en[-_]US/i
-  return vs.find((v) => pattern.test(v.lang)) || vs.find((v) => v.lang?.startsWith('en')) || vs[0]
-}
 function speakWord(text: string, rate = 0.9) {
   if (!text) return
-  if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
-    ElMessage.warning('当前浏览器不支持语音朗读，请使用 Chrome / Edge / Safari 重试')
-    return
-  }
-  // 移动端必须先由用户手势解锁音频上下文
-  unlockAudioContext()
-  warmVoices()
-  const synth = window.speechSynthesis
-  const u = new SpeechSynthesisUtterance(text)
-  u.lang = voiceAccent.value
-  u.rate = rate
-  const voice = pickEnVoice()
-  if (voice) u.voice = voice
-  currentUtterance = u
-  // 先清空可能积压的朗读，留一帧再播，规避 cancel+speak 竞态导致无声
-  try {
-    synth.cancel()
-  } catch {
-    /* noop */
-  }
-  window.setTimeout(() => {
-    if (!currentUtterance) return
-    synth.speak(currentUtterance)
-    // iOS 偶发 paused → resume 保活
-    if (synth.paused) synth.resume()
-    // 部分浏览器 speak 后立即进入 paused，持续轮询 resume 200ms
-    let resumeTicks = 0
-    const keepAlive = window.setInterval(() => {
-      if (!currentUtterance || resumeTicks > 6) {
-        window.clearInterval(keepAlive)
-        return
-      }
-      resumeTicks++
-      if (synth.paused) synth.resume()
-    }, 40)
-  }, 80)
+  void speakEn(text, rate, voiceAccent.value)
 }
 function speakText(t: string) {
-  speakWord(t, 0.95)
+  if (!t) return
+  void speakEn(t, 0.95, voiceAccent.value)
 }
 
 // ===== 划词翻译浮层（免费 MyMemory，无需 Key） =====
@@ -1628,7 +1562,6 @@ async function removeFav(id: string, isMistake = false) {
 }
 
 onMounted(() => {
-  warmVoices()
   loadAll()
   // 移动端检测：窄屏默认折叠记忆区
   syncMobile()

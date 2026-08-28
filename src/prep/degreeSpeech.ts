@@ -15,9 +15,15 @@ export function warmVoices() {
   }
 }
 
-function pickEnVoice(): SpeechSynthesisVoice | undefined {
+/** 口音：美式 / 英式（备考台「美 / 英」切换与在线发音 type 均由此驱动） */
+export type SpeechAccent = 'en-US' | 'en-GB'
+
+function pickEnVoice(accent: SpeechAccent = 'en-US'): SpeechSynthesisVoice | undefined {
   const vs = window.speechSynthesis.getVoices()
+  // 优先精确匹配所选口音，再退回任意英文语音
+  const region = accent === 'en-GB' ? /en[-_]GB/i : /en[-_]US/i
   return (
+    vs.find((v) => region.test(v.lang)) ||
     vs.find((v) => /en[-_]?(US|GB)/i.test(v.lang)) ||
     vs.find((v) => v.lang.toLowerCase().startsWith('en'))
   )
@@ -69,7 +75,7 @@ export function detectEnVoiceNow(): boolean | null {
 
 let onlineAudio: HTMLAudioElement | null = null
 /** 在线发音（有道 dictvoice）。resolve(true)=已起播 */
-function playOnline(text: string): Promise<boolean> {
+function playOnline(text: string, accent: SpeechAccent = 'en-US'): Promise<boolean> {
   return new Promise((resolve) => {
     if (typeof window === 'undefined' || typeof Audio === 'undefined') {
       resolve(false)
@@ -88,11 +94,76 @@ function playOnline(text: string): Promise<boolean> {
       el.onplaying = () => done(true)
       el.onerror = () => done(false)
       // type=2 美音 / type=1 英音
-      el.src = `https://dict.youdao.com/dictvoice?audio=${encodeURIComponent(text)}&type=2`
+      const vType = accent === 'en-GB' ? 1 : 2
+      el.src = `https://dict.youdao.com/dictvoice?audio=${encodeURIComponent(text)}&type=${vType}`
       const p = el.play()
       if (p && typeof p.then === 'function') p.then(() => done(true)).catch(() => done(false))
       // 网络慢/被拦截时兜底，避免 Promise 悬挂
       window.setTimeout(() => done(false), 3500)
+    } catch {
+      done(false)
+    }
+  })
+}
+
+/**
+ * 长文本按句切分（用于「朗读全文」）。
+ * 在线发音接口对超长文本会截断/失败，切成 <=160 字符的片段逐段播放。
+ * 注意：不使用后行断言 (?<=) —— 部分国产浏览器内核较老，会导致正则编译报错。
+ */
+function splitForSpeech(text: string, maxLen = 160): string[] {
+  const clean = text.replace(/\s+/g, ' ').trim()
+  if (clean.length <= maxLen) return [clean]
+  const sentences: string[] = []
+  let cur = ''
+  for (const ch of clean) {
+    cur += ch
+    if (/[.!?;:。！？；：]/.test(ch) && cur.length >= 40) {
+      sentences.push(cur.trim())
+      cur = ''
+    }
+  }
+  if (cur.trim()) sentences.push(cur.trim())
+  // 合并短句，尽量填满 maxLen，减少请求次数
+  const parts: string[] = []
+  let buf = ''
+  for (const s of sentences) {
+    if (buf && (buf + ' ' + s).length > maxLen) {
+      parts.push(buf)
+      buf = s
+    } else {
+      buf = buf ? buf + ' ' + s : s
+    }
+  }
+  if (buf) parts.push(buf)
+  return parts.length ? parts : [clean]
+}
+
+/** 播放在线音频并等待播完（分段朗读用），带超时兜底防悬挂 */
+function playOnlineChunk(text: string, accent: SpeechAccent = 'en-US'): Promise<boolean> {
+  return new Promise((resolve) => {
+    if (typeof window === 'undefined' || typeof Audio === 'undefined') {
+      resolve(false)
+      return
+    }
+    let settled = false
+    const done = (ok: boolean) => {
+      if (!settled) {
+        settled = true
+        resolve(ok)
+      }
+    }
+    try {
+      onlineAudio = onlineAudio || new Audio()
+      const el = onlineAudio
+      const vType = accent === 'en-GB' ? 1 : 2
+      el.onended = () => done(true)
+      el.onerror = () => done(false)
+      el.src = `https://dict.youdao.com/dictvoice?audio=${encodeURIComponent(text)}&type=${vType}`
+      const p = el.play()
+      if (p && typeof p.catch === 'function') p.catch(() => done(false))
+      // 兜底：单段最长等 20s，避免网络异常时永久悬挂
+      window.setTimeout(() => done(false), 20000)
     } catch {
       done(false)
     }
@@ -108,7 +179,7 @@ function hasEnVoice(): boolean | null {
 }
 
 /** 本地 TTS，带「起播验证」：700ms 内未触发 onstart 即判定为静音失败 */
-function speakLocal(text: string, rate: number): Promise<boolean> {
+function speakLocal(text: string, rate: number, accent: SpeechAccent = 'en-US'): Promise<boolean> {
   return new Promise((resolve) => {
     let settled = false
     const done = (ok: boolean) => {
@@ -124,9 +195,9 @@ function speakLocal(text: string, rate: number): Promise<boolean> {
     try {
       const synth = window.speechSynthesis
       const u = new SpeechSynthesisUtterance(text)
-      u.lang = 'en-US'
+      u.lang = accent
       u.rate = rate
-      const v = pickEnVoice()
+      const v = pickEnVoice(accent)
       if (v) u.voice = v
       u.onstart = () => done(true)
       u.onerror = () => done(false)
@@ -158,7 +229,7 @@ function speakLocal(text: string, rate: number): Promise<boolean> {
  * - auto（默认）：有系统英文语音用本地（可离线）；无则自动走在线，解决国产浏览器静音问题。
  * - local / online：可在「个人设置 → 发音引擎」强制指定。
  */
-export async function speakEn(text: string, rate = 0.95) {
+export async function speakEn(text: string, rate = 0.95, accent: SpeechAccent = 'en-US') {
   const t = (text || '').trim()
   if (!t) return
   unlockAudioContext()
@@ -169,7 +240,7 @@ export async function speakEn(text: string, rate = 0.95) {
 
   // 1) 本地 TTS（仅确认有英文语音，或用户强制 local 时）
   if (pref === 'local' || (pref === 'auto' && localVoice === true)) {
-    const ok = await speakLocal(t, rate)
+    const ok = await speakLocal(t, rate, accent)
     if (ok) return
     try {
       window.speechSynthesis?.cancel()
@@ -183,12 +254,21 @@ export async function speakEn(text: string, rate = 0.95) {
   }
 
   // 2) 在线发音降级（国产浏览器主力路径）
-  const onlineOk = await playOnline(t)
-  if (onlineOk) return
+  //    长文本（如备考台「朗读全文」）按句切分逐段播放，避免单次请求过长被截断/失败
+  const chunks = splitForSpeech(t)
+  if (chunks.length === 1) {
+    if (await playOnline(t, accent)) return
+  } else {
+    let anyOk = false
+    for (const c of chunks) {
+      if (await playOnlineChunk(c, accent)) anyOk = true
+    }
+    if (anyOk) return
+  }
 
   // 3) 兜底：在线失败且本地尚未尝试（语音列表未就绪）时再试本地
   if (pref === 'auto' && localVoice !== true) {
-    const ok = await speakLocal(t, rate)
+    const ok = await speakLocal(t, rate, accent)
     if (ok) return
   }
 
