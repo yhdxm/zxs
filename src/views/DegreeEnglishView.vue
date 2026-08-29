@@ -453,14 +453,30 @@
                 <div class="fc-hint">点击翻转查看释义 / 翻译</div>
               </div>
               <div class="flashcard-back">
-                <div class="fc-def">{{ currentPhrase!.zh || '（暂无中文释义）' }}</div>
+                <div class="fc-def-row">
+                  <span class="fc-def">{{ currentPhrase!.zh || '（暂无中文释义）' }}</span>
+                </div>
                 <div class="fc-def" v-if="currentPhrase!.extra" style="font-size: 13px; color: var(--text-muted);">
                   {{ currentPhrase!.category === 'irregular' ? '过去式 / 过去分词：' : currentPhrase!.category === 'affix' ? '例词：' : '' }}{{ currentPhrase!.extra }}
                 </div>
-                <div class="fc-example" v-if="phraseTranslations[currentPhrase!.en]">📝 {{ phraseTranslations[currentPhrase!.en] }}</div>
-                <button class="trans-btn" @click.stop="translatePhrase(currentPhrase!)" :disabled="phraseTranslating[currentPhrase!.en]">
-                  {{ phraseTranslations[currentPhrase!.en] ? '已翻译' : '翻译' }}
-                </button>
+
+                <!-- 配图 -->
+                <div class="fc-enrich-sec">
+                  <div class="fc-enrich-hd">配图</div>
+                  <div class="fc-pic-row">
+                    <span class="fc-pic-em">{{ getEmoji((currentPhrase!.en || '').split(' ')[0] || currentPhrase!.en) }}</span>
+                    <span class="fc-pic-tx">离线象形符号</span>
+                  </div>
+                </div>
+
+                <!-- 例句 / 翻译 -->
+                <div class="fc-enrich-sec">
+                  <div class="fc-enrich-hd">例句 / 翻译</div>
+                  <div class="fc-example" v-if="phraseTranslations[currentPhrase!.en]">📝 {{ phraseTranslations[currentPhrase!.en] }}</div>
+                  <button class="trans-btn" @click.stop="translatePhrase(currentPhrase!)" :disabled="phraseTranslating[currentPhrase!.en]">
+                    {{ phraseTranslations[currentPhrase!.en] ? '已翻译' : '翻译' }}
+                  </button>
+                </div>
               </div>
             </div>
           </div>
