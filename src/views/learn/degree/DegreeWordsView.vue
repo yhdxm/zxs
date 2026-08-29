@@ -97,12 +97,13 @@
             <span v-if="current?.pos" class="dw-pos">{{ current.pos }}</span>
             <el-button :icon="Microphone" circle size="small" class="dw-card-speak" @click.stop="speak(current?.word || '')" title="朗读" />
           </div>
-          <div v-if="showAnswer" class="dw-card-def">{{ current?.definition }}</div>
-          <div v-else class="dw-card-hint">
+
+          <!-- 收起态：显示释义按钮 -->
+          <div v-if="!showAnswer" class="dw-card-hint">
             <el-button @click="showAnswer = true">显示释义</el-button>
           </div>
 
-          <!-- 翻转背面：完整详情结构（美/英音标、助记、例句、配图） -->
+          <!-- 点开后完整详情（与详情弹窗同源） -->
           <div v-if="showAnswer && current" class="dw-full">
             <div class="dw-full-ph">
               <span class="dw-full-ph-item">
@@ -115,6 +116,14 @@
                 <span>{{ enrich.phoneticUK || enrich.phonetic || current.phonetic || '—' }}</span>
                 <el-button :icon="Microphone" circle size="small" @click.stop="speakAccent('en-GB')" title="英式朗读" />
               </span>
+            </div>
+
+            <div class="dw-full-sec">
+              <div class="dw-full-hd">释义</div>
+              <div class="dw-full-mean">
+                <span v-if="current.pos" class="dw-full-pos">{{ current.pos }}</span>
+                <span>{{ current.definition || '（词库暂未提供释义）' }}</span>
+              </div>
             </div>
 
             <div class="dw-full-sec dw-full-mnc">
@@ -144,7 +153,29 @@
                 <span class="dw-full-pic-tx">离线象形符号，点击卡片顶部图标可自定义</span>
               </div>
             </div>
+
+            <div class="dw-full-sec">
+              <div class="dw-full-tabs" role="tablist">
+                <button :class="{ on: reviewTab === 'en' }" type="button" role="tab" :aria-selected="reviewTab === 'en'" @click="reviewTab = 'en'">英文释义</button>
+                <button :class="{ on: reviewTab === 'sim' }" type="button" role="tab" :aria-selected="reviewTab === 'sim'" @click="reviewTab = 'sim'">形近词</button>
+              </div>
+              <div v-show="reviewTab === 'en'" class="dw-full-pane" role="tabpanel">
+                <ol v-if="enrich.enDefs.length">
+                  <li v-for="(d, i) in enrich.enDefs" :key="i">{{ d }}</li>
+                </ol>
+                <div v-else-if="enrichLoading" class="dw-full-empty">正在获取英文释义…</div>
+                <div v-else class="dw-full-empty">暂无英文释义（多为生僻词或接口未收录）。</div>
+              </div>
+              <div v-show="reviewTab === 'sim'" class="dw-full-pane" role="tabpanel">
+                <div v-if="enrich.similar.length" class="dw-full-sim">
+                  <span v-for="s in enrich.similar" :key="s">{{ s }}</span>
+                </div>
+                <div v-else-if="enrichLoading" class="dw-full-empty">正在计算形近词…</div>
+                <div v-else class="dw-full-empty">词表中未找到形近词。</div>
+              </div>
+            </div>
           </div>
+
           <div v-if="showAnswer" class="dw-grades">
             <el-button type="danger" @click="grade('again')">遗忘</el-button>
             <el-button type="primary" @click="grade('good')">记得</el-button>
@@ -335,9 +366,11 @@ const reviewedCount = ref(0)
 const showAnswer = ref(false)
 const current = computed(() => queue.value[0] ?? null)
 const reviewNewPerDay = ref(15)
+/** 复习卡底部标签：英文释义 / 形近词 */
+const reviewTab = ref<'en' | 'sim'>('en')
 
-/* 翻转显示答案 / 切到下一个词时，拉取该词完整增强数据（音标、助记、例句；免费 API）。
-   不显示答案时不提前请求，避免为没翻开的词浪费接口调用。 */
+/* 点「显示释义」后才拉取该词完整增强数据（音标、助记、例句、英文释义、形近词；免费 API），
+   节省为没翻开的词浪费的接口调用。 */
 watch(
   () => [showAnswer.value, current.value?.word],
   () => {
@@ -381,6 +414,7 @@ async function grade(g: SrsGrade) {
   // 遗忘：本轮稍后再出现，强化记忆
   if (g === 'again') queue.value.push(w)
   showAnswer.value = false
+  reviewTab.value = 'en'
   stats.value = srsStats(words.value, progressMap.value, reviewNewPerDay.value)
 }
 
@@ -718,6 +752,78 @@ onMounted(async () => {
   font-size: 12.5px;
   color: #9a9ab0;
   line-height: 1.7;
+}
+
+/* 释义（词性 + 中文） */
+.dw-full-mean {
+  font-size: 15px;
+  line-height: 1.7;
+  color: #2c2c3a;
+}
+.dw-full-pos {
+  color: #7c3aed;
+  font-weight: 700;
+  margin-right: 7px;
+}
+
+/* 英文释义 / 形近词 标签页 */
+.dw-full-tabs {
+  display: flex;
+  gap: 4px;
+  background: #f1f5f9;
+  border-radius: 10px;
+  padding: 3px;
+  margin-bottom: 11px;
+}
+.dw-full-tabs button {
+  flex: 1;
+  border: none;
+  background: transparent;
+  padding: 8px;
+  border-radius: 8px;
+  font-size: 12.5px;
+  color: #64748b;
+  cursor: pointer;
+  font-weight: 700;
+  min-height: 36px;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: rgba(99, 102, 241, 0.12);
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.dw-full-tabs button:active {
+  transform: scale(0.97);
+}
+.dw-full-tabs button.on {
+  background: #fff;
+  color: #0f172a;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.09);
+}
+.dw-full-pane {
+  font-size: 13px;
+  line-height: 1.75;
+  color: #475569;
+  min-height: 70px;
+}
+.dw-full-pane ol {
+  margin: 0;
+  padding-left: 18px;
+}
+.dw-full-pane li {
+  margin-bottom: 6px;
+}
+.dw-full-sim {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.dw-full-sim span {
+  background: #f8fafc;
+  border: 1px solid #eceaff;
+  border-radius: 8px;
+  padding: 6px 11px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #334155;
 }
 
 @media (max-width: 768px) {

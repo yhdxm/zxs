@@ -66,6 +66,49 @@
             <div v-if="current.phonetic" class="wtp-phon">/{{ current.phonetic }}/</div>
           </div>
           <div v-else-if="revealed && !current.definition" class="wtp-back">（暂无释义）</div>
+
+          <!-- 点开后完整详情（与 WordDetailDialog 同源） -->
+          <div v-if="revealed && current.word" class="wtp-detail">
+            <div class="wtp-sec">
+              <div class="wtp-sec-hd">助记</div>
+              <div v-if="enrich.mnemonicReal">{{ enrich.mnemonic }}</div>
+              <div v-else class="wtp-empty">*助记正在赶来的路上</div>
+            </div>
+            <div class="wtp-sec">
+              <div class="wtp-sec-hd">例句</div>
+              <template v-if="enrich.example">
+                <div class="wtp-ex-en">{{ enrich.example }}</div>
+                <div v-if="enrich.exampleZh" class="wtp-ex-zh">{{ enrich.exampleZh }}</div>
+                <div v-else class="wtp-ex-zh wtp-empty">（翻译获取中或不可用）</div>
+                <div class="wtp-ex-bar">
+                  <button type="button" @click="speakText(enrich.example, 0.95)">朗读</button>
+                  <button type="button" @click="speakText(enrich.example, 0.6)">慢速</button>
+                </div>
+              </template>
+              <div v-else class="wtp-empty">该词暂无例句，先记住释义即可。</div>
+            </div>
+            <div class="wtp-sec">
+              <div class="wtp-sec-hd">配图</div>
+              <div class="wtp-pic"><span class="wtp-pic-em">{{ getEmoji(current.word) }}</span><span class="wtp-pic-tx">离线象形符号，不耗流量</span></div>
+            </div>
+            <div class="wtp-sec">
+              <div class="wtp-tabs" role="tablist">
+                <button :class="{ on: detailTab === 'en' }" type="button" role="tab" :aria-selected="detailTab === 'en'" @click="detailTab = 'en'">英文释义</button>
+                <button :class="{ on: detailTab === 'sim' }" type="button" role="tab" :aria-selected="detailTab === 'sim'" @click="detailTab = 'sim'">形近词</button>
+              </div>
+              <div v-show="detailTab === 'en'" class="wtp-pane" role="tabpanel">
+                <ol v-if="enrich.enDefs.length"><li v-for="(d, i) in enrich.enDefs" :key="i">{{ d }}</li></ol>
+                <div v-else-if="enrichLoading" class="wtp-empty">正在获取英文释义…</div>
+                <div v-else class="wtp-empty">暂无英文释义（多为生僻词或接口未收录）。</div>
+              </div>
+              <div v-show="detailTab === 'sim'" class="wtp-pane" role="tabpanel">
+                <div v-if="enrich.similar.length" class="wtp-sim"><span v-for="s in enrich.similar" :key="s">{{ s }}</span></div>
+                <div v-else-if="enrichLoading" class="wtp-empty">正在计算形近词…</div>
+                <div v-else class="wtp-empty">词表中未找到形近词。</div>
+              </div>
+            </div>
+          </div>
+
           <div class="wtp-actions">
             <el-button :icon="Microphone" @click="speak(current.word)">朗读</el-button>
             <el-button v-if="!revealed" type="primary" @click="revealed = true">显示释义</el-button>
@@ -148,6 +191,8 @@ import { ElMessage } from 'element-plus'
 import { loadWords, loadPhrases } from '../prep/degreeDb'
 import { allDegreeQuestions } from '../prep/degreeQuestionBank'
 import { speakEn } from '../prep/degreeSpeech'
+import { getEmoji } from '../data/emojiDict'
+import { getWordEnrich, type WordEnrichData } from '../services/wordEnrichService'
 import { MASTER_WORDS_BUNDLE } from '../prep/masterWordsBundle'
 import { CET6_WORDS_BUNDLE } from '../prep/cet6WordsBundle'
 import { loadCetProgress, saveCetProgress, type CetWordProgress } from '../services/cetProgressService'
@@ -208,6 +253,33 @@ const correct = ref(false)
 const sessionReviewed = ref(0)
 const lastSchedule = ref('')
 const newPerDay = ref(15)
+// ===== 显示释义后的完整详情（与 WordDetailDialog 同源，免费 API） =====
+const EMPTY_ENRICH: WordEnrichData = {
+  word: '', phonetic: '', phoneticUS: '', phoneticUK: '',
+  enDefs: [], example: '', exampleZh: '', similar: [],
+  mnemonic: '', mnemonicReal: false, emoji: ''
+}
+const enrich = ref<WordEnrichData>({ ...EMPTY_ENRICH })
+const enrichLoading = ref(false)
+const detailTab = ref<'en' | 'sim'>('en')
+/** 形近词候选池：当前模块全部词 */
+const pool = computed(() => items.value.map((i) => i.word))
+
+async function loadEnrich(w: string): Promise<void> {
+  if (!w) { enrich.value = { ...EMPTY_ENRICH }; return }
+  const phon = current.value.phonetic || ''
+  enrichLoading.value = true
+  enrich.value = { ...EMPTY_ENRICH, word: w }
+  try {
+    const d = await getWordEnrich(w, { localPhonetic: phon, pool: pool.value })
+    if (current.value.word === w) enrich.value = d
+  } finally {
+    if (current.value.word === w) enrichLoading.value = false
+  }
+}
+function speakText(text: string, rate: number): void {
+  if (text) speakEn(text, rate, 'en-US')
+}
 // 已掌握词回流开关（来自模块独立设置，不串）
 const graduatedReturn = ref(false)
 // 当前模块 key（用于连续学习天数记录）：学习中心背单词卡=learn，四六级=cet
@@ -421,6 +493,13 @@ function nextTranslate() {
   reset()
 }
 
+watch(
+  () => [revealed.value, current.value.word],
+  () => {
+    if (revealed.value && current.value.word) void loadEnrich(current.value.word)
+    else { enrich.value = { ...EMPTY_ENRICH }; detailTab.value = 'en' }
+  }
+)
 watch(innerMode, () => {
   reset()
   if (innerMode.value !== 'translate') rebuildQueue()
@@ -499,4 +578,24 @@ onMounted(async () => {
 @media (max-width: 640px) {
   .wtp-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+.wtp-detail { margin-top: 14px; border-top: 1px dashed var(--border); padding-top: 12px; text-align: left; }
+.wtp-sec { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; margin-bottom: 10px; }
+.wtp-sec-hd { font-size: 12px; font-weight: 700; color: var(--text-strong); margin-bottom: 6px; }
+.wtp-empty { font-size: 12.5px; color: var(--text-faint); line-height: 1.7; }
+.wtp-ex-en { font-size: 13.5px; line-height: 1.7; color: var(--text-strong); }
+.wtp-ex-zh { font-size: 12.5px; color: var(--text-muted); line-height: 1.65; margin-top: 5px; }
+.wtp-ex-bar { display: flex; gap: 8px; margin-top: 9px; }
+.wtp-ex-bar button { border: 1px solid var(--border); background: var(--surface); border-radius: 8px; padding: 5px 12px; font-size: 12px; cursor: pointer; color: var(--brand, #378add); font-weight: 600; min-height: 32px; touch-action: manipulation; }
+.wtp-pic { display: flex; align-items: center; gap: 14px; }
+.wtp-pic-em { font-size: 40px; line-height: 1; }
+.wtp-pic-tx { font-size: 12px; color: var(--text-muted); line-height: 1.65; }
+.wtp-tabs { display: flex; gap: 4px; background: var(--surface-soft); border-radius: 10px; padding: 3px; margin-bottom: 11px; }
+.wtp-tabs button { flex: 1; border: none; background: transparent; padding: 8px; border-radius: 8px; font-size: 12.5px; color: var(--text-muted); cursor: pointer; font-weight: 700; min-height: 36px; touch-action: manipulation; transition: background .15s, color .15s; }
+.wtp-tabs button.on { background: var(--surface); color: var(--text-strong); box-shadow: 0 1px 3px rgba(15,23,42,.09); }
+.wtp-pane { font-size: 13px; line-height: 1.75; color: var(--text-muted); min-height: 70px; }
+.wtp-pane ol { margin: 0; padding-left: 18px; }
+.wtp-pane li { margin-bottom: 6px; }
+.wtp-sim { display: flex; flex-wrap: wrap; gap: 8px; }
+.wtp-sim span { background: var(--surface-soft); border: 1px solid var(--border); border-radius: 8px; padding: 6px 11px; font-size: 12.5px; font-weight: 600; color: var(--text-strong); }
+
 </style>

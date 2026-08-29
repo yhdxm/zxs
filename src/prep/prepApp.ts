@@ -12,8 +12,10 @@ import {
   newId
 } from '../services/cetPrepService'
 import { MASTER_WORDS_BUNDLE } from './masterWordsBundle'
+import { CET6_WORDS_BUNDLE } from './cet6WordsBundle'
 import { speakEn } from '../prep/degreeSpeech'
 import { getEmoji } from '../data/emojiDict'
+import { getWordEnrich } from '../services/wordEnrichService'
 
 export interface PrepStorage {
   fetchMasterWords(): Promise<PrepWord[]>
@@ -1121,6 +1123,7 @@ function renderCard(m: PrepWord, flipped: boolean) {
       <div class="fc-pos">${esc(m[2])}</div>
       <div class="fc-back">${esc(m[3])}</div>
       <div class="fc-coll">常考：${esc(m[4])}</div>
+      <div class="fc-full" id="fcFull"></div>
       <div class="fc-actions">
         <button class="fc-btn fc-unknown" id="fcUnk">${ICON.cross}不认识</button>
         <button class="fc-btn fc-known" id="fcKn">${ICON.check}认识</button>
@@ -1134,8 +1137,60 @@ function renderCard(m: PrepWord, flipped: boolean) {
     // 关键：判断认识/不认识后必须调用 afterReview() 前进到下一个卡片（修复卡片卡死）
     if (kn) kn.addEventListener('click', () => { reviewWord(current!.w, true); afterReview() })
     if (unk) unk.addEventListener('click', () => { reviewWord(current!.w, false); afterReview() })
+    // 异步填充完整详情（助记/例句/配图/英文释义/形近词），免费 API
+    void renderFcFull(m)
   }
 }
+async function renderFcFull(m: PrepWord) {
+  const box = document.querySelector('#fcFull')
+  if (!box) return
+  const pool = [...MASTER_WORDS_BUNDLE.map((w) => w[0]), ...CET6_WORDS_BUNDLE.map((w) => w[0])]
+  try {
+    const d = await getWordEnrich(m[0], { localPhonetic: m[1], pool })
+    if (!box.isConnected) return
+    const enDefs = d.enDefs.length
+      ? `<ol class="fc-enlist">${d.enDefs.map((x) => `<li>${esc(x)}</li>`).join('')}</ol>`
+      : '<div class="fc-empty">暂无英文释义（多为生僻词或接口未收录）。</div>'
+    const sim = d.similar.length
+      ? `<div class="fc-sim">${d.similar.map((x) => `<span>${esc(x)}</span>`).join('')}</div>`
+      : '<div class="fc-empty">词表中未找到形近词。</div>'
+    const ex = d.example
+      ? `<div class="fc-ex-en">${esc(d.example)}</div>${d.exampleZh ? `<div class="fc-ex-zh">${esc(d.exampleZh)}</div>` : ''}<div class="fc-ex-bar"><button type="button" class="fc-ex-btn" data-t="0.95">朗读</button><button type="button" class="fc-ex-btn" data-t="0.6">慢速</button></div>`
+      : '<div class="fc-empty">该词暂无例句，先记住释义即可。</div>'
+    const mnc = d.mnemonicReal
+      ? `<div class="fc-mnc">${esc(d.mnemonic)}</div>`
+      : '<div class="fc-empty">*助记正在赶来的路上</div>'
+    box.innerHTML = `
+      <div class="fc-sec"><div class="fc-sec-hd">助记</div>${mnc}</div>
+      <div class="fc-sec"><div class="fc-sec-hd">例句</div>${ex}</div>
+      <div class="fc-sec"><div class="fc-sec-hd">配图</div><div class="fc-pic"><span class="fc-pic-em">${getEmoji(m[0])}</span><span class="fc-pic-tx">离线象形符号，不耗流量</span></div></div>
+      <div class="fc-sec">
+        <div class="fc-tabs">
+          <button type="button" class="on" data-tab="en">英文释义</button>
+          <button type="button" data-tab="sim">形近词</button>
+        </div>
+        <div class="fc-pane" data-pane="en">${enDefs}</div>
+        <div class="fc-pane" data-pane="sim" style="display:none">${sim}</div>
+      </div>
+    `
+    box.querySelectorAll('.fc-tabs button').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const tab = (btn as HTMLButtonElement).dataset.tab
+        box.querySelectorAll('.fc-tabs button').forEach((b) => b.classList.remove('on'))
+        btn.classList.add('on')
+        box.querySelectorAll('.fc-pane').forEach((p) => {
+          ;(p as HTMLElement).style.display = (p as HTMLElement).dataset.pane === tab ? '' : 'none'
+        })
+      })
+    })
+    box.querySelectorAll('.fc-ex-btn').forEach((b) => {
+      b.addEventListener('click', () => speakEn(d.example || '', parseFloat((b as HTMLButtonElement).dataset.t || '0.95'), 'en-US'))
+    })
+  } catch {
+    box.innerHTML = '<div class="fc-empty">详情加载失败（可点「查看完整详情」）。</div>'
+  }
+}
+
 function afterReview() {
   updateProgress()
   if (queueArr.length === 0) finishFocus()

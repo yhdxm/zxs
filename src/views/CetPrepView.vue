@@ -445,6 +445,28 @@ onUnmounted(() => {
 .cet-prep-root .fc-kind { position: absolute; top: 14px; left: 16px; font-size: 12px; font-weight: 700; color: var(--ink-soft); }
 .cet-prep-root .fc-kind.review { color: var(--orange); }
 
+/* 翻面后的完整详情区（与 WordDetailDialog 同源，免费 API） */
+.cet-prep-root .fc-full { margin-top: 18px; border-top: 1px dashed var(--border-2); padding-top: 14px; text-align: left; }
+.cet-prep-root .fc-sec { background: var(--surface-2); border: 1px solid var(--border); border-radius: 12px; padding: 11px 13px; margin-bottom: 10px; }
+.cet-prep-root .fc-sec-hd { font-size: 12.5px; font-weight: 800; color: var(--ink-soft); margin-bottom: 7px; letter-spacing: 0.3px; }
+.cet-prep-root .fc-empty { font-size: 12.5px; color: var(--ink-soft); line-height: 1.7; }
+.cet-prep-root .fc-mnc { font-size: 13px; line-height: 1.75; color: var(--ink); }
+.cet-prep-root .fc-ex-en { font-size: 14px; line-height: 1.7; color: var(--ink); }
+.cet-prep-root .fc-ex-zh { font-size: 12.5px; color: var(--ink-soft); line-height: 1.65; margin-top: 5px; }
+.cet-prep-root .fc-ex-bar { display: flex; gap: 8px; margin-top: 9px; }
+.cet-prep-root .fc-ex-btn { border: 1px solid var(--border); background: var(--surface); border-radius: 8px; padding: 5px 12px; font-size: 12px; cursor: pointer; color: var(--orange); font-weight: 700; min-height: 32px; touch-action: manipulation; }
+.cet-prep-root .fc-enlist { margin: 0; padding-left: 18px; font-size: 13px; line-height: 1.75; color: var(--ink-soft); }
+.cet-prep-root .fc-enlist li { margin-bottom: 6px; }
+.cet-prep-root .fc-pic { display: flex; align-items: center; gap: 14px; }
+.cet-prep-root .fc-pic-em { font-size: 44px; line-height: 1; }
+.cet-prep-root .fc-pic-tx { font-size: 12px; color: var(--ink-soft); line-height: 1.65; }
+.cet-prep-root .fc-tabs { display: flex; gap: 4px; background: var(--surface-2); border-radius: 10px; padding: 3px; margin-bottom: 11px; }
+.cet-prep-root .fc-tabs button { flex: 1; border: none; background: transparent; padding: 8px; border-radius: 8px; font-size: 12.5px; color: var(--ink-soft); cursor: pointer; font-weight: 700; min-height: 36px; touch-action: manipulation; transition: background .15s, color .15s; }
+.cet-prep-root .fc-tabs button.on { background: var(--surface); color: var(--ink); box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+.cet-prep-root .fc-pane { font-size: 13px; line-height: 1.75; color: var(--ink-soft); min-height: 68px; }
+.cet-prep-root .fc-sim { display: flex; flex-wrap: wrap; gap: 8px; }
+.cet-prep-root .fc-sim span { background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; padding: 6px 11px; font-size: 12.5px; font-weight: 700; color: var(--ink); }
+
 .cet-prep-root #confetti { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
 .cet-prep-root #confetti i { position: absolute; top: -12px; width: 10px; height: 14px; border-radius: 2px; animation: cetprep-fall 1.8s linear forwards; }
 @keyframes cetprep-fall { to { transform: translateY(110vh) rotate(540deg); opacity: 0; } }
