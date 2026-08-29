@@ -318,11 +318,81 @@ export function marketOf(code: string): MarketKind {
 }
 
 /**
- * 外盘商品（hf_ 前缀）腾讯免费接口**不提供 K 线**（实测 param error），
- * 其他市场均可用。组件据此决定是否展示 K 线，避免打开空白图表。
+ * 外盘商品（hf_ 前缀）腾讯免费接口**不提供 K 线**（实测 param error）。
+ * 改用东方财富「环球期货 / 外汇贵金属」免费接口拿 K 线（浏览器端 CORS 头为 *，可直连，无需 Key）。
+ * 下方映射经逐个实测确认 secid 有效（伦敦金=外汇贵金属板、纽约金/银/COMEX铜=COMEX、WTI/天然气=NYMEX、布伦特=ICE）。
+ * 伦铜（LME）东财仅暴露人民币小型合约、无干净主连，退而用 COMEX 铜（全球铜价基准）作免费近似。
  */
+export const COMMODITY_KLINE_SECIDS: Record<string, string> = {
+  hf_XAU: '122.XAU', // 伦敦金（现货黄金/美元）
+  hf_XAG: '122.XAG', // 伦敦银（现货白银/美元）
+  hf_GC: '101.GC00Y', // 纽约金（COMEX 黄金连续）
+  hf_SI: '101.SI00Y', // 纽约银（COMEX 白银连续）
+  hf_CL: '102.CL00Y', // WTI 原油（NYMEX 原油连续）
+  hf_OIL: '112.B00Y', // 布伦特原油（ICE 当月连续）
+  hf_NG: '102.NG00Y', // 美国天然气（NYMEX 天然气连续）
+  hf_CAD: '101.HG00Y' // 伦铜（用 COMEX 铜作免费近似）
+}
+
+/** 外盘商品是否已有可用的免费 K 线源（东方财富） */
 export function supportsKline(code: string): boolean {
-  return marketOf(code) !== 'foreign'
+  return marketOf(code) !== 'foreign' || Boolean(COMMODITY_KLINE_SECIDS[code])
+}
+
+/** 东方财富 K 线周期 → klt 参数 */
+const EM_KLT: Record<KLinePeriod, number> = {
+  minute: 1,
+  day: 101,
+  week: 102,
+  month: 103,
+  quarter: 104
+}
+
+/**
+ * 东方财富 K 线（免费、浏览器端 CORS * 可直连）。
+ * 返回 klines 为逗号分隔字符串：date,open,close,high,low,volume,amount,振幅,涨跌幅,涨跌额,换手。
+ */
+export async function fetchEastmoneyKline(
+  secid: string,
+  period: KLinePeriod,
+  limit = 160
+): Promise<KLineResult> {
+  const empty: KLineResult = { points: [], prevClose: 0, source: 'none' }
+  if (!secid) return empty
+  try {
+    const klt = EM_KLT[period]
+    const url =
+      `https://push2his.eastmoney.com/api/qt/stock/kline/get?secid=${secid}` +
+      `&fields1=f1,f2,f3,f4,f5,f6&fields2=f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61` +
+      `&klt=${klt}&fqt=0&end=20500101&lmt=${limit}`
+    const r = await fetch(url, {
+      headers: { Referer: 'https://quote.eastmoney.com/' },
+      signal: AbortSignal.timeout(9000)
+    })
+    const json = await r.json()
+    const klines: string[] | undefined = json?.data?.klines
+    if (!Array.isArray(klines) || !klines.length) return empty
+    const points: KLinePoint[] = klines
+      .map((row) => {
+        const f = String(row).split(',')
+        return {
+          date: (f[0] || '').slice(0, 10),
+          open: toNum(f[1]),
+          close: toNum(f[2]),
+          high: toNum(f[3]),
+          low: toNum(f[4]),
+          volume: toNum(f[5])
+        }
+      })
+      .filter((p) => p.close > 0)
+    if (!points.length) return empty
+    // 分时无昨收字段，用首根开盘作涨跌幅基准；日/周/月蜡烛无需昨收
+    const prevClose = period === 'minute' ? (points[0]?.open ?? 0) : 0
+    return { points, prevClose, source: 'eastmoney' }
+  } catch (e) {
+    console.error('[影仓智核] 东财 K线加载失败', e)
+    return empty
+  }
 }
 
 /**
@@ -394,6 +464,13 @@ export async function fetchKlineWithMeta(
 ): Promise<KLineResult> {
   const empty: KLineResult = { points: [], prevClose: 0, source: 'none' }
   if (!supportsKline(code) && period !== 'minute') return empty
+
+  // 外盘商品：腾讯无 K 线，改走东方财富免费源（浏览器端 CORS 可直连）
+  if (marketOf(code) === 'foreign') {
+    const secid = COMMODITY_KLINE_SECIDS[code]
+    if (secid) return await fetchEastmoneyKline(secid, period, limit)
+    return empty
+  }
 
   try {
     if (period === 'minute') {
@@ -613,3 +690,52 @@ export const CHART_TARGETS: { group: string; items: { code: string; name: string
     ]
   }
 ]
+
+// ===================== 行情缓存（省免费额度、防重复调用） =====================
+//
+// 免费公开接口没有额度，但高频重复请求容易被限速甚至临时封 IP。
+// 这里做进程内缓存，解决两类重复调用：
+//   1) 切 Tab / 组件重挂载时立刻又打一次接口
+//   2) 多个视图同时订阅同一批标的
+// 缓存寿命按市场状态区分：交易中数据变化快（短），休市数据不动（长）。
+
+export interface QuoteSnapshot {
+  indices: Quote[]
+  globals: Quote[]
+  commodities: Quote[]
+  stocks: Quote[]
+  /** 快照时间（Date.now()） */
+  at: number
+}
+
+let snapshot: QuoteSnapshot | null = null
+
+export function getSnapshot(): QuoteSnapshot | null {
+  return snapshot
+}
+
+export function setSnapshot(s: QuoteSnapshot): void {
+  snapshot = s
+}
+
+/**
+ * 缓存是否仍然新鲜。
+ * @param maxAgeSec 允许的最大存活秒数（交易中建议 4s，休市建议 120s）
+ */
+export function isSnapshotFresh(maxAgeSec: number): boolean {
+  if (!snapshot) return false
+  return (Date.now() - snapshot.at) / 1000 < maxAgeSec
+}
+
+/**
+ * 任一 A 股标的处于交易时段 → 认为整体处于「盘中」，需要高频刷新。
+ * 全休市时返回 false，调用方据此降频到长间隔甚至暂停自动刷新。
+ */
+export function isAnyMarketOpen(): boolean {
+  return INDEX_CODES.some((c) => marketStatusOf(c).status === 'open')
+}
+
+/** 按市场状态给出建议的自动刷新间隔（毫秒） */
+export function suggestedRefreshMs(): number {
+  return isAnyMarketOpen() ? 3000 : 60000
+}

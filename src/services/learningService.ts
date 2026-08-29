@@ -34,6 +34,43 @@ export async function fetchDefinition(word: string): Promise<WordDefinition | nu
   return null
 }
 
+/**
+ * 英译中（MyMemory 免费免 Key，纯前端直连）。
+ * 失败返回空串，由调用方决定是否显示占位，绝不抛错打断查词。
+ */
+const MYMEMORY = 'https://api.mymemory.translated.net/get'
+const zhCache = new Map<string, string>()
+const zhInflight = new Map<string, Promise<string>>()
+
+export async function translateToZh(text: string): Promise<string> {
+  const q = (text || '').trim()
+  if (!q) return ''
+  if (zhCache.has(q)) return zhCache.get(q)!
+  if (zhInflight.has(q)) return zhInflight.get(q)!
+
+  const task = (async (): Promise<string> => {
+    try {
+      const res = await fetch(`${MYMEMORY}?q=${encodeURIComponent(q)}&langpair=en|zh-CN`)
+      if (!res.ok) return ''
+      const data = await res.json()
+      const t: string = data?.responseData?.translatedText || ''
+      // MyMemory 限长或异常时会回一段英文警告，识别出来当作无翻译
+      if (!t || /MYMEMORY WARNING|QUERY LENGTH LIMIT|ALLOWED/i.test(t)) return ''
+      // 译不出来时会原样返回英文，判定为无效
+      if (t.trim().toLowerCase() === q.toLowerCase()) return ''
+      zhCache.set(q, t)
+      return t
+    } catch {
+      return ''
+    } finally {
+      zhInflight.delete(q)
+    }
+  })()
+
+  zhInflight.set(q, task)
+  return task
+}
+
 /** 用已配置 AI 通俗讲解单词（面向学位英语/考研备考） */
 export async function explainWord(word: string, def: WordDefinition | null, cfg: AiConfig): Promise<string> {
   const base = def ? JSON.stringify(def.meanings?.slice(0, 3)) : '（词典未返回释义）'

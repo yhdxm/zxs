@@ -130,6 +130,7 @@
                 <span class="xy-board-ico">⚡</span>
                 <span class="xy-board-title">新能源销量榜</span>
                 <span class="xy-board-tag">国内车企</span>
+                <span class="xy-board-fresh" :class="rank.nevLive ? 'is-live' : 'is-stale'">{{ rank.nevLive ? '实时报道' : '2024 参考' }}</span>
               </div>
               <ol class="xy-rank">
                 <li v-for="r in rank.nev" :key="'nev' + r.rank" class="xy-rank-row" :class="'top' + Math.min(r.rank, 3)">
@@ -153,6 +154,7 @@
                 <span class="xy-board-ico">🔥</span>
                 <span class="xy-board-title">燃油车销量榜</span>
                 <span class="xy-board-tag">国内车企</span>
+                <span class="xy-board-fresh" :class="rank.fuelLive ? 'is-live' : 'is-stale'">{{ rank.fuelLive ? '实时报道' : '2024 参考' }}</span>
               </div>
               <ol class="xy-rank">
                 <li v-for="r in rank.fuel" :key="'fuel' + r.rank" class="xy-rank-row" :class="'top' + Math.min(r.rank, 3)">
@@ -329,12 +331,14 @@ import {
   CAR_KNOWLEDGE,
   CAR_TYPES,
   CAR_BRANDS,
+  CAR_TOPIC_WORDS,
   type CarNewsItem,
   type CarMacro,
   type BitefuBrand,
   type BitefuSeries,
   type BitefuModel,
-  type BitefuDetail
+  type BitefuDetail,
+  type SalesRankResult
 } from '../services/carService'
 import { listCarWatch, addCarWatch, removeCarWatch, type CarWatchItem } from '../services/learnDb'
 
@@ -430,9 +434,10 @@ const brand = ref('比亚迪')
 const brandNews = ref<CarNewsItem[]>([])
 
 async function loadHot(): Promise<void> { loading.hot = true; hotNews.value = await fetchCarNews('汽车 新能源', 20); loading.hot = false }
-async function loadDiscount(): Promise<void> { loading.discount = true; discountNews.value = await fetchCarNews('汽车 终端优惠 降价', 20); loading.discount = false }
-async function loadNewCar(): Promise<void> { loading.newcar = true; newCarNews.value = await fetchCarNews('新车 上市 发布', 20); loading.newcar = false }
-async function loadBrand(): Promise<void> { loading.brand = true; brandNews.value = await fetchCarNews(brand.value + ' 汽车', 20); loading.brand = false }
+// 各入口带主题词，保证「终端优惠 / 新品发布 / 品牌热点」不会和「热点信息」显示成同一批新闻
+async function loadDiscount(): Promise<void> { loading.discount = true; discountNews.value = await fetchCarNews('汽车 终端优惠 降价', 20, [...CAR_TOPIC_WORDS.discount]); loading.discount = false }
+async function loadNewCar(): Promise<void> { loading.newcar = true; newCarNews.value = await fetchCarNews('新车 上市 发布', 20, [...CAR_TOPIC_WORDS.newcar]); loading.newcar = false }
+async function loadBrand(): Promise<void> { loading.brand = true; brandNews.value = await fetchCarNews(brand.value + ' 汽车', 20, brand.value ? [brand.value] : undefined); loading.brand = false }
 
 /* 知识（支持分类筛选 + 关键词搜索 + 展开详细讲解） */
 const kSearch = ref('')
@@ -511,7 +516,7 @@ async function onSelectModel(m: BitefuModel): Promise<void> {
 
 /* 销量排行 + 宏观（国内车企 · 新能源/燃油车 分榜） */
 const macro = ref<CarMacro>({ source: '', title: '', series: [] })
-const rank = ref<{ nev: { rank: number; name: string; sales: string; yoy: string; note: string }[]; fuel: { rank: number; name: string; sales: string; yoy: string; note: string }[]; note: string }>({ nev: [], fuel: [], note: '' })
+const rank = ref<SalesRankResult>({ nev: [], fuel: [], note: '' })
 async function loadRank(): Promise<void> {
   loading.rank = true
   const [m, r] = await Promise.all([fetchCarMacro(), fetchSalesRanking(cfg.value)])
@@ -680,6 +685,10 @@ onUnmounted(() => { if (clockTimer) window.clearInterval(clockTimer) })
 .xy-board-tag { margin-left: auto; font-size: 11px; font-weight: 700; color: #fff; background: var(--text-faint); border-radius: 999px; padding: 2px 9px; }
 .xy-board.nev .xy-board-tag { background: #10b981; }
 .xy-board.fuel .xy-board-tag { background: #f97316; }
+/* 榜单数据时效性：绿色=实时报道抽取，灰色=内置 2024 参考榜（数据不是最新的，需标明） */
+.xy-board-fresh { margin-left: 6px; font-size: 11px; font-weight: 700; border-radius: 999px; padding: 2px 9px; white-space: nowrap; border: 1px solid; }
+.xy-board-fresh.is-live { color: #16a34a; background: #dcfce7; border-color: #bbf7d0; }
+.xy-board-fresh.is-stale { color: #94a3b8; background: #f1f5f9; border-color: #e2e8f0; }
 
 .xy-rank { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
 .xy-rank-row {

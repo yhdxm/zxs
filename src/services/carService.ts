@@ -281,11 +281,43 @@ function isCarRelated(n: NewsItem): boolean {
 }
 
 /**
+ * 各细分入口的主题词表。
+ * 用于把「终端优惠 / 新品发布」与「热点信息」区分开——
+ * 否则东财按泛汽车词检索后，几栏返回的都是同一批新闻。
+ */
+export const CAR_TOPIC_WORDS = {
+  /** 终端优惠：降价促销类 */
+  discount: ['优惠', '降价', '促销', '终端', '让利', '补贴', '一口价', '限时', '官降', '清库'],
+  /** 新品发布：上市首发类 */
+  newcar: ['上市', '发布', '预售', '亮相', '首发', '新车', '改款', '换代']
+} as const
+
+/** 新闻缓存：相同参数短时间内复用，避免切 Tab / 反复刷新重复打免费接口 */
+const newsCache = new Map<string, { items: CarNewsItem[]; at: number }>()
+/** 缓存寿命 3 分钟：新闻更新没那么快，且省接口、防限速 */
+const NEWS_TTL_MS = 3 * 60 * 1000
+
+/** 判断一条新闻是否命中主题词（优惠 / 新品 / 品牌等细分入口） */
+function matchTopic(n: NewsItem, topicWords?: string[]): boolean {
+  if (!topicWords || !topicWords.length) return true
+  const hay = n.title + n.description
+  return topicWords.some((w) => hay.includes(w))
+}
+
+/**
  * 抓取汽车相关新闻（热点/优惠/新品/品牌）。
  * 顺序：东财搜索（国内直连、主力）→ Google News（备源，需梯子）→ 内置精选兜底。
- * 保证任何网络状况下都有内容，且不同关键词返回不同结果（不再所有 Tab 共用一份兜底）。
+ *
+ * @param topicWords 主题词表（如「终端优惠」传优惠类词，「新品发布」传上市类词）。
+ *   传入后各入口只保留命中该主题的新闻，避免几栏内容长得一模一样——
+ *   这是此前最大的体验问题：所有入口都用同一套汽车词过滤，
+ *   网络不通时又都回落到同一份内置精选，导致四栏显示完全相同的内容。
  */
-export async function fetchCarNews(keyword: string, limit = 20): Promise<CarNewsItem[]> {
+export async function fetchCarNews(keyword: string, limit = 20, topicWords?: string[]): Promise<CarNewsItem[]> {
+  const cacheKey = `${keyword}|${limit}|${(topicWords || []).join(',')}`
+  const cached = newsCache.get(cacheKey)
+  if (cached && Date.now() - cached.at < NEWS_TTL_MS) return cached.items
+
   const seen = new Set<string>()
   const out: CarNewsItem[] = []
   const push = (items: NewsItem[]): void => {
@@ -297,25 +329,36 @@ export async function fetchCarNews(keyword: string, limit = 20): Promise<CarNews
       if (out.length >= limit) break
     }
   }
+  const finish = (items: CarNewsItem[]): CarNewsItem[] => {
+    const res = items.slice(0, limit)
+    newsCache.set(cacheKey, { items: res, at: Date.now() })
+    return res
+  }
 
   // 1) 主源：东方财富资讯搜索（免 KEY，Access-Control-Allow-Origin: *，国内可直连）
+  //    有主题词时用主题词做相关性过滤（更严格），多取一些保证过滤后仍够数
   try {
-    push(await fetchEastmoneyNews(keyword, { limit, sort: 'time', mustInclude: CAR_CORE_WORDS }))
+    const mustInclude = topicWords?.length ? topicWords : CAR_CORE_WORDS
+    const raw = await fetchEastmoneyNews(keyword, { limit: limit * 2, sort: 'time', mustInclude })
+    push(raw.filter((n) => matchTopic(n, topicWords)))
   } catch {
     /* 忽略，继续备源 */
   }
-  if (out.length >= limit) return out.slice(0, limit)
+  if (out.length >= limit) return finish(out)
 
   // 2) 备源：Google News RSS（有梯子时可用，国内多不可达）
   try {
-    push((await fetchNews({ keyword, limit })).filter(isCarRelated))
+    const raw = await fetchNews({ keyword, limit })
+    push(raw.filter(isCarRelated).filter((n) => matchTopic(n, topicWords)))
   } catch {
     /* 忽略，走兜底 */
   }
-  if (out.length) return out.slice(0, limit)
+  if (out.length) return finish(out)
 
-  // 3) 终极兜底：内置精选（保证页面永不空白）
-  return BUILTIN_CAR_NEWS.slice(0, limit)
+  // 3) 兜底：内置精选同样按主题分流，避免各入口共用同一份内容。
+  //    主题实在没匹配上时才退回全量，保证页面永不空白。
+  const fallback = BUILTIN_CAR_NEWS.filter((n) => matchTopic(n, topicWords))
+  return finish(fallback.length ? fallback : BUILTIN_CAR_NEWS)
 }
 
 /* ============================================================
@@ -852,6 +895,22 @@ export interface SalesRankResult {
   nev: SalesRankItem[]
   fuel: SalesRankItem[]
   note: string
+  /** 新能源榜是否为实时抽取（false = 内置 2024 参考榜） */
+  nevLive?: boolean
+  /** 燃油车榜是否为实时抽取（false = 内置 2024 参考榜） */
+  fuelLive?: boolean
+}
+
+/** 生成销量榜时效性说明，让"数据是什么时候的"一目了然 */
+function buildRankNote(nevOk: boolean, fuelOk: boolean, latest: string): string {
+  const live =
+    `摘自公开财经报道原文${latest ? `（最新 ${latest}）` : ''}，点击「查看原文」可逐条核查；` +
+    '按报道中出现的销量数值降序排列，不同厂商统计口径（批发 / 零售 / 交付）可能不一致。'
+  const stale = '当前为国内车企参考榜（2024 年月度量级，不代表最新销量，仅供了解市场格局）。'
+  if (nevOk && fuelOk) return `新能源榜与燃油车榜均为实时抽取：${live}`
+  if (nevOk) return `新能源榜为实时抽取：${live}　燃油车榜实时数据不足，${stale}`
+  if (fuelOk) return `燃油车榜为实时抽取：${live}　新能源榜实时数据不足，${stale}`
+  return `实时数据源暂不可达，两榜均展示参考数据：${stale}`
 }
 
 /**
@@ -867,22 +926,21 @@ export async function fetchSalesRanking(_cfg: AiConfig | null): Promise<SalesRan
 
   // 1) 正则抽取真实数字，并按动力类型分榜
   const facts = extractSalesFacts(news)
-  const nev = toRankItems(facts, 'nev')
-  const fuel = toRankItems(facts, 'fuel')
+  const nevLive = toRankItems(facts, 'nev')
+  const fuelLive = toRankItems(facts, 'fuel')
 
-  if (nev.length >= 3 && fuel.length >= 3) {
-    const latest = facts[0]?.date ?? ''
-    return {
-      nev,
-      fuel,
-      note: `以下均摘自公开财经报道原文（最新 ${latest}），点击「查看原文」可逐条核查；按报道中出现的销量数值降序排列，不同厂商统计口径（批发/零售/交付）可能不一致。新能源与燃油车已分榜展示。`
-    }
-  }
+  // 分榜降级：哪一榜抽到足够的最新数据就用哪一榜。
+  // 旧实现要求两榜都够 3 条才启用实时数据，否则两个榜一起退回 2024 年参考榜——
+  // 只要燃油榜抽不满，新能源榜也会被拖成两年前的老数据，这是「数据太旧」的主因。
+  const nevOk = nevLive.length >= 3
+  const fuelOk = fuelLive.length >= 3
+  const latest = facts[0]?.date ?? ''
 
-  // 2) 内置国内车企参考榜（新能源 / 燃油车 两榜）
   return {
-    nev: DOMESTIC_NEV_RANK,
-    fuel: DOMESTIC_FUEL_RANK,
-    note: '实时数据源暂不可达，当前展示国内车企参考榜（2024 年月度量级，自主品牌口径，分新能源/燃油车；不代表最新销量，仅供了解市场格局）。'
+    nev: nevOk ? nevLive : DOMESTIC_NEV_RANK,
+    fuel: fuelOk ? fuelLive : DOMESTIC_FUEL_RANK,
+    nevLive: nevOk,
+    fuelLive: fuelOk,
+    note: buildRankNote(nevOk, fuelOk, latest)
   }
 }

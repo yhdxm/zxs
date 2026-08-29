@@ -44,13 +44,18 @@
       <div class="yc-section-title">
         贵金属 · 能源 · 大宗
         <span class="yc-hint">
-          伦敦金 · 伦敦银 · 纽约金银 · WTI 原油 · 布伦特原油 · 天然气 · 伦铜（腾讯外盘免费源 · 无 K
-          线）
+          伦敦金 · 伦敦银 · 纽约金银 · WTI 原油 · 布伦特原油 · 天然气 · 伦铜（外盘免费源 · 点击看
+          K 线·东财）
         </span>
       </div>
       <div v-if="commodities.length" class="yc-grid">
-        <div v-for="q in commodities" :key="q.code" class="yc-card" :class="trendClass(q)">
-          <!-- 外盘商品免费接口不提供 K 线，故不做点击，避免打开空白图表 -->
+        <div
+          v-for="q in commodities"
+          :key="q.code"
+          class="yc-card yc-clickable"
+          :class="trendClass(q)"
+          @click="openKline(q)"
+        >
           <div class="yc-card-head">
             <span class="yc-card-name">{{ q.name }}</span>
             <span class="yc-card-code">{{ unitOf(q.code) }}</span>
@@ -203,6 +208,11 @@ import {
   fetchHotStocks,
   freshnessOf,
   marketStatusOf,
+  getSnapshot,
+  isSnapshotFresh,
+  setSnapshot,
+  suggestedRefreshMs,
+  isAnyMarketOpen,
   COMMODITY_UNITS,
   type Freshness,
   type MarketSession,
@@ -218,11 +228,6 @@ const props = defineProps<{
 }>()
 const emit = defineEmits<{ updated: [string] }>()
 
-/** 秒级刷新间隔 */
-const REFRESH_MS = 3000
-/** 供标题展示的刷新秒数，与 REFRESH_MS 保持一致，避免文案与实际不符 */
-const refreshSec = REFRESH_MS / 1000
-
 const indices = ref<Quote[]>([])
 const globals = ref<Quote[]>([])
 const commodities = ref<Quote[]>([])
@@ -231,6 +236,17 @@ const loading = ref(false)
 const nowText = ref('')
 /** 每秒递增，驱动「数据鲜度」文案重算 */
 const freshTick = ref(0)
+
+/**
+ * 刷新间隔按市场状态自适应（省免费额度、避免接口限速）：
+ * - 交易时段：3 秒（数据在动，需要跟得上）
+ * - 休市/周末：60 秒（数据不动，高频刷新只是白打接口）
+ * 依赖 freshTick 每秒重算，保证标题文案与实际间隔一致。
+ */
+const refreshSec = computed(() => {
+  void freshTick.value
+  return suggestedRefreshMs() / 1000
+})
 
 // ===== K 线弹窗 =====
 const klineVisible = ref(false)
@@ -266,9 +282,18 @@ const freshMap = computed<Record<string, Freshness>>(() => {
   for (const q of all) m[q.code] = freshnessOf(q.time)
   return m
 })
-/** 模板取用：未加载时给出兜底，避免 undefined 报错 */
+/**
+ * 模板取用：未加载时给出兜底，避免 undefined 报错。
+ * 市场已休市且数据超过 5 分钟时，文案改为「休市 · 最近收盘」——
+ * 这时数据不动是正常现象，显示「3 小时前」会让用户误以为接口坏了。
+ */
 function freshOf(code: string): Freshness {
-  return freshMap.value[code] ?? { seconds: null, text: '—', level: 'stale' }
+  const f = freshMap.value[code] ?? { seconds: null, text: '—', level: 'stale' }
+  const st = statusMap.value[code]
+  if (st && st.status === 'close' && (f.seconds === null || f.seconds > 300)) {
+    return { ...f, text: '休市 · 最近收盘', level: 'stale' }
+  }
+  return f
 }
 
 /** 各标的市场状态（交易中 / 已休市 / 周末休市等） */
@@ -299,7 +324,26 @@ function priceDigits(q: Quote): number {
   return 2
 }
 
-async function refresh(): Promise<void> {
+/**
+ * 拉取行情。
+ * @param force 为 true 时跳过缓存强制联网（用户手动点刷新）；自动刷新则优先用缓存。
+ *
+ * 缓存的意义：免费公开接口虽无额度，但高频重复请求容易被限速甚至临时封 IP。
+ * 切 Tab 回来、组件重挂载、自动刷新到点但数据还没变时，都不该再打一次接口。
+ * 缓存寿命按市场状态区分：交易中 4 秒，休市 120 秒（休市数据本就不动）。
+ */
+async function refresh(force = false): Promise<void> {
+  if (!force) {
+    const maxAge = isAnyMarketOpen() ? 4 : 120
+    const snap = isSnapshotFresh(maxAge) ? getSnapshot() : null
+    if (snap) {
+      indices.value = snap.indices
+      globals.value = snap.globals
+      commodities.value = snap.commodities
+      stocks.value = snap.stocks
+      return
+    }
+  }
   loading.value = true
   try {
     const [idx, glb, cmd, stk] = await Promise.all([
@@ -310,8 +354,16 @@ async function refresh(): Promise<void> {
     ])
     indices.value = idx
     globals.value = glb
+    // 外盘商品接口偶发空返回，空时不覆盖已有数据，避免把已有行情刷没
     if (cmd.length) commodities.value = cmd
     stocks.value = stk
+    setSnapshot({
+      indices: idx,
+      globals: glb,
+      commodities: cmd.length ? cmd : commodities.value,
+      stocks: stk,
+      at: Date.now()
+    })
     emit('updated', nowText.value)
   } catch (e) {
     console.error('[影仓智核] 行情加载失败', e)
@@ -320,13 +372,22 @@ async function refresh(): Promise<void> {
   }
 }
 
+/**
+ * 自动刷新用 setTimeout 递归而非固定 setInterval：
+ * 间隔需要根据市场状态动态变化（交易中 3s / 休市 60s），
+ * 固定 interval 无法中途调整，休市时仍在高频打接口。
+ */
 function startAuto(): void {
   stopAuto()
-  refreshTimer = window.setInterval(() => void refresh(), REFRESH_MS)
+  const tick = (): void => {
+    void refresh()
+    refreshTimer = window.setTimeout(tick, suggestedRefreshMs())
+  }
+  refreshTimer = window.setTimeout(tick, suggestedRefreshMs())
 }
 function stopAuto(): void {
   if (refreshTimer) {
-    window.clearInterval(refreshTimer)
+    window.clearTimeout(refreshTimer)
     refreshTimer = undefined
   }
 }
@@ -339,17 +400,18 @@ watch(
   },
   { immediate: true }
 )
-// 父级刷新按钮 / 自动刷新 nonce 变化时，重新拉取行情
+// 父级刷新按钮（用户手动点）→ 强制联网，忽略缓存
 watch(
   () => props.refreshNonce,
-  () => void refresh()
+  () => void refresh(true)
 )
 
 onMounted(() => {
   updateClock()
   clockTimer = window.setInterval(updateClock, 1000)
+  // 不强制：切 Tab 回来时若缓存仍新鲜就直接用，避免重复打免费接口。
+  // 自动刷新由上面 watch(autoRefresh, immediate) 启动，这里不再重复启动。
   void refresh()
-  if (props.autoRefresh) startAuto()
 })
 onUnmounted(() => {
   stopAuto()

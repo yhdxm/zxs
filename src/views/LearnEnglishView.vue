@@ -60,6 +60,15 @@
             <div class="le-mean">{{ builtin.def }}<span v-if="builtin.example" class="le-ex"> — {{ builtin.example }}</span></div>
             <p class="le-tip">（Free Dictionary 暂不可达，已用内置大纲词库兜底，仍可加入生词本）</p>
           </div>
+
+          <!-- 中文释义（MyMemory 免费免 Key，查词后自动补，不依赖 AI 配置） -->
+          <div v-if="def || builtin" class="le-zh">
+            <div class="le-zh-hd"><span class="le-zh-badge">中</span>中文释义</div>
+            <div v-if="zhText" class="le-zh-body">{{ zhText }}</div>
+            <div v-else-if="zhTranslating" class="le-zh-body le-zh-load">翻译获取中…</div>
+            <div v-else class="le-zh-body le-zh-load">（该词暂无自动翻译，可参考上方英文释义）</div>
+            <div v-if="zhExampleText" class="le-zh-ex">例句翻译：{{ zhExampleText }}</div>
+          </div>
           <p v-else-if="searched && !loading" class="le-empty">未找到「{{ lastWord }}」的释义，检查拼写或换词试试。</p>
 
           <div v-if="explainText" class="le-answer">{{ explainText }}</div>
@@ -538,6 +547,7 @@ import {
   explainTopic,
   generateStudyPlan,
   parseMaterialFile,
+  translateToZh,
   type WordDefinition,
   type EnglishLesson,
   type StudyPlan
@@ -753,6 +763,10 @@ const builtin = ref<{ phonetic: string; pos: string; def: string; example?: stri
 const searched = ref(false)
 const loading = ref(false)
 const explainText = ref('')
+/** 查词结果的中文翻译（MyMemory 免费免 Key，查完自动补，不依赖 AI 配置） */
+const zhTranslating = ref(false)
+const zhText = ref('')
+const zhExampleText = ref('')
 async function lookup(): Promise<void> {
   const w = word.value.trim()
   if (!w) return
@@ -761,10 +775,37 @@ async function lookup(): Promise<void> {
   loading.value = true
   def.value = null
   builtin.value = null
+  explainText.value = ''
+  zhText.value = ''
+  zhExampleText.value = ''
   const r = await fetchDefinitionSafe(w)
   def.value = r.def
   builtin.value = r.builtin || null
   loading.value = false
+
+  // 查到释义后自动补中文翻译（免费、异步，不阻塞展示英文结果）
+  const pending: { text: string; target: 'zh' | 'ex' }[] = []
+  if (def.value) {
+    const first = def.value.meanings[0]?.definitions[0]
+    if (first?.definition) pending.push({ text: first.definition, target: 'zh' })
+    if (first?.example) pending.push({ text: first.example, target: 'ex' })
+  } else if (builtin.value) {
+    if (builtin.value.def) pending.push({ text: builtin.value.def, target: 'zh' })
+    if (builtin.value.example) pending.push({ text: builtin.value.example, target: 'ex' })
+  }
+  if (!pending.length) return
+  zhTranslating.value = true
+  void Promise.all(
+    pending.map(async (p) => {
+      const t = await translateToZh(p.text)
+      // 词已切换就丢弃过期结果，避免串词
+      if (lastWord.value !== w) return
+      if (p.target === 'zh') zhText.value = t
+      else zhExampleText.value = t
+    })
+  ).finally(() => {
+    if (lastWord.value === w) zhTranslating.value = false
+  })
 }
 async function explain(): Promise<void> {
   if (!cfg.value) { ElMessage.warning('请先配置 AI 密钥'); return }
@@ -1219,6 +1260,13 @@ watch(cetSub, (v) => { if (v === 'home') void loadWordStats() })
 .le-phon { font-size: 13px; color: var(--text-faint); margin-left: 8px; }
 .le-mean { margin-bottom: 8px; }
 .le-pos { font-size: 12px; font-style: italic; color: var(--brand, #378add); margin-right: 6px; }
+/* 中文释义块（免费 MyMemory 翻译，不依赖 AI 配置） */
+.le-zh { margin-top: 10px; padding: 12px 14px; background: #fffbeb; border: 1px solid #fde68a; border-radius: 10px; }
+.le-zh-hd { display: flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 700; color: #78350f; margin-bottom: 7px; }
+.le-zh-badge { width: 18px; height: 18px; border-radius: 5px; background: #f59e0b; color: #fff; font-size: 11px; display: inline-flex; align-items: center; justify-content: center; font-weight: 700; }
+.le-zh-body { font-size: 14px; line-height: 1.75; color: #78350f; }
+.le-zh-load { font-size: 12.5px; color: #b45309; opacity: 0.8; }
+.le-zh-ex { margin-top: 7px; font-size: 12.5px; line-height: 1.7; color: #92400e; border-top: 1px dashed #fcd34d; padding-top: 7px; }
 
 /* 单词模块可视化看板 */
 .le-dash {

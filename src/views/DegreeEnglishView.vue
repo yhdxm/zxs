@@ -495,31 +495,71 @@
 
     <!-- 资料库 -->
     <section v-if="renderedTabs.has('library')" v-show="activeTab === 'library'" class="panel">
-      <div class="card-title" style="margin-bottom: 10px">资料库（三本 PDF 内容已全量内置，可在线阅读讲解正文）</div>
+      <div class="card-title" style="margin-bottom: 10px">资料库（三本 PDF 内容已全量内置，可在线阅读讲解正文 / 浏览模拟原题）</div>
       <div class="lib-layout">
         <div class="lib-side">
           <el-radio-group v-model="libBook" size="small" class="lib-filter">
             <el-radio-button value="all">全部</el-radio-button>
             <el-radio-button value="考试大纲">大纲</el-radio-button>
             <el-radio-button value="复习指南">指南</el-radio-button>
+            <el-radio-button value="模拟试卷">模拟</el-radio-button>
           </el-radio-group>
-          <div class="lib-list">
+          <!-- 大纲 / 指南：讲解正文列表 -->
+          <div v-if="libBook !== '模拟试卷'" class="lib-list">
             <div v-for="a in libraryArticles" :key="a.id" class="lib-item" :class="{ active: activeArticle?.id === a.id }" @click="openArticle(a)">
               <span class="lib-book">{{ a.book === '复习指南' ? '指南' : '大纲' }}</span>
               <span class="lib-title">{{ a.title }}</span>
             </div>
           </div>
+          <!-- 模拟试卷：按套卷浏览原题 -->
+          <div v-else class="lib-list">
+            <div
+              v-for="p in mockPapers"
+              :key="p.name"
+              class="lib-item"
+              :class="{ active: activeMockPaper === p.name }"
+              @click="activeMockPaper = p.name"
+            >
+              <span class="lib-book">模拟</span>
+              <span class="lib-title">{{ p.name }}（{{ p.questions.length }} 题）</span>
+            </div>
+          </div>
         </div>
         <div class="lib-reader">
-          <template v-if="activeArticle">
-            <div class="reader-head">
-              <span class="reader-book">{{ activeArticle.book }}</span>
-              <h3 class="reader-title">{{ activeArticle.title }}</h3>
-              <el-button size="small" text :icon="Reading" @click="speakText(activeArticle.content)">朗读全文</el-button>
-            </div>
-            <div class="reader-body">{{ activeArticle.content }}</div>
+          <!-- 大纲 / 指南 正文阅读 -->
+          <template v-if="libBook !== '模拟试卷'">
+            <template v-if="activeArticle">
+              <div class="reader-head">
+                <span class="reader-book">{{ activeArticle.book }}</span>
+                <h3 class="reader-title">{{ activeArticle.title }}</h3>
+                <el-button size="small" text :icon="Reading" @click="speakText(activeArticle.content)">朗读全文</el-button>
+              </div>
+              <div class="reader-body">{{ activeArticle.content }}</div>
+            </template>
+            <el-empty v-else description="从左侧选择一篇讲解开始阅读" :image-size="70" />
           </template>
-          <el-empty v-else description="从左侧选择一篇讲解开始阅读" :image-size="70" />
+          <!-- 模拟试卷 原题 -->
+          <template v-else>
+            <template v-if="activeMockPaper">
+              <div class="reader-head">
+                <span class="reader-book">模拟试卷</span>
+                <h3 class="reader-title">{{ activeMockPaper }}</h3>
+                <span class="muted">《全真模拟试卷及考点点睛》原题</span>
+              </div>
+              <div class="reader-body mock-reader">
+                <div v-for="q in activeMockQuestions" :key="q.id" class="mock-q">
+                  <div class="mock-q-meta">{{ typeLabel(q.type) }} · 第 {{ q.source.page }} 页</div>
+                  <div class="mock-q-stem">{{ q.stem }}</div>
+                  <ul v-if="q.options && q.options.length" class="mock-q-opts">
+                    <li v-for="(o, i) in q.options" :key="i" :class="{ on: isAnswer(o, q.answer) }">{{ o }}</li>
+                  </ul>
+                  <div class="mock-q-ans">答案：{{ q.answer }}</div>
+                  <div v-if="q.explanation" class="mock-q-exp">解析：{{ q.explanation }}</div>
+                </div>
+              </div>
+            </template>
+            <el-empty v-else description="从左侧选择一套模拟卷开始浏览" :image-size="70" />
+          </template>
         </div>
       </div>
       <div class="card-title" style="margin: 16px 0 10px">原文件（点开看扫描件）</div>
@@ -852,6 +892,31 @@ const libraryArticles = computed(() =>
 )
 function openArticle(a: DegreeArticle) {
   activeArticle.value = a
+}
+// ===== 资料库 · 模拟试卷原题（按套卷分组浏览，《全真模拟试卷及考点点睛》PDF 内容）=====
+const activeMockPaper = ref<string>('')
+const mockPapers = computed(() => {
+  const map = new Map<string, DegreeQuestion[]>()
+  for (const q of allDegreeQuestions.value) {
+    if (q.source.book !== '模拟试卷') continue
+    const name = q.source.section || '模拟卷'
+    if (!map.has(name)) map.set(name, [])
+    map.get(name)!.push(q)
+  }
+  return [...map.entries()].map(([name, questions]) => ({ name, questions }))
+})
+const activeMockQuestions = computed(() => {
+  const p = mockPapers.value.find((x) => x.name === activeMockPaper.value) ?? mockPapers.value[0]
+  return p?.questions ?? []
+})
+// 进入「模拟」筛选时默认选中第一套，避免空白
+watch(libBook, (v) => {
+  if (v === '模拟试卷' && !activeMockPaper.value && mockPapers.value.length) {
+    activeMockPaper.value = mockPapers.value[0]?.name ?? ''
+  }
+})
+function isAnswer(opt: string, ans: string): boolean {
+  return opt.trim() === String(ans).trim()
 }
 // ===== 单词/例句读音 =====
 // 统一复用 degreeSpeech.speakEn 的双通道实现（本地 TTS → 在线发音自动降级），
@@ -2798,6 +2863,61 @@ onBeforeUnmount(() => {
   line-height: 1.9;
   white-space: pre-wrap;
   color: var(--text-strong);
+}
+/* 资料库 · 模拟试卷原题浏览 */
+.mock-reader {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.mock-q {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 14px;
+  background: var(--surface-soft);
+}
+.mock-q-meta {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+.mock-q-stem {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text-strong);
+  line-height: 1.7;
+}
+.mock-q-opts {
+  list-style: none;
+  margin: 8px 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.mock-q-opts li {
+  font-size: 13px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+.mock-q-opts li.on {
+  border-color: var(--brand, #378add);
+  background: color-mix(in srgb, var(--brand, #378add) 10%, transparent);
+  color: var(--brand, #378add);
+  font-weight: 700;
+}
+.mock-q-ans {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #16a34a;
+}
+.mock-q-exp {
+  font-size: 12.5px;
+  color: var(--text-muted);
+  margin-top: 4px;
+  line-height: 1.7;
 }
 .rw-grid {
   display: grid;

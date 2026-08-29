@@ -91,15 +91,59 @@
             <span>今日已复习 {{ reviewedCount }}</span>
           </div>
           <div class="dw-card-word">
-            <span class="dw-emoji dw-emoji-lg" :title="'点击设置象形图标'" @click="editEmoji(current?.word || '')">{{ emojiOf(current?.word || '') }}</span>
-            <span class="dw-word">{{ current?.word }}</span>
+            <span class="dw-emoji dw-emoji-lg" :title="'点击设置象形图标'" @click.stop="editEmoji(current?.word || '')">{{ emojiOf(current?.word || '') }}</span>
+            <span class="dw-word dw-word-link" title="点击查看完整详情" @click="openDetail(current!)">{{ current?.word }}</span>
             <span v-if="current?.phonetic" class="dw-phon">/{{ current.phonetic }}/</span>
             <span v-if="current?.pos" class="dw-pos">{{ current.pos }}</span>
-            <el-button :icon="Microphone" circle size="small" class="dw-card-speak" @click="speak(current?.word || '')" title="朗读" />
+            <el-button :icon="Microphone" circle size="small" class="dw-card-speak" @click.stop="speak(current?.word || '')" title="朗读" />
           </div>
           <div v-if="showAnswer" class="dw-card-def">{{ current?.definition }}</div>
           <div v-else class="dw-card-hint">
             <el-button @click="showAnswer = true">显示释义</el-button>
+          </div>
+
+          <!-- 翻转背面：完整详情结构（美/英音标、助记、例句、配图） -->
+          <div v-if="showAnswer && current" class="dw-full">
+            <div class="dw-full-ph">
+              <span class="dw-full-ph-item">
+                <b>美</b>
+                <span>{{ enrich.phoneticUS || enrich.phonetic || current.phonetic || '—' }}</span>
+                <el-button :icon="Microphone" circle size="small" @click.stop="speakAccent('en-US')" title="美式朗读" />
+              </span>
+              <span class="dw-full-ph-item">
+                <b>英</b>
+                <span>{{ enrich.phoneticUK || enrich.phonetic || current.phonetic || '—' }}</span>
+                <el-button :icon="Microphone" circle size="small" @click.stop="speakAccent('en-GB')" title="英式朗读" />
+              </span>
+            </div>
+
+            <div class="dw-full-sec dw-full-mnc">
+              <div class="dw-full-hd">助记</div>
+              <div v-if="enrich.mnemonicReal">{{ enrich.mnemonic }}</div>
+              <div v-else class="dw-full-empty">*助记正在赶来的路上</div>
+            </div>
+
+            <div class="dw-full-sec dw-full-ex">
+              <div class="dw-full-hd">例句</div>
+              <template v-if="enrich.example">
+                <div class="dw-full-ex-en">{{ enrich.example }}</div>
+                <div v-if="enrich.exampleZh" class="dw-full-ex-zh">{{ enrich.exampleZh }}</div>
+                <div v-else class="dw-full-ex-zh dw-full-empty">（翻译获取中或不可用）</div>
+                <div class="dw-full-ex-bar">
+                  <button type="button" @click.stop="speakText(enrich.example, 0.95)">朗读</button>
+                  <button type="button" @click.stop="speakText(enrich.example, 0.6)">慢速</button>
+                </div>
+              </template>
+              <div v-else class="dw-full-empty">该词暂无例句，先记住释义即可。</div>
+            </div>
+
+            <div class="dw-full-sec dw-full-pic">
+              <div class="dw-full-hd">配图</div>
+              <div class="dw-full-pic-row">
+                <span class="dw-full-pic-em">{{ emojiOf(current.word) }}</span>
+                <span class="dw-full-pic-tx">离线象形符号，点击卡片顶部图标可自定义</span>
+              </div>
+            </div>
           </div>
           <div v-if="showAnswer" class="dw-grades">
             <el-button type="danger" @click="grade('again')">遗忘</el-button>
@@ -135,7 +179,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Microphone, Collection, Select } from '@element-plus/icons-vue'
 import { loadWords } from '../../../prep/degreeDb'
@@ -151,6 +195,7 @@ import {
   type SrsStats
 } from '../../../prep/degreeSrs'
 import type { DegreeWord, WordProgress } from '../../../prep/degreeTypes'
+import { getWordEnrich, type WordEnrichData } from '../../../services/wordEnrichService'
 
 const kw = ref('')
 const bookFilter = ref('all')
@@ -177,6 +222,43 @@ async function onAddWordBook(word: string) {
 async function onMastered(word: string) {
   const w = words.value.find((x) => x.word === word)
   if (w && !isGraduated(word)) await toggleGraduated(w)
+}
+
+/* ===== 复习卡片背面：完整详情结构（与 WordDetailDialog 同源，走免费 API） ===== */
+const EMPTY_ENRICH: WordEnrichData = {
+  word: '', phonetic: '', phoneticUS: '', phoneticUK: '',
+  enDefs: [], example: '', exampleZh: '', similar: [],
+  mnemonic: '', mnemonicReal: false, emoji: ''
+}
+const enrich = ref<WordEnrichData>({ ...EMPTY_ENRICH })
+const enrichLoading = ref(false)
+
+async function loadEnrich(w: DegreeWord | null): Promise<void> {
+  if (!w) {
+    enrich.value = { ...EMPTY_ENRICH }
+    return
+  }
+  enrichLoading.value = true
+  enrich.value = { ...EMPTY_ENRICH, word: w.word }
+  try {
+    const d = await getWordEnrich(w.word, {
+      localPhonetic: w.phonetic || '',
+      pool: allWordList.value
+    })
+    // 词已切换就丢弃过期结果，避免串词
+    if (current.value?.word === w.word) enrich.value = d
+  } finally {
+    if (current.value?.word === w.word) enrichLoading.value = false
+  }
+}
+/** 按口音朗读单词（统一走 speakEn 双通道，国产浏览器自动降级在线发音） */
+function speakAccent(accent: 'en-US' | 'en-GB'): void {
+  const w = current.value?.word
+  if (w) speakEn(w, 0.9, accent)
+}
+/** 朗读任意英文文本（例句），支持慢速 */
+function speakText(text: string, rate: number): void {
+  if (text) speakEn(text, rate, 'en-US')
 }
 
 const filtered = computed(() => {
@@ -253,6 +335,17 @@ const reviewedCount = ref(0)
 const showAnswer = ref(false)
 const current = computed(() => queue.value[0] ?? null)
 const reviewNewPerDay = ref(15)
+
+/* 翻转显示答案 / 切到下一个词时，拉取该词完整增强数据（音标、助记、例句；免费 API）。
+   不显示答案时不提前请求，避免为没翻开的词浪费接口调用。 */
+watch(
+  () => [showAnswer.value, current.value?.word],
+  () => {
+    if (mode.value !== 'review') return
+    if (showAnswer.value && current.value) void loadEnrich(current.value)
+    else enrich.value = { ...EMPTY_ENRICH }
+  }
+)
 
 async function startReview() {
   try {
@@ -508,6 +601,125 @@ onMounted(async () => {
   font-size: 12px;
   color: #a0a0b4;
 }
+
+/* 单词可点开完整详情 */
+.dw-word-link {
+  cursor: pointer;
+  border-bottom: 2px dashed #c7d2fe;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: rgba(99, 102, 241, 0.12);
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+.dw-word-link:hover {
+  color: #534ab7;
+  border-bottom-color: #534ab7;
+}
+
+/* 翻转背面：完整详情结构 */
+.dw-full {
+  margin-top: 14px;
+  border-top: 1px dashed #eceaff;
+  padding-top: 12px;
+  text-align: left;
+}
+.dw-full-ph {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.dw-full-ph-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #f8fafc;
+  border: 1px solid #eceaff;
+  border-radius: 9px;
+  padding: 4px 8px;
+  font-size: 12.5px;
+  color: #4a4a5a;
+}
+.dw-full-ph-item b {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #9a9ab0;
+}
+.dw-full-sec {
+  background: #fff;
+  border: 1px solid #eceaff;
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin-bottom: 10px;
+}
+.dw-full-mnc {
+  background: #fffbeb;
+  border-color: #fde68a;
+  color: #78350f;
+  font-size: 13px;
+  line-height: 1.7;
+}
+.dw-full-ex {
+  background: #f0f9ff;
+  border-color: #bae6fd;
+}
+.dw-full-pic {
+  background: #f0fdfa;
+  border-color: #99f6e4;
+}
+.dw-full-hd {
+  font-size: 12px;
+  font-weight: 700;
+  color: #334155;
+  margin-bottom: 6px;
+}
+.dw-full-ex-en {
+  font-size: 13.5px;
+  line-height: 1.7;
+  color: #2c2c3a;
+}
+.dw-full-ex-zh {
+  font-size: 12.5px;
+  color: #64748b;
+  line-height: 1.65;
+  margin-top: 5px;
+}
+.dw-full-ex-bar {
+  display: flex;
+  gap: 8px;
+  margin-top: 9px;
+}
+.dw-full-ex-bar button {
+  border: 1px solid #bae6fd;
+  background: #fff;
+  border-radius: 8px;
+  padding: 5px 12px;
+  font-size: 12px;
+  cursor: pointer;
+  color: #0369a1;
+  font-weight: 600;
+  min-height: 32px;
+  touch-action: manipulation;
+}
+.dw-full-pic-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.dw-full-pic-em {
+  font-size: 40px;
+  line-height: 1;
+}
+.dw-full-pic-tx {
+  font-size: 12px;
+  color: #0f766e;
+  line-height: 1.65;
+}
+.dw-full-empty {
+  font-size: 12.5px;
+  color: #9a9ab0;
+  line-height: 1.7;
+}
+
 @media (max-width: 768px) {
   .dw-book {
     width: 100%;
