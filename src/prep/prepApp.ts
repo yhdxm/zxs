@@ -1077,6 +1077,19 @@ function nextCard() {
   renderCard(m, false)
   updateProgress()
 }
+/**
+ * 打开统一单词详情（三模块共用组件）。
+ * 本文件是原生 DOM 驱动的（非 Vue 模板），无法直接挂载 Vue 组件，
+ * 因此派发全局事件，由 CetPrepView.vue 监听后打开 WordDetailDialog。
+ */
+function openWordDetail(m: PrepWord) {
+  window.dispatchEvent(
+    new CustomEvent('zxs-word-detail', {
+      detail: { word: m[0], phonetic: m[1], pos: m[2], definition: m[3] }
+    })
+  )
+}
+
 function renderCard(m: PrepWord, flipped: boolean) {
   const card = document.querySelector('#focusCard')
   if (!card) return
@@ -1088,6 +1101,7 @@ function renderCard(m: PrepWord, flipped: boolean) {
       <div class="fc-word">${esc(m[0])}</div>
       <div class="fc-ph">${esc(m[1])}</div>
       ${speakBtn}
+      <button class="fc-speak fc-detail" id="fcDetail">${ICON.book}详情</button>
       <div class="fc-divider"></div>
       <button class="btn btn-primary btn-block" id="fcFlip">${ICON.book}翻面看释义</button>
     `
@@ -1095,6 +1109,8 @@ function renderCard(m: PrepWord, flipped: boolean) {
     if (flip) flip.addEventListener('click', () => renderCard(m, true))
     const sp = document.querySelector('#fcSpeak')
     if (sp) sp.addEventListener('click', () => speak(m[0]))
+    const dt = document.querySelector('#fcDetail')
+    if (dt) dt.addEventListener('click', () => openWordDetail(m))
   } else {
     card.innerHTML = `
       <div class="fc-kind ${current!.kind === 'review' ? 'review' : ''}">${current!.kind === 'review' ? '复习' : '新词'}</div>
@@ -1106,12 +1122,15 @@ function renderCard(m: PrepWord, flipped: boolean) {
       <div class="fc-back">${esc(m[3])}</div>
       <div class="fc-coll">常考：${esc(m[4])}</div>
       <div class="fc-actions">
+        <button class="fc-btn fc-detail" id="fcDetail2">${ICON.book}详情</button>
         <button class="fc-btn fc-unknown" id="fcUnk">${ICON.cross}不认识</button>
         <button class="fc-btn fc-known" id="fcKn">${ICON.check}认识</button>
       </div>
     `
     const kn = document.querySelector('#fcKn')
     const unk = document.querySelector('#fcUnk')
+    const dt2 = document.querySelector('#fcDetail2')
+    if (dt2) dt2.addEventListener('click', () => openWordDetail(m))
     // 关键：判断认识/不认识后必须调用 afterReview() 前进到下一个卡片（修复卡片卡死）
     if (kn) kn.addEventListener('click', () => { reviewWord(current!.w, true); afterReview() })
     if (unk) unk.addEventListener('click', () => { reviewWord(current!.w, false); afterReview() })
@@ -1407,8 +1426,32 @@ async function init() {
 /**
  * 挂载备考台到指定根元素。返回清理函数（组件卸载时调用，移除根级事件监听）。
  */
+/**
+ * 统一详情弹窗回传的操作（由 CetPrepView.vue 派发）。
+ * mastered → 按「认识」推进 SRS；book → 存入本地生词本（离线、免费）。
+ */
+function handleWordAction(e: Event) {
+  const d = (e as CustomEvent).detail || {}
+  const word = typeof d.word === 'string' ? d.word : ''
+  if (!word) return
+  if (d.action === 'mastered') {
+    reviewWord(word, true)
+    updateProgress()
+  } else if (d.action === 'book') {
+    try {
+      const raw = localStorage.getItem('zxs_cet_wordbook')
+      const list: string[] = raw ? JSON.parse(raw) : []
+      if (!list.includes(word)) list.push(word)
+      localStorage.setItem('zxs_cet_wordbook', JSON.stringify(list))
+    } catch {
+      /* 存储不可用时忽略，不阻断主流程 */
+    }
+  }
+}
+
 export async function initPrep(root: HTMLElement, store: PrepStorage): Promise<() => void> {
   storage = store
+  window.addEventListener('zxs-word-action', handleWordAction)
   const navHandler = (e: Event) => {
     const b = (e.target as HTMLElement).closest('.nav-item') as HTMLElement | null
     if (b) setView(b.dataset.view || '')
@@ -1421,6 +1464,7 @@ export async function initPrep(root: HTMLElement, store: PrepStorage): Promise<(
   await init()
 
   return () => {
+    window.removeEventListener('zxs-word-action', handleWordAction)
     root.removeEventListener('click', navHandler)
     if (focusClose) focusClose.removeEventListener('click', fcClose)
   }

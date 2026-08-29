@@ -31,15 +31,30 @@
 
     <div v-if="loading" class="prep-state">正在加载备考数据…</div>
     <div v-if="error" class="prep-state prep-error">{{ error }}</div>
+
+    <!-- 统一单词详情（三模块共用同一组件） -->
+    <WordDetailDialog
+      v-model="detailVisible"
+      :word="detailWord.word"
+      :phonetic="detailWord.phonetic"
+      :pos="detailWord.pos"
+      :definition="detailWord.definition"
+      :pool="wordPool"
+      module-label="四六级 · 备考"
+      @add-word-book="onDetailAction('book')"
+      @mastered="onDetailAction('mastered')"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref } from 'vue'
+import { onMounted, onUnmounted, ref, reactive, computed } from 'vue'
+import { ElMessage } from 'element-plus'
 import PageHeader from '../components/PageHeader.vue'
 import { School, Setting, VideoPlay } from '@element-plus/icons-vue'
 import { initPrep, type PrepStorage } from '../prep/prepApp'
 import { MASTER_WORDS_BUNDLE } from '../prep/masterWordsBundle'
+import WordDetailDialog from '../components/WordDetailDialog.vue'
 import {
   fetchMasterWords,
   loadAll,
@@ -63,6 +78,27 @@ const loading = ref(true)
 const error = ref('')
 const missingTable = ref(false)
 let cleanup: (() => void) | null = null
+
+// ===== 统一单词详情：监听原生 DOM 卡片（prepApp.ts）派发的事件 =====
+const detailVisible = ref(false)
+const detailWord = reactive({ word: '', phonetic: '', pos: '', definition: '' })
+/** 形近词候选池：四级主词表全部单词 */
+const wordPool = computed(() => MASTER_WORDS_BUNDLE.map((w) => w[0]))
+function onWordDetailEvent(e: Event) {
+  const d = (e as CustomEvent).detail || {}
+  detailWord.word = d.word || ''
+  detailWord.phonetic = d.phonetic || ''
+  detailWord.pos = d.pos || ''
+  detailWord.definition = d.definition || ''
+  detailVisible.value = true
+}
+/** 详情弹窗底部操作：回传给 vanilla 应用处理 */
+function onDetailAction(action: 'book' | 'mastered') {
+  const word = detailWord.word
+  if (!word) return
+  window.dispatchEvent(new CustomEvent('zxs-word-action', { detail: { word, action } }))
+  ElMessage.success(action === 'book' ? '已加入生词本' : '已标记为掌握')
+}
 
 const emptyState = () => ({
   words: {},
@@ -104,6 +140,8 @@ const storage: PrepStorage = {
 }
 
 onMounted(async () => {
+  // 监听 vanilla 卡片（prepApp.ts）派发的「查看详情」事件
+  window.addEventListener('zxs-word-detail', onWordDetailEvent)
   if (!root.value) return
   try {
     cleanup = await initPrep(root.value, storage)
@@ -133,6 +171,7 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
+  window.removeEventListener('zxs-word-detail', onWordDetailEvent)
   if (cleanup) cleanup()
 })
 </script>

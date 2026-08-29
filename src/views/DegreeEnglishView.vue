@@ -213,7 +213,7 @@
       </div>
       <div v-if="filteredWords.length" class="word-list">
         <div v-for="w in visibleWords" :key="w.word" class="word-item" :class="{ weak: wordProgress[w.word]?.weak }">
-          <div class="word-main">
+          <div class="word-main word-main-click" @click="openWordDetail(w)" title="点击查看详情">
             <span class="word-text">{{ w.word }}<span v-if="w.productive" class="star">*</span><span v-if="wordPhonetic(w.word)" class="word-phonetic">{{ wordPhonetic(w.word) }}</span></span>
             <button class="speak-btn" :title="'朗读 ' + w.word" @click="speak(w.word)">🔊</button>
             <button class="speak-btn" :title="'查看例句 ' + w.word" @click="loadExample(w.word)" :disabled="exampleLoading[w.word]">📖</button>
@@ -682,10 +682,8 @@
       </div>
     </section>
 
-    <!-- PDF 预览（全局弹窗，不受 topNav 影响） -->
-    <el-dialog v-model="previewVisible" :title="previewTitle" width="90%" top="5vh" class="pdf-dialog">
-      <iframe :src="previewUrl" class="pdf-frame" />
-    </el-dialog>
+    <!-- PDF 预览：pdf.js 渲染到 canvas，移动端不再变成下载；仍保留「下载」入口 -->
+    <PdfViewerDialog v-model="previewVisible" :url="previewUrl" :title="previewTitle" />
 
     <!-- 设置 -->
     <el-dialog v-model="settingsVisible" title="备考设置" width="min(92vw, 420px)">
@@ -748,6 +746,19 @@
       :paper="currentMockPaper"
       :all-questions="allDegreeQuestions"
     />
+
+    <!-- 统一单词详情（三模块共用同一组件） -->
+    <WordDetailDialog
+      v-model="wordDetailVisible"
+      :word="wordDetail?.word || ''"
+      :phonetic="wordDetail?.phonetic || ''"
+      :pos="wordDetail?.pos || ''"
+      :definition="wordDetail?.definition || ''"
+      :pool="degreeWordList"
+      module-label="学位英语 · 备考台"
+      @add-word-book="onDetailAddWordBook"
+      @mastered="onDetailMastered"
+    />
   </div>
 </template>
 
@@ -769,12 +780,11 @@ import {
   type MaterialMeta
 } from '../prep/degreeExamStructure'
 import { degreeWords } from '../prep/degreeWords'
-import { allDegreeQuestions } from '../prep/degreeQuestionBank'
 import { degreePhrases } from '../prep/degreePhrases'
 import { spokenPhrases, affixPhrases, irregularPhrases } from '../prep/degreePhrasesExtra'
-import { guideArticles } from '../prep/degreeGuide'
-import { syllabusProse } from '../prep/degreeSyllabusProse'
-import type { DegreeSettings, WordProgress, MistakeRec, FavoriteRec, PracticeRec, QuestionType, DegreeQuestion, DegreePhrase, PhraseCategory, SourceBook, DegreeArticle } from '../prep/degreeTypes'
+// 重型数据改为按需动态 import（题库约 907KB、资料库文章约 394KB），
+// 避免进入备考台时同步解析阻塞首屏 —— 见下方 ensureQuestions() / ensureArticles()
+import type { DegreeSettings, DegreeWord, WordProgress, MistakeRec, FavoriteRec, PracticeRec, QuestionType, DegreeQuestion, DegreePhrase, PhraseCategory, SourceBook, DegreeArticle } from '../prep/degreeTypes'
 import * as svc from '../prep/degreeService'
 import { ensureContentSeeded } from '../prep/degreeDb'
 import {
@@ -786,13 +796,60 @@ import {
 import { buildReviewQueue as buildGenericReviewQueue } from '../prep/trainingSrs'
 import { getStudySettings, saveStudySettings, countLearnedToday, computeStreakFromDates, collectStudyDates } from '../services/studySettingsService'
 import { speakEn } from '../prep/degreeSpeech'
+import WordDetailDialog from '../components/WordDetailDialog.vue'
+import PdfViewerDialog from '../components/PdfViewerDialog.vue'
+import { warmEnrich } from '../services/wordEnrichService'
 
-// 资料库：三本 PDF 正文切分后的可读文章（确保内容不遗漏）
-const allArticles: DegreeArticle[] = [...syllabusProse, ...guideArticles]
+// ===== 重型数据按需加载（提速：进入备考台不再同步解析 1.3MB 数据） =====
+// 题库（约 907KB）：进入页面后后台加载，不阻塞首屏；开模考前确保就绪
+const allDegreeQuestions = ref<DegreeQuestion[]>([])
+let questionsLoaded = false
+let questionsLoading: Promise<void> | null = null
+function ensureQuestions(): Promise<void> {
+  if (questionsLoaded) return Promise.resolve()
+  if (questionsLoading) return questionsLoading
+  questionsLoading = import('../prep/degreeQuestionBank')
+    .then((m) => {
+      allDegreeQuestions.value = m.allDegreeQuestions
+      questionsLoaded = true
+    })
+    .catch((e) => {
+      console.warn('[DegreeEnglish] 题库加载失败', e)
+    })
+    .finally(() => {
+      questionsLoading = null
+    })
+  return questionsLoading
+}
+
+// 资料库文章（约 394KB）：切到「资料库」时才加载
+const allArticles = ref<DegreeArticle[]>([])
+let articlesLoaded = false
+let articlesLoading: Promise<void> | null = null
+function ensureArticles(): Promise<void> {
+  if (articlesLoaded) return Promise.resolve()
+  if (articlesLoading) return articlesLoading
+  articlesLoading = Promise.all([
+    import('../prep/degreeSyllabusProse'),
+    import('../prep/degreeGuide')
+  ])
+    .then(([prose, guide]) => {
+      allArticles.value = [...prose.syllabusProse, ...guide.guideArticles]
+      articlesLoaded = true
+    })
+    .catch((e) => {
+      console.warn('[DegreeEnglish] 资料库文章加载失败', e)
+    })
+    .finally(() => {
+      articlesLoading = null
+    })
+  return articlesLoading
+}
+
 const libBook = ref<'all' | string>('all')
 const activeArticle = ref<DegreeArticle | null>(null)
 const libraryArticles = computed(() =>
-  libBook.value === 'all' ? allArticles : allArticles.filter((a) => a.book === libBook.value)
+  libBook.value === 'all' ? allArticles.value : allArticles.value.filter((a) => a.book === libBook.value)
 )
 function openArticle(a: DegreeArticle) {
   activeArticle.value = a
@@ -896,7 +953,7 @@ const overviewStep = ref(0)
 
 // 按题型统计题数（用于空状态标注）
 function questionCountByType(type: string): number {
-  return allDegreeQuestions.filter((q) => q.type === type).length
+  return allDegreeQuestions.value.filter((q) => q.type === type).length
 }
 
 const settings = ref<DegreeSettings>({ targetSchool: '商丘师范学院继续教育学院', examDate: null, newPerDay: 15, manualStreak: null })
@@ -1286,7 +1343,7 @@ function onCardTouchEnd(e: TouchEvent) {
 
 const trainingType = ref<QuestionType>('vocab_grammar')
 const trainingTypeLabel = computed(() => EXAM_SECTIONS.find((s) => s.key === trainingType.value)?.name || '')
-const questionsOfType = computed(() => allDegreeQuestions.filter((q) => q.type === trainingType.value))
+const questionsOfType = computed(() => allDegreeQuestions.value.filter((q) => q.type === trainingType.value))
 const currentQ = ref<DegreeQuestion | null>(null)
 const showAnswer = ref(false)
 const myAnswer = ref('')
@@ -1466,7 +1523,7 @@ async function markMistake(q: DegreeQuestion) {
 }
 async function retryMistake(m: MistakeRec) {
   // 找到原题并进入刷题模式
-  const orig = allDegreeQuestions.find((q) => q.id === m.questionId)
+  const orig = allDegreeQuestions.value.find((q) => q.id === m.questionId)
   if (orig) {
     trainingType.value = m.type || 'vocab_grammar'
     currentQ.value = orig
@@ -1491,12 +1548,36 @@ async function addWordBook(w: { word: string; definition: string }) {
   ElMessage.success('已加入生词本')
 }
 
+// ===== 统一单词详情（三模块共用同一组件） =====
+const wordDetailVisible = ref(false)
+const wordDetail = ref<DegreeWord | null>(null)
+/** 形近词候选池：本模块全部单词 */
+const degreeWordList = computed(() => degreeWords.map((w) => w.word))
+function openWordDetail(w: DegreeWord) {
+  wordDetail.value = w
+  wordDetailVisible.value = true
+}
+async function onDetailAddWordBook(word: string) {
+  const w = degreeWords.find((x) => x.word === word)
+  await addWordBook({ word, definition: w?.definition || '' })
+}
+async function onDetailMastered(word: string) {
+  // 循环推进到「已掌握」即停，避免多次点击
+  for (let i = 0; i < 3; i++) {
+    if (wordProgress.value[word]?.status === 'graduated') break
+    await cycleWord(word)
+  }
+  ElMessage.success('已标记为掌握')
+}
+
 function openPreview(m: MaterialMeta) {
   previewUrl.value = base + m.file
   previewTitle.value = m.title
   previewVisible.value = true
 }
-function startMock(p: { id: string; title: string; no: number }) {
+async function startMock(p: { id: string; title: string; no: number }) {
+  // 题库已改为按需加载，开考前确保就绪，避免弹窗里没有题目
+  await ensureQuestions()
   currentMockPaper.value = p
   mockExamVisible.value = true
 }
@@ -1563,6 +1644,14 @@ async function removeFav(id: string, isMistake = false) {
 
 onMounted(() => {
   loadAll()
+  // 重型数据延后加载（题库 907KB + 资料库文章 394KB）：
+  // 先让首屏渲染出来，再后台补齐，避免进入备考台时同步解析大数组造成卡顿
+  window.setTimeout(() => {
+    void ensureQuestions()
+  }, 300)
+  window.setTimeout(() => {
+    void ensureArticles()
+  }, 1500)
   // 移动端检测：窄屏默认折叠记忆区
   syncMobile()
   if (isMobile.value) memOpen.value = false
@@ -2096,6 +2185,14 @@ onBeforeUnmount(() => {
 .word-item.weak {
   border-color: #f09595;
   background: #fdf3f3;
+}
+.word-main-click {
+  cursor: pointer;
+  border-radius: 10px;
+  transition: background 0.18s ease;
+}
+.word-main-click:active {
+  background: #f1f5f9;
 }
 .word-main {
   display: flex;

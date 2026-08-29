@@ -33,7 +33,7 @@
 
       <div class="dw-list">
         <div v-for="w in paged" :key="w.word" class="dw-item" :class="{ prod: w.productive }">
-          <div class="dw-item-main">
+          <div class="dw-item-main dw-clickable" @click="openDetail(w)" title="点击查看详情">
             <div class="dw-word-row">
               <span class="dw-emoji" :title="'点击设置象形图标'" @click="editEmoji(w.word)">{{ emojiOf(w.word) }}</span>
               <span class="dw-word">{{ w.word }}</span>
@@ -118,6 +118,19 @@
         </el-result>
       </template>
     </div>
+
+    <!-- 统一单词详情（三模块共用同一组件） -->
+    <WordDetailDialog
+      v-model="detailVisible"
+      :word="detailWord?.word || ''"
+      :phonetic="detailWord?.phonetic || ''"
+      :pos="detailWord?.pos || ''"
+      :definition="detailWord?.definition || ''"
+      :pool="allWordList"
+      module-label="学位英语 · 背单词卡"
+      @add-word-book="onAddWordBook"
+      @mastered="onMastered"
+    />
   </div>
 </template>
 
@@ -129,6 +142,7 @@ import { loadWords } from '../../../prep/degreeDb'
 import * as svc from '../../../prep/degreeService'
 import { speakEn } from '../../../prep/degreeSpeech'
 import { getEmoji, setEmojiOverride } from '../../../data/emojiDict'
+import WordDetailDialog from '../../../components/WordDetailDialog.vue'
 import {
   reviewWord,
   buildReviewQueue,
@@ -146,6 +160,24 @@ const pageSize = 30
 const words = ref<DegreeWord[]>([])
 const progressMap = ref<Record<string, WordProgress>>({})
 const wordBook = ref<string[]>([])
+
+// ===== 统一单词详情（三个学英语模块共用同一组件） =====
+const detailVisible = ref(false)
+const detailWord = ref<DegreeWord | null>(null)
+/** 形近词候选池：本模块全部单词 */
+const allWordList = computed(() => words.value.map((w) => w.word))
+function openDetail(w: DegreeWord) {
+  detailWord.value = w
+  detailVisible.value = true
+}
+async function onAddWordBook(word: string) {
+  const w = words.value.find((x) => x.word === word)
+  if (w && !isWordBook(word)) await toggleWordBook(w)
+}
+async function onMastered(word: string) {
+  const w = words.value.find((x) => x.word === word)
+  if (w && !isGraduated(word)) await toggleGraduated(w)
+}
 
 const filtered = computed(() => {
   const k = kw.value.trim().toLowerCase()
@@ -337,6 +369,14 @@ onMounted(async () => {
 }
 .dw-item.prod {
   border-left: 4px solid #534ab7;
+}
+.dw-clickable {
+  cursor: pointer;
+  border-radius: 10px;
+  transition: background 0.18s ease;
+}
+.dw-clickable:active {
+  background: #f1f5f9;
 }
 .dw-item-main {
   min-width: 0;
