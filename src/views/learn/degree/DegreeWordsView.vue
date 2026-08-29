@@ -35,7 +35,7 @@
         <div v-for="w in paged" :key="w.word" class="dw-item" :class="{ prod: w.productive }">
           <div class="dw-item-main dw-clickable" @click="openDetail(w)" title="点击查看详情">
             <div class="dw-word-row">
-              <span class="dw-emoji" :title="'点击设置象形图标'" @click="editEmoji(w.word)">{{ emojiOf(w.word) }}</span>
+              <span class="dw-emoji" :title="'点击设置象形图标'" @click.stop="editEmoji(w.word)">{{ emojiOf(w.word) }}</span>
               <span class="dw-word">{{ w.word }}</span>
               <span v-if="w.phonetic" class="dw-phon">/{{ w.phonetic }}/</span>
               <span v-if="w.pos" class="dw-pos">{{ w.pos }}</span>

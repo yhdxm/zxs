@@ -215,8 +215,8 @@
         <div v-for="w in visibleWords" :key="w.word" class="word-item" :class="{ weak: wordProgress[w.word]?.weak }">
           <div class="word-main word-main-click" @click="openWordDetail(w)" title="点击查看详情">
             <span class="word-text">{{ w.word }}<span v-if="w.productive" class="star">*</span><span v-if="wordPhonetic(w.word)" class="word-phonetic">{{ wordPhonetic(w.word) }}</span></span>
-            <button class="speak-btn" :title="'朗读 ' + w.word" @click="speak(w.word)">🔊</button>
-            <button class="speak-btn" :title="'查看例句 ' + w.word" @click="loadExample(w.word)" :disabled="exampleLoading[w.word]">📖</button>
+            <button class="speak-btn" :title="'朗读 ' + w.word" @click.stop="speak(w.word)">🔊</button>
+            <button class="speak-btn" :title="'查看例句 ' + w.word" @click.stop="loadExample(w.word)" :disabled="exampleLoading[w.word]">📖</button>
           </div>
           <div class="word-def">{{ w.definition }}</div>
           <div class="word-example" v-if="examples[w.word]">

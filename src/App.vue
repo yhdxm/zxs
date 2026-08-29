@@ -324,9 +324,13 @@ function triggerAutoRemind() {
   if (isLoggedIn.value && isPushSupported()) autoRemindDue().catch(() => {})
 }
 
-/* ===== 侧边栏折叠（PC 端，三角形按钮） ===== */
+/* ===== 侧边栏折叠（PC 端，三角形按钮） =====
+   用户要求：进入时默认收起，自己点展开；localStorage 只记住用户显式展开的状态（'0'），
+   未设置过或保存为 '1' 都按「收起」处理。 */
 const sidebarCollapsed = ref(
-  typeof localStorage !== 'undefined' && localStorage.getItem('zxs-sidebar-collapsed') === '1'
+  typeof localStorage !== 'undefined'
+    ? localStorage.getItem('zxs-sidebar-collapsed') !== '0'
+    : true
 )
 function toggleSidebar() {
   sidebarCollapsed.value = !sidebarCollapsed.value
