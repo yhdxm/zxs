@@ -33,7 +33,17 @@
           </template>
 
           <template v-else>
-            <span class="pdfv-page">{{ pageNum }} / {{ numPages }}</span>
+            <span class="pdfv-page">
+              <input
+                v-model.number="pageInput"
+                type="number"
+                min="1"
+                :max="numPages"
+                class="pdfv-page-input"
+                @change="jumpFromInput"
+              />
+              <span>/ {{ numPages }}</span>
+            </span>
           </template>
         </div>
 
@@ -120,7 +130,7 @@ const errMsg = ref('')
 const pageNum = ref(1)
 const numPages = ref(0)
 const pageInput = ref(1)
-const mode = ref<'single' | 'scroll'>('single')
+const mode = ref<'single' | 'scroll'>('scroll')
 const isFullscreen = ref(false)
 
 const rootEl = ref<HTMLElement | null>(null)

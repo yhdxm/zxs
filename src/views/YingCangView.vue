@@ -62,7 +62,7 @@ import YcSimTrade from '../components/finance/YcSimTrade.vue'
 
 /** 顶部模块名下方左侧的免责声明（免费接口 + 投资建议提示） */
 const disclaimer =
-  '腾讯财经·实时行情（免费接口直连，无需 Key，含 A 股核心指数、全球市场与热门个股）。 数据仅供参考，不构成任何投资建议。'
+  '腾讯财经公开行情（免费接口直连，无需 Key）。盘中为延迟行情，非交易所官方实时推送；休市期间显示最近收盘数据。数据仅供参考，不构成任何投资建议。'
 
 const tabs = [
   { key: 'quotes', label: '行情', icon: '📊', hint: 'A股指数 · 贵金属能源 · 全球股指 · 热门个股，3 秒自动刷新' },

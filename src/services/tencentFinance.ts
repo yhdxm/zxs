@@ -290,6 +290,15 @@ export interface KLinePoint {
   volume: number
 }
 
+/** K 线附带上下文（用于分时图算涨跌幅、判断数据可用性） */
+export interface KLineResult {
+  points: KLinePoint[]
+  /** 昨收价（分时图基准；K 线取首根的前收，可能为空） */
+  prevClose: number
+  /** 数据源标识，便于排障 */
+  source: string
+}
+
 const PERIOD_PARAM: Record<Exclude<KLinePeriod, 'minute'>, string> = {
   day: 'day',
   week: 'week',
@@ -297,53 +306,310 @@ const PERIOD_PARAM: Record<Exclude<KLinePeriod, 'minute'>, string> = {
   quarter: 'month' // 季K 暂用月K近似（免费接口无季K）
 }
 
+/** 标的市场分类（决定走哪个 K 线端点） */
+export type MarketKind = 'cn-stock' | 'cn-index' | 'us' | 'hk' | 'foreign'
+
+export function marketOf(code: string): MarketKind {
+  if (code.startsWith('hf_')) return 'foreign'
+  if (code.startsWith('us')) return 'us'
+  if (code.startsWith('hk') || code.startsWith('r_hk')) return 'hk'
+  // A 股：指数 6 位以 000/399 开头；个股 sh60/sz00/sz30/sh68 等
+  return /^(sh|sz)\d{6}$/.test(code) && /^(sh000|sz399)/.test(code) ? 'cn-index' : 'cn-stock'
+}
+
+/**
+ * 外盘商品（hf_ 前缀）腾讯免费接口**不提供 K 线**（实测 param error），
+ * 其他市场均可用。组件据此决定是否展示 K 线，避免打开空白图表。
+ */
+export function supportsKline(code: string): boolean {
+  return marketOf(code) !== 'foreign'
+}
+
+/**
+ * 腾讯 K 线接口返回的响应 key 与请求 code 并非总是一致：
+ * - A 股 / 港股：与 code 相同（sh000001 / hkHSI）
+ * - 美股：返回 `us.DJI`（点号分隔），请求用 `usDJI`
+ * 港股实时行情用 `r_hkHSI`，但 K 线必须用 `hkHSI`，故需要归一化。
+ */
+function klineCodeOf(code: string): string {
+  if (marketOf(code) === 'hk') return code.replace(/^r_/, '')
+  return code
+}
+function responseKeyOf(code: string): string {
+  if (marketOf(code) === 'us') return 'us.' + code.replace(/^us/, '')
+  return klineCodeOf(code)
+}
+
+/** 腾讯 K 线每行是**数组**而非对象：[日期, 开, 收, 高, 低, 量] */
+function toPoints(rows: unknown, limit: number): KLinePoint[] {
+  if (!Array.isArray(rows)) return []
+  return rows
+    .slice(-limit)
+    .map((row: unknown) => {
+      // 兼容数组格式与（极少数情况的）对象格式
+      const r = row as unknown as string[] & Record<string, string>
+      if (Array.isArray(row)) {
+        return {
+          date: String(r[0] || '').slice(0, 10),
+          open: toNum(r[1]),
+          close: toNum(r[2]),
+          high: toNum(r[3]),
+          low: toNum(r[4]),
+          volume: toNum(r[5])
+        }
+      }
+      return {
+        date: String(r.date || '').slice(0, 10),
+        open: toNum(r.open),
+        close: toNum(r.close),
+        high: toNum(r.high),
+        low: toNum(r.low),
+        volume: toNum(r.volume)
+      }
+    })
+    .filter((p: KLinePoint) => p.close > 0)
+}
+
 /**
  * 获取 K 线 / 分时数据（免费接口 web.ifzq.gtimg.cn）。
- * 该接口通常允许跨域；若被网络限制则返回空数组，由组件降级提示。
+ *
+ * 实测端点矩阵：
+ * - A 股个股：`fqkline/get?param=<code>,<period>,,,<n>,qfq` → `qfqday|qfqweek|qfqmonth`
+ * - 指数 / 美股 / 港股：`kline/kline?param=<code>,<period>,,,<n>` → `day|week|month`
+ * - 外盘商品（hf_）：不支持 K 线
+ * - 分时：`minute/query?code=<code>` → `data[code].data.data`，每行 "HHMM 价格 累计量 累计额"
+ *
+ * 注意：K 线每行是**数组** [date,open,close,high,low,volume]，
+ * 早期版本按对象字段 row.date 解析会得到全 0，导致 K 线画不出来。
  */
 export async function fetchKline(code: string, period: KLinePeriod, limit = 120): Promise<KLinePoint[]> {
+  return (await fetchKlineWithMeta(code, period, limit)).points
+}
+
+/** 与 fetchKline 相同，但额外返回昨收等上下文，供分时图计算涨跌幅 */
+export async function fetchKlineWithMeta(
+  code: string,
+  period: KLinePeriod,
+  limit = 120
+): Promise<KLineResult> {
+  const empty: KLineResult = { points: [], prevClose: 0, source: 'none' }
+  if (!supportsKline(code) && period !== 'minute') return empty
+
   try {
     if (period === 'minute') {
       const url = `https://web.ifzq.gtimg.cn/appstock/app/minute/query?code=${code}`
       const r = await fetch(url, { signal: AbortSignal.timeout(9000) })
       const json = await r.json()
-      const node = json?.data?.[code]?.data
-      if (!node || !Array.isArray(node.minute)) return []
-      return node.minute
-        .map((row: string) => {
-          const parts = row.split(' ')
-          const price = toNum(parts[1])
+      const top = json?.data?.[code]
+      const node = top?.data
+      if (!node || !Array.isArray(node.data)) return empty
+      // 每行格式："0930 3950.24 4488109 8595747495.80"（时间 价格 累计成交量 累计成交额）
+      const rows: string[] = node.data
+      const parsed = rows
+        .map((row) => {
+          const parts = String(row).split(' ')
           return {
             date: parts[0] || '',
-            open: price,
-            close: price,
-            high: price,
-            low: price,
-            volume: toNum(parts[2])
+            price: toNum(parts[1]),
+            cumVol: toNum(parts[2])
           }
         })
-        .filter((p: KLinePoint) => p.close > 0)
-        .slice(-limit)
+        .filter((p) => p.price > 0)
+      // 接口第 3 列是「累计」成交量，需差分还原为每分钟成交量，否则柱状图会画成单调递增
+      let prevCum = 0
+      const points = parsed.map((p, i) => {
+        const vol = i === 0 ? p.cumVol : Math.max(0, p.cumVol - prevCum)
+        prevCum = p.cumVol
+        return {
+          date: p.date,
+          open: p.price,
+          close: p.price,
+          high: p.price,
+          low: p.price,
+          volume: vol
+        }
+      })
+      // 昨收在同级的 qt 节点里（qt.<code>[4]），用于分时图涨跌幅基准
+      const prevClose = toNum(top?.qt?.[code]?.[4] ?? 0)
+      return { points: points.slice(-limit), prevClose, source: 'minute/query' }
     }
 
-    const param = `${code},${PERIOD_PARAM[period]},,,${limit},qfq`
-    const url = `https://web.ifzq.gtimg.cn/appstock/app/fqkline/get?param=${param}`
+    const p = PERIOD_PARAM[period]
+    const kCode = klineCodeOf(code)
+    const kind = marketOf(code)
+    // A 股个股走复权接口（前后复权更贴近真实走势），其余走通用 K 线接口
+    const url =
+      kind === 'cn-stock'
+        ? `https://web.ifzq.gtimg.cn/appstock/app/fqkline/get?param=${kCode},${p},,,${limit},qfq`
+        : `https://web.ifzq.gtimg.cn/appstock/app/kline/kline?param=${kCode},${p},,,${limit}`
     const r = await fetch(url, { signal: AbortSignal.timeout(9000) })
     const json = await r.json()
-    const node = json?.data?.[code]
-    const key = period === 'day' ? 'qfqday' : period === 'week' ? 'qfqweek' : 'qfqmonth'
-    const arr = node?.[key] || node?.qfqday || []
-    if (!Array.isArray(arr)) return []
-    return arr.slice(-limit).map((row: Record<string, string>) => ({
-      date: (row.date || '').slice(0, 10),
-      open: toNum(row.open),
-      close: toNum(row.close),
-      high: toNum(row.high),
-      low: toNum(row.low),
-      volume: toNum(row.volume)
-    }))
+    const node = json?.data?.[responseKeyOf(code)]
+    if (!node) return empty
+    const keys = kind === 'cn-stock' ? ['qfq' + p, p] : [p, 'qfq' + p]
+    let arr: unknown = null
+    for (const k of keys) {
+      if (Array.isArray(node[k])) {
+        arr = node[k]
+        break
+      }
+    }
+    const points = toPoints(arr, limit)
+    if (!points.length) return empty
+    return { points, prevClose: 0, source: kind === 'cn-stock' ? 'fqkline/get' : 'kline/kline' }
   } catch (e) {
     console.error('[影仓智核] K线加载失败', e)
-    return []
+    return empty
   }
 }
+
+// ===================== 市场状态 =====================
+
+export type MarketStatus = 'open' | 'close' | 'premarket' | 'afterhours'
+
+export interface MarketSession {
+  status: MarketStatus
+  label: string
+  /** 当前是否为实时交易时段 */
+  isRealtime: boolean
+}
+
+/**
+ * 根据标的市场与当前北京时间，判断市场状态。
+ * 仅用于 UI 提示，不保证交易所官方精确时段；美股/外盘按常见北京时间折算。
+ */
+export function marketStatusOf(code: string): MarketSession {
+  const now = new Date()
+  // 强制按北京时间（UTC+8）计算
+  const cst = new Date(now.getTime() + (now.getTimezoneOffset() + 480) * 60000)
+  const day = cst.getDay()
+  const hh = cst.getHours()
+  const mm = cst.getMinutes()
+  const hm = hh * 60 + mm
+  const isWeekday = day >= 1 && day <= 5
+
+  // A 股指数 / 个股
+  if (/^(sh|sz)\d{6}$/.test(code)) {
+    if (!isWeekday) return { status: 'close', label: '周末休市', isRealtime: false }
+    // 09:30-11:30, 13:00-15:00
+    if ((hm >= 570 && hm <= 690) || (hm >= 780 && hm <= 900)) {
+      return { status: 'open', label: '交易中', isRealtime: true }
+    }
+    if (hm >= 540 && hm < 570) return { status: 'premarket', label: '盘前竞价', isRealtime: false }
+    if (hm > 900 && hm <= 930) return { status: 'afterhours', label: '盘后整理', isRealtime: false }
+    return { status: 'close', label: '已休市', isRealtime: false }
+  }
+
+  // 港股
+  if (/^r_hk/.test(code) || /^hk/.test(code)) {
+    if (!isWeekday) return { status: 'close', label: '周末休市', isRealtime: false }
+    // 09:30-12:00, 13:00-16:00
+    if ((hm >= 570 && hm <= 720) || (hm >= 780 && hm <= 960)) {
+      return { status: 'open', label: '交易中', isRealtime: true }
+    }
+    return { status: 'close', label: '已休市', isRealtime: false }
+  }
+
+  // 美股（北京时间 21:30-次日 04:00）
+  if (/^us/.test(code)) {
+    if (!isWeekday && !(day === 6 && hm < 240) && !(day === 0 && hm >= 1290)) {
+      return { status: 'close', label: '周末休市', isRealtime: false }
+    }
+    if (hm >= 1290 || hm < 240) {
+      return { status: 'open', label: '交易中', isRealtime: true }
+    }
+    if (hm >= 1200 && hm < 1290) return { status: 'premarket', label: '盘前', isRealtime: false }
+    if (hm >= 240 && hm < 360) return { status: 'afterhours', label: '盘后', isRealtime: false }
+    return { status: 'close', label: '已休市', isRealtime: false }
+  }
+
+  // 外盘商品：多数 24h 但有维护窗口，保守标记为「持续报价」
+  if (code.startsWith('hf_')) {
+    return { status: 'open', label: '持续报价', isRealtime: true }
+  }
+
+  return { status: 'close', label: '—', isRealtime: false }
+}
+
+// ===================== 数据鲜度 =====================
+
+export interface Freshness {
+  /** 距数据时间的秒数；无法解析时为 null */
+  seconds: number | null
+  /** 展示文案，如「12 秒前」「3 分钟前」 */
+  text: string
+  /** 等级：fresh=60s 内、normal=5 分钟内、stale=超过 5 分钟或无法解析 */
+  level: 'fresh' | 'normal' | 'stale'
+}
+
+/**
+ * 计算行情数据的「鲜度」，解决用户看不到时效性的问题。
+ * 支持 A 股 YYYYMMDDHHmmss 与美股/港股 YYYY-MM-DD HH:mm:ss 两种格式。
+ */
+export function freshnessOf(time: string, now = Date.now()): Freshness {
+  const s = (time || '').trim().replace(/\//g, '-')
+  if (!s) return { seconds: null, text: '时间未知', level: 'stale' }
+  let ts: number
+  if (/^\d{14}$/.test(s)) {
+    const d = new Date(
+      Number(s.slice(0, 4)),
+      Number(s.slice(4, 6)) - 1,
+      Number(s.slice(6, 8)),
+      Number(s.slice(8, 10)),
+      Number(s.slice(10, 12)),
+      Number(s.slice(12, 14))
+    )
+    ts = d.getTime()
+  } else {
+    const d = new Date(s.replace(' ', 'T'))
+    ts = d.getTime()
+  }
+  if (Number.isNaN(ts)) return { seconds: null, text: '时间未知', level: 'stale' }
+  const seconds = Math.max(0, Math.round((now - ts) / 1000))
+  let text: string
+  if (seconds < 60) text = `${seconds} 秒前`
+  else if (seconds < 3600) text = `${Math.floor(seconds / 60)} 分钟前`
+  else if (seconds < 86400) text = `${Math.floor(seconds / 3600)} 小时前`
+  else text = `${Math.floor(seconds / 86400)} 天前`
+  const level = seconds <= 60 ? 'fresh' : seconds <= 300 ? 'normal' : 'stale'
+  return { seconds, text, level }
+}
+
+// ===================== 专业图表快捷标的池 =====================
+
+/** 图表页可切换的标的（指数 / 热门个股 / 海外市场），均为实测可用代码 */
+export const CHART_TARGETS: { group: string; items: { code: string; name: string }[] }[] = [
+  {
+    group: 'A股指数',
+    items: [
+      { code: 'sh000001', name: '上证指数' },
+      { code: 'sz399001', name: '深证成指' },
+      { code: 'sz399006', name: '创业板指' },
+      { code: 'sh000300', name: '沪深300' },
+      { code: 'sh000016', name: '上证50' },
+      { code: 'sh000905', name: '中证500' }
+    ]
+  },
+  {
+    group: '海外指数',
+    items: [
+      { code: 'usDJI', name: '道琼斯' },
+      { code: 'usIXIC', name: '纳斯达克' },
+      { code: 'usINX', name: '标普500' },
+      { code: 'hkHSI', name: '恒生指数' },
+      { code: 'hkHSTECH', name: '恒生科技' },
+      { code: 'hkHSCEI', name: '国企指数' }
+    ]
+  },
+  {
+    group: '热门个股',
+    items: [
+      { code: 'sh600519', name: '贵州茅台' },
+      { code: 'sz300750', name: '宁德时代' },
+      { code: 'sz002594', name: '比亚迪' },
+      { code: 'sh601318', name: '中国平安' },
+      { code: 'sh600036', name: '招商银行' },
+      { code: 'sh600276', name: '恒瑞医药' }
+    ]
+  }
+]

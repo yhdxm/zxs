@@ -68,7 +68,7 @@ export const APP_MENU: SideItem[] = [
     key: 'lianzhicang',
     label: '联智舱',
     icon: MagicStick,
-    expanded: true,
+    expanded: false,
     permissionKey: 'ai',
     children: [
       { key: 'ai', label: 'AI 助手', icon: MagicStick, permissionKey: 'ai', to: '/ai' },
@@ -80,7 +80,7 @@ export const APP_MENU: SideItem[] = [
     key: 'fanjingzhixie',
     label: '凡境智协',
     icon: Compass,
-    expanded: true,
+    expanded: false,
     permissionKey: 'dashboard',
     children: [
       { key: 'news', label: '新闻聚合', icon: TrendCharts, permissionKey: 'news', to: '/news' },
@@ -95,14 +95,14 @@ export const APP_MENU: SideItem[] = [
     key: 'learncenter',
     label: '学习中心',
     icon: Reading,
-    expanded: true,
+    expanded: false,
     permissionKey: 'dashboard',
     children: [
       {
         key: 'learn-english',
         label: '学位英语',
         icon: Document,
-        expanded: true,
+        expanded: false,
         permissionKey: 'learn-english',
         children: [
           { key: 'degree-legacy', label: '备考学位英语', icon: Reading, permissionKey: 'degree-legacy', to: '/learn/english' },
@@ -127,7 +127,7 @@ export const APP_MENU: SideItem[] = [
     key: 'worktasks',
     label: '工作任务',
     icon: List,
-    expanded: true,
+    expanded: false,
     permissionKey: 'worktasks',
     children: [
       { key: 'overview', label: '工作数据看板', icon: DataBoard, permissionKey: 'dashboard', to: { path: '/dashboard', query: { view: 'overview' } } },

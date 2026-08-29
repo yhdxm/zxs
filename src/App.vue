@@ -425,6 +425,29 @@ const toggleGroup = (key: string) => {
   }
 }
 
+/**
+ * 进入页面或切换路由时，自动展开包含当前激活项的分组，
+ * 保证用户即使默认全部收起，也能一眼看到自己在哪。
+ * 不强制折叠其他分组，尊重用户手动展开的状态。
+ */
+function expandActiveGroups(items: SideItem[]): void {
+  for (const it of items) {
+    if (it.children && it.children.length) {
+      const hasActiveChild = it.children.some((child) => {
+        if (isMenuActive(child.key)) return true
+        if (child.children && child.children.length) {
+          return child.children.some((gc) => isMenuActive(gc.key))
+        }
+        return false
+      })
+      if (hasActiveChild) {
+        it.expanded = true
+      }
+      expandActiveGroups(it.children)
+    }
+  }
+}
+
 const isMenuActive = (key: string) => {
   if (key === 'learn-english') return route.path.startsWith('/degree') || route.path === '/learn/english' || route.path === '/learn/english/prep'
   if (key === 'degree-legacy') return route.path === '/learn/english' || route.path === '/learn/english/prep' || route.path.startsWith('/degree')
@@ -605,8 +628,11 @@ const handleLogout = async () => {
   router.replace('/login')
 }
 
-// 路由变化时刷新登录态（登录/退出后导航同步）
-watch(() => route.fullPath, refreshUser)
+// 路由变化时刷新登录态，并自动展开当前路由所在分组
+watch(() => route.fullPath, () => {
+  refreshUser()
+  expandActiveGroups(sideMenu)
+})
 onMounted(async () => {
   applyTheme(theme.value)
   updatePlatform()
@@ -638,6 +664,8 @@ onMounted(async () => {
     }
   } finally {
     initializing.value = false
+    // 初始化时展开当前路由所在分组（用户仍可手动折叠）
+    expandActiveGroups(sideMenu)
     // 消息中心：未读轮询 + 自动提醒 + SW 点击跳转
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.addEventListener('message', onSwMessage)

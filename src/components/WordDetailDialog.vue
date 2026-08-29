@@ -100,20 +100,34 @@
 
       <!-- 标签：英文释义 / 形近词 -->
       <section class="wd-card">
-        <div class="wd-tabs">
-          <button :class="{ on: tab === 'en' }" type="button" @click="tab = 'en'">英文释义</button>
-          <button :class="{ on: tab === 'sim' }" type="button" @click="tab = 'sim'">形近词</button>
+        <div class="wd-tabs" role="tablist">
+          <button
+            :class="{ on: tab === 'en' }"
+            type="button"
+            role="tab"
+            :aria-selected="tab === 'en'"
+            @click="tab = 'en'"
+          >英文释义</button>
+          <button
+            :class="{ on: tab === 'sim' }"
+            type="button"
+            role="tab"
+            :aria-selected="tab === 'sim'"
+            @click="tab = 'sim'"
+          >形近词</button>
         </div>
-        <div v-if="tab === 'en'" class="wd-pane">
+        <div v-show="tab === 'en'" class="wd-pane" role="tabpanel">
           <ol v-if="data.enDefs.length">
             <li v-for="(d, i) in data.enDefs" :key="i">{{ d }}</li>
           </ol>
+          <div v-else-if="loading" class="wd-empty">正在获取英文释义…</div>
           <div v-else class="wd-empty">暂无英文释义（多为生僻词或接口未收录）。</div>
         </div>
-        <div v-else class="wd-pane">
+        <div v-show="tab === 'sim'" class="wd-pane" role="tabpanel">
           <div v-if="data.similar.length" class="wd-sim">
             <span v-for="s in data.similar" :key="s">{{ s }}</span>
           </div>
+          <div v-else-if="loading" class="wd-empty">正在计算形近词…</div>
           <div v-else class="wd-empty">词表中未找到形近词。</div>
         </div>
       </section>
@@ -471,6 +485,12 @@ function regenMnemonic() {
   cursor: pointer;
   font-weight: 700;
   min-height: 36px;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: rgba(99, 102, 241, 0.12);
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.wd-tabs button:active {
+  transform: scale(0.97);
 }
 .wd-tabs button.on {
   background: #fff;
