@@ -1122,10 +1122,10 @@ function renderCard(m: PrepWord, flipped: boolean) {
       <div class="fc-back">${esc(m[3])}</div>
       <div class="fc-coll">常考：${esc(m[4])}</div>
       <div class="fc-actions">
-        <button class="fc-btn fc-detail" id="fcDetail2">${ICON.book}详情</button>
         <button class="fc-btn fc-unknown" id="fcUnk">${ICON.cross}不认识</button>
         <button class="fc-btn fc-known" id="fcKn">${ICON.check}认识</button>
       </div>
+      <button class="fc-speak fc-detail" id="fcDetail2">${ICON.book}查看完整详情</button>
     `
     const kn = document.querySelector('#fcKn')
     const unk = document.querySelector('#fcUnk')

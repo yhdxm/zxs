@@ -7,7 +7,6 @@
     :class="{ 'wd--mobile': isMobile }"
     width="540px"
     top="6vh"
-    @opened="onOpened"
   >
     <!-- ===== 头部：单词 + 音标 + 朗读 ===== -->
     <div class="wd-head">
@@ -197,11 +196,6 @@ async function load() {
     pool: props.pool || []
   })
   loading.value = false
-}
-
-function onOpened() {
-  // 弹窗动画结束后再拉数据，避免动画卡顿
-  void load()
 }
 
 watch(
@@ -544,25 +538,6 @@ function regenMnemonic() {
 
 /* ===== 移动端：底部全宽抽屉 ===== */
 @media (max-width: 768px) {
-  .wd-dialog :deep(.el-dialog) {
-    width: 100% !important;
-    max-width: 100% !important;
-    margin: 0 !important;
-    position: fixed !important;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    top: auto !important;
-    border-radius: 18px 18px 0 0;
-    max-height: 90vh;
-    display: flex;
-    flex-direction: column;
-  }
-  .wd-dialog :deep(.el-dialog__body) {
-    max-height: none;
-    flex: 1;
-    overflow-y: auto;
-  }
   .wd-word {
     font-size: 24px;
   }
@@ -587,5 +562,32 @@ function regenMnemonic() {
   --wd-blue: #0ea5e9;
   --wd-teal: #14b8a6;
   --wd-line: #e2e8f0;
+}
+
+/* 移动端底部全宽抽屉。
+   注意：Element Plus 把自定义 class 合并到 .el-dialog 元素自身（不是它的子元素），
+   所以必须在这里用全局样式直接命中 .wd-dialog —— scoped 里写
+   .wd-dialog :deep(.el-dialog) 是找自己的后代，永远匹配不到。 */
+@media (max-width: 768px) {
+  .wd-dialog {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    position: fixed !important;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    top: auto !important;
+    border-radius: 18px 18px 0 0;
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+  }
+  .wd-dialog .el-dialog__body {
+    max-height: none;
+    flex: 1;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
 }
 </style>

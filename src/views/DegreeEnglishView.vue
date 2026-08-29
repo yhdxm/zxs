@@ -798,7 +798,6 @@ import { getStudySettings, saveStudySettings, countLearnedToday, computeStreakFr
 import { speakEn } from '../prep/degreeSpeech'
 import WordDetailDialog from '../components/WordDetailDialog.vue'
 import PdfViewerDialog from '../components/PdfViewerDialog.vue'
-import { warmEnrich } from '../services/wordEnrichService'
 
 // ===== 重型数据按需加载（提速：进入备考台不再同步解析 1.3MB 数据） =====
 // 题库（约 907KB）：进入页面后后台加载，不阻塞首屏；开模考前确保就绪

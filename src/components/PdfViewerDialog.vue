@@ -94,20 +94,18 @@ function loadScript(src: string): Promise<void> {
 async function ensurePdfjs(): Promise<any> {
   const g = window as any
   if (g.pdfjsLib) return g.pdfjsLib
+  // worker 默认用主 CDN；主 CDN 不可达时随主脚本一起切到备用，保证同源
+  let worker = PDFJS_WORKER
   try {
     await loadScript(PDFJS_CDN)
   } catch {
     await loadScript(PDFJS_CDN_ALT)
+    worker = PDFJS_WORKER_ALT
   }
   const lib = g.pdfjsLib
   if (!lib) throw new Error('PDF 阅读器加载失败')
-  lib.GlobalWorkerOptions.workerSrc = g.pdfjsLib?.GlobalWorkerOptions?.workerSrc || PDFJS_WORKER
-  // worker 也做一次兜底：主 CDN 失败时用备用
-  try {
-    lib.GlobalWorkerOptions.workerSrc = PDFJS_WORKER
-  } catch {
-    lib.GlobalWorkerOptions.workerSrc = PDFJS_WORKER_ALT
-  }
+  // worker 必须与主脚本来自同一个 CDN，否则版本/跨域可能不一致
+  lib.GlobalWorkerOptions.workerSrc = worker
   return lib
 }
 
