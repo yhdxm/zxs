@@ -27,7 +27,8 @@ import {
   User,
   Cpu,
   ChatLineSquare,
-  Notebook
+  Notebook,
+  Download
 } from '@element-plus/icons-vue'
 
 export interface SideItem {
@@ -111,7 +112,8 @@ export const APP_MENU: SideItem[] = [
       { key: 'learn-industry', label: '各行业知识', icon: DataBoard, permissionKey: 'learn-industry', to: '/learn/industry' },
       { key: 'learn-books', label: '书籍阅读', icon: Reading, permissionKey: 'learn-books', to: '/learn/books' },
       { key: 'learn-goals', label: '学习目标', icon: Aim, permissionKey: 'learn-goals', to: '/learn/goals' },
-      { key: 'cet-prep', label: '四六级备考台', icon: Notebook, permissionKey: 'cet-prep', to: '/learn/cet-prep' }
+      { key: 'cet-prep', label: '四六级备考台', icon: Notebook, permissionKey: 'cet-prep', to: '/learn/cet-prep' },
+      { key: 'study-report', label: '学习报告导出', icon: Download, permissionKey: 'study-report', to: '/learn/report' }
     ]
   },
   {

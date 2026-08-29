@@ -173,6 +173,13 @@ const router = createRouter({
       component: () => import('../views/CetPrepView.vue'),
       meta: { requirePermission: 'cet-prep' }
     },
+    {
+      // B4 学习数据导出：三个模块各自独立统计，分别导出 CSV / 打印 PDF
+      path: '/learn/report',
+      name: 'study-report',
+      component: () => import('../views/StudyReportView.vue'),
+      meta: { requirePermission: 'study-report' }
+    },
     // ===== 学位英语备考台 2.0 模块（数据已落地数据库，见 scripts/degree-english-schema.sql） =====
     {
       path: '/degree/words',
