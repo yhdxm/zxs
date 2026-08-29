@@ -291,12 +291,71 @@
                 <div v-if="wordPhonetic(currentCardWord!.word)" class="fc-phonetic">{{ wordPhonetic(currentCardWord!.word) }}</div>
                 <div class="fc-hint">点击翻转查看释义</div>
               </div>
-              <!-- 背面：释义+例句 -->
+              <!-- 背面：释义+例句+完整详情 -->
               <div class="flashcard-back">
-                <div class="fc-def">{{ currentCardWord!.definition }}</div>
+                <div class="fc-def-row">
+                  <span v-if="currentCardWord!.pos" class="fc-pos">{{ currentCardWord!.pos }}</span>
+                  <span class="fc-def">{{ currentCardWord!.definition }}</span>
+                </div>
                 <div class="fc-src" v-if="currentCardWord!.sourceBooks?.length">
                   <el-tag v-for="b in currentCardWord!.sourceBooks" :key="b" size="small" :type="srcTagType(b)" effect="plain">{{ b }}</el-tag>
                 </div>
+
+                <!-- 助记 -->
+                <div class="fc-enrich-sec">
+                  <div class="fc-enrich-hd">助记</div>
+                  <div v-if="cardEnrich?.mnemonicReal && cardEnrich.mnemonic">{{ cardEnrich.mnemonic }}</div>
+                  <div v-else class="fc-enrich-empty">*助记正在赶来的路上</div>
+                </div>
+
+                <!-- 例句 -->
+                <div class="fc-enrich-sec">
+                  <div class="fc-enrich-hd">例句</div>
+                  <template v-if="cardEnrich?.example">
+                    <div class="fc-ex-en">{{ cardEnrich.example }}</div>
+                    <div v-if="cardEnrich.exampleZh" class="fc-ex-zh">{{ cardEnrich.exampleZh }}</div>
+                    <div v-else class="fc-ex-zh fc-enrich-empty">（翻译获取中或不可用）</div>
+                    <div class="fc-ex-bar">
+                      <button type="button" @click.stop="speakExample(cardEnrich.example, 0.95)">朗读</button>
+                      <button type="button" @click.stop="speakExample(cardEnrich.example, 0.6)">慢速</button>
+                    </div>
+                  </template>
+                  <div v-else-if="cardEnrichLoading" class="fc-enrich-empty">例句加载中…</div>
+                  <div v-else class="fc-enrich-empty">该词暂无例句，先记住释义即可。</div>
+                </div>
+
+                <!-- 配图 -->
+                <div class="fc-enrich-sec">
+                  <div class="fc-enrich-hd">配图</div>
+                  <div class="fc-pic-row">
+                    <span class="fc-pic-em">{{ getEmoji(currentCardWord!.word) }}</span>
+                    <span class="fc-pic-tx">离线象形符号</span>
+                  </div>
+                </div>
+
+                <!-- 英文释义 / 形近词 -->
+                <div class="fc-enrich-sec">
+                  <div class="fc-enrich-tabs" role="tablist">
+                    <button :class="{ on: cardReviewTab === 'en' }" type="button" role="tab" :aria-selected="cardReviewTab === 'en'" @click="cardReviewTab = 'en'">英文释义</button>
+                    <button :class="{ on: cardReviewTab === 'sim' }" type="button" role="tab" :aria-selected="cardReviewTab === 'sim'" @click="cardReviewTab = 'sim'">形近词</button>
+                  </div>
+                  <div v-show="cardReviewTab === 'en'" class="fc-enrich-pane" role="tabpanel">
+                    <ol v-if="cardEnrich?.enDefs?.length">
+                      <li v-for="(d, i) in cardEnrich.enDefs" :key="i">{{ d }}</li>
+                    </ol>
+                    <div v-else-if="cardEnrichLoading" class="fc-enrich-empty">正在获取英文释义…</div>
+                    <div v-else class="fc-enrich-empty">暂无英文释义（多为生僻词或接口未收录）。</div>
+                  </div>
+                  <div v-show="cardReviewTab === 'sim'" class="fc-enrich-pane" role="tabpanel">
+                    <div v-if="cardEnrich?.similar?.length" class="fc-sim">
+                      <span v-for="s in cardEnrich.similar" :key="s">{{ s }}</span>
+                    </div>
+                    <div v-else-if="cardEnrichLoading" class="fc-enrich-empty">正在计算形近词…</div>
+                    <div v-else class="fc-enrich-empty">词表中未找到形近词。</div>
+                  </div>
+                </div>
+
+                <!-- 原有例句（兼容旧逻辑） -->
                 <div class="fc-example" v-if="examples[currentCardWord!.word]">
                   <span class="ex-label">例句</span> {{ examples[currentCardWord!.word] }}
                   <button class="trans-btn" @click.stop="translateExample(currentCardWord!.word)" :disabled="translating[currentCardWord!.word]">
@@ -836,6 +895,8 @@ import {
 import { buildReviewQueue as buildGenericReviewQueue } from '../prep/trainingSrs'
 import { getStudySettings, saveStudySettings, countLearnedToday, computeStreakFromDates, collectStudyDates } from '../services/studySettingsService'
 import { speakEn } from '../prep/degreeSpeech'
+import { getWordEnrich, type WordEnrichData } from '../services/wordEnrichService'
+import { getEmoji } from '../data/emojiDict'
 import WordDetailDialog from '../components/WordDetailDialog.vue'
 import PdfViewerDialog from '../components/PdfViewerDialog.vue'
 
@@ -1457,6 +1518,9 @@ const cardQueue = ref<(typeof degreeWords)[number][]>([])
 const cardReviewedCount = ref(0)
 const cardFlipped = ref(false)
 const isMobileDevice = ref(typeof window !== 'undefined' && window.innerWidth <= 768)
+const cardEnrich = ref<WordEnrichData | null>(null)
+const cardEnrichLoading = ref(false)
+const cardReviewTab = ref<'en' | 'sim'>('en')
 // 注意：卡片统计与训练队列统一基于「全量词库」，不随词书筛选器变化（B1 修复：避免切 tab 后统计漂移）
 const cardNewToday = computed(() => {
   const fresh = degreeWords.filter((w) => !wordProgress.value[w.word]).length
@@ -1527,6 +1591,8 @@ async function gradeCard(g: SrsGrade) {
   }
   cardQueue.value.shift()
   cardFlipped.value = false
+  cardEnrich.value = null
+  cardReviewTab.value = 'en'
   const nextW = currentCardWord.value
   if (nextW && !examples.value[nextW.word]) loadExample(nextW.word)
 }
@@ -1536,9 +1602,35 @@ function skipCard() {
   if (!w) return
   cardQueue.value.shift()
   cardFlipped.value = false
+  cardEnrich.value = null
+  cardReviewTab.value = 'en'
   const nextW = currentCardWord.value
   if (nextW && !examples.value[nextW.word]) loadExample(nextW.word)
 }
+
+async function loadCardEnrich(word: string) {
+  if (cardEnrichLoading.value) return
+  cardEnrichLoading.value = true
+  try {
+    cardEnrich.value = await getWordEnrich(word, { pool: degreeWords.map((w) => w.word) })
+  } catch {
+    cardEnrich.value = null
+  } finally {
+    cardEnrichLoading.value = false
+  }
+}
+
+function speakExample(text: string, rate = 0.95) {
+  void speakEn(text, rate)
+}
+
+// 翻转背面展示时自动加载完整详情（与详情弹窗同源）
+watch(cardFlipped, (flipped) => {
+  const w = currentCardWord.value
+  if (flipped && w) {
+    void loadCardEnrich(w.word)
+  }
+})
 
 // 键盘快捷键（PC端）
 if (typeof window !== 'undefined') {
@@ -2524,6 +2616,63 @@ onBeforeUnmount(() => {
   cursor: pointer;
   margin-top: 8px;
   align-self: flex-start;
+}
+.fc-def-row { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+.fc-pos { font-size: 13px; color: #6b5bd6; background: #edeaff; padding: 2px 8px; border-radius: 6px; white-space: nowrap; }
+.fc-enrich-sec {
+  background: #fff;
+  border: 1px solid #e6e1ff;
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin-bottom: 10px;
+  font-size: 13.5px;
+  line-height: 1.65;
+  color: var(--text-strong);
+}
+.fc-enrich-hd {
+  font-size: 12px;
+  font-weight: 700;
+  color: #6b5bd6;
+  margin-bottom: 6px;
+  letter-spacing: 0.5px;
+}
+.fc-enrich-empty { font-size: 12.5px; color: #9a9ab0; line-height: 1.7; }
+.fc-ex-en { font-size: 13.5px; color: var(--text-strong); margin-bottom: 4px; }
+.fc-ex-zh { font-size: 12.5px; color: #555; margin-bottom: 8px; }
+.fc-ex-bar { display: flex; gap: 8px; }
+.fc-ex-bar button {
+  border: 1px solid #c9c2ff;
+  background: #fff;
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 12px;
+  color: #6b5bd6;
+  cursor: pointer;
+}
+.fc-ex-bar button:active { background: #f0edff; }
+.fc-pic-row { display: flex; align-items: center; gap: 10px; }
+.fc-pic-em { font-size: 32px; }
+.fc-pic-tx { font-size: 12px; color: #888; }
+.fc-enrich-tabs { display: flex; gap: 8px; margin-bottom: 8px; }
+.fc-enrich-tabs button {
+  border: 1px solid #ddd8ff;
+  background: #f7f6ff;
+  border-radius: 6px;
+  padding: 5px 12px;
+  font-size: 12px;
+  color: #6b5bd6;
+  cursor: pointer;
+}
+.fc-enrich-tabs button.on { background: #6b5bd6; color: #fff; border-color: #6b5bd6; }
+.fc-enrich-pane ol { margin: 0; padding-left: 18px; font-size: 13px; color: #444; }
+.fc-enrich-pane li { margin-bottom: 4px; }
+.fc-sim { display: flex; flex-wrap: wrap; gap: 6px; }
+.fc-sim span {
+  background: #edeaff;
+  color: #5a4dc1;
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 12.5px;
 }
 
 .flashcard-ops {
