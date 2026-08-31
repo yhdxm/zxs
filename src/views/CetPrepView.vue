@@ -52,7 +52,8 @@ import { onMounted, onUnmounted, ref, reactive, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import PageHeader from '../components/PageHeader.vue'
 import { School, Setting, VideoPlay } from '@element-plus/icons-vue'
-import { initPrep, type PrepStorage } from '../prep/prepApp'
+import { initPrep, reloadPrepData, type PrepStorage } from '../prep/prepApp'
+import { useCloudSync } from '../composables/useCloudSync'
 import { MASTER_WORDS_BUNDLE } from '../prep/masterWordsBundle'
 import WordDetailDialog from '../components/WordDetailDialog.vue'
 import {
@@ -138,6 +139,24 @@ const storage: PrepStorage = {
   isAdmin,
   seedMasterWords
 }
+
+/* 跨端同步：PC 端写入云端后，移动端切回前台 / 聚焦 / 联网 / 收到 Realtime 推送时，
+   只重新拉数据并按当前视图重渲染（reloadPrepData 不重置视图、不打断背单词）。
+   cleanup 为空表示 initPrep 尚未完成，直接跳过，避免在数据未就绪时重载报错。 */
+useCloudSync({
+  tables: [
+    'cet4_prep_progress',
+    'cet4_prep_practice',
+    'cet4_prep_mistakes',
+    'cet4_prep_checkins',
+    'cet4_prep_settings'
+  ],
+  reload: async () => {
+    if (!cleanup) return
+    await reloadPrepData()
+  },
+  immediate: false
+})
 
 onMounted(async () => {
   // 监听 vanilla 卡片（prepApp.ts）派发的「查看详情」事件

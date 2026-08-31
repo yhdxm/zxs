@@ -913,6 +913,7 @@ import { getStudySettings, saveStudySettings, countLearnedToday, computeStreakFr
 import { speakEn } from '../prep/degreeSpeech'
 import { getWordEnrich, type WordEnrichData } from '../services/wordEnrichService'
 import { getEmoji } from '../data/emojiDict'
+import { useCloudSync } from '../composables/useCloudSync'
 import WordDetailDialog from '../components/WordDetailDialog.vue'
 import PdfViewerDialog from '../components/PdfViewerDialog.vue'
 
@@ -1813,6 +1814,22 @@ async function removeFav(id: string, isMistake = false) {
     wordBook.value = await svc.loadFavorites('word')
   }
 }
+
+/* 跨端同步：PC 端写入云端后，移动端在「切回前台 / 聚焦 / 联网恢复 / 收到 Realtime 推送」
+   时自动重拉，避免手机端停留在进入页面时的旧快照。
+   首次加载交给下方 onMounted 的 loadAll()，故 immediate: false。 */
+useCloudSync({
+  tables: [
+    'degree_settings',
+    'degree_word_progress',
+    'degree_practice',
+    'degree_mistakes',
+    'degree_favorites',
+    'degree_exam_records'
+  ],
+  reload: loadAll,
+  immediate: false
+})
 
 onMounted(() => {
   loadAll()

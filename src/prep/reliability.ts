@@ -77,11 +77,42 @@ export function clearQueue(): void {
 }
 
 /* ===================== 四六级本地镜像（聚合状态） ===================== */
-export function mirrorGet(userId: string): PrepState | null {
-  return lsGet<PrepState | null>('mirror_' + userId, null)
+// ⚠️ 镜像加 TTL：旧实现写入后**永久有效**，弱网 / 断网时会长期静默展示几天前的数据，
+// 用户在手机上的表现就是「PC 明明更新了，手机还是老的，而且没有任何提示」。
+// 现在：超期一律视为不可用（调用方强制走云端）；云端彻底不可达时用 mirrorGetStale
+// 兜底展示，并由调用方按 ageMs **显式提示**「离线 / 数据可能不是最新」，杜绝静默陈旧。
+export const DEFAULT_MIRROR_TTL = 5 * 60 * 1000
+
+interface MirrorEnvelope {
+  data: PrepState
+  ts: number
 }
+
+export function mirrorGet(userId: string, ttlMs: number = DEFAULT_MIRROR_TTL): PrepState | null {
+  const raw = lsGet<MirrorEnvelope | PrepState | null>('mirror_' + userId, null)
+  if (raw == null) return null
+  // 兼容旧格式（裸数据、无 ts）：无法判断新鲜度，直接视为已过期
+  if (typeof raw !== 'object' || !('ts' in (raw as object))) return null
+  const env = raw as MirrorEnvelope
+  if (!env.ts || Date.now() - env.ts > ttlMs) return null
+  return env.data
+}
+
+/** 无视 TTL 读取镜像，专供云端彻底不可达时兜底展示 */
+export function mirrorGetStale(userId: string): { data: PrepState; ageMs: number } | null {
+  const raw = lsGet<MirrorEnvelope | PrepState | null>('mirror_' + userId, null)
+  if (raw == null) return null
+  if (typeof raw !== 'object' || !('ts' in (raw as object))) {
+    // 旧格式无时间戳：无法判断新鲜度，当作极旧处理
+    return { data: raw as PrepState, ageMs: Number.MAX_SAFE_INTEGER }
+  }
+  const env = raw as MirrorEnvelope
+  return { data: env.data, ageMs: Math.max(0, Date.now() - (env.ts || 0)) }
+}
+
 export function mirrorSet(userId: string, val: PrepState): void {
-  lsSet('mirror_' + userId, val)
+  const env: MirrorEnvelope = { data: val, ts: Date.now() }
+  lsSet('mirror_' + userId, env)
 }
 export function mirrorClear(userId: string): void {
   lsSet('mirror_' + userId, null)

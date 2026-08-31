@@ -5,9 +5,28 @@
 import type { StudyPlan } from './learningService'
 import { supabase, getSavedUser } from './appDataService'
 
+/**
+ * 取当前登录账号 id；未登录返回空串。
+ *
+ * ⚠️ 历史坑（跨端不同步的元凶之一）：
+ * 旧实现是 `return u?.id || 'anonymous'` —— 未登录 / 会话丢失时，数据会写进
+ * user_id='anonymous' 这个「所有匿名设备共享」的公共账号，导致：
+ *   ① PC 端用真实账号写、移动端用 anonymous 写，两边永远看不到对方的数据；
+ *   ② 重新登录后，之前用 anonymous 写的数据不会归属到自己的账号。
+ * 现改为：读操作在空 id 时返回空结果（不读公共脏数据），写操作直接抛错提示登录，
+ * 从根上杜绝 anonymous 污染。
+ */
 async function uid(): Promise<string> {
   const u = await getSavedUser()
-  return u?.id || 'anonymous'
+  return u?.id || ''
+}
+
+/** 写操作守卫：未登录时明确失败，而不是静默写到 anonymous */
+function assertUid(u: string): string {
+  if (!u) {
+    throw new Error('未登录：请先登录后再操作，否则数据只会存在本机、无法跨设备同步')
+  }
+  return u
 }
 
 export interface CarWatchItem {
@@ -57,11 +76,12 @@ export interface LearnReading {
 /* ---------- 星舆识途：自选车 ---------- */
 export async function listCarWatch(): Promise<CarWatchItem[]> {
   const u = await uid()
+  if (!u) return []
   const { data } = await supabase.from('car_watchlist').select('*').eq('user_id', u).order('created_at', { ascending: false })
   return (data as CarWatchItem[] | null) || []
 }
 export async function addCarWatch(name: string, ref = '', note = ''): Promise<void> {
-  const u = await uid()
+  const u = assertUid(await uid())
   await supabase.from('car_watchlist').insert({ user_id: u, name, ref, note })
 }
 export async function removeCarWatch(id: string): Promise<void> {
@@ -71,11 +91,12 @@ export async function removeCarWatch(id: string): Promise<void> {
 /* ---------- AI模型知识：收藏 ---------- */
 export async function listModelBookmarks(): Promise<ModelBookmark[]> {
   const u = await uid()
+  if (!u) return []
   const { data } = await supabase.from('model_bookmarks').select('*').eq('user_id', u).order('created_at', { ascending: false })
   return (data as ModelBookmark[] | null) || []
 }
 export async function addModelBookmark(modelId: string, modelName: string, note = ''): Promise<void> {
-  const u = await uid()
+  const u = assertUid(await uid())
   await supabase.from('model_bookmarks').insert({ user_id: u, model_id: modelId, model_name: modelName, note })
 }
 export async function removeModelBookmark(id: string): Promise<void> {
@@ -85,6 +106,7 @@ export async function removeModelBookmark(id: string): Promise<void> {
 /* ---------- 学习中心：书签 ---------- */
 export async function listLearnBookmarks(kind?: string): Promise<LearnBookmark[]> {
   const u = await uid()
+  if (!u) return []
   let q = supabase.from('learn_bookmarks').select('*').eq('user_id', u).order('created_at', { ascending: false })
   if (kind) q = q.eq('kind', kind)
   const { data, error } = await q
@@ -92,7 +114,7 @@ export async function listLearnBookmarks(kind?: string): Promise<LearnBookmark[]
   return (data as LearnBookmark[] | null) || []
 }
 export async function addLearnBookmark(kind: string, refId: string, title: string, note = ''): Promise<void> {
-  const u = await uid()
+  const u = assertUid(await uid())
   const { error } = await supabase.from('learn_bookmarks').insert({ user_id: u, kind, ref_id: refId, title, note })
   if (error) throw error
 }
@@ -104,6 +126,7 @@ export async function removeLearnBookmark(id: string): Promise<void> {
 /* ---------- 学习中心：进度 ---------- */
 export async function getProgress(module: string, itemId: string): Promise<LearnProgress | null> {
   const u = await uid()
+  if (!u) return null
   const { data, error } = await supabase
     .from('learn_progress')
     .select('*')
@@ -115,7 +138,7 @@ export async function getProgress(module: string, itemId: string): Promise<Learn
   return (data as LearnProgress | null) || null
 }
 export async function setProgress(module: string, itemId: string, status: string, score = 0): Promise<void> {
-  const u = await uid()
+  const u = assertUid(await uid())
   const { error } = await supabase
     .from('learn_progress')
     .upsert(
@@ -126,6 +149,7 @@ export async function setProgress(module: string, itemId: string, status: string
 }
 export async function listProgress(module: string): Promise<LearnProgress[]> {
   const u = await uid()
+  if (!u) return []
   const { data, error } = await supabase
     .from('learn_progress')
     .select('*')
@@ -137,6 +161,7 @@ export async function listProgress(module: string): Promise<LearnProgress[]> {
 }
 export async function removeProgress(module: string, itemId: string): Promise<void> {
   const u = await uid()
+  if (!u) return
   const { error } = await supabase
     .from('learn_progress')
     .delete()
@@ -149,11 +174,12 @@ export async function removeProgress(module: string, itemId: string): Promise<vo
 /* ---------- 学习中心：阅读记录 ---------- */
 export async function listReading(): Promise<LearnReading[]> {
   const u = await uid()
+  if (!u) return []
   const { data } = await supabase.from('learn_reading').select('*').eq('user_id', u).order('updated_at', { ascending: false })
   return (data as LearnReading[] | null) || []
 }
 export async function upsertReading(bookId: number, bookTitle: string, progress = 0, lastPos = 0): Promise<void> {
-  const u = await uid()
+  const u = assertUid(await uid())
   await supabase
     .from('learn_reading')
     .upsert(
@@ -167,7 +193,7 @@ export async function listStudyPlans(): Promise<LearnBookmark[]> {
   return listLearnBookmarks('plan')
 }
 export async function saveStudyPlan(plan: StudyPlan, examDate: string): Promise<void> {
-  const u = await uid()
+  assertUid(await uid())
   const title = `学习计划 · ${examDate}`
   const exist = (await listLearnBookmarks('plan')).find((p) => p.title === title)
   if (exist) {

@@ -535,7 +535,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onActivated, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
+import { useCloudSync } from '../composables/useCloudSync'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { School, Reading, Collection, Calendar, ChatDotRound, ArrowDown, ArrowLeft, Odometer, CircleCheck, Notebook, Setting } from '@element-plus/icons-vue'
@@ -1201,6 +1202,16 @@ async function loadWeakness(): Promise<void> {
   }
 }
 
+/* 跨端同步：PC 端写入云端后，移动端切回前台 / 聚焦 / 联网 / 收到 Realtime 推送时自动重拉。
+   只重载数据类接口 —— 刻意不调用 lookup()（查词会走网络/AI，不应被刷新连带触发）。 */
+useCloudSync({
+  tables: ['learn_word_progress', 'learn_progress', 'learn_bookmarks', 'learn_reading'],
+  reload: async () => {
+    await Promise.all([loadWordStats(), loadWords(), loadKbProgress(), loadPlans()])
+  },
+  immediate: false
+})
+
 onMounted(async () => {
   updateClock()
   clockTimer = window.setInterval(updateClock, 1000)
@@ -1213,9 +1224,8 @@ onMounted(async () => {
 })
 onUnmounted(() => { if (clockTimer) window.clearInterval(clockTimer) })
 
-// L6 修复：返回本看板页时强制刷新统计（今日新学/待复习/已掌握/连续天数）。
-// 既有 wordSub/cetSub 订阅在部分返回路径可能未触发，onActivated 作为兜底确保数据不陈旧。
-onActivated(() => { void loadWordStats() })
+// 注：此处原有一个 onActivated 兜底（返回页面时刷新统计）。但全项目并未使用 <KeepAlive>，
+// 该钩子永不触发，属于死代码。现已由上方 useCloudSync 统一覆盖（切回前台/聚焦/联网/Realtime）。
 
 // 从训练面板返回首页时刷新看板（今日新学/待复习/已掌握/连续学习天数）
 watch(wordSub, (v) => { if (v === 'home') void loadWordStats() })

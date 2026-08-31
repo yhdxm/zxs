@@ -1524,3 +1524,16 @@ export async function initPrep(root: HTMLElement, store: PrepStorage): Promise<(
     if (focusClose) focusClose.removeEventListener('click', fcClose)
   }
 }
+
+/**
+ * 跨端同步用：仅重新拉取云端数据，并按**当前视图**重渲染。
+ *
+ * 与 init() 的区别：不重置到「今日」、不重建事件绑定。
+ * 因此用户在手机上背单词时切到后台再回来，数据会静默更新，但不会被打断跳走。
+ */
+export async function reloadPrepData(): Promise<void> {
+  const st = await storage.loadAll()
+  S = buildS(st)
+  ensureDay()
+  setView(view)
+}
