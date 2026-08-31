@@ -1,9 +1,14 @@
 // ============================================================
-// 学习目标管理台 · 纯前端数据层（localStorage，不连任何外部接口）
-// 目标：有终点、有总量的学习目标（如"背完 2000 个单词""读完 440 页的书"）
-// 全部数据存于 localStorage，断网可用；所有变更即时持久化。
+// 学习目标管理台 · 数据层
+//
+// 2026-08-31 改造：从纯 localStorage 升级为「Supabase 主存 + localStorage 镜像」。
+//   - 数据上云后，PC 端新增/修改目标、打卡记录，手机端切回前台即可同步。
+//   - 未登录或会话丢失时，回退到 localStorage，功能不崩但不上云。
+//   - 首次登录时自动把现有 localStorage 数据迁移到云端，不丢数据。
+//   - 所有计算函数仍基于内存中的 reactive state，无需改动。
 // ============================================================
 import { reactive, watch } from 'vue'
+import { supabase, getSavedUser } from './appDataService'
 
 // ---------- 类型 ----------
 export interface LearningGoal {
@@ -59,6 +64,7 @@ export interface WeekStat {
 
 // ---------- 常量 ----------
 const STORAGE_KEY = 'zxs_learning_goals'
+const CLOUD_FLUSH_MS = 1200 // 连续编辑时，1.2 秒内只 upsert 一次云端
 const CURRENT_VERSION = 1
 export const BACKUP_THRESHOLD = 20 // 累计打卡记录达到该值显示备份横幅
 
@@ -121,7 +127,7 @@ function uid(): string {
   return 'g_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8)
 }
 
-// ---------- 响应式状态 + 持久化 ----------
+// ---------- 响应式状态 ----------
 const state = reactive<StoreData>({
   version: CURRENT_VERSION,
   goals: [],
@@ -129,22 +135,60 @@ const state = reactive<StoreData>({
   weeklyNotes: {}
 })
 
-let persistTimer: number | null = null
-function persist() {
+let persistTimer: ReturnType<typeof setTimeout> | null = null
+let cloudFlushTimer: ReturnType<typeof setTimeout> | null = null
+let initialized = false
+
+function toPlainData(): StoreData {
+  // 把 reactive proxy 转成普通对象，用于云端 upsert / LS 保存
+  return JSON.parse(JSON.stringify(state)) as StoreData
+}
+
+function persistLocal() {
   if (typeof localStorage === 'undefined') return
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
   } catch (e) {
-    console.warn('[learningGoals] 持久化失败', e)
+    console.warn('[learningGoals] 本地持久化失败', e)
   }
+}
+
+async function flushToCloud() {
+  const user = await getSavedUser()
+  if (!user?.id || user.id === 'anonymous') return
+  const { error } = await supabase
+    .from('learning_goals')
+    .upsert(
+      { user_id: user.id, data: toPlainData(), updated_at: new Date().toISOString() },
+      { onConflict: 'user_id' }
+    )
+  if (error) {
+    console.warn('[learningGoals] 云端写入失败，下次同步重试', error.message)
+  }
+}
+
+function scheduleCloudFlush() {
+  if (cloudFlushTimer) clearTimeout(cloudFlushTimer)
+  cloudFlushTimer = setTimeout(() => {
+    cloudFlushTimer = null
+    void flushToCloud()
+  }, CLOUD_FLUSH_MS)
+}
+
+function persist() {
+  if (persistTimer) window.clearTimeout(persistTimer)
+  persistTimer = window.setTimeout(() => {
+    persistTimer = null
+    persistLocal()
+    scheduleCloudFlush()
+  }, 120)
 }
 
 // 深度监听：任意输入即时保存
 watch(
   state,
   () => {
-    if (persistTimer) window.clearTimeout(persistTimer)
-    persistTimer = window.setTimeout(persist, 120)
+    persist()
   },
   { deep: true }
 )
@@ -159,6 +203,22 @@ function migrate(raw: any): StoreData {
     weeklyNotes: raw?.weeklyNotes && typeof raw.weeklyNotes === 'object' ? raw.weeklyNotes : {}
   }
   return data
+}
+
+function loadFromLocalStorage() {
+  if (typeof localStorage === 'undefined') return
+  const rawStr = localStorage.getItem(STORAGE_KEY)
+  if (!rawStr) return
+  try {
+    const raw = JSON.parse(rawStr)
+    const data = migrate(raw)
+    state.goals = data.goals
+    state.records = data.records
+    state.weeklyNotes = data.weeklyNotes
+    state.version = CURRENT_VERSION
+  } catch (e) {
+    console.warn('[learningGoals] 本地读取失败', e)
+  }
 }
 
 function buildSample(): StoreData {
@@ -211,27 +271,21 @@ function buildSample(): StoreData {
     createdAt: new Date().toISOString()
   })
 
-  // g1 背单词：覆盖 补记（day -5）、休息日（day -2 首次漏打）
   recs.push(mk(g1.id, -6, 40, 240, false))
-  recs.push(mk(g1.id, -5, 35, 180, true)) // 补记示例
+  recs.push(mk(g1.id, -5, 35, 180, true))
   recs.push(mk(g1.id, -4, 45, 200, false))
   recs.push(mk(g1.id, -3, 50, 220, false))
-  // day -2 漏打（本周首次，休息日）
   recs.push(mk(g1.id, -1, 42, 160, false))
 
-  // g2 学位英语：连续漏打（day -3 / -2 / -1），昨天是第二次漏打 → 中断
   recs.push(mk(g2.id, -6, 1, 30, false))
   recs.push(mk(g2.id, -5, 1, 25, false))
   recs.push(mk(g2.id, -4, 1, 20, false))
-  // day -3 / -2 / -1 漏打（连续，触发中断）
 
-  // g3 Python：截至昨天连续打卡，昨天首次漏打（休息日黄卡）
   recs.push(mk(g3.id, -6, 1, 40, false))
   recs.push(mk(g3.id, -5, 1, 35, false))
   recs.push(mk(g3.id, -4, 1, 45, false))
   recs.push(mk(g3.id, -3, 1, 30, false))
   recs.push(mk(g3.id, -2, 1, 50, false))
-  // day -1 漏打（本周首次，休息日）
 
   return {
     version: CURRENT_VERSION,
@@ -241,40 +295,106 @@ function buildSample(): StoreData {
   }
 }
 
-let initialized = false
-export function initLearningGoals() {
+/**
+ * 初始化学习目标数据。
+ * - 已登录：优先从云端读取；云端无则迁移本地数据；本地也无则生成预置示例。
+ * - 未登录：只读本地。
+ */
+export async function initLearningGoals(): Promise<void> {
   if (initialized) return
   initialized = true
-  if (typeof localStorage === 'undefined') return
-  const rawStr = localStorage.getItem(STORAGE_KEY)
-  if (!rawStr) {
-    // 首次使用：写入预置示例
-    const sample = buildSample()
-    state.goals = sample.goals
-    state.records = sample.records
-    state.weeklyNotes = sample.weeklyNotes
-    state.version = CURRENT_VERSION
-    persist()
+
+  const user = await getSavedUser()
+  if (!user?.id || user.id === 'anonymous') {
+    loadFromLocalStorage()
+    if (state.goals.length === 0) {
+      const sample = buildSample()
+      state.goals = sample.goals
+      state.records = sample.records
+      state.weeklyNotes = sample.weeklyNotes
+      state.version = CURRENT_VERSION
+    }
     return
   }
-  try {
-    const raw = JSON.parse(rawStr)
-    const data = migrate(raw)
-    state.goals = data.goals
-    state.records = data.records
-    state.weeklyNotes = data.weeklyNotes
+
+  // 已登录：先读云端
+  const { data, error } = await supabase
+    .from('learning_goals')
+    .select('data,updated_at')
+    .eq('user_id', user.id)
+    .maybeSingle()
+
+  if (!error && data?.data) {
+    const parsed = migrate(data.data)
+    state.goals = parsed.goals
+    state.records = parsed.records
+    state.weeklyNotes = parsed.weeklyNotes
     state.version = CURRENT_VERSION
-  } catch (e) {
-    console.warn('[learningGoals] 读取失败，回退预置', e)
+    persistLocal()
+    return
+  }
+
+  // 云端无：迁移本地或生成示例
+  loadFromLocalStorage()
+  if (state.goals.length > 0 || state.records.length > 0) {
+    // 本地有数据：迁移到云端
+    await flushToCloud()
+  } else {
     const sample = buildSample()
     state.goals = sample.goals
     state.records = sample.records
     state.weeklyNotes = sample.weeklyNotes
-    persist()
+    state.version = CURRENT_VERSION
+    await flushToCloud()
   }
 }
 
-// ---------- 查询 / 计算（纯函数） ----------
+/**
+ * 从云端同步学习目标数据到本地。
+ * 单人使用场景下以云端为准直接覆盖；返回「是否发生了变更」。
+ */
+export async function syncLearningGoalsFromCloud(): Promise<boolean> {
+  const user = await getSavedUser()
+  if (!user?.id || user.id === 'anonymous') return false
+
+  const { data, error } = await supabase
+    .from('learning_goals')
+    .select('data,updated_at')
+    .eq('user_id', user.id)
+    .maybeSingle()
+
+  if (error) {
+    console.warn('[learningGoals] 从云端同步失败', error.message)
+    return false
+  }
+  if (!data?.data) return false
+
+  const parsed = migrate(data.data)
+  const changed =
+    JSON.stringify(state.goals) !== JSON.stringify(parsed.goals) ||
+    JSON.stringify(state.records) !== JSON.stringify(parsed.records) ||
+    JSON.stringify(state.weeklyNotes) !== JSON.stringify(parsed.weeklyNotes)
+
+  if (changed) {
+    state.goals = parsed.goals
+    state.records = parsed.records
+    state.weeklyNotes = parsed.weeklyNotes
+    state.version = CURRENT_VERSION
+    persistLocal()
+  }
+  return changed
+}
+
+/** 强制立即把当前状态刷到云端（例如切后台前调用）。 */
+export async function flushLearningGoalsNow(): Promise<void> {
+  if (cloudFlushTimer) {
+    clearTimeout(cloudFlushTimer)
+    cloudFlushTimer = null
+  }
+  await flushToCloud()
+}
+
+// ---------- 查询 / 计算（纯函数，未改动） ----------
 export function goalDone(goalId: string, records = state.records): number {
   return records.filter((r) => r.goalId === goalId).reduce((a, r) => a + r.amount, 0)
 }
@@ -535,7 +655,7 @@ export function importData(json: string): { ok: boolean; error?: string } {
     state.records = raw.records
     state.weeklyNotes = raw.weeklyNotes && typeof raw.weeklyNotes === 'object' ? raw.weeklyNotes : {}
     state.version = CURRENT_VERSION
-    persist()
+    persistLocal()
     return { ok: true }
   } catch (e: any) {
     return { ok: false, error: e?.message || '解析失败' }

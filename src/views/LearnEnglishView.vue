@@ -576,7 +576,7 @@ import { MASTER_WORDS_BUNDLE } from '../prep/masterWordsBundle'
 import { CET6_WORDS_BUNDLE } from '../prep/cet6WordsBundle'
 import { loadWords as loadDegreeWords } from '../prep/degreeDb'
 import { countDueToday, countNewToday } from '../prep/trainingSrs'
-import { getStudySettings, saveStudySettings, countLearnedToday, computeStreakFromDates, collectStudyDates } from '../services/studySettingsService'
+import { getStudySettings, saveStudySettings, syncStudySettingsFromCloud, countLearnedToday, computeStreakFromDates, collectStudyDates } from '../services/studySettingsService'
 import { loadLearnWordProgress } from '../services/learnWordProgressService'
 import { loadCetProgress } from '../services/cetProgressService'
 import type { PrepWord } from '../services/cetPrepService'
@@ -1205,9 +1205,10 @@ async function loadWeakness(): Promise<void> {
 /* 跨端同步：PC 端写入云端后，移动端切回前台 / 聚焦 / 联网 / 收到 Realtime 推送时自动重拉。
    只重载数据类接口 —— 刻意不调用 lookup()（查词会走网络/AI，不应被刷新连带触发）。 */
 useCloudSync({
-  tables: ['learn_word_progress', 'learn_progress', 'learn_bookmarks', 'learn_reading'],
+  tables: ['learn_word_progress', 'learn_progress', 'learn_bookmarks', 'learn_reading', 'study_module_settings'],
   reload: async () => {
     await Promise.all([loadWordStats(), loadWords(), loadKbProgress(), loadPlans()])
+    await syncStudySettingsFromCloud()
   },
   immediate: false
 })

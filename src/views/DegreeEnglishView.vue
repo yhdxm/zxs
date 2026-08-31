@@ -909,7 +909,7 @@ import {
   type SrsGrade
 } from '../prep/degreeSrs'
 import { buildReviewQueue as buildGenericReviewQueue } from '../prep/trainingSrs'
-import { getStudySettings, saveStudySettings, countLearnedToday, computeStreakFromDates, collectStudyDates } from '../services/studySettingsService'
+import { getStudySettings, saveStudySettings, syncStudySettingsFromCloud, countLearnedToday, computeStreakFromDates, collectStudyDates } from '../services/studySettingsService'
 import { speakEn } from '../prep/degreeSpeech'
 import { getWordEnrich, type WordEnrichData } from '../services/wordEnrichService'
 import { getEmoji } from '../data/emojiDict'
@@ -1523,6 +1523,9 @@ async function loadAll() {
   practice.value = practiceData
   notes.value = notesData
   wordBook.value = wordBookData
+
+  // 同步学习设置（PC 端改每日新词数/提醒后，手机端切回前台生效）
+  await syncStudySettingsFromCloud().catch(() => {})
 }
 
 function startStudy() {

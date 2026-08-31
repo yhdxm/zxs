@@ -60,10 +60,13 @@
 
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref, watch } from 'vue'
+import { useCloudSync } from '../../composables/useCloudSync'
 import { fetchQuotes, fetchKline, type Quote } from '../../services/tencentFinance'
+import { loadUserBlob, saveUserBlob, type BlobKey } from '../../services/userBlobService'
 import KLineDialog from './KLineDialog.vue'
 
-const STORAGE_KEY = 'zxs_watchlist'
+const BLOB_KEY: BlobKey = 'watchlist'
+const DEFAULT_LIST = ['sh600519', 'sz300750', 'hf_XAUUSD']
 const watchlist = ref<string[]>([])
 const quotes = ref<Quote[]>([])
 const loading = ref(false)
@@ -72,20 +75,11 @@ const autoRefresh = ref(true)
 const sparks = ref<Record<string, number[]>>({})
 let timer: number | undefined
 
-function loadList(): void {
-  try {
-    const s = localStorage.getItem(STORAGE_KEY)
-    watchlist.value = s ? (JSON.parse(s) as string[]) : ['sh600519', 'sz300750', 'hf_XAUUSD']
-  } catch {
-    watchlist.value = ['sh600519', 'sz300750', 'hf_XAUUSD']
-  }
+async function loadList(): Promise<void> {
+  watchlist.value = await loadUserBlob(BLOB_KEY, DEFAULT_LIST)
 }
-function saveList(): void {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(watchlist.value))
-  } catch {
-    /* ignore */
-  }
+async function saveList(): Promise<void> {
+  await saveUserBlob(BLOB_KEY, watchlist.value)
 }
 
 function formatNum(v: number, d = 2): string {
@@ -146,15 +140,22 @@ function addItem(): void {
     return
   }
   watchlist.value.push(code)
-  saveList()
   input.value = ''
   void refresh()
 }
 function removeItem(code: string): void {
   watchlist.value = watchlist.value.filter((c) => c !== code)
-  saveList()
   void refresh()
 }
+
+// 数据变更自动同步（云端 + 本地镜像）
+watch(
+  watchlist,
+  () => {
+    void saveList()
+  },
+  { deep: true }
+)
 
 // ===== K 线 =====
 const klineVisible = ref(false)
@@ -178,8 +179,14 @@ function stopAuto(): void {
 
 watch(autoRefresh, (v) => (v ? startAuto() : stopAuto()))
 
-onMounted(() => {
-  loadList()
+useCloudSync({
+  tables: ['user_json_blobs'],
+  reload: loadList,
+  immediate: false
+})
+
+onMounted(async () => {
+  await loadList()
   void refresh()
   if (autoRefresh.value) startAuto()
 })

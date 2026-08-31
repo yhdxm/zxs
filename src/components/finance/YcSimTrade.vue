@@ -142,7 +142,9 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
+import { useCloudSync } from '../../composables/useCloudSync'
+import { loadUserBlob, saveUserBlob, type BlobKey } from '../../services/userBlobService'
 import type { EChartsOption } from 'echarts'
 import EChart from '../EChart.vue'
 import KLineDialog from './KLineDialog.vue'
@@ -173,7 +175,7 @@ interface SimState {
   trades: Trade[]
 }
 
-const STORAGE_KEY = 'zxs_simtrade'
+const BLOB_KEY: BlobKey = 'simtrade'
 const INIT_CASH = 100000
 
 /** 自选标的（代码 + 名称，便于一键填入交易面板） */
@@ -266,24 +268,15 @@ function setMsg(text: string, err = false): void {
   isErr.value = err
 }
 
-function save(): void {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
-  } catch {
-    /* ignore */
-  }
+async function save(): Promise<void> {
+  await saveUserBlob(BLOB_KEY, state)
 }
-function load(): void {
-  try {
-    const s = localStorage.getItem(STORAGE_KEY)
-    if (s) {
-      const parsed = JSON.parse(s) as SimState
-      state.cash = parsed.cash
-      state.positions = parsed.positions
-      state.trades = parsed.trades
-    }
-  } catch {
-    /* ignore */
+async function load(): Promise<void> {
+  const parsed = await loadUserBlob<SimState | null>(BLOB_KEY, null)
+  if (parsed) {
+    state.cash = parsed.cash
+    state.positions = parsed.positions
+    state.trades = parsed.trades
   }
 }
 
@@ -448,8 +441,22 @@ function stopTimer(): void {
   }
 }
 
+useCloudSync({
+  tables: ['user_json_blobs'],
+  reload: load,
+  immediate: false
+})
+
+watch(
+  () => state,
+  () => {
+    void save()
+  },
+  { deep: true }
+)
+
 onMounted(async () => {
-  load()
+  await load()
   await refreshPrices()
   // 记录开盘基准（用于当日盈亏）：以当前价计，本会话内稳定
   const base: Record<string, number> = {}

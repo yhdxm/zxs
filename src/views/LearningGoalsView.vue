@@ -408,6 +408,7 @@ import PageHeader from '../components/PageHeader.vue'
 import {
   useLearningGoals,
   initLearningGoals,
+  syncLearningGoalsFromCloud,
   addGoal,
   updateGoal,
   deleteGoal,
@@ -439,6 +440,7 @@ import {
   formatShort,
   type LearningGoal
 } from '../services/learningGoalService'
+import { useCloudSync } from '../composables/useCloudSync'
 
 const store = useLearningGoals()
 const today = todayStr()
@@ -451,8 +453,17 @@ function syncBreakpoint() {
   isMobile.value = w <= 768
   isTablet.value = w > 768 && w <= 1024
 }
-onMounted(() => {
-  initLearningGoals()
+/* 跨端同步：PC 端更新目标 / 打卡后，移动端切回前台 / 聚焦 / 联网 / Realtime 时自动同步。 */
+useCloudSync({
+  tables: ['learning_goals'],
+  reload: async () => {
+    await syncLearningGoalsFromCloud()
+  },
+  immediate: false
+})
+
+onMounted(async () => {
+  await initLearningGoals()
   syncBreakpoint()
   window.addEventListener('resize', syncBreakpoint)
 })

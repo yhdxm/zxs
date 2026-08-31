@@ -75,7 +75,9 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref, computed } from 'vue'
+import { onMounted, ref, computed, watch } from 'vue'
+import { useCloudSync } from '../../composables/useCloudSync'
+import { loadUserBlob, saveUserBlob, type BlobKey } from '../../services/userBlobService'
 
 defineEmits<{ (e: 'open-sim'): void }>()
 
@@ -101,7 +103,7 @@ const lessons: Lesson[] = [
   { id: 'l10', title: '期权基础', level: '高级', minutes: 10, mode: '图文', content: '期权是未来以约定价格买卖标的的权利（非义务）。看涨期权在上涨时获利，看跌期权在对冲下跌风险时有用。' }
 ]
 
-const STORAGE_KEY = 'zxs_learn_mastery'
+const BLOB_KEY: BlobKey = 'learn_mastery'
 const mastered = ref<string[]>([])
 const openId = ref('')
 const query = ref('')
@@ -139,25 +141,32 @@ function toggleOpen(l: Lesson): void {
 }
 function markMastered(id: string): void {
   if (!mastered.value.includes(id)) mastered.value.push(id)
-  save()
   openId.value = ''
 }
-function save(): void {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(mastered.value))
-  } catch {
-    /* ignore */
-  }
+async function save(): Promise<void> {
+  await saveUserBlob(BLOB_KEY, mastered.value)
+}
+async function loadMastered(): Promise<void> {
+  mastered.value = await loadUserBlob(BLOB_KEY, [])
 }
 
-onMounted(() => {
-  try {
-    const s = localStorage.getItem(STORAGE_KEY)
-    if (s) mastered.value = JSON.parse(s)
-  } catch {
-    /* ignore */
-  }
+useCloudSync({
+  tables: ['user_json_blobs'],
+  reload: loadMastered,
+  immediate: false
 })
+
+onMounted(async () => {
+  await loadMastered()
+})
+
+watch(
+  mastered,
+  () => {
+    void save()
+  },
+  { deep: true }
+)
 </script>
 
 <style scoped>
