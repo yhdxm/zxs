@@ -462,7 +462,6 @@ const isMenuActive = (key: string) => {
   if (key === 'learncenter') return route.path.startsWith('/learn') || route.path.startsWith('/degree')
   if (key === 'learn-industry') return route.path === '/learn/industry'
   if (key === 'learn-books') return route.path === '/learn/books'
-  if (key === 'learn-goals') return route.path === '/learn/goals'
   if (key === 'news') return route.path === '/news'
   if (key === 'news-main') return route.path === '/news'
   if (key === 'yingcang') return route.path === '/yingcang'
@@ -581,13 +580,12 @@ function onBottomNav(item: BottomNavItem) {
   }
 }
 
-// 这些路由的页面自带 fixed 底部导航（四六级备考台 / 学位英语 / 学习目标），
+// 这些路由的页面自带 fixed 底部导航（四六级备考台 / 学位英语），
 // 进入时需隐藏全局移动端底部导航（z-index 更高，会盖住页面自带底栏导致点击失效），
 // 并去掉全局底部留白（页面自身已处理 safe-area 与留白），避免双层底栏重叠 + 留白叠加。
 const HIDDEN_GLOBAL_BOTTOM_ROUTES = new Set([
   '/learn/cet-prep', // 四六级备考台
   '/learn/english/prep', // 学位英语备考台（自带底部导航 z-index:40）
-  '/learn/goals' // 学习目标（自带底部导航 z-index:40）
 ])
 const isCetPrepRoute = computed(() => HIDDEN_GLOBAL_BOTTOM_ROUTES.has(route.path))
 

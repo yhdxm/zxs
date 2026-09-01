@@ -1292,12 +1292,12 @@ function buildFullStateFromDefaults() {
   }
 }
 
-/* ===================== 关联系统学习目标（简化为记录关联目标） ===================== */
+/* ===================== 关联目标（简化为记录关联目标） ===================== */
 function linkGoal() {
   const goalName = '四六级每日背词'
   S.linkedGoal = goalName
   p(storage.persistSettings(settings()))
-  alert('已在备考设置中记录关联目标「' + goalName + '」。可在系统学习目标模块手动建立对应目标。')
+  alert('已在备考设置中记录关联目标「' + goalName + '」。')
 }
 
 function saveSettings() {

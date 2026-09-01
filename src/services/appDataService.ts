@@ -160,7 +160,7 @@ const baseKeyOf = (k: string): string => k.replace(/\.(pc|mobile)$/, '')
 const USER_ALLOWED_BASES = new Set<string>([
   'news', 'yingcang', 'xingyu', 'weather', 'map', 'third-api',
   'degree-legacy',
-  'learn-industry', 'learn-books', 'learn-goals', 'cet-prep', 'study-report',
+  'learn-industry', 'learn-books', 'cet-prep', 'study-report',
   'requirements', 'dashboard', 'todos', 'points', 'contents',
   'feedback'
 ])

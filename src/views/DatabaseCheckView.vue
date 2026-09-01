@@ -242,7 +242,6 @@ const TABLE_DESC: Record<string, string> = {
   degree_questions: '学位英语备考台·题库表：五大题型题目（题干/选项/答案/解析/来源溯源），首次运行 lazy-seed 注入',
   degree_phrases: '学位英语备考台·词组语句表：词组/口语表达/词缀/不规则动词（大纲附录二~八）',
   degree_exam_records: '学位英语备考台·模拟考试记录表：每套卷得分/用时/逐题作答，按 user_id 隔离',
-  learning_goals: '学习目标·目标与打卡记录表：用户设定的学习目标、每日打卡记录与周报复盘（每用户一条 JSON blob）',
   study_module_settings: '学习设置·三模块设置表：learn/cet/degree 的每日新词数、待复习提醒、已掌握回流',
   user_json_blobs: '通用 KV 表：自选股、学习掌握、模拟盘、AI 用量等单用户单 key 的 JSON 数据',
   push_subscriptions: '消息推送·订阅表：用户浏览器/设备推送订阅端点与公钥，按账号隔离',
@@ -278,7 +277,7 @@ const TABLE_GROUP: Record<string, string> = {
   degree_practice: 'degree', degree_mistakes: 'degree', degree_favorites: 'degree',
   degree_words: 'degree', degree_questions: 'degree', degree_phrases: 'degree',
   degree_exam_records: 'degree',
-  learning_goals: 'learn', study_module_settings: 'learn', user_json_blobs: 'biz'
+  study_module_settings: 'learn', user_json_blobs: 'biz'
 }
 
 /** 业务域元信息：中文名 + 主题色（浅色主题下的柔和色，用于分组色条与标识） */

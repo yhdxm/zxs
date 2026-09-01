@@ -162,12 +162,6 @@ const router = createRouter({
       meta: { requirePermission: 'learn-books' }
     },
     {
-      path: '/learn/goals',
-      name: 'learn-goals',
-      component: () => import('../views/LearningGoalsView.vue'),
-      meta: { requirePermission: 'learn-goals' }
-    },
-    {
       path: '/learn/cet-prep',
       name: 'cet-prep',
       component: () => import('../views/CetPrepView.vue'),
