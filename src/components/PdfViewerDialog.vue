@@ -48,6 +48,17 @@
         </div>
 
         <div class="pdfv-bar-right">
+          <span v-if="loadSource && !useNative" class="pdfv-src">{{ loadSource }}</span>
+          <!-- 系统阅读器：常驻可切换，用浏览器原生渲染，成功率最高 -->
+          <button
+            type="button"
+            class="pdfv-btn"
+            :class="{ 'pdfv-on': useNative }"
+            title="用手机/浏览器自带的 PDF 阅读器打开，兼容性最好"
+            @click="toggleNative"
+          >
+            {{ useNative ? '高级阅读' : '系统阅读器' }}
+          </button>
           <button type="button" class="pdfv-btn pdfv-fullscreen" @click="toggleFullscreen">
             {{ isFullscreen ? '退出全屏' : '全屏' }}
           </button>
@@ -55,16 +66,38 @@
         </div>
       </div>
 
+      <!-- 加载进度：百分比数字 + 横条，避免用户以为卡死 -->
+      <div v-if="phase === 'loading' && !useNative" class="pdfv-progress">
+        <div class="pdfv-progress-track">
+          <div class="pdfv-progress-bar" :style="{ width: progress + '%' }"></div>
+        </div>
+        <span class="pdfv-progress-txt">{{ progress }}%</span>
+      </div>
+
       <!-- 主体 -->
       <div ref="bodyEl" class="pdfv-body" @scroll="onScrollThrottled">
-        <div v-if="phase === 'loading'" class="pdfv-tip">正在加载 PDF 阅读器…</div>
-        <div v-else-if="phase === 'error'" class="pdfv-tip pdfv-err">
-          {{ errMsg }}
-          <div class="pdfv-err-sub">
-            可直接
-            <a :href="url" target="_blank" rel="noopener">下载后查看</a>
+        <!-- 系统阅读器：浏览器原生渲染 PDF，移动端兼容性最好 -->
+        <iframe
+          v-if="useNative"
+          :src="url"
+          class="pdfv-native"
+          title="PDF 预览"
+          frameborder="0"
+        ></iframe>
+
+        <template v-else>
+          <div v-if="phase === 'loading'" class="pdfv-tip">
+            正在加载 PDF…（{{ loadSource || '准备中' }}）
           </div>
-        </div>
+          <div v-else-if="phase === 'error'" class="pdfv-tip pdfv-err">
+            {{ errMsg }}
+            <div class="pdfv-err-sub">
+              可切换到
+              <a href="javascript:void(0)" @click="toggleNative">系统阅读器</a>
+              打开，或
+              <a :href="url" target="_blank" rel="noopener">下载后查看</a>
+            </div>
+          </div>
 
         <template v-else>
           <!-- 单页模式：当前页 -->
@@ -83,6 +116,7 @@
               <canvas :ref="(el) => setPageRef(el, i)" class="pdfv-canvas"></canvas>
             </div>
           </div>
+        </template>
         </template>
       </div>
 
@@ -120,10 +154,22 @@ if (typeof window !== 'undefined') {
 }
 
 const PDFJS_VER = '3.11.174'
-const PDFJS_CDN = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${PDFJS_VER}/build/pdf.min.js`
-const PDFJS_WORKER = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${PDFJS_VER}/build/pdf.worker.min.js`
-const PDFJS_CDN_ALT = `https://unpkg.com/pdfjs-dist@${PDFJS_VER}/build/pdf.min.js`
-const PDFJS_WORKER_ALT = `https://unpkg.com/pdfjs-dist@${PDFJS_VER}/build/pdf.worker.min.js`
+// 加载优先级：① 本地 public/pdfjs（离线可用，不依赖网络，移动端成功率最高）
+//            ② jsDelivr CDN  ③ unpkg CDN（前两级都失败时的兜底）
+const BASE = import.meta.env.BASE_URL || './'
+const SOURCES = [
+  { js: `${BASE}pdfjs/pdf.min.js`, worker: `${BASE}pdfjs/pdf.worker.min.js`, name: '本地' },
+  {
+    js: `https://cdn.jsdelivr.net/npm/pdfjs-dist@${PDFJS_VER}/build/pdf.min.js`,
+    worker: `https://cdn.jsdelivr.net/npm/pdfjs-dist@${PDFJS_VER}/build/pdf.worker.min.js`,
+    name: 'jsDelivr'
+  },
+  {
+    js: `https://unpkg.com/pdfjs-dist@${PDFJS_VER}/build/pdf.min.js`,
+    worker: `https://unpkg.com/pdfjs-dist@${PDFJS_VER}/build/pdf.worker.min.js`,
+    name: 'unpkg'
+  }
+]
 
 const phase = ref<'idle' | 'loading' | 'ready' | 'error'>('idle')
 const errMsg = ref('')
@@ -132,6 +178,12 @@ const numPages = ref(0)
 const pageInput = ref(1)
 const mode = ref<'single' | 'scroll'>('scroll')
 const isFullscreen = ref(false)
+/** 实际生效的 pdf.js 加载源（本地/CDN），用于状态提示 */
+const loadSource = ref('')
+/** 文档加载进度 0-100（含下载与解析） */
+const progress = ref(0)
+/** 是否改用系统阅读器（iframe 原生预览），用户可随时切换 */
+const useNative = ref(false)
 
 const rootEl = ref<HTMLElement | null>(null)
 const bodyEl = ref<HTMLElement | null>(null)
@@ -162,26 +214,38 @@ function loadScript(src: string): Promise<void> {
   })
 }
 
+/** 依次尝试 本地 → jsDelivr → unpkg，任一成功即返回；全部失败抛错 */
 async function ensurePdfjs(): Promise<any> {
   const g = window as any
   if (g.pdfjsLib) return g.pdfjsLib
-  let worker = PDFJS_WORKER
-  try {
-    await loadScript(PDFJS_CDN)
-  } catch {
-    await loadScript(PDFJS_CDN_ALT)
-    worker = PDFJS_WORKER_ALT
+  let lastErr: unknown = null
+  for (const s of SOURCES) {
+    try {
+      await loadScript(s.js)
+      const lib = g.pdfjsLib
+      if (!lib) throw new Error('脚本已加载但 pdfjsLib 未挂载')
+      lib.GlobalWorkerOptions.workerSrc = s.worker
+      loadSource.value = s.name
+      return lib
+    } catch (e) {
+      lastErr = e
+      console.warn('[PdfViewer] 加载源失败:', s.name, e)
+    }
   }
-  const lib = g.pdfjsLib
-  if (!lib) throw new Error('PDF 阅读器加载失败')
-  lib.GlobalWorkerOptions.workerSrc = worker
-  return lib
+  throw new Error('PDF 阅读器加载失败（本地与 CDN 均不可用）')
 }
 
 async function openDoc() {
   if (!props.url) return
+  // 系统阅读器模式：直接交给浏览器原生渲染，不走 pdf.js
+  if (useNative.value) {
+    phase.value = 'ready'
+    numPages.value = 0
+    return
+  }
   phase.value = 'loading'
   errMsg.value = ''
+  progress.value = 0
   try {
     const lib = await ensurePdfjs()
     if (pdfDocUrl !== props.url) {
@@ -194,11 +258,20 @@ async function openDoc() {
       }
       renderedPages.clear()
       pageCanvasMap.value = {}
-      pdfDoc = await lib.getDocument({ url: props.url }).promise
+      // 进度回调：实时反馈下载/解析进度，避免"一直转圈看不到进展"
+      pdfDoc = await lib.getDocument({
+        url: props.url,
+        onProgress: (p: { loaded?: number; total?: number }) => {
+          if (p?.total && p.loaded != null) {
+            progress.value = Math.min(99, Math.round((p.loaded / p.total) * 100))
+          }
+        }
+      }).promise
       pdfDocUrl = props.url
       numPages.value = pdfDoc.numPages || 0
       pageNum.value = 1
       pageInput.value = 1
+      progress.value = 100
     }
     phase.value = 'ready'
     await nextTick()
@@ -377,6 +450,20 @@ function toggleMode() {
       renderVisiblePages()
     }
   })
+}
+
+/* ==================== 系统阅读器切换 ==================== */
+function toggleNative() {
+  useNative.value = !useNative.value
+  if (useNative.value) {
+    // 系统阅读器：交给浏览器/手机原生 PDF 渲染，兼容性最好
+    phase.value = 'ready'
+    numPages.value = 0
+    progress.value = 0
+  } else {
+    // 切回高级阅读：重新走 pdf.js 加载
+    void openDoc()
+  }
 }
 
 /* ==================== 全屏 ==================== */

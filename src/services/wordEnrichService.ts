@@ -7,6 +7,7 @@
 // 任何一步失败都降级为占位文案，绝不静默空白。
 
 import { getEmoji } from '../data/emojiDict'
+import { getOfflineWordDef } from '../data/degreeWordDefs'
 
 /** 单个单词的增强数据（够用即可，字段缺失为空串/空数组） */
 export interface WordEnrichData {
@@ -269,16 +270,27 @@ export function getWordEnrich(word: string, opts: EnrichOptions = {}): Promise<W
     out.mnemonicReal = mn.real
 
     const dict = await fetchDict(word)
+    // 离线词库（ECDICT 子集）优先：dictionaryapi.dev 当前 90%+ 返回 522，
+    // 离线数据保证"必有数据"，API 仅作在线增强兜底。
+    const offline = getOfflineWordDef(word)
 
-    out.phoneticUS = dict.phoneticUS || local
-    out.phoneticUK = dict.phoneticUK
-    out.phonetic = local || dict.phonetic || dict.phoneticUS || ''
+    // 音标：本地 > 离线 > API
+    out.phoneticUS = dict.phoneticUS || offline?.phonetic || local
+    out.phoneticUK = dict.phoneticUK || offline?.phonetic || ''
+    out.phonetic = local || offline?.phonetic || dict.phonetic || dict.phoneticUS || ''
     // 本地没有音标时，美式列兜底展示同一个值，避免"美"那栏空掉
     if (!out.phoneticUS) out.phoneticUS = out.phonetic
-    out.enDefs = dict.enDefs
-    out.example = dict.example
-    if (dict.example) {
-      out.exampleZh = await translateZh(dict.example)
+
+    // 英文释义：离线优先，API 结果去重拼接（最多 4 条）
+    const enDefs: string[] = []
+    if (offline?.enDef) enDefs.push(offline.enDef)
+    for (const d of dict.enDefs) if (d && !enDefs.includes(d)) enDefs.push(d)
+    out.enDefs = enDefs.slice(0, 4)
+
+    // 例句：离线优先（API 已废，离线句子最稳），否则取 API 在线例句
+    out.example = offline?.example || dict.example
+    if (out.example) {
+      out.exampleZh = await translateZh(out.example)
     }
     // 助记能补强：把同义词并进联想，帮记忆
     if (!out.mnemonicReal && dict.synonyms.length) {

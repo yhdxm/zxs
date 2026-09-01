@@ -3376,12 +3376,18 @@ onBeforeUnmount(() => {
   .card-wall { grid-template-columns: 1fr; }
   .phrase-list { grid-template-columns: 1fr; }
   /* 闪卡移动端 */
-  .flashcard-inner { min-height: 220px; }
+  /* 关键修复：正反面是 absolute(inset:0)，不撑开父高度，内容被锁死在 min-height 里。
+     改为按视口撑满可用空间（减去 tabs/进度条/操作栏/底导航），内容不再被挤压。 */
+  .flashcard-inner { min-height: max(280px, calc(100vh - 340px)); }
+  .flashcard-back { padding-bottom: 10px; }
   .fc-word { font-size: 24px; }
   .fc-def { font-size: 15px; }
   .flashcard-ops { flex-wrap: wrap; justify-content: center; }
   .fc-nav-btn { padding: 6px 12px; font-size: 12px; }
   .fc-actions { width: 100%; justify-content: center; }
+  /* 资料库移动端：阅读区限高+内部滚动，避免正文顶穿底部导航 */
+  .lib-reader { max-height: calc(100vh - 320px); }
+  .lib-list { max-height: 220px; }
 }
 
 @media (max-width: 560px) {

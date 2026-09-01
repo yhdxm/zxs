@@ -63,7 +63,41 @@ const DICT: Record<string, string> = {
   music: '🎵', song: '🎶', game: '🎮', sport: '⚽', ball: '⚾', team: '👥',
   health: '🏥', hospital: '🏥', medicine: '💊', plant: '🌱', sun2: '🌞',
   world: '🌍', country2: '🏳️', flag: '🚩', peace: '🕊️', war: '⚔️', law: '⚖️',
-  government: '🏛️', art: '🎨', music2: '🎼', story: '📖', poem: '📜', song2: '🎤'
+  government: '🏛️',   art: '🎨', music2: '🎼', story: '📖', poem: '📜', song2: '🎤',
+  // 职业 / 身份（学位英语高频）
+  composer: '🎼', writer: '✍️', author: '✍️', poet: '🖊️', artist: '🎨',
+  painter: '🖌️', singer: '🎤', actor: '🎭', dancer: '💃', musician: '🎻',
+  scientist: '🔬', engineer: '🛠️', inventor: '💡', researcher: '🔍',
+  builder: '🏗️', designer: '📐', leader: '🧭', manager: '💼', founder: '🏛️',
+  member: '🧑', owner: '🔑', user: '🖱️', buyer: '🛒', seller: '💲',
+  winner: '🏆', hero: '🦸', judge: '⚖️', lawyer: '📜',
+  thief: '🥷', criminal: '🔗', victim: '🆘', witness: '👁️', customer: '🛍️',
+  patient: '🤕', client: '🤝', sailor: '⛵', pilot: '✈️', speaker: '📢',
+  listener: '👂', reader: '📖', thinker: '🤔', learner: '📚', creator: '🌟',
+  neighbor: '🏘️', guest: '🤝', host: '🛎️', enemy: '⚔️', partner: '🤝',
+  // 抽象概念（学位英语高频名词）
+  ability: '💪', action: '⚡', change: '🔄', chance: '🎲', choice: '🔘',
+  condition: '📋', decision: '🤔', development: '🌱', difference: '🔀',
+  effect: '💥', effort: '💦', event: '📅', experience: '🧳', fact: '📌',
+  freedom: '🕊️', future: '🔮', growth: '🌿', history: '📜', importance: '⭐',
+  increase: '📈', industry: '🏭', information: 'ℹ️', intention: '🎯',
+  learning: '📚', meaning: '💭', method: '🧮',
+  mind: '🧠', nature: '🌿', opportunity: '🚪', opinion: '💬', original: '🆕',
+  pain: '😣', period: '⏳', plan: '🗺️', policy: '📜',
+  power: '🔋', practice: '🔁', process: '⚙️', progress: '📊',
+  purpose: '🎯', quality: '✨', reason: '💡', relation: '🔗',
+  result: '🏁', rule: '📏', society: '👥', solution: '💡', source: '💧',
+  success: '🎉', system: '🧩', thought: '💭', truth: '✅', value: '💎',
+  variety: '🌈', view: '👀', culture: '🏛️',
+  education: '🎓', economy: '💹', environment: '🌳', technology: '⚙️',
+  literature: '📚', philosophy: '🤔', psychology: '🧠',
+  // 常见动词 / 形容词
+  build: '🛠️', design: '🎨', create: '🌟', improve: '📈', protect: '🛡️',
+  discover: '🔭', explore: '🧭', achieve: '🏆', succeed: '🎉', fail: '💔',
+  understand: '💡', explain: '🗣️', describe: '📝', compare: '⚖️', connect: '🔗',
+  communicate: '💬', participate: '🙋', contribute: '🤝', compete: '🏅',
+  cooperate: '🤝', encourage: '👏', discourage: '📉', require: '📋', provide: '📦',
+  produce: '🏭', reduce: '📉', increase2: '📈', develop: '🌱', influence: '🌊'
 }
 
 function loadOverrides(): Record<string, string> {
