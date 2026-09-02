@@ -182,8 +182,8 @@ const isFullscreen = ref(false)
 const loadSource = ref('')
 /** 文档加载进度 0-100（含下载与解析） */
 const progress = ref(0)
-/** 是否改用系统阅读器（iframe 原生预览），用户可随时切换 */
-const useNative = ref(false)
+/** 是否改用系统阅读器（iframe 原生预览），用户可随时切换。默认 true：移动端浏览器原生渲染 PDF 兼容性最高，加载最稳，避免 pdfjs canvas 在大文档（66MB / 200+ 页）上的渲染时序 bug。 */
+const useNative = ref(true)
 
 const rootEl = ref<HTMLElement | null>(null)
 const bodyEl = ref<HTMLElement | null>(null)

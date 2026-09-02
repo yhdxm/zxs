@@ -3382,11 +3382,11 @@ onBeforeUnmount(() => {
   .flashcard-back { padding-bottom: 10px; }
   .fc-word { font-size: 24px; }
   .fc-def { font-size: 15px; }
-  .flashcard-ops { flex-wrap: wrap; justify-content: center; }
+  .flashcard-ops { flex-wrap: wrap; justify-content: center; margin-bottom: calc(70px + env(safe-area-inset-bottom)); }
   .fc-nav-btn { padding: 6px 12px; font-size: 12px; }
   .fc-actions { width: 100%; justify-content: center; }
   /* 资料库移动端：阅读区限高+内部滚动，避免正文顶穿底部导航 */
-  .lib-reader { max-height: calc(100vh - 320px); }
+  .lib-reader { max-height: calc(100vh - 320px); padding-bottom: calc(70px + env(safe-area-inset-bottom)); }
   .lib-list { max-height: 220px; }
 }
 
@@ -3440,6 +3440,7 @@ onBeforeUnmount(() => {
     flex-direction: column;
     gap: 8px;
     padding: 0 2px;
+    margin-bottom: calc(70px + env(safe-area-inset-bottom));
   }
   .flashcard-ops > .fc-nav-btn,
   .flashcard-ops > .fc-accent,
