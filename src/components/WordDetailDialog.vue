@@ -193,7 +193,8 @@ const data = ref<WordEnrichData>({
   similar: [],
   mnemonic: '',
   mnemonicReal: false,
-  emoji: '🔤'
+  emoji: '🔤',
+  exampleIsFallback: false
 })
 const emoji = computed(() => data.value.emoji || getEmoji(props.word))
 

@@ -304,7 +304,7 @@
                 <!-- 助记 -->
                 <div class="fc-enrich-sec">
                   <div class="fc-enrich-hd">助记</div>
-                  <div v-if="cardEnrich?.mnemonicReal && cardEnrich.mnemonic">{{ cardEnrich.mnemonic }}</div>
+                  <div v-if="cardEnrich?.mnemonic">{{ cardEnrich.mnemonic }}</div>
                   <div v-else class="fc-enrich-empty">*助记正在赶来的路上</div>
                 </div>
 
@@ -321,7 +321,6 @@
                     </div>
                   </template>
                   <div v-else-if="cardEnrichLoading" class="fc-enrich-empty">例句加载中…</div>
-                  <div v-else class="fc-enrich-empty">该词暂无例句，先记住释义即可。</div>
                 </div>
 
                 <!-- 配图 -->
@@ -1637,7 +1636,10 @@ async function loadCardEnrich(word: string) {
   if (cardEnrichLoading.value) return
   cardEnrichLoading.value = true
   try {
-    cardEnrich.value = await getWordEnrich(word, { pool: degreeWords.map((w) => w.word) })
+    cardEnrich.value = await getWordEnrich(word, {
+      pool: degreeWords.map((w) => w.word),
+      zhDef: currentCardWord.value?.definition || ''
+    })
   } catch {
     cardEnrich.value = null
   } finally {
@@ -1774,12 +1776,8 @@ function openPreview(m: MaterialMeta) {
   const url = base + m.file
   previewUrl.value = url
   previewTitle.value = m.title
-  // 移动端：微信/国产浏览器对 iframe 内嵌 PDF 支持极差（黑屏/白屏），
-  // 直接调用系统浏览器/系统 PDF 阅读器打开，成功率最高。
-  if (isMobileDevice.value) {
-    window.open(url, '_blank')
-    return
-  }
+  // 移动端/PC 统一走 PdfViewerDialog：默认 pdf.js canvas 单页渲染，微信/国产 WebView 稳定显示；
+  // 若某机型异常，弹窗内可一键切「系统阅读器」兜底。满足"要预览、不要下载"。
   previewVisible.value = true
 }
 async function startMock(p: { id: string; title: string; no: number }) {

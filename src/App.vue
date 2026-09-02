@@ -1225,13 +1225,15 @@ onUnmounted(() => {
 .mobile-menu-fab {
   display: none;
   position: fixed;
-  left: 14px;
-  /* 固定 px：微信内置浏览器等不支持 env()，calc(18px + env(...)) 会整条失效，
-     悬浮按钮会贴底被 tabbar 遮挡。具体位置由 @media(max-width:768px) 覆盖。 */
+  /* 固定 px：微信内置浏览器等不支持 env()，calc(18px + env(...)) 会整条失效；
+     悬浮按钮会贴底被 tabbar 遮挡。具体位置由 @media(max-width:768px) 覆盖。
+     放右侧，避免遮挡正文左侧内容（"距考试还有 N 天"/"开始今日学习"等）。 */
+  right: 14px;
+  left: auto;
   bottom: 28px;
   z-index: 40;
-  width: 48px;
-  height: 48px;
+  width: 46px;
+  height: 46px;
   border-radius: 50%;
   border: none;
   background: var(--primary);
@@ -1239,10 +1241,10 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  box-shadow: 0 6px 18px rgba(99, 102, 241, 0.45);
+  box-shadow: 0 4px 14px rgba(99, 102, 241, 0.4);
   transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
-.mobile-menu-fab:hover { transform: translateY(-2px); box-shadow: 0 10px 24px rgba(99, 102, 241, 0.55); }
+.mobile-menu-fab:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(99, 102, 241, 0.5); }
 .mobile-menu-fab:active { transform: scale(0.94); }
 .mobile-menu-fab :deep(svg) { font-size: 22px; }
 

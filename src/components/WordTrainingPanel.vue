@@ -257,7 +257,7 @@ const newPerDay = ref(15)
 const EMPTY_ENRICH: WordEnrichData = {
   word: '', phonetic: '', phoneticUS: '', phoneticUK: '',
   enDefs: [], example: '', exampleZh: '', similar: [],
-  mnemonic: '', mnemonicReal: false, emoji: ''
+  mnemonic: '', mnemonicReal: false, emoji: '', exampleIsFallback: false
 }
 const enrich = ref<WordEnrichData>({ ...EMPTY_ENRICH })
 const enrichLoading = ref(false)

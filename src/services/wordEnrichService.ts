@@ -30,6 +30,8 @@ export interface WordEnrichData {
   mnemonicReal: boolean
   /** 象形配图 emoji */
   emoji: string
+  /** 例句是否为离线兜底（true 时在线真实例句可覆盖） */
+  exampleIsFallback: boolean
 }
 
 /** 入参：本地词库已有的音标（有则优先展示，不重复联网） */
@@ -37,6 +39,8 @@ export interface EnrichOptions {
   localPhonetic?: string
   /** 形近词候选池（当前模块的词表；不传则用空池，形近词为空） */
   pool?: string[]
+  /** 中文释义（来自词表），用于兜底生成助记，保证「必有数据」 */
+  zhDef?: string
 }
 
 const DICT_API = 'https://api.dictionaryapi.dev/api/v2/entries/en/'
@@ -59,7 +63,8 @@ function emptyData(word: string, localPhonetic = ''): WordEnrichData {
     similar: [],
     mnemonic: '',
     mnemonicReal: false,
-    emoji: getEmoji(word)
+    emoji: getEmoji(word),
+    exampleIsFallback: false
   }
 }
 
@@ -105,6 +110,18 @@ export function computeSimilar(word: string, pool: string[] = [], limit = 6): st
     const d = levenshtein(target, w)
     // 距离 1~3 视为形近；完全相同(0)已排除
     if (d >= 1 && d <= 3) scored.push({ w, d })
+  }
+  // 编辑距离层面无匹配时，用「相同前缀(≥3 字符)」作兜底，保证形近词区域有内容
+  if (!scored.length) {
+    const pre = target.slice(0, 3)
+    const seen2 = new Set<string>([target])
+    for (const raw of pool) {
+      const w = (raw || '').toLowerCase().trim()
+      if (!w || w === target || seen2.has(w)) continue
+      if (Math.abs(w.length - target.length) > 5) continue
+      seen2.add(w)
+      if (w.startsWith(pre) || target.startsWith(w.slice(0, 3))) scored.push({ w, d: 4 })
+    }
   }
   scored.sort((x, y) => x.d - y.d || x.w.length - y.w.length)
   return scored.slice(0, limit).map((s) => s.w)
@@ -165,6 +182,32 @@ export function buildMnemonic(word: string, definition = ''): { text: string; re
   const head = parts.join(' + ')
   const tail = definition ? `→ 合起来记：${definition.split(/[；;，,]/)[0]}` : '→ 拆开记，先认词根再套词缀'
   return { text: `${head} ${tail}`, real: true }
+}
+
+/* ==================== 兜底文案：保证「必有数据」 ==================== */
+
+function cap(word: string): string {
+  const w = (word || '').toLowerCase().trim()
+  return w.charAt(0).toUpperCase() + w.slice(1)
+}
+
+/**
+ * 助记兜底：词根词缀拆不出有效结构时，用中文/英文释义生成一条简单联想助记，
+ * 保证卡片背面「助记」区永远有内容（不再显示"正在赶来的路上"）。
+ */
+function fallbackMnemonic(word: string, zhDef = '', enDef = ''): string {
+  const w = (word || '').toLowerCase().trim()
+  const meaning = zhDef || enDef || ''
+  if (meaning) return `联想记忆：${w} 意为「${meaning}」，结合词形反复诵读即可记住。`
+  return `联想记忆：反复读写 ${w}，结合例句语境加深印象。`
+}
+
+/**
+ * 例句兜底：无在线例句（dictionaryapi.dev 在微信内常挂起）时，生成一条极简英文例句，
+ * 保证卡片背面「例句」区永远有内容；在线真实例句返回后会覆盖它。
+ */
+function fallbackExample(word: string): string {
+  return `${cap(word)} is a useful word to remember.`
 }
 
 /* ==================== 在线数据：dictionaryapi.dev（免 Key） ==================== */
@@ -286,14 +329,22 @@ export function getWordEnrich(word: string, opts: EnrichOptions = {}): Promise<W
   const out = emptyData(word, local)
   out.similar = computeSimilar(word, opts.pool || [])
   const mn = buildMnemonic(word)
-  out.mnemonic = mn.text
+  // 拆不出词缀时用中文/英文释义兜底，保证助记区必有内容
+  out.mnemonic = mn.real ? mn.text : fallbackMnemonic(word, opts.zhDef || '', offline?.enDef || '')
   out.mnemonicReal = mn.real
   if (offline?.enDef) out.enDefs = [offline.enDef]
   out.phonetic = local || offline?.phonetic || ''
   out.phoneticUS = out.phonetic
   out.phoneticUK = offline?.phonetic || ''
-  out.example = offline?.example || ''
-  if (out.example) {
+  // 例句：离线词库有则用，否则用兜底模板；两者都非"正在加载"状态，卡片即时有数据
+  if (offline?.example) {
+    out.example = offline.example
+    out.exampleIsFallback = false
+  } else {
+    out.example = fallbackExample(word)
+    out.exampleIsFallback = true
+  }
+  if (out.example && !out.exampleIsFallback) {
     void translateZh(out.example).then((zh) => {
       const cur = cache.get(key)
       if (cur && !cur.exampleZh && zh) cache.set(key, { ...cur, exampleZh: zh })
@@ -319,7 +370,20 @@ export function getWordEnrich(word: string, opts: EnrichOptions = {}): Promise<W
         enDefs: enDefs.slice(0, 4)
       }
       if (!merged.phoneticUS) merged.phoneticUS = merged.phonetic
-      if (dict.example && !merged.example) merged.example = dict.example
+      // 在线真实例句优先覆盖离线兜底模板
+      if (dict.example) {
+        merged.example = dict.example
+        merged.exampleIsFallback = false
+        if (!merged.exampleZh) {
+          void translateZh(dict.example).then((zh) => {
+            const c = cache.get(key)
+            if (c && !c.exampleZh && zh) cache.set(key, { ...c, exampleZh: zh })
+          })
+        }
+      } else {
+        merged.example = cur.example
+        merged.exampleIsFallback = cur.exampleIsFallback
+      }
       cache.set(key, merged)
     } catch {
       /* 在线增强失败：保留离线结果即可 */
