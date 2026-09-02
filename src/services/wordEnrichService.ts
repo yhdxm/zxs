@@ -248,67 +248,87 @@ async function translateZh(text: string): Promise<string> {
   }
 }
 
+/* ==================== 在线数据：带超时兜底（dictionaryapi.dev 在部分网络/微信内挂起） ==================== */
+
+const DICT_TIMEOUT = 3500
+
+async function fetchDictSafe(word: string): Promise<DictResult> {
+  const empty: DictResult = {
+    phoneticUS: '', phoneticUK: '', phonetic: '', enDefs: [], example: '', synonyms: []
+  }
+  const timeoutP = new Promise<DictResult>((resolve) => {
+    setTimeout(() => resolve(empty), DICT_TIMEOUT)
+  })
+  try {
+    return await Promise.race([fetchDict(word), timeoutP])
+  } catch {
+    return empty
+  }
+}
+
 /* ==================== 对外主入口 ==================== */
 
 /**
- * 获取单词增强数据。带内存缓存 + 请求去重。
- * 网络失败时仍返回本地可算出的部分（音标/形近词/助记/配图），不会整块空白。
+ * 获取单词增强数据。
+ * 设计目标：① 离线词库 + 本地可算部分（形近词/助记/emoji）**瞬时返回**，保证「必有数据」，
+ *          绝不因在线接口挂起而长期停在"正在获取"；
+ *          ② 在线 API 仅作后台增强（套 3.5s 超时），成功则补进缓存供下次复用，失败不影响离线结果。
  */
 export function getWordEnrich(word: string, opts: EnrichOptions = {}): Promise<WordEnrichData> {
   const key = word.toLowerCase()
   if (cache.has(key)) return Promise.resolve(cache.get(key)!)
   if (inflight.has(key)) return inflight.get(key)!
 
-  const task = (async (): Promise<WordEnrichData> => {
-    const local = opts.localPhonetic || ''
-    const out = emptyData(word, local)
+  const local = opts.localPhonetic || ''
+  const offline = getOfflineWordDef(word)
 
-    // 本地可立即算出的部分（不等网络）
-    out.similar = computeSimilar(word, opts.pool || [])
-    const mn = buildMnemonic(word)
-    out.mnemonic = mn.text
-    out.mnemonicReal = mn.real
+  // ① 离线 + 本地可算部分：立即组装并返回（不等网络）
+  const out = emptyData(word, local)
+  out.similar = computeSimilar(word, opts.pool || [])
+  const mn = buildMnemonic(word)
+  out.mnemonic = mn.text
+  out.mnemonicReal = mn.real
+  if (offline?.enDef) out.enDefs = [offline.enDef]
+  out.phonetic = local || offline?.phonetic || ''
+  out.phoneticUS = out.phonetic
+  out.phoneticUK = offline?.phonetic || ''
+  out.example = offline?.example || ''
+  if (out.example) {
+    void translateZh(out.example).then((zh) => {
+      const cur = cache.get(key)
+      if (cur && !cur.exampleZh && zh) cache.set(key, { ...cur, exampleZh: zh })
+    })
+  }
 
-    const dict = await fetchDict(word)
-    // 离线词库（ECDICT 子集）优先：dictionaryapi.dev 当前 90%+ 返回 522，
-    // 离线数据保证"必有数据"，API 仅作在线增强兜底。
-    const offline = getOfflineWordDef(word)
+  cache.set(key, out)
+  inflight.set(key, Promise.resolve(out))
 
-    // 音标：本地 > 离线 > API
-    out.phoneticUS = dict.phoneticUS || offline?.phonetic || local
-    out.phoneticUK = dict.phoneticUK || offline?.phonetic || ''
-    out.phonetic = local || offline?.phonetic || dict.phonetic || dict.phoneticUS || ''
-    // 本地没有音标时，美式列兜底展示同一个值，避免"美"那栏空掉
-    if (!out.phoneticUS) out.phoneticUS = out.phonetic
-
-    // 英文释义：离线优先，API 结果去重拼接（最多 4 条）
-    const enDefs: string[] = []
-    if (offline?.enDef) enDefs.push(offline.enDef)
-    for (const d of dict.enDefs) if (d && !enDefs.includes(d)) enDefs.push(d)
-    out.enDefs = enDefs.slice(0, 4)
-
-    // 例句：离线优先（API 已废，离线句子最稳），否则取 API 在线例句
-    out.example = offline?.example || dict.example
-    if (out.example) {
-      out.exampleZh = await translateZh(out.example)
+  // ② 后台增强：在线 API（失败/超时不影响已返回的离线结果）
+  void (async () => {
+    try {
+      const dict = await fetchDictSafe(word)
+      const cur = cache.get(key) || out
+      const enDefs: string[] = []
+      if (offline?.enDef) enDefs.push(offline.enDef)
+      for (const d of dict.enDefs) if (d && !enDefs.includes(d)) enDefs.push(d)
+      const merged: WordEnrichData = {
+        ...cur,
+        phoneticUS: dict.phoneticUS || offline?.phonetic || local || cur.phoneticUS,
+        phoneticUK: dict.phoneticUK || offline?.phonetic || cur.phoneticUK,
+        phonetic: local || offline?.phonetic || dict.phonetic || dict.phoneticUS || cur.phonetic,
+        enDefs: enDefs.slice(0, 4)
+      }
+      if (!merged.phoneticUS) merged.phoneticUS = merged.phonetic
+      if (dict.example && !merged.example) merged.example = dict.example
+      cache.set(key, merged)
+    } catch {
+      /* 在线增强失败：保留离线结果即可 */
+    } finally {
+      inflight.delete(key)
     }
-    // 助记能补强：把同义词并进联想，帮记忆
-    if (!out.mnemonicReal && dict.synonyms.length) {
-      out.mnemonic = `联想近义词：${dict.synonyms.slice(0, 3).join('、')}（结合中文释义一起记）`
-      out.mnemonicReal = true
-    }
+  })()
 
-    cache.set(key, out)
-    inflight.delete(key)
-    return out
-  })().catch(() => {
-    inflight.delete(key)
-    const local = opts.localPhonetic || ''
-    return emptyData(word, local)
-  })
-
-  inflight.set(key, task)
-  return task
+  return Promise.resolve(out)
 }
 
 /** 同步取缓存（用于列表快速展示，没有则返回 null） */

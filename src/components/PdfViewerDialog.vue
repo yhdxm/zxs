@@ -176,14 +176,15 @@ const errMsg = ref('')
 const pageNum = ref(1)
 const numPages = ref(0)
 const pageInput = ref(1)
-const mode = ref<'single' | 'scroll'>('scroll')
+const mode = ref<'single' | 'scroll'>('single')
 const isFullscreen = ref(false)
 /** 实际生效的 pdf.js 加载源（本地/CDN），用于状态提示 */
 const loadSource = ref('')
 /** 文档加载进度 0-100（含下载与解析） */
 const progress = ref(0)
-/** 是否改用系统阅读器（iframe 原生预览），用户可随时切换。默认 true：移动端浏览器原生渲染 PDF 兼容性最高，加载最稳，避免 pdfjs canvas 在大文档（66MB / 200+ 页）上的渲染时序 bug。 */
-const useNative = ref(true)
+/** 是否改用系统阅读器（iframe 原生预览），用户可随时切换。默认 false：走 pdf.js 单页 canvas 渲染，
+ *  全平台（含微信/国产 WebView）都能稳定显示；若某机型 pdf.js 异常，用户可点"系统阅读器"切换 iframe 兜底。 */
+const useNative = ref(false)
 
 const rootEl = ref<HTMLElement | null>(null)
 const bodyEl = ref<HTMLElement | null>(null)
@@ -237,11 +238,9 @@ async function ensurePdfjs(): Promise<any> {
 
 async function openDoc() {
   if (!props.url) return
-  // 每次打开 PDF 强制走 iframe 系统阅读器（兼容性最好、最稳）：
-  // el-dialog 默认 destroy-on-close=false，组件复用会保留上次的 useNative 状态，
-  // 这里重置为 true 避免上次的 pdfjs 失败状态污染新打开。
-  useNative.value = true
-  // 系统阅读器模式：直接交给浏览器原生渲染，不走 pdf.js
+  // 每次打开重置为 pdf.js 单页渲染（最可靠），避免 el-dialog 复用残留上次的 iframe 失败状态
+  useNative.value = false
+  // 默认走 pdf.js 单页 canvas 渲染（全平台可靠）；若用户手动切到"系统阅读器"(iframe) 则走原生
   if (useNative.value) {
     phase.value = 'ready'
     numPages.value = 0

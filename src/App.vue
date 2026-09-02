@@ -1312,8 +1312,9 @@ onUnmounted(() => {
   /* M1：三备考路由(隐藏全局底栏)下，悬浮菜单按钮显形为菜单入口，浮动在页面自带底栏之上 */
   .mobile-menu-fab.fab-visible {
     display: flex;
-    /* 固定 px 同 main-content 留白，避免 env() 失效导致悬浮按钮压在底部导航上 */
-    bottom: 100px;
+    /* 固定 px 同 main-content 留白，避免 env() 失效导致悬浮按钮压在底部导航上。
+       180px 覆盖：全局底栏 58px + 备考台底栏 60px + 全面屏手势条 ~34px + 余量。 */
+    bottom: 180px;
   }
   .app-shell.is-authed .app-main {
     height: 100vh;
@@ -1322,15 +1323,16 @@ onUnmounted(() => {
     flex: 1 1 auto;
     min-width: 0;
   }
-  /* 主内容底部留白：避开底部 tabbar(58px) + 悬浮按钮 + 系统手势条，避免内容被遮挡。
+  /* 主内容底部留白：避开底部 tabbar(58px) + 备考台底栏(60px) + 悬浮按钮 + 系统手势条，避免内容被遮挡。
      🔴 必须用固定 px、禁用 env()：本构建链压缩器会内联/合并掉 env 兜底写法；
      且不支持 env() 的 WebView（微信内置浏览器等）会让整条 calc 失效 = 留白为 0，
-     内容直接被 fixed 底部导航遮住。学位英语备考台不走 no-global-pad 分支，全站全靠这条兜底。 */
+     内容直接被 fixed 底部导航遮住。学位英语备考台不走 no-global-pad 分支，全站全靠这条兜底。
+     180px 覆盖最坏双层底栏叠加 + 全面屏手势条。 */
   .main-content.authed-main {
-    padding-bottom: 100px;
+    padding-bottom: 180px;
   }
   .main-content {
-    padding-bottom: 100px;
+    padding-bottom: 180px;
   }
   /* 备考台自带底部导航，进入该路由时去掉全局底部留白，避免双重留白 */
   .main-content.authed-main.no-global-pad {

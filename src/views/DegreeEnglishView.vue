@@ -1447,7 +1447,9 @@ const reviewDistOption = computed<EChartsOption>(() => ({
 }))
 
 // ===== 移动端沉浸式背词 =====
-const immersive = ref(false)
+// 默认在移动端直接进入沉浸式全屏：卡片 position:fixed;inset:0 覆盖整屏，
+// 彻底避开页面底部导航（.de-bottom-nav）的遮挡，按钮安全间距由下方 CSS 兜底。
+const immersive = ref(typeof window !== 'undefined' && window.innerWidth <= 768)
 const cardsSection = ref<HTMLElement | null>(null)
 function toggleImmersive() {
   immersive.value = !immersive.value
@@ -1541,6 +1543,9 @@ const isMobileDevice = ref(typeof window !== 'undefined' && window.innerWidth <=
 const cardEnrich = ref<WordEnrichData | null>(null)
 const cardEnrichLoading = ref(false)
 const cardReviewTab = ref<'en' | 'sim'>('en')
+const phraseEnrich = ref<WordEnrichData | null>(null)
+const phraseEnrichLoading = ref(false)
+const phraseReviewTab = ref<'en' | 'sim'>('en')
 // 注意：卡片统计与训练队列统一基于「全量词库」，不随词书筛选器变化（B1 修复：避免切 tab 后统计漂移）
 const cardNewToday = computed(() => {
   const fresh = degreeWords.filter((w) => !wordProgress.value[w.word]).length
@@ -1639,6 +1644,19 @@ async function loadCardEnrich(word: string) {
     cardEnrichLoading.value = false
   }
 }
+async function loadPhraseEnrich(phrase: string) {
+  if (phraseEnrichLoading.value) return
+  phraseEnrichLoading.value = true
+  try {
+    // 词组用第一个实词作为 enrich 主键；离线词库以单词为主，词组 fallback 到首词
+    const head = (phrase || '').split(' ').find((p) => p.length > 2) || phrase
+    phraseEnrich.value = await getWordEnrich(head, { pool: degreeWords.map((w) => w.word) })
+  } catch {
+    phraseEnrich.value = null
+  } finally {
+    phraseEnrichLoading.value = false
+  }
+}
 
 function speakExample(text: string, rate = 0.95) {
   void speakEn(text, rate)
@@ -1649,6 +1667,12 @@ watch(cardFlipped, (flipped) => {
   const w = currentCardWord.value
   if (flipped && w) {
     void loadCardEnrich(w.word)
+  }
+})
+watch(phraseFlipped, (flipped) => {
+  const p = currentPhrase.value
+  if (flipped && p) {
+    void loadPhraseEnrich(p.en)
   }
 })
 
@@ -1747,8 +1771,15 @@ async function onDetailMastered(word: string) {
 }
 
 function openPreview(m: MaterialMeta) {
-  previewUrl.value = base + m.file
+  const url = base + m.file
+  previewUrl.value = url
   previewTitle.value = m.title
+  // 移动端：微信/国产浏览器对 iframe 内嵌 PDF 支持极差（黑屏/白屏），
+  // 直接调用系统浏览器/系统 PDF 阅读器打开，成功率最高。
+  if (isMobileDevice.value) {
+    window.open(url, '_blank')
+    return
+  }
   previewVisible.value = true
 }
 async function startMock(p: { id: string; title: string; no: number }) {
@@ -3353,11 +3384,11 @@ onBeforeUnmount(() => {
     box-shadow: none;
   }
 
-  /* 为底部导航留白：固定 130px，禁用 env()。
-     130px = 页面自带底栏 60px + 全局底栏 58px（若未被 HIDDEN_GLOBAL_BOTTOM_ROUTES 隐藏
-     会形成双层底栏叠加）+ 12px 余量。用固定值可同时规避：① env() 失效整条丢弃
-     ② 真机上路由判断未命中导致双层底栏叠加两种情况。 */
-  .degree-view { padding: 0 14px 100px; }
+  /* 为底部导航留白：固定 180px，禁用 env()。
+     180px = 页面自带底栏 60px + 全局底栏 58px（若未被 HIDDEN_GLOBAL_BOTTOM_ROUTES 隐藏
+     会形成双层底栏叠加）+ 全面屏手势条 ~34px + 28px 余量。用固定值可同时规避：
+     ① env() 失效整条丢弃 ② 真机上路由判断未命中导致双层底栏叠加两种情况。 */
+  .degree-view { padding: 0 14px 180px; }
   .dh-header { padding: 10px 12px; }
   .dh-title { font-size: 17px; }
   .dh-sub { font-size: 12px; -webkit-line-clamp: 2; display: -webkit-box; -webkit-box-orient: vertical; overflow: hidden; }
@@ -3594,8 +3625,10 @@ section.immersive {
 .immersive .flashcard-ops {
   flex: none;
   margin-top: 10px;
-  /* 固定 px：沉浸式模式底部按钮同样会被 tabbar/手势条遮挡 */
-  padding-bottom: 20px;
+  /* 固定 px、禁用 env()：沉浸式全屏容器自身 padding 16px，
+     再加 40px 共 56px 底部安全间距，足以避开全面屏手势条 / 系统导航条。
+     不用 env()：不支持的 WebView 会让整条 calc 失效。 */
+  padding-bottom: 40px;
 }
 .immersive .fc-shortcuts { flex: none; margin-top: 6px; }
 .immersive-exit {
