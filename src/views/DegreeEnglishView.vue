@@ -2007,7 +2007,10 @@ onBeforeUnmount(() => {
   min-width: 0;
   max-width: 1400px;
   margin: 0 auto;
-  padding: 0 18px calc(18px + env(safe-area-inset-bottom));
+  /* 固定 px：部分 WebView（微信内置浏览器）不支持 env(safe-area-inset-bottom)，
+     calc(18px + env(...)) 会整条失效，导致底部被 tabbar 遮挡。
+     PC/大屏统一用 110px，移动端在 @media 里覆盖为 130px。 */
+  padding: 0 18px 110px;
   width: 100%;
   box-sizing: border-box;
   /* 与现有系统白底一致 */
@@ -3324,8 +3327,10 @@ onBeforeUnmount(() => {
     position: fixed;
     bottom: 0; left: 0; right: 0;
     z-index: 40;
-    height: calc(60px + env(safe-area-inset-bottom));
-    padding-bottom: env(safe-area-inset-bottom);
+    /* 固定 60px：env() 失效会让整条 height 被丢弃、底栏塌陷；
+       安全区统一由 .degree-view 的 130px 底部留白兜底 */
+    height: 60px;
+    padding-bottom: 0;
     background: color-mix(in srgb, #fff 92%, transparent);
     backdrop-filter: saturate(160%) blur(14px);
     -webkit-backdrop-filter: saturate(160%) blur(14px);
@@ -3348,8 +3353,11 @@ onBeforeUnmount(() => {
     box-shadow: none;
   }
 
-  /* 为底部导航留白 */
-  .degree-view { padding: 0 14px calc(84px + env(safe-area-inset-bottom)); }
+  /* 为底部导航留白：固定 130px，禁用 env()。
+     130px = 页面自带底栏 60px + 全局底栏 58px（若未被 HIDDEN_GLOBAL_BOTTOM_ROUTES 隐藏
+     会形成双层底栏叠加）+ 12px 余量。用固定值可同时规避：① env() 失效整条丢弃
+     ② 真机上路由判断未命中导致双层底栏叠加两种情况。 */
+  .degree-view { padding: 0 14px 100px; }
   .dh-header { padding: 10px 12px; }
   .dh-title { font-size: 17px; }
   .dh-sub { font-size: 12px; -webkit-line-clamp: 2; display: -webkit-box; -webkit-box-orient: vertical; overflow: hidden; }
@@ -3384,19 +3392,17 @@ onBeforeUnmount(() => {
   .fc-def { font-size: 15px; }
   .flashcard-ops {
     flex-wrap: wrap; justify-content: center;
-    /* 固定 px，禁用 env()：实测本构建链的压缩器会把「同属性重复声明」
-       和「@supports 增强块」都内联优化掉，产物里只剩 calc(70px + env(...))；
-       而不支持 env() 的 WebView（微信内置浏览器等）会让整条 calc 失效
-       = 这条样式等于没写，底部按钮继续被 tabbar 遮。
-       100px 覆盖最坏情况：底部 tabbar 58px + 全面屏安全区 ~34px = 92px。 */
-    margin-bottom: 100px;
+    /* 固定 px、禁用 env()：压缩器会内联/合并掉 env 兜底写法，
+       且不支持 env() 的 WebView 会让整条 calc 失效 = 样式等于没写。
+       页面级底部留白已由 .degree-view 的 130px 统一兜底，这里只留按钮与页面底的间距。 */
+    margin-bottom: 24px;
   }
   .fc-nav-btn { padding: 6px 12px; font-size: 12px; }
   .fc-actions { width: 100%; justify-content: center; }
   /* 资料库移动端：阅读区限高+内部滚动，避免正文顶穿底部导航 */
   .lib-reader {
     max-height: calc(100vh - 320px);
-    padding-bottom: 100px;
+    padding-bottom: 24px;
   }
   .lib-list { max-height: 220px; }
 }
@@ -3451,7 +3457,7 @@ onBeforeUnmount(() => {
     flex-direction: column;
     gap: 8px;
     padding: 0 2px;
-    margin-bottom: 100px;
+    margin-bottom: 24px;
   }
   .flashcard-ops > .fc-nav-btn,
   .flashcard-ops > .fc-accent,
@@ -3588,7 +3594,8 @@ section.immersive {
 .immersive .flashcard-ops {
   flex: none;
   margin-top: 10px;
-  padding-bottom: env(safe-area-inset-bottom, 0px);
+  /* 固定 px：沉浸式模式底部按钮同样会被 tabbar/手势条遮挡 */
+  padding-bottom: 20px;
 }
 .immersive .fc-shortcuts { flex: none; margin-top: 6px; }
 .immersive-exit {

@@ -1225,8 +1225,10 @@ onUnmounted(() => {
 .mobile-menu-fab {
   display: none;
   position: fixed;
-  left: calc(14px + env(safe-area-inset-left));
-  bottom: calc(18px + env(safe-area-inset-bottom));
+  left: 14px;
+  /* 固定 px：微信内置浏览器等不支持 env()，calc(18px + env(...)) 会整条失效，
+     悬浮按钮会贴底被 tabbar 遮挡。具体位置由 @media(max-width:768px) 覆盖。 */
+  bottom: 28px;
   z-index: 40;
   width: 48px;
   height: 48px;
@@ -1252,8 +1254,10 @@ onUnmounted(() => {
   right: 0;
   bottom: 0;
   z-index: 45;
-  height: calc(58px + env(safe-area-inset-bottom));
-  padding-bottom: env(safe-area-inset-bottom);
+  /* 固定 px：避免 env(safe-area-inset-bottom) 在不支持的 WebView 中失效。
+     80px = 内容区 58px + 常见全面屏手势条 22px，覆盖 iPhone X+ / 安卓手势导航。 */
+  height: 80px;
+  padding-bottom: 22px;
   background: var(--surface);
   background: color-mix(in srgb, var(--surface) 92%, transparent);
   backdrop-filter: saturate(160%) blur(14px);
@@ -1308,7 +1312,8 @@ onUnmounted(() => {
   /* M1：三备考路由(隐藏全局底栏)下，悬浮菜单按钮显形为菜单入口，浮动在页面自带底栏之上 */
   .mobile-menu-fab.fab-visible {
     display: flex;
-    bottom: calc(72px + env(safe-area-inset-bottom));
+    /* 固定 px 同 main-content 留白，避免 env() 失效导致悬浮按钮压在底部导航上 */
+    bottom: 100px;
   }
   .app-shell.is-authed .app-main {
     height: 100vh;
@@ -1317,12 +1322,15 @@ onUnmounted(() => {
     flex: 1 1 auto;
     min-width: 0;
   }
-  /* 主内容底部留白：避开悬浮菜单按钮 + 系统手势条，避免内容被遮挡 */
+  /* 主内容底部留白：避开底部 tabbar(58px) + 悬浮按钮 + 系统手势条，避免内容被遮挡。
+     🔴 必须用固定 px、禁用 env()：本构建链压缩器会内联/合并掉 env 兜底写法；
+     且不支持 env() 的 WebView（微信内置浏览器等）会让整条 calc 失效 = 留白为 0，
+     内容直接被 fixed 底部导航遮住。学位英语备考台不走 no-global-pad 分支，全站全靠这条兜底。 */
   .main-content.authed-main {
-    padding-bottom: calc(84px + env(safe-area-inset-bottom));
+    padding-bottom: 100px;
   }
   .main-content {
-    padding-bottom: calc(84px + env(safe-area-inset-bottom));
+    padding-bottom: 100px;
   }
   /* 备考台自带底部导航，进入该路由时去掉全局底部留白，避免双重留白 */
   .main-content.authed-main.no-global-pad {
