@@ -237,6 +237,10 @@ async function ensurePdfjs(): Promise<any> {
 
 async function openDoc() {
   if (!props.url) return
+  // 每次打开 PDF 强制走 iframe 系统阅读器（兼容性最好、最稳）：
+  // el-dialog 默认 destroy-on-close=false，组件复用会保留上次的 useNative 状态，
+  // 这里重置为 true 避免上次的 pdfjs 失败状态污染新打开。
+  useNative.value = true
   // 系统阅读器模式：直接交给浏览器原生渲染，不走 pdf.js
   if (useNative.value) {
     phase.value = 'ready'
@@ -262,8 +266,13 @@ async function openDoc() {
       pdfDoc = await lib.getDocument({
         url: props.url,
         onProgress: (p: { loaded?: number; total?: number }) => {
-          if (p?.total && p.loaded != null) {
-            progress.value = Math.min(99, Math.round((p.loaded / p.total) * 100))
+          if (p?.loaded != null) {
+            if (p.total) {
+              progress.value = Math.min(99, Math.round((p.loaded / p.total) * 100))
+            } else {
+              // pdfjs 某些下载阶段不传 total（流式/range 请求），给个 indeterminate 进度让用户看到在动
+              progress.value = Math.min(90, (progress.value || 10) + 5)
+            }
           }
         }
       }).promise

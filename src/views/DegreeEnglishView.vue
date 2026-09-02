@@ -3382,11 +3382,22 @@ onBeforeUnmount(() => {
   .flashcard-back { padding-bottom: 10px; }
   .fc-word { font-size: 24px; }
   .fc-def { font-size: 15px; }
-  .flashcard-ops { flex-wrap: wrap; justify-content: center; margin-bottom: calc(70px + env(safe-area-inset-bottom)); }
+  .flashcard-ops {
+    flex-wrap: wrap; justify-content: center;
+    /* 固定 px，禁用 env()：实测本构建链的压缩器会把「同属性重复声明」
+       和「@supports 增强块」都内联优化掉，产物里只剩 calc(70px + env(...))；
+       而不支持 env() 的 WebView（微信内置浏览器等）会让整条 calc 失效
+       = 这条样式等于没写，底部按钮继续被 tabbar 遮。
+       100px 覆盖最坏情况：底部 tabbar 58px + 全面屏安全区 ~34px = 92px。 */
+    margin-bottom: 100px;
+  }
   .fc-nav-btn { padding: 6px 12px; font-size: 12px; }
   .fc-actions { width: 100%; justify-content: center; }
   /* 资料库移动端：阅读区限高+内部滚动，避免正文顶穿底部导航 */
-  .lib-reader { max-height: calc(100vh - 320px); padding-bottom: calc(70px + env(safe-area-inset-bottom)); }
+  .lib-reader {
+    max-height: calc(100vh - 320px);
+    padding-bottom: 100px;
+  }
   .lib-list { max-height: 220px; }
 }
 
@@ -3440,7 +3451,7 @@ onBeforeUnmount(() => {
     flex-direction: column;
     gap: 8px;
     padding: 0 2px;
-    margin-bottom: calc(70px + env(safe-area-inset-bottom));
+    margin-bottom: 100px;
   }
   .flashcard-ops > .fc-nav-btn,
   .flashcard-ops > .fc-accent,
