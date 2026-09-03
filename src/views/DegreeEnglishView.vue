@@ -3699,7 +3699,9 @@ section.immersive {
   position: fixed !important;
   inset: 0 !important;
   /* 用 100dvh 替代 100vh/layout viewport，避开手机浏览器动态地址栏/工具栏
-     导致的高度误判，从而消除底部内容被「遮挡」的观感。 */
+     导致的高度误判，从而消除底部内容被「遮挡」的观感。
+     双写：不支持 dvh 的旧浏览器回退到 100vh。 */
+  height: 100vh !important;
   height: 100dvh !important;
   z-index: 2500 !important;
   background: var(--surface, #fff);
@@ -3739,32 +3741,40 @@ section.immersive {
   overflow-y: auto;
 }
 .immersive .fc-def {
-  font-size: 16px;
-  margin-bottom: 6px;
+  font-size: 15.5px;
+  margin-bottom: 4px;
 }
-.immersive .fc-src { margin-bottom: 6px; }
+.immersive .fc-src { margin-bottom: 4px; }
+.immersive .fc-src .el-tag { font-size: 11px; padding: 0 6px; height: 20px; }
 .immersive .fc-enrich-sec {
-  padding: 8px 10px;
-  margin-bottom: 6px;
+  padding: 6px 8px;
+  margin-bottom: 4px;
 }
-.immersive .fc-enrich-hd { margin-bottom: 3px; }
+.immersive .fc-enrich-hd { margin-bottom: 2px; }
+.immersive .fc-ex-en { margin-bottom: 2px; }
+.immersive .fc-ex-zh { margin-bottom: 4px; }
+.immersive .fc-pic-row { gap: 4px; }
+.immersive .fc-pic-em { font-size: 22px; }
+.immersive .fc-enrich-tabs { margin-bottom: 4px; }
+.immersive .fc-enrich-tabs button { padding: 4px 10px; }
+.immersive .fc-enrich-pane ol { padding-left: 16px; }
 .immersive .flashcard-ops {
   flex: none;
-  margin-top: 8px;
+  margin-top: 6px;
   /* 固定 px、禁用 env()：沉浸式全屏容器自身 padding 12px，
-     再加 16px 共 28px 底部安全间距，配合 100dvh 已可避开全面屏手势条。
+     再加 12px 共 24px 底部安全间距，配合 100dvh 已可避开全面屏手势条。
      不用 env()：不支持的 WebView 会让整条 calc 失效。 */
-  padding-bottom: 16px;
+  padding-bottom: 12px;
 }
 .immersive .fc-actions { flex-wrap: wrap; gap: 5px; }
 .immersive .fc-actions .el-button {
   flex: 1 1 calc(50% - 3px);
-  padding: 7px 8px;
+  padding: 6px 6px;
   font-size: 13px;
 }
 .immersive .fc-actions .el-button.fc-skip {
   flex: 1 1 100%;
-  padding: 6px 8px;
+  padding: 5px 6px;
 }
 .immersive .fc-shortcuts { flex: none; margin-top: 6px; }
 .immersive-exit {
