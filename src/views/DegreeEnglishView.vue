@@ -270,12 +270,16 @@
       </div>
 
       <template v-else>
-        <!-- 闪卡进度条 -->
-        <div class="flashcard-progress">
-          <span class="flashcard-pos">已学 {{ cardReviewedCount }} · 剩余 {{ cardQueue.length }} · 已掌握 {{ graduatedCount }}</span>
-          <div class="flashcard-bar"><div class="flashcard-fill" :style="{ width: cardPercent + '%' }"></div></div>
-          <button v-if="immersive" class="flashcard-exit immersive-exit" @click="exitImmersiveOnly" title="退出沉浸式">⛶ 退出沉浸</button>
-          <button class="flashcard-exit" @click="exitCardMode" title="退出背词">✕</button>
+        <!-- 闪卡顶栏：进度 + 退出沉浸 + 关闭，整条融合 -->
+        <div class="fc-topbar">
+          <div class="fc-topbar-left">
+            <span class="flashcard-pos">已学 {{ cardReviewedCount }} · 剩余 {{ cardQueue.length }} · 已掌握 {{ graduatedCount }}</span>
+            <div class="flashcard-bar"><div class="flashcard-fill" :style="{ width: cardPercent + '%' }"></div></div>
+          </div>
+          <div class="fc-topbar-right">
+            <button v-if="immersive" class="fc-exit-pill" @click="exitImmersiveOnly" title="退出沉浸式">退出沉浸</button>
+            <button class="fc-exit-x" @click="exitCardMode" title="退出背词">✕</button>
+          </div>
         </div>
 
         <template v-if="cardQueue.length">
@@ -286,7 +290,18 @@
               <div class="flashcard-front">
                 <div class="fc-word-row">
                   <span class="fc-word">{{ currentCardWord!.word }}<span v-if="currentCardWord!.productive" class="star">*</span></span>
-                  <button class="speak-btn fc-speak" @click.stop="speak(currentCardWord!.word)" title="朗读">🔊</button>
+                  <button
+                    class="speak-btn fc-speak"
+                    @click.stop="onSpeakBtn"
+                    @mousedown="startAccentPress"
+                    @mouseup="endAccentPress"
+                    @mouseleave="cancelAccentPress"
+                    @touchstart="startAccentPress"
+                    @touchend="endAccentPress"
+                    :title="'朗读（' + (voiceAccent === 'en-US' ? '美' : '英') + '）长按切换美/英'"
+                  >
+                    <span class="fc-speak-ico">🔊</span><span class="fc-speak-accent">{{ voiceAccent === 'en-US' ? '美' : '英' }}</span>
+                  </button>
                 </div>
                 <div v-if="wordPhonetic(currentCardWord!.word)" class="fc-phonetic">{{ wordPhonetic(currentCardWord!.word) }}</div>
                 <div class="fc-hint">点击翻转查看释义</div>
@@ -314,7 +329,6 @@
                   <template v-if="cardEnrich?.example">
                     <div class="fc-ex-en">{{ cardEnrich.example }}</div>
                     <div v-if="cardEnrich.exampleZh" class="fc-ex-zh">{{ cardEnrich.exampleZh }}</div>
-                    <div v-else class="fc-ex-zh fc-enrich-empty">（翻译获取中或不可用）</div>
                     <div class="fc-ex-bar">
                       <button type="button" @click.stop="speakExample(cardEnrich.example, 0.95)">朗读</button>
                       <button type="button" @click.stop="speakExample(cardEnrich.example, 0.6)">慢速</button>
@@ -340,7 +354,7 @@
                   </div>
                   <div v-show="cardReviewTab === 'en'" class="fc-enrich-pane" role="tabpanel">
                     <ol v-if="cardEnrich?.enDefs?.length">
-                      <li v-for="(d, i) in cardEnrich.enDefs" :key="i">{{ d }}</li>
+                      <li v-for="(d, i) in cardEnrich.enDefs" :key="i" style="white-space: pre-line;">{{ d }}</li>
                     </ol>
                     <div v-else-if="cardEnrichLoading" class="fc-enrich-empty">正在获取英文释义…</div>
                     <div v-else class="fc-enrich-empty">暂无英文释义（多为生僻词或接口未收录）。</div>
@@ -369,18 +383,13 @@
 
           <!-- 操作栏 -->
           <div class="flashcard-ops">
-            <button class="fc-nav-btn immersible-btn" :class="{ on: immersive }" @click="toggleImmersive">{{ immersive ? '📱 退出沉浸' : '⛶ 沉浸式' }}</button>
-            <div class="fc-accent">
-              <span class="accent-label">读音</span>
-              <button class="accent-opt" :class="{ on: voiceAccent === 'en-US' }" @click="voiceAccent = 'en-US'">美</button>
-              <button class="accent-opt" :class="{ on: voiceAccent === 'en-GB' }" @click="voiceAccent = 'en-GB'">英</button>
-            </div>
+            <button v-if="!immersive" class="fc-nav-btn immersible-btn" :class="{ on: immersive }" @click="toggleImmersive">⛶ 进入沉浸</button>
             <div class="fc-actions">
               <el-button size="small" type="danger" @click="gradeCard('again')">忘记</el-button>
-              <el-button size="small" type="warning" @click="addWordBook(currentCardWord!)">生词本</el-button>
               <el-button size="small" type="primary" @click="gradeCard('good')">认识</el-button>
+              <el-button size="small" type="warning" @click="addWordBook(currentCardWord!)">生词本</el-button>
               <el-button size="small" type="success" @click="gradeCard('easy')">简单</el-button>
-              <el-button size="small" @click="skipCard">跳过 →</el-button>
+              <el-button size="small" class="fc-skip" @click="skipCard">跳过</el-button>
             </div>
           </div>
 
@@ -1148,6 +1157,36 @@ function srcTagType(b: SourceBook): 'success' | 'warning' | 'info' {
 }
 function speak(word: string) {
   speakWord(word, 0.9)
+}
+// 卡片音按钮：点击朗读，长按(>500ms)切换美/英口音
+let accentPressTimer: ReturnType<typeof setTimeout> | null = null
+let accentPressSuppress = false
+function onSpeakBtn() {
+  if (accentPressSuppress) {
+    accentPressSuppress = false
+    return
+  }
+  speak(currentCardWord.value!.word)
+}
+function startAccentPress() {
+  accentPressSuppress = false
+  accentPressTimer = setTimeout(() => {
+    voiceAccent.value = voiceAccent.value === 'en-US' ? 'en-GB' : 'en-US'
+    accentPressTimer = null
+    accentPressSuppress = true
+  }, 500)
+}
+function endAccentPress() {
+  if (accentPressTimer) {
+    clearTimeout(accentPressTimer)
+    accentPressTimer = null
+  }
+}
+function cancelAccentPress() {
+  if (accentPressTimer) {
+    clearTimeout(accentPressTimer)
+    accentPressTimer = null
+  }
 }
 function wordPhonetic(word: string): string {
   if (phonetics.value[word]) return phonetics.value[word]
@@ -2578,6 +2617,40 @@ onBeforeUnmount(() => {
   border-radius: 3px;
   transition: width 0.3s ease;
 }
+
+/* 闪卡融合顶栏：进度 + 退出沉浸 + 关闭同处一行 */
+.fc-topbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+  padding: 8px 12px;
+  background: #f3f4f6;
+  border-radius: 10px;
+}
+.fc-topbar-left { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.fc-topbar-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.fc-exit-pill {
+  border: none;
+  background: #e0e7ff;
+  color: #4338ca;
+  border-radius: 12px;
+  padding: 5px 12px;
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.fc-exit-pill:active { background: #c7d2fe; }
+.fc-exit-x {
+  border: 1px solid var(--border, #e5e7eb);
+  background: #fff;
+  border-radius: 50%;
+  width: 28px; height: 28px;
+  font-size: 14px; color: #6b7280;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
 .flashcard-exit {
   border: 1px solid var(--border);
   background: #fff;
@@ -2635,7 +2708,15 @@ onBeforeUnmount(() => {
   color: #3c3489;
   word-break: keep-all;
 }
-.fc-speak { width: 36px; height: 36px; font-size: 18px; }
+.fc-speak {
+  width: 44px; height: 44px; font-size: 18px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 0; line-height: 1; padding: 0;
+}
+.fc-speak-ico { font-size: 18px; }
+.fc-speak-accent {
+  font-size: 9px; color: #534ab7; font-weight: 700; margin-top: 1px;
+}
 .fc-phonetic {
   font-size: 14px;
   color: #888;
@@ -2692,16 +2773,16 @@ onBeforeUnmount(() => {
   border: 1px solid #e6e1ff;
   border-radius: 10px;
   padding: 10px 12px;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
   font-size: 13.5px;
-  line-height: 1.65;
+  line-height: 1.55;
   color: var(--text-strong);
 }
 .fc-enrich-hd {
   font-size: 12px;
   font-weight: 700;
   color: #6b5bd6;
-  margin-bottom: 6px;
+  margin-bottom: 4px;
   letter-spacing: 0.5px;
 }
 .fc-enrich-empty { font-size: 12.5px; color: #9a9ab0; line-height: 1.7; }
@@ -2718,8 +2799,8 @@ onBeforeUnmount(() => {
   cursor: pointer;
 }
 .fc-ex-bar button:active { background: #f0edff; }
-.fc-pic-row { display: flex; align-items: center; gap: 10px; }
-.fc-pic-em { font-size: 32px; }
+.fc-pic-row { display: flex; align-items: center; gap: 8px; }
+.fc-pic-em { font-size: 26px; }
 .fc-pic-tx { font-size: 12px; color: #888; }
 .fc-enrich-tabs { display: flex; gap: 8px; margin-bottom: 8px; }
 .fc-enrich-tabs button {
@@ -3420,14 +3501,37 @@ onBeforeUnmount(() => {
   .fc-word { font-size: 24px; }
   .fc-def { font-size: 15px; }
   .flashcard-ops {
+    flex: none;
     flex-wrap: wrap; justify-content: center;
+    gap: 6px;
     /* 固定 px、禁用 env()：压缩器会内联/合并掉 env 兜底写法，
        且不支持 env() 的 WebView 会让整条 calc 失效 = 样式等于没写。
        页面级底部留白已由 .degree-view 的 130px 统一兜底，这里只留按钮与页面底的间距。 */
     margin-bottom: 24px;
   }
   .fc-nav-btn { padding: 6px 12px; font-size: 12px; }
-  .fc-actions { width: 100%; justify-content: center; }
+  .fc-actions {
+    width: 100%;
+    display: flex; flex-wrap: wrap; gap: 6px; justify-content: center;
+  }
+  .fc-actions .el-button {
+    flex: 1 1 calc(50% - 3px);
+    margin: 0 !important;
+    min-width: 0;
+    height: auto;
+    padding: 8px 10px;
+    font-size: 13px;
+    border-radius: 10px;
+  }
+  .fc-actions .el-button + .el-button { margin-left: 0 !important; }
+  .fc-actions .el-button.fc-skip {
+    flex: 1 1 100%;
+    background: transparent;
+    border-color: #d1d5db;
+    color: #6b7280;
+    padding: 6px 8px;
+    font-size: 12px;
+  }
   /* 资料库移动端：阅读区限高+内部滚动，避免正文顶穿底部导航 */
   .lib-reader {
     max-height: calc(100vh - 320px);
@@ -3484,39 +3588,39 @@ onBeforeUnmount(() => {
   .fc-def { font-size: 14.5px; }
   .flashcard-ops {
     flex-direction: column;
-    gap: 8px;
+    gap: 6px;
     padding: 0 2px;
     margin-bottom: 24px;
-  }
-  .flashcard-ops > .fc-nav-btn,
-  .flashcard-ops > .fc-accent,
-  .flashcard-ops > .fc-actions {
-    width: 100%;
-    box-sizing: border-box;
   }
   .fc-nav-btn {
     width: 100%;
     text-align: center;
     margin: 0;
-    padding: 10px 14px;
-    font-size: 14px;
+    padding: 8px 14px;
+    font-size: 13px;
     border-radius: 10px;
-  }
-  .fc-accent {
-    justify-content: center;
-    margin: 0;
   }
   .fc-actions {
-    flex-direction: column;
-    gap: 8px;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 6px;
   }
   .fc-actions .el-button {
-    width: 100%;
+    flex: 1 1 calc(50% - 3px);
+    width: auto;
     margin: 0 !important;
-    padding: 10px 14px;
-    font-size: 14px;
+    padding: 8px 10px;
+    font-size: 13px;
     border-radius: 10px;
     height: auto;
+  }
+  .fc-actions .el-button.fc-skip {
+    flex: 1 1 100%;
+    background: transparent;
+    border-color: #d1d5db;
+    color: #6b7280;
+    padding: 5px 8px;
+    font-size: 12px;
   }
   .fc-actions .el-button + .el-button {
     margin-left: 0 !important;
@@ -3604,6 +3708,7 @@ section.immersive {
   flex-direction: column;
 }
 .immersive .flashcard-progress { flex: none; margin-bottom: 10px; }
+.immersive .fc-topbar { flex: none; margin-bottom: 10px; }
 .immersive .flashcard {
   flex: 1 1 auto;
   min-height: 0;
@@ -3626,8 +3731,11 @@ section.immersive {
   /* 固定 px、禁用 env()：沉浸式全屏容器自身 padding 16px，
      再加 40px 共 56px 底部安全间距，足以避开全面屏手势条 / 系统导航条。
      不用 env()：不支持的 WebView 会让整条 calc 失效。 */
-  padding-bottom: 40px;
+  padding-bottom: 24px;
 }
+.immersive .fc-actions { flex-wrap: wrap; }
+.immersive .fc-actions .el-button { flex: 1 1 calc(50% - 4px); }
+.immersive .fc-actions .el-button.fc-skip { flex: 1 1 100%; }
 .immersive .fc-shortcuts { flex: none; margin-top: 6px; }
 .immersive-exit {
   background: #3c3489 !important;
