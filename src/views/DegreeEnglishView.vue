@@ -3495,8 +3495,9 @@ onBeforeUnmount(() => {
   .phrase-list { grid-template-columns: 1fr; }
   /* 闪卡移动端 */
   /* 关键修复：正反面是 absolute(inset:0)，不撑开父高度，内容被锁死在 min-height 里。
-     改为按视口撑满可用空间（减去 tabs/进度条/操作栏/底导航），内容不再被挤压。 */
-  .flashcard-inner { min-height: max(280px, calc(100vh - 340px)); }
+     改为按视口撑满可用空间（减去 tabs/进度条/操作栏/底导航），内容不再被挤压。
+     用 100dvh 替代 100vh，适配手机浏览器动态工具栏。 */
+  .flashcard-inner { min-height: max(280px, calc(100dvh - 340px)); }
   .flashcard-back { padding-bottom: 10px; }
   .fc-word { font-size: 24px; }
   .fc-def { font-size: 15px; }
@@ -3697,18 +3698,26 @@ onBeforeUnmount(() => {
 section.immersive {
   position: fixed !important;
   inset: 0 !important;
+  /* 用 100dvh 替代 100vh/layout viewport，避开手机浏览器动态地址栏/工具栏
+     导致的高度误判，从而消除底部内容被「遮挡」的观感。 */
+  height: 100dvh !important;
   z-index: 2500 !important;
   background: var(--surface, #fff);
   margin: 0 !important;
   border-radius: 0 !important;
   border: none !important;
-  padding: 16px !important;
+  padding: 12px !important;
   overflow: hidden;
   display: flex;
   flex-direction: column;
 }
-.immersive .flashcard-progress { flex: none; margin-bottom: 10px; }
-.immersive .fc-topbar { flex: none; margin-bottom: 10px; }
+.immersive .flashcard-progress { flex: none; margin-bottom: 8px; }
+.immersive .fc-topbar {
+  flex: none;
+  margin-bottom: 8px;
+  padding: 6px 10px;
+  gap: 8px;
+}
 .immersive .flashcard {
   flex: 1 1 auto;
   min-height: 0;
@@ -3721,21 +3730,42 @@ section.immersive {
   flex: 1 1 auto;
   min-height: 0;
 }
+.immersive .flashcard-front,
+.immersive .flashcard-back {
+  padding: 16px 14px;
+}
 .immersive .flashcard-back {
   justify-content: flex-start;
   overflow-y: auto;
 }
+.immersive .fc-def {
+  font-size: 16px;
+  margin-bottom: 6px;
+}
+.immersive .fc-src { margin-bottom: 6px; }
+.immersive .fc-enrich-sec {
+  padding: 8px 10px;
+  margin-bottom: 6px;
+}
+.immersive .fc-enrich-hd { margin-bottom: 3px; }
 .immersive .flashcard-ops {
   flex: none;
-  margin-top: 10px;
-  /* 固定 px、禁用 env()：沉浸式全屏容器自身 padding 16px，
-     再加 40px 共 56px 底部安全间距，足以避开全面屏手势条 / 系统导航条。
+  margin-top: 8px;
+  /* 固定 px、禁用 env()：沉浸式全屏容器自身 padding 12px，
+     再加 16px 共 28px 底部安全间距，配合 100dvh 已可避开全面屏手势条。
      不用 env()：不支持的 WebView 会让整条 calc 失效。 */
-  padding-bottom: 24px;
+  padding-bottom: 16px;
 }
-.immersive .fc-actions { flex-wrap: wrap; }
-.immersive .fc-actions .el-button { flex: 1 1 calc(50% - 4px); }
-.immersive .fc-actions .el-button.fc-skip { flex: 1 1 100%; }
+.immersive .fc-actions { flex-wrap: wrap; gap: 5px; }
+.immersive .fc-actions .el-button {
+  flex: 1 1 calc(50% - 3px);
+  padding: 7px 8px;
+  font-size: 13px;
+}
+.immersive .fc-actions .el-button.fc-skip {
+  flex: 1 1 100%;
+  padding: 6px 8px;
+}
 .immersive .fc-shortcuts { flex: none; margin-top: 6px; }
 .immersive-exit {
   background: #3c3489 !important;
