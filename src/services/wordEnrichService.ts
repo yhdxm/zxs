@@ -212,6 +212,12 @@ function fallbackExample(word: string): string {
 
 /* ==================== 在线数据：dictionaryapi.dev（免 Key） ==================== */
 
+/** 清洗英文释义文本：部分数据源（dictionaryapi.dev / 离线词库）会把换行存成字面 "\n" 两个字符，
+ *  模板里 white-space:pre-line 只认真实换行符，这里统一替换掉，避免释义里出现字面 \n。 */
+function cleanDefText(s: string): string {
+  return s.replace(/\\n/g, ' ').replace(/\s{2,}/g, ' ').trim()
+}
+
 interface DictResult {
   phoneticUS: string
   phoneticUK: string
@@ -250,7 +256,7 @@ async function fetchDict(word: string): Promise<DictResult> {
       }
       for (const m of entry?.meanings || []) {
         for (const d of m?.definitions || []) {
-          if (d?.definition && enDefs.length < 4) enDefs.push(d.definition)
+          if (d?.definition && enDefs.length < 4) enDefs.push(cleanDefText(d.definition))
           if (!example && d?.example) example = d.example
           for (const s of d?.synonyms || []) {
             if (synonyms.length < 5 && !synonyms.includes(s)) synonyms.push(s)
@@ -332,7 +338,7 @@ export function getWordEnrich(word: string, opts: EnrichOptions = {}): Promise<W
   // 拆不出词缀时用中文/英文释义兜底，保证助记区必有内容
   out.mnemonic = mn.real ? mn.text : fallbackMnemonic(word, opts.zhDef || '', offline?.enDef || '')
   out.mnemonicReal = mn.real
-  if (offline?.enDef) out.enDefs = [offline.enDef]
+  if (offline?.enDef) out.enDefs = [cleanDefText(offline.enDef)]
   out.phonetic = local || offline?.phonetic || ''
   out.phoneticUS = out.phonetic
   out.phoneticUK = offline?.phonetic || ''
@@ -360,7 +366,7 @@ export function getWordEnrich(word: string, opts: EnrichOptions = {}): Promise<W
       const dict = await fetchDictSafe(word)
       const cur = cache.get(key) || out
       const enDefs: string[] = []
-      if (offline?.enDef) enDefs.push(offline.enDef)
+      if (offline?.enDef) enDefs.push(cleanDefText(offline.enDef))
       for (const d of dict.enDefs) if (d && !enDefs.includes(d)) enDefs.push(d)
       const merged: WordEnrichData = {
         ...cur,
