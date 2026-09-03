@@ -13,6 +13,10 @@ dist
 # 临时/带时间戳的构建输出目录（如 dist_1785518949、dist_verify）
 dist_*
 dist-ssr
+
+# 调试/临时产物（根目录下划线文件，避免被 git add -A 误提交；scripts/ 下项目脚本不受影响）
+/_*.png
+/_*.cjs
 coverage
 *.local
 

@@ -58,6 +58,9 @@ git config https.postBuffer 524288000
 git config --local credential.helper ""
 
 REM ================= commit local changes =================
+REM 安全说明：临时/敏感文件已由 .gitignore 排除，下方保留 git add -A 以包含所有部署
+REM 所需的新增源码。请勿改为 pathspec 排除写法（本脚本启用 enabledelayedexpansion，
+REM 其中的 ! 会与 :!xxx 语法冲突导致失效），也不要改为精确列文件（易漏部署文件）。
 git add -A
 git diff --cached --quiet
 if !ERRORLEVEL! neq 0 (
