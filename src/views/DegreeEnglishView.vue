@@ -316,11 +316,20 @@
                   <el-tag v-for="b in currentCardWord!.sourceBooks" :key="b" size="small" :type="srcTagType(b)" effect="plain">{{ b }}</el-tag>
                 </div>
 
-                <!-- 助记 -->
-                <div class="fc-enrich-sec">
-                  <div class="fc-enrich-hd">助记</div>
-                  <div v-if="cardEnrich?.mnemonic">{{ cardEnrich.mnemonic }}</div>
-                  <div v-else class="fc-enrich-empty">*助记正在赶来的路上</div>
+                <!-- 助记 + 配图：同一行，节省竖向空间，保证背面一屏放下不滚动 -->
+                <div class="fc-enrich-row">
+                  <div class="fc-enrich-sec fc-sec-mnemonic">
+                    <div class="fc-enrich-hd">助记</div>
+                    <div v-if="cardEnrich?.mnemonic">{{ cardEnrich.mnemonic }}</div>
+                    <div v-else class="fc-enrich-empty">*助记正在赶来的路上</div>
+                  </div>
+                  <div class="fc-enrich-sec fc-sec-pic">
+                    <div class="fc-enrich-hd">配图</div>
+                    <div class="fc-pic-row">
+                      <span class="fc-pic-em">{{ getEmoji(currentCardWord!.word) }}</span>
+                      <span class="fc-pic-tx">离线象形符号</span>
+                    </div>
+                  </div>
                 </div>
 
                 <!-- 例句 -->
@@ -337,17 +346,8 @@
                   <div v-else-if="cardEnrichLoading" class="fc-enrich-empty">例句加载中…</div>
                 </div>
 
-                <!-- 配图 -->
-                <div class="fc-enrich-sec">
-                  <div class="fc-enrich-hd">配图</div>
-                  <div class="fc-pic-row">
-                    <span class="fc-pic-em">{{ getEmoji(currentCardWord!.word) }}</span>
-                    <span class="fc-pic-tx">离线象形符号</span>
-                  </div>
-                </div>
-
-                <!-- 英文释义 / 形近词 -->
-                <div class="fc-enrich-sec">
+                <!-- 英文释义 / 形近词（吸收剩余高度，保证一屏不溢出） -->
+                <div class="fc-enrich-sec fc-sec-flex">
                   <div class="fc-enrich-tabs" role="tablist">
                     <button :class="{ on: cardReviewTab === 'en' }" type="button" role="tab" :aria-selected="cardReviewTab === 'en'" @click="cardReviewTab = 'en'">英文释义</button>
                     <button :class="{ on: cardReviewTab === 'sim' }" type="button" role="tab" :aria-selected="cardReviewTab === 'sim'" @click="cardReviewTab = 'sim'">形近词</button>
@@ -2778,6 +2778,15 @@ onBeforeUnmount(() => {
   line-height: 1.55;
   color: var(--text-strong);
 }
+/* 助记 + 配图 同一行：竖向省空间，保证背面一屏可容纳 */
+.fc-enrich-row {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+.fc-enrich-row > .fc-enrich-sec { min-width: 0; }
+.fc-sec-mnemonic { flex: 1 1 auto; }
+.fc-sec-pic { flex: 0 0 34%; max-width: 150px; }
 .fc-enrich-hd {
   font-size: 12px;
   font-weight: 700;
@@ -3497,8 +3506,25 @@ onBeforeUnmount(() => {
   /* 关键修复：正反面是 absolute(inset:0)，不撑开父高度，内容被锁死在 min-height 里。
      改为按视口撑满可用空间（减去 tabs/进度条/操作栏/底导航），内容不再被挤压。
      用 100dvh 替代 100vh，适配手机浏览器动态工具栏。 */
-  .flashcard-inner { min-height: max(280px, calc(100dvh - 340px)); }
+  .flashcard-inner { min-height: max(280px, calc(100dvh - 300px)); }
   .flashcard-back { padding-bottom: 10px; }
+  /* 移动端区块压缩：助记+配图同行的前提下进一步收紧留白，尽量一屏放下 */
+  .flashcard-front, .flashcard-back { padding: 16px 14px; }
+  .fc-enrich-sec { padding: 8px 10px; margin-bottom: 6px; font-size: 12.5px; line-height: 1.5; }
+  .fc-enrich-hd { font-size: 11.5px; margin-bottom: 3px; }
+  .fc-enrich-row { gap: 6px; }
+  .fc-sec-pic { flex: 0 0 32%; }
+  .fc-ex-en { margin-bottom: 3px; }
+  .fc-ex-zh { margin-bottom: 5px; }
+  .fc-ex-bar { gap: 6px; }
+  .fc-ex-bar button { padding: 3px 10px; font-size: 11.5px; }
+  .fc-pic-em { font-size: 20px; }
+  .fc-pic-tx { font-size: 11px; }
+  .fc-def { margin-bottom: 8px; }
+  .fc-enrich-tabs { gap: 6px; margin-bottom: 5px; }
+  .fc-enrich-tabs button { padding: 3px 10px; font-size: 11.5px; }
+  .fc-enrich-pane ol { padding-left: 16px; font-size: 12px; }
+  .fc-sim span { padding: 2px 8px; font-size: 11.5px; }
   .fc-word { font-size: 24px; }
   .fc-def { font-size: 15px; }
   .flashcard-ops {
@@ -3736,35 +3762,85 @@ section.immersive {
 .immersive .flashcard-back {
   padding: 16px 14px;
 }
+/* 背面：一屏平铺，不滚动。所有区块压缩后完整呈现，超出部分不产生滚动条。 */
 .immersive .flashcard-back {
   justify-content: flex-start;
-  overflow-y: auto;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
+.immersive .fc-def-row { flex: none; margin-bottom: 0; }
 .immersive .fc-def {
-  font-size: 15.5px;
-  margin-bottom: 4px;
+  font-size: 15px;
+  margin-bottom: 0;
+  line-height: 1.5;
 }
-.immersive .fc-src { margin-bottom: 4px; }
+.immersive .fc-src { flex: none; margin-bottom: 0; }
 .immersive .fc-src .el-tag { font-size: 11px; padding: 0 6px; height: 20px; }
 .immersive .fc-enrich-sec {
-  padding: 6px 8px;
-  margin-bottom: 4px;
+  flex: none;
+  padding: 7px 9px;
+  margin-bottom: 0;
+  font-size: 12.5px;
+  line-height: 1.5;
 }
-.immersive .fc-enrich-hd { margin-bottom: 2px; }
+.immersive .fc-enrich-row { flex: none; gap: 6px; }
+.immersive .fc-sec-pic { flex: 0 0 32%; }
+.immersive .fc-enrich-hd { margin-bottom: 2px; font-size: 11.5px; }
 .immersive .fc-ex-en { margin-bottom: 2px; }
 .immersive .fc-ex-zh { margin-bottom: 4px; }
+.immersive .fc-ex-bar { gap: 6px; }
+.immersive .fc-ex-bar button { padding: 3px 10px; font-size: 11.5px; }
 .immersive .fc-pic-row { gap: 4px; }
-.immersive .fc-pic-em { font-size: 22px; }
-.immersive .fc-enrich-tabs { margin-bottom: 4px; }
-.immersive .fc-enrich-tabs button { padding: 4px 10px; }
-.immersive .fc-enrich-pane ol { padding-left: 16px; }
+.immersive .fc-pic-em { font-size: 20px; }
+.immersive .fc-pic-tx { font-size: 11px; }
+.immersive .fc-enrich-tabs { margin-bottom: 4px; gap: 6px; }
+.immersive .fc-enrich-tabs button { padding: 3px 10px; font-size: 11.5px; }
+.immersive .fc-enrich-pane ol { padding-left: 16px; font-size: 12px; }
+.immersive .fc-enrich-pane li { margin-bottom: 2px; }
+.immersive .fc-sim span { padding: 2px 8px; font-size: 11.5px; }
+.immersive .fc-enrich-empty { font-size: 11.5px; line-height: 1.5; }
+/* 英文释义 / 形近词：吸收剩余高度，内部不滚动 */
+.immersive .fc-sec-flex {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.immersive .fc-sec-flex .fc-enrich-tabs { flex: none; }
+.immersive .fc-enrich-pane {
+  flex: 1 1 auto;
+  min-height: 0;
+  /* 兜底：常规长度一屏放得下、不出现滚动条；
+     仅当英文释义/形近词异常长时该小区域内部可滑，避免内容被硬裁切后永久看不到。 */
+  overflow-y: auto;
+}
+/* 旧兼容例句块：沉浸式下压缩，不再挤占一屏空间 */
+.immersive .fc-example {
+  flex: none;
+  padding: 5px 8px;
+  margin-bottom: 0;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.immersive .fc-load-ex {
+  flex: none;
+  padding: 4px 10px;
+  font-size: 12px;
+  margin-top: 0;
+  align-self: stretch;
+  text-align: center;
+}
 .immersive .flashcard-ops {
   flex: none;
   margin-top: 6px;
-  /* 固定 px、禁用 env()：沉浸式全屏容器自身 padding 12px，
-     再加 12px 共 24px 底部安全间距，配合 100dvh 已可避开全面屏手势条。
-     不用 env()：不支持的 WebView 会让整条 calc 失效。 */
+  /* 双写兜底：先给固定 12px（不支持 env() 的旧 WebView 整条 calc 失效时仍有效），
+     IQOO Neo9 自带浏览器为 Chromium 内核，支持 env() 时会覆盖为真实安全区高度，
+     精确避开系统手势条，操作按钮不再被遮挡。 */
   padding-bottom: 12px;
+  padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
 }
 .immersive .fc-actions { flex-wrap: wrap; gap: 5px; }
 .immersive .fc-actions .el-button {
