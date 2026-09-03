@@ -3734,7 +3734,7 @@ section.immersive {
   margin: 0 !important;
   border-radius: 0 !important;
   border: none !important;
-  padding: 12px !important;
+  padding: 12px 12px 8px !important;
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -3785,8 +3785,9 @@ section.immersive {
   font-size: 12.5px;
   line-height: 1.5;
 }
-.immersive .fc-enrich-row { flex: none; gap: 6px; }
-.immersive .fc-sec-pic { flex: 0 0 32%; }
+/* 助记恢复独立一行（与配图上下排）：长助记文本不再被右侧配图列挤压溢出 */
+.immersive .fc-enrich-row { flex: none; flex-direction: column; gap: 6px; }
+.immersive .fc-sec-pic { flex: 1 1 auto; max-width: none; padding: 5px 9px; }
 .immersive .fc-enrich-hd { margin-bottom: 2px; font-size: 11.5px; }
 .immersive .fc-ex-en { margin-bottom: 2px; }
 .immersive .fc-ex-zh { margin-bottom: 4px; }
@@ -3836,11 +3837,11 @@ section.immersive {
 .immersive .flashcard-ops {
   flex: none;
   margin-top: 6px;
-  /* 双写兜底：先给固定 12px（不支持 env() 的旧 WebView 整条 calc 失效时仍有效），
-     IQOO Neo9 自带浏览器为 Chromium 内核，支持 env() 时会覆盖为真实安全区高度，
-     精确避开系统手势条，操作按钮不再被遮挡。 */
-  padding-bottom: 12px;
-  padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  /* 双写兜底：先给固定 6px（不支持 env() 的旧 WebView 整条 calc 失效时仍有效），
+     IQOO Neo9 自带浏览器为 Chromium 内核，支持 env() 时会覆盖为真实安全区高度。
+     底部留白收紧：把按钮下方的浪费空间还给内容区（用户要求页面拉长）。 */
+  padding-bottom: 6px;
+  padding-bottom: calc(6px + env(safe-area-inset-bottom, 0px));
 }
 .immersive .fc-actions { flex-wrap: wrap; gap: 5px; }
 .immersive .fc-actions .el-button {
