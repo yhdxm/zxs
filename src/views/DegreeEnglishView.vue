@@ -3734,8 +3734,11 @@ section.immersive {
   margin: 0 !important;
   border-radius: 0 !important;
   border: none !important;
-  /* 容器留白再收紧（12→10），把更多竖向空间还给卡片内容，避免助记被挤出/截断 */
-  padding: 10px 10px 2px !important;
+  /* 关键修复：容器底部预留手机浏览器手势条(~24px)安全区。
+     position:fixed inset:0 会被底部导航条 overlay 遮挡，导致操作栏/tab 内容「被遮挡看不到」。
+     固定 32px 兜底 + env() 增强（不支持 env 的旧 WebView 自动回退到 32px）。 */
+  padding: 8px 8px 32px !important;
+  padding: 8px 8px calc(8px + env(safe-area-inset-bottom, 24px)) !important;
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -3761,8 +3764,8 @@ section.immersive {
 }
 .immersive .flashcard-front,
 .immersive .flashcard-back {
-  /* 卡片内边距 16/14 → 14/12，继续压缩，背面内容更舒展不溢出 */
-  padding: 14px 12px;
+  /* 卡片内边距继续压缩，背面内容更舒展不溢出 */
+  padding: 12px 10px;
 }
 /* 背面：一屏平铺，不滚动。所有区块压缩后完整呈现，超出部分不产生滚动条。 */
 .immersive .flashcard-back {
@@ -3782,10 +3785,10 @@ section.immersive {
 .immersive .fc-src .el-tag { font-size: 11px; padding: 0 6px; height: 20px; }
 .immersive .fc-enrich-sec {
   flex: none;
-  padding: 7px 9px;
+  padding: 5px 7px;
   margin-bottom: 0;
   font-size: 12.5px;
-  line-height: 1.5;
+  line-height: 1.45;
 }
 /* 助记恢复独立一行（与配图上下排）：长助记文本不再被右侧配图列挤压溢出 */
 .immersive .fc-enrich-row { flex: none; flex-direction: column; gap: 6px; }
@@ -3793,21 +3796,22 @@ section.immersive {
 .immersive .fc-enrich-hd { margin-bottom: 2px; font-size: 11.5px; }
 .immersive .fc-ex-en { margin-bottom: 2px; }
 .immersive .fc-ex-zh { margin-bottom: 4px; }
-.immersive .fc-ex-bar { gap: 6px; }
-.immersive .fc-ex-bar button { padding: 3px 10px; font-size: 11.5px; }
+.immersive .fc-ex-bar { gap: 4px; }
+.immersive .fc-ex-bar button { padding: 2px 8px; font-size: 11px; }
 .immersive .fc-pic-row { gap: 4px; }
 .immersive .fc-pic-em { font-size: 20px; }
 .immersive .fc-pic-tx { font-size: 11px; }
 .immersive .fc-enrich-tabs { margin-bottom: 4px; gap: 6px; }
 .immersive .fc-enrich-tabs button { padding: 3px 10px; font-size: 11.5px; }
-.immersive .fc-enrich-pane ol { padding-left: 16px; font-size: 12px; }
-.immersive .fc-enrich-pane li { margin-bottom: 2px; }
+.immersive .fc-enrich-pane ol { padding-left: 14px; font-size: 11.5px; line-height: 1.5; }
+.immersive .fc-enrich-pane li { margin-bottom: 1px; }
 .immersive .fc-sim span { padding: 2px 8px; font-size: 11.5px; }
 .immersive .fc-enrich-empty { font-size: 11.5px; line-height: 1.5; }
 /* 英文释义 / 形近词：吸收剩余高度，内部不滚动 */
 .immersive .fc-sec-flex {
   flex: 1 1 auto;
-  min-height: 0;
+  /* 保证「英文释义 / 形近词」tab 内容区（含翻译）始终有可见高度，不丢功能 */
+  min-height: 100px;
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -3839,20 +3843,21 @@ section.immersive {
 .immersive .flashcard-ops {
   flex: none;
   margin-top: 4px;
-  /* 双写兜底：固定 0（IQOO Neo9 支持 env()，真实安全区高度会补上；
-     不支持 env() 的旧 WebView 直接 0，让按钮贴底，消除用户反馈的「按钮下面还空一大截」）。 */
-  padding-bottom: 0;
-  padding-bottom: env(safe-area-inset-bottom, 0px);
+  /* 底部安全区由 .immersive 容器统一预留（含手势条），操作栏自身不再额外留白，
+     让「忘记/认识/生词本/简单/跳过」真正沉底且不超出容器被遮挡。 */
+  padding-bottom: 0 !important;
 }
-.immersive .fc-actions { flex-wrap: wrap; gap: 4px; }
+.immersive .fc-actions { flex-wrap: wrap; gap: 3px; }
+/* 5 个按钮从 2+2+1 三行改为 3+2 两行，省出一整行高度给释义区 */
 .immersive .fc-actions .el-button {
-  flex: 1 1 calc(50% - 2px);
-  padding: 5px 6px;
-  font-size: 13px;
+  flex: 1 1 calc(33.333% - 2px);
+  padding: 5px 4px;
+  font-size: 12.5px;
+  min-width: 0;
 }
 .immersive .fc-actions .el-button.fc-skip {
-  flex: 1 1 100%;
-  padding: 4px 6px;
+  flex: 1 1 calc(50% - 2px);
+  padding: 4px 4px;
 }
 .immersive .fc-shortcuts { flex: none; margin-top: 4px; }
 .immersive-exit {
