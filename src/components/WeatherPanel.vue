@@ -380,8 +380,15 @@ watch(() => weather.value?.current.weatherCode, (code) => {
   .wp-hero-icon { font-size: 64px; }
   .wp-hero-temp { font-size: 42px; }
   .wp-hero-stats { width: 100%; grid-template-columns: repeat(2, 1fr); }
-  .wp-daily { grid-template-columns: repeat(7, minmax(40px, 1fr)); gap: 5px; }
-  .wp-day { padding: 10px 2px; }
+  .wp-daily {
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 6px;
+    grid-template-columns: none;
+  }
+  .wp-day { flex: 0 0 auto; width: 58px; padding: 10px 2px; }
   .wp-day-cond { font-size: 9px; min-height: 24px; }
   .wp-day-icon { font-size: 26px; }
   .half-icon { font-size: 13px; }

@@ -1350,6 +1350,10 @@ onUnmounted(() => {
   .main-content.authed-main:has(.welcome-shell) {
     padding-bottom: 0;
   }
+  /* AI 助手页面自带底部输入栏，自身处理安全区，取消全局底部留白避免输入栏上方出现空白 */
+  .main-content.authed-main:has(.ai-page.ai-fixed) {
+    padding-bottom: 0;
+  }
   /* 未登录顶栏避让刘海/状态栏安全区 */
   .mobile-topbar {
     padding-top: calc(10px + env(safe-area-inset-top));

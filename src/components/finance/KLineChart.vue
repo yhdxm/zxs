@@ -105,6 +105,8 @@ const isMinute = computed(() => props.period === 'minute')
 const option = computed<EChartsOption>(() => {
   const pts = props.points
   const dark = isDark()
+  // 移动端（IQOO Neo9 等窄屏）右侧 Y 轴文字空间紧张，需加大 right 并压字号，避免坐标轴标签被挤压堆叠
+  const isMobileView = typeof window !== 'undefined' && window.innerWidth <= 768
   const axisLine = dark ? '#334155' : '#e2e8f0'
   const axisLabel = dark ? '#94a3b8' : '#64748b'
   const splitLine = dark ? 'rgba(148,163,184,0.14)' : 'rgba(100,116,139,0.12)'
@@ -218,8 +220,8 @@ const option = computed<EChartsOption>(() => {
     animation: false,
     backgroundColor: 'transparent',
     grid: [
-      { left: 8, right: 52, top: 16, height: '62%' },
-      { left: 8, right: 52, top: '74%', bottom: props.zoom ? 42 : 16 }
+      { left: isMobileView ? 6 : 8, right: isMobileView ? 64 : 52, top: 16, height: '62%' },
+      { left: isMobileView ? 6 : 8, right: isMobileView ? 64 : 52, top: '74%', bottom: props.zoom ? 42 : 16 }
     ],
     axisPointer: {
       link: [{ xAxisIndex: 'all' }],
@@ -285,7 +287,7 @@ const option = computed<EChartsOption>(() => {
         gridIndex: 1,
         boundaryGap: !isMinute.value,
         axisLine: { lineStyle: { color: axisLine } },
-        axisLabel: { color: axisLabel, fontSize: 10, hideOverlap: true },
+        axisLabel: { color: axisLabel, fontSize: isMobileView ? 9 : 10, hideOverlap: true },
         axisTick: { show: false },
         splitLine: { show: false },
         min: 'dataMin',
@@ -299,7 +301,7 @@ const option = computed<EChartsOption>(() => {
         position: 'right',
         axisLine: { show: false },
         axisTick: { show: false },
-        axisLabel: { color: axisLabel, fontSize: 10, formatter: (v: number) => v.toFixed(d) },
+        axisLabel: { color: axisLabel, fontSize: isMobileView ? 9 : 10, formatter: (v: number) => v.toFixed(d) },
         splitLine: { lineStyle: { color: splitLine } }
       },
       {
@@ -307,13 +309,13 @@ const option = computed<EChartsOption>(() => {
         scale: isMinute.value,
         gridIndex: 0,
         position: 'right',
-        offset: 40,
+        offset: isMobileView ? 36 : 40,
         show: isMinute.value,
         axisLine: { show: false },
         axisTick: { show: false },
         axisLabel: {
           color: axisLabel,
-          fontSize: 10,
+          fontSize: isMobileView ? 9 : 10,
           formatter: (v: number) => `${v.toFixed(2)}%`
         },
         splitLine: { show: false }
@@ -324,7 +326,7 @@ const option = computed<EChartsOption>(() => {
         position: 'right',
         axisLine: { show: false },
         axisTick: { show: false },
-        axisLabel: { color: axisLabel, fontSize: 9, formatter: (v: number) => fmtVol(v) },
+        axisLabel: { color: axisLabel, fontSize: isMobileView ? 8 : 9, formatter: (v: number) => fmtVol(v) },
         splitLine: { lineStyle: { color: splitLine } }
       }
     ],

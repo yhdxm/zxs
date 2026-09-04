@@ -53,4 +53,25 @@ const onConfig = () => chatRef.value?.openConfig()
   min-height: 100vh;
   min-height: 100dvh;
 }
+@media (max-width: 768px) {
+  .ai-page.ai-fixed {
+    position: fixed;
+    top: 0;
+    top: env(safe-area-inset-top, 0px);
+    left: 0;
+    right: 0;
+    bottom: calc(56px + env(safe-area-inset-bottom, 0px));
+    height: auto;
+    max-width: none;
+    margin: 0;
+    padding: 0 14px;
+    z-index: 1;
+  }
+  :deep(.ai-chat-panel) {
+    flex: 1;
+    height: auto;
+    min-height: 0;
+    padding-bottom: 0;
+  }
+}
 </style>
