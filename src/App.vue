@@ -1256,10 +1256,14 @@ onUnmounted(() => {
   right: 0;
   bottom: 0;
   z-index: 45;
-  /* 固定 px：避免 env(safe-area-inset-bottom) 在不支持的 WebView 中失效。
-     80px = 内容区 58px + 常见全面屏手势条 22px，覆盖 iPhone X+ / 安卓手势导航。 */
-  height: 80px;
-  padding-bottom: 22px;
+  /* 高度自适应：内容(约 48px) + 顶部留白(5px) + 底部手势条安全区，
+     不再写死 80px 导致图标被顶到上半部、底部留一大截空白（用户反馈「模块提高了」）。 */
+  height: auto;
+  min-height: 56px;
+  padding-top: 5px;
+  padding-bottom: 8px;
+  /* 双写兜底：固定 8px 兼容旧 WebView；IQOO Neo9 等支持 env() 的浏览器用真实安全区高度 */
+  padding-bottom: env(safe-area-inset-bottom, 8px);
   background: var(--surface);
   background: color-mix(in srgb, var(--surface) 92%, transparent);
   backdrop-filter: saturate(160%) blur(14px);
@@ -1325,19 +1329,23 @@ onUnmounted(() => {
     flex: 1 1 auto;
     min-width: 0;
   }
-  /* 主内容底部留白：避开底部 tabbar(58px) + 备考台底栏(60px) + 悬浮按钮 + 系统手势条，避免内容被遮挡。
-     🔴 必须用固定 px、禁用 env()：本构建链压缩器会内联/合并掉 env 兜底写法；
-     且不支持 env() 的 WebView（微信内置浏览器等）会让整条 calc 失效 = 留白为 0，
-     内容直接被 fixed 底部导航遮住。学位英语备考台不走 no-global-pad 分支，全站全靠这条兜底。
-     180px 覆盖最坏双层底栏叠加 + 全面屏手势条。 */
+  /* 主内容底部留白：避开底部 tabbar + 系统手势条，避免内容被遮挡。
+     底部导航栏已改为自适应高度（约 56~82px），只需预留其高度 + 手势安全区缓冲，
+     不再写死 180px（旧值是双层底栏叠加的过度留白，会把 Welcome 背景顶上去「少一节」）。
+     92px 覆盖导航栏(≤82) + 约 10px 缓冲；固定 px 兼容不支持 env() 的旧 WebView。 */
   .main-content.authed-main {
-    padding-bottom: 180px;
+    padding-bottom: 92px;
   }
   .main-content {
-    padding-bottom: 180px;
+    padding-bottom: 92px;
   }
   /* 备考台自带底部导航，进入该路由时去掉全局底部留白，避免双重留白 */
   .main-content.authed-main.no-global-pad {
+    padding-bottom: 0;
+  }
+  /* 欢迎页：让背景渐变自然延伸至底部，取消全局底部留白，渐变会透到半透明导航栏下方，
+     消除「智习欢迎你下面少一节」的断裂感。居中内容仍在安全区内。 */
+  .main-content.authed-main:has(.welcome-shell) {
     padding-bottom: 0;
   }
   /* 未登录顶栏避让刘海/状态栏安全区 */

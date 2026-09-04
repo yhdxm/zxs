@@ -3734,7 +3734,8 @@ section.immersive {
   margin: 0 !important;
   border-radius: 0 !important;
   border: none !important;
-  padding: 12px 12px 8px !important;
+  /* 容器留白再收紧（12→10），把更多竖向空间还给卡片内容，避免助记被挤出/截断 */
+  padding: 10px 10px 2px !important;
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -3760,7 +3761,8 @@ section.immersive {
 }
 .immersive .flashcard-front,
 .immersive .flashcard-back {
-  padding: 16px 14px;
+  /* 卡片内边距 16/14 → 14/12，继续压缩，背面内容更舒展不溢出 */
+  padding: 14px 12px;
 }
 /* 背面：一屏平铺，不滚动。所有区块压缩后完整呈现，超出部分不产生滚动条。 */
 .immersive .flashcard-back {
@@ -3836,24 +3838,23 @@ section.immersive {
 }
 .immersive .flashcard-ops {
   flex: none;
-  margin-top: 6px;
-  /* 双写兜底：先给固定 6px（不支持 env() 的旧 WebView 整条 calc 失效时仍有效），
-     IQOO Neo9 自带浏览器为 Chromium 内核，支持 env() 时会覆盖为真实安全区高度。
-     底部留白收紧：把按钮下方的浪费空间还给内容区（用户要求页面拉长）。 */
-  padding-bottom: 6px;
-  padding-bottom: calc(6px + env(safe-area-inset-bottom, 0px));
+  margin-top: 4px;
+  /* 双写兜底：固定 0（IQOO Neo9 支持 env()，真实安全区高度会补上；
+     不支持 env() 的旧 WebView 直接 0，让按钮贴底，消除用户反馈的「按钮下面还空一大截」）。 */
+  padding-bottom: 0;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
 }
-.immersive .fc-actions { flex-wrap: wrap; gap: 5px; }
+.immersive .fc-actions { flex-wrap: wrap; gap: 4px; }
 .immersive .fc-actions .el-button {
-  flex: 1 1 calc(50% - 3px);
-  padding: 6px 6px;
+  flex: 1 1 calc(50% - 2px);
+  padding: 5px 6px;
   font-size: 13px;
 }
 .immersive .fc-actions .el-button.fc-skip {
   flex: 1 1 100%;
-  padding: 5px 6px;
+  padding: 4px 6px;
 }
-.immersive .fc-shortcuts { flex: none; margin-top: 6px; }
+.immersive .fc-shortcuts { flex: none; margin-top: 4px; }
 .immersive-exit {
   background: #3c3489 !important;
   color: #fff !important;
