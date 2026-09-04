@@ -346,11 +346,12 @@
                   <div v-else-if="cardEnrichLoading" class="fc-enrich-empty">例句加载中…</div>
                 </div>
 
-                <!-- 英文释义 / 形近词（吸收剩余高度，保证一屏不溢出） -->
+                <!-- 英文释义 / 形近词 / 例句（全部收进 tab，一屏不滚动、不丢功能） -->
                 <div class="fc-enrich-sec fc-sec-flex">
                   <div class="fc-enrich-tabs" role="tablist">
                     <button :class="{ on: cardReviewTab === 'en' }" type="button" role="tab" :aria-selected="cardReviewTab === 'en'" @click="cardReviewTab = 'en'">英文释义</button>
                     <button :class="{ on: cardReviewTab === 'sim' }" type="button" role="tab" :aria-selected="cardReviewTab === 'sim'" @click="cardReviewTab = 'sim'">形近词</button>
+                    <button :class="{ on: cardReviewTab === 'ex' }" type="button" role="tab" :aria-selected="cardReviewTab === 'ex'" @click="cardReviewTab = 'ex'">例句</button>
                   </div>
                   <div v-show="cardReviewTab === 'en'" class="fc-enrich-pane" role="tabpanel">
                     <ol v-if="cardEnrich?.enDefs?.length">
@@ -366,17 +367,19 @@
                     <div v-else-if="cardEnrichLoading" class="fc-enrich-empty">正在计算形近词…</div>
                     <div v-else class="fc-enrich-empty">词表中未找到形近词。</div>
                   </div>
+                  <div v-show="cardReviewTab === 'ex'" class="fc-enrich-pane" role="tabpanel">
+                    <div class="fc-example" v-if="examples[currentCardWord!.word]">
+                      <span class="ex-label">例句</span> {{ examples[currentCardWord!.word] }}
+                      <button class="trans-btn" @click.stop="translateExample(currentCardWord!.word)" :disabled="translating[currentCardWord!.word]">
+                        {{ translations[currentCardWord!.word] ? '已翻译' : '翻译' }}
+                      </button>
+                      <div class="fc-translation" v-if="translations[currentCardWord!.word]">📝 {{ translations[currentCardWord!.word] }}</div>
+                    </div>
+                    <div class="fc-enrich-empty" v-else-if="exampleLoading[currentCardWord!.word]">例句加载中…</div>
+                    <div class="fc-enrich-empty" v-else>暂无例句，点击「加载例句」获取。</div>
+                    <button class="fc-load-ex" v-if="!examples[currentCardWord!.word] && !exampleLoading[currentCardWord!.word]" @click.stop="loadExample(currentCardWord!.word)">📖 加载例句</button>
+                  </div>
                 </div>
-
-                <!-- 原有例句（兼容旧逻辑） -->
-                <div class="fc-example" v-if="examples[currentCardWord!.word]">
-                  <span class="ex-label">例句</span> {{ examples[currentCardWord!.word] }}
-                  <button class="trans-btn" @click.stop="translateExample(currentCardWord!.word)" :disabled="translating[currentCardWord!.word]">
-                    {{ translations[currentCardWord!.word] ? '已翻译' : '翻译' }}
-                  </button>
-                  <div class="fc-translation" v-if="translations[currentCardWord!.word]">📝 {{ translations[currentCardWord!.word] }}</div>
-                </div>
-                <button class="fc-load-ex" v-if="!examples[currentCardWord!.word] && !exampleLoading[currentCardWord!.word]" @click.stop="loadExample(currentCardWord!.word)">📖 加载例句</button>
               </div>
             </div>
           </div>
@@ -1580,7 +1583,7 @@ const cardFlipped = ref(false)
 const isMobileDevice = ref(typeof window !== 'undefined' && window.innerWidth <= 768)
 const cardEnrich = ref<WordEnrichData | null>(null)
 const cardEnrichLoading = ref(false)
-const cardReviewTab = ref<'en' | 'sim'>('en')
+const cardReviewTab = ref<'en' | 'sim' | 'ex'>('en')
 const phraseEnrich = ref<WordEnrichData | null>(null)
 const phraseEnrichLoading = ref(false)
 const phraseReviewTab = ref<'en' | 'sim'>('en')
@@ -3820,17 +3823,27 @@ section.immersive {
 .immersive .fc-enrich-pane {
   flex: 1 1 auto;
   min-height: 0;
-  /* 兜底：常规长度一屏放得下、不出现滚动条；
-     仅当英文释义/形近词异常长时该小区域内部可滑，避免内容被硬裁切后永久看不到。 */
-  overflow-y: auto;
+  /* 一屏不滚动：超长内容直接截断，保证整面不出现滚动条、操作栏不被顶上去遮挡 */
+  overflow: hidden;
 }
-/* 旧兼容例句块：沉浸式下压缩，不再挤占一屏空间 */
+.immersive .fc-enrich-pane ol { margin: 0; }
+.immersive .fc-enrich-pane li { line-height: 1.4; }
+/* 例句 tab 内容：压缩、翻译结果最多 3 行截断，保证一屏放下 */
 .immersive .fc-example {
   flex: none;
   padding: 5px 8px;
-  margin-bottom: 0;
+  margin-bottom: 6px;
   font-size: 12px;
   line-height: 1.5;
+}
+.immersive .fc-translation {
+  font-size: 11.5px;
+  line-height: 1.45;
+  margin-top: 4px;
+  -webkit-line-clamp: 3;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 .immersive .fc-load-ex {
   flex: none;
