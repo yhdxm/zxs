@@ -92,6 +92,7 @@ if exist "%IPFILE%" (
 
 if not defined GOOD_IP (
   for %%i in (
+    192.30.255.112
     4.208.26.197
     20.27.177.113
     20.26.156.215
@@ -156,20 +157,25 @@ if not defined GH_TOKEN (
   exit /b 1
 )
 
-REM ================= push (with retry over other routes) =================
+REM ================= push (retry each route) =================
 echo.
 echo 正在推送到 GitHub...
 set "PUSH_URL=https://%GH_TOKEN%@github.com/%REPO_FULL%.git"
 set "PUSH_LOG=%TEMP%\zxs_deploy_push.log"
-
-git !RESOLVE_ARG! push -f "%PUSH_URL%" main > "%PUSH_LOG%" 2>&1
-set "PUSH_ERR=!ERRORLEVEL!"
 set "PUSH_OK=0"
-findstr /C:"main -> main" "%PUSH_LOG%" >nul 2>&1 && set "PUSH_OK=1"
 
+REM 低速容忍：半通网络下避免被误判断流导致整轮失败
+git config http.lowSpeedLimit 0
+git config http.lowSpeedTime 9999
+git config http.maxRequestBuffer 104857600
+
+if defined GOOD_IP (
+  call :PUSH_WITH_RETRY "!GOOD_IP!" 3
+)
 if not "!PUSH_OK!" == "1" (
-  echo 首次推送失败或日志异常，正在尝试其他线路...
+  echo 首选线路未成功，正在尝试其他线路...
   for %%r in (
+    192.30.255.112
     4.208.26.197
     20.27.177.113
     20.26.156.215
@@ -179,17 +185,10 @@ if not "!PUSH_OK!" == "1" (
     140.82.114.3
     140.82.121.3
     20.205.243.166
-    192.30.255.112
   ) do (
     if not "!PUSH_OK!" == "1" (
       if not "%%r" == "!GOOD_IP!" (
-        echo   正在通过线路 %%r 重试 ...
-        git -c http.curloptResolve=github.com:443:%%r push -f "%PUSH_URL%" main > "%PUSH_LOG%" 2>&1
-        set "PUSH_ERR=!ERRORLEVEL!"
-        findstr /C:"main -> main" "%PUSH_LOG%" >nul 2>&1 && (
-          set "PUSH_OK=1"
-          > "%IPFILE%" echo %%r
-        )
+        call :PUSH_WITH_RETRY "%%r" 2
       )
     )
   )
@@ -227,6 +226,26 @@ set "PUSH_URL="
 set "GH_TOKEN="
 echo.
 pause
+exit /b 0
+
+REM ================= push retry helper =================
+:PUSH_WITH_RETRY
+set "TRY_IP=%~1"
+set "TRY_N=%~2"
+set /a P_IDX=0
+:PUSH_RETRY_LOOP
+set /a P_IDX+=1
+echo   线路 %TRY_IP% 第 %P_IDX%/%TRY_N% 次尝试...
+git -c http.curloptResolve=github.com:443:%TRY_IP% push -f "%PUSH_URL%" main > "%PUSH_LOG%" 2>&1
+if !ERRORLEVEL! == 0 (
+  findstr /C:"main -> main" "%PUSH_LOG%" >nul 2>&1
+  if !ERRORLEVEL! == 0 (
+    set "PUSH_OK=1"
+    > "%IPFILE%" echo %TRY_IP%
+    goto :EOF
+  )
+)
+if %P_IDX% lss %TRY_N% goto PUSH_RETRY_LOOP
 exit /b 0
 
 REM ================= subroutine =================
