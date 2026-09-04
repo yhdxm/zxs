@@ -444,7 +444,7 @@ onBeforeUnmount(() => {
 
 .chat-input-bar {
   flex-shrink: 0; display: flex; gap: 10px; align-items: flex-end;
-  padding: 14px 20px;
+  padding: 14px 20px calc(14px + env(safe-area-inset-bottom, 0px));
   background: var(--surface-soft);
   backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
   border-top: 1px solid var(--border);
@@ -515,7 +515,7 @@ onBeforeUnmount(() => {
   .ai-header { padding: 12px 14px; }
   .ai-title p { display: none; }
   .chat-scroll { padding: 16px 14px; }
-  .chat-input-bar { padding: 12px 14px; }
+  .chat-input-bar { padding: 12px 14px calc(12px + env(safe-area-inset-bottom, 12px)); }
   .message-row { max-width: 94%; }
   .send-text { display: none; }
   .send-btn { padding: 0 14px; }

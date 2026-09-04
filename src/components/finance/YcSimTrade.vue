@@ -490,6 +490,7 @@ onBeforeUnmount(stopTimer)
   margin: 0;
   font-size: 13px;
   color: var(--text-muted);
+  overflow-wrap: anywhere; word-break: break-word; line-height: 1.5;
 }
 .st-reset {
   flex-shrink: 0;
@@ -759,6 +760,7 @@ onBeforeUnmount(stopTimer)
   .st-kpis {
     grid-template-columns: repeat(2, 1fr);
   }
+  .st-head { flex-direction: column; }
   .st-main {
     grid-template-columns: 1fr;
   }

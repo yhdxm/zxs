@@ -1334,10 +1334,12 @@ onUnmounted(() => {
      不再写死 180px（旧值是双层底栏叠加的过度留白，会把 Welcome 背景顶上去「少一节」）。
      92px 覆盖导航栏(≤82) + 约 10px 缓冲；固定 px 兼容不支持 env() 的旧 WebView。 */
   .main-content.authed-main {
-    padding-bottom: 92px;
+    padding-bottom: 110px;
+    padding-bottom: calc(110px + env(safe-area-inset-bottom, 0px));
   }
   .main-content {
-    padding-bottom: 92px;
+    padding-bottom: 110px;
+    padding-bottom: calc(110px + env(safe-area-inset-bottom, 0px));
   }
   /* 备考台自带底部导航，进入该路由时去掉全局底部留白，避免双重留白 */
   .main-content.authed-main.no-global-pad {

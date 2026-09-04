@@ -359,9 +359,9 @@ watch(
     position: fixed;
     left: 0;
     right: 0;
-    bottom: 0;
+    bottom: env(safe-area-inset-bottom, 0px);
     top: auto !important;
-    max-height: 92vh;
+    max-height: calc(100dvh - env(safe-area-inset-bottom, 0px));
     border-radius: 16px 16px 0 0;
     display: flex;
     flex-direction: column;

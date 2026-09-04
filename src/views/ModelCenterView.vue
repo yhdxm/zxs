@@ -1690,6 +1690,8 @@ const onWindowBlur = () => {
 
 @media (max-width: 768px) {
   .mc-shell { padding: 0 14px 14px; }
+  /* 窄屏：操作链接独占一行换行，避免「设置额度」等按钮文字被截断 */
+  .mc-quota-actions { width: 100%; margin-top: 8px; justify-content: flex-start; }
   .mc-shell :deep(.ph-actions) { width: 100%; justify-content: space-between; }
   .mc-call-stats { grid-template-columns: repeat(2, 1fr); }
   /* 配额卡：总量/已用/剩余 5 列网格在窄屏过度拥挤，改为 3 列紧凑布局并隐藏分隔符 */
