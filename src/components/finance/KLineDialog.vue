@@ -30,12 +30,18 @@
       </div>
 
       <div class="kl-kpi">
-        <span>开 <b>{{ formatNum(quote.open, dg) }}</b></span>
-        <span>高 <b>{{ formatNum(quote.high, dg) }}</b></span>
-        <span>低 <b>{{ formatNum(quote.low, dg) }}</b></span>
+        <span :class="trendClassVal(quote.open)">开 <b>{{ formatNum(quote.open, dg) }}</b></span>
+        <span :class="trendClassVal(quote.high)">高 <b>{{ formatNum(quote.high, dg) }}</b></span>
+        <span :class="trendClassVal(quote.low)">低 <b>{{ formatNum(quote.low, dg) }}</b></span>
         <span>昨收 <b>{{ formatNum(quote.prevClose, dg) }}</b></span>
         <span class="kl-fresh" :class="'f-' + fresh.level">● {{ fresh.text }}</span>
         <span class="kl-time">{{ quote.time || '—' }}</span>
+      </div>
+
+      <div v-if="maVals" class="kl-ma">
+        <span class="kl-ma-i" style="--mc:#f59e0b">MA5 <b>{{ maVals.ma5 != null ? formatNum(maVals.ma5, dg) : '—' }}</b></span>
+        <span class="kl-ma-i" style="--mc:#3b82f6">MA10 <b>{{ maVals.ma10 != null ? formatNum(maVals.ma10, dg) : '—' }}</b></span>
+        <span class="kl-ma-i" style="--mc:#a855f7">MA20 <b>{{ maVals.ma20 != null ? formatNum(maVals.ma20, dg) : '—' }}</b></span>
       </div>
 
       <!-- 外盘商品（hf_）免费接口不提供 K 线，明确提示而非展示空白图表 -->
@@ -124,6 +130,20 @@ const loadFailed = ref(false)
 const quote = computed(() => props.quote ?? null)
 const klineSupported = computed(() => supportsKline(props.code))
 const isMobile = computed(() => typeof window !== 'undefined' && window.innerWidth <= 768)
+const isMinuteView = computed(() => period.value === 'minute')
+
+/** 非分时（K 线）视图下，展示 MA5/MA10/MA20 当前值色标图例 */
+const maVals = computed(() => {
+  if (isMinuteView.value || points.value.length < 5) return null
+  const p = points.value
+  const last = (n: number): number | null => {
+    if (p.length < n) return null
+    let s = 0
+    for (let i = p.length - n; i < p.length; i++) s += p[i]!.close
+    return Number((s / n).toFixed(p[0]!.close < 10 ? 3 : 2))
+  }
+  return { ma5: last(5), ma10: last(10), ma20: last(20) }
+})
 /** 低价品种（如天然气 2.88）保留 3 位小数，避免显示不准 */
 const dg = computed(() => ((quote.value?.price ?? 0) > 0 && quote.value!.price < 10 ? 3 : 2))
 
@@ -139,6 +159,14 @@ const emptyText = computed(() =>
 function trendClass(q: Quote): string {
   if (q.change > 0) return 'kl-up'
   if (q.change < 0) return 'kl-down'
+  return ''
+}
+/** 开/高/低 相对昨收着色（涨红跌绿），昨收本身不参与 */
+function trendClassVal(v: number): string {
+  const base = quote.value?.prevClose ?? 0
+  if (!base) return ''
+  if (v > base) return 'kl-up'
+  if (v < base) return 'kl-down'
   return ''
 }
 function formatNum(v: number, d = 2): string {
@@ -258,6 +286,20 @@ watch(
   color: var(--text-strong);
   font-weight: 600;
 }
+/* MA 图例：与图内均线同色，专业行情软件即视感 */
+.kl-ma {
+  display: flex;
+  gap: 14px;
+  font-size: 11px;
+  color: var(--text-faint);
+  margin: 4px 0 6px;
+  font-variant-numeric: tabular-nums;
+}
+.kl-ma-i b {
+  color: var(--mc, var(--text-strong));
+  font-weight: 600;
+  margin-left: 2px;
+}
 .kl-time {
   color: var(--text-faint);
   font-size: 12px;
@@ -368,7 +410,7 @@ watch(
   }
   .kl-dialog.el-dialog .el-dialog__body {
     overflow-y: auto;
-    padding: 12px 14px calc(16px + env(safe-area-inset-bottom, 0px));
+    padding: 12px 10px calc(16px + env(safe-area-inset-bottom, 0px));
   }
 }
 </style>
