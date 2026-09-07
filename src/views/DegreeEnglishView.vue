@@ -3857,13 +3857,14 @@ section.immersive {
   border: none !important;
   /* 关键修复：容器底部预留手机浏览器手势条(~24px)安全区。
      position:fixed inset:0 会被底部导航条 overlay 遮挡，导致操作栏/tab 内容「被遮挡看不到」。
-     固定 32px 兜底 + env() 增强（不支持 env 的旧 WebView 自动回退到 32px）。 */
+     env() 的 fallback 仅在属性「未定义」时生效；若内核把 safe-area-inset-* 报成 0（已定义但为 0），
+     fallback 不会触发，故必须用 max(env, 下限) 把固定值设为硬下限，env 仅在真正大于下限时生效。 */
   padding: 8px 8px 32px !important;
-  padding: 8px 8px calc(8px + env(safe-area-inset-bottom, 24px)) !important;
+  padding: 8px 8px calc(8px + max(env(safe-area-inset-bottom, 0px), 24px)) !important;
   /* 顶部同样预留挖孔/灵动岛/状态栏安全区，避免「退出沉浸」「✕」被居中摄像头遮挡。
-     固定 32px 兜底 + env(safe-area-inset-top) 增强，不支持的浏览器自动回退。 */
-  padding-top: calc(8px + 32px) !important;
-  padding-top: calc(8px + env(safe-area-inset-top, 32px)) !important;
+     IQOO Neo9 状态栏+挖孔实际约 44-50px，硬下限 48px；env 大于 48px 时取其值。 */
+  padding-top: calc(8px + 48px) !important;
+  padding-top: calc(8px + max(env(safe-area-inset-top, 0px), 48px)) !important;
   overflow: hidden;
   display: flex;
   flex-direction: column;

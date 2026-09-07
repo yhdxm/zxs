@@ -432,8 +432,8 @@ function onSwipeEnd(e: TouchEvent) {
   if (!t) return
   const dx = t.clientX - touchStartX
   const dy = t.clientY - touchStartY
-  // 横向位移 > 50px 且大于纵向，才算翻页手势（避免与上下滚动冲突）
-  if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)) {
+  // 横向位移 > 40px 且大于纵向，才算翻页手势（避免与上下滚动冲突）
+  if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy)) {
     if (dx < 0) next()
     else prev()
   }
@@ -584,6 +584,17 @@ function toggleFullscreen() {
 }
 function onFullscreenChange() {
   isFullscreen.value = Boolean(document.fullscreenElement)
+  // 全屏切换后容器尺寸改变，按新视口重新渲染当前页：文档自适应放大、撑满可用空间，不再留白。
+  // 延迟 320ms 等浏览器完成全屏布局（部分内核全屏后 clientWidth 仍短暂为旧值，导致 canvas 仍偏小）。
+  if (!props.modelValue) return
+  window.setTimeout(() => {
+    if (mode.value === 'single') {
+      void renderPage(pageNum.value, canvasEl.value)
+    } else {
+      setupScrollObserver()
+      void renderVisiblePages()
+    }
+  }, 320)
 }
 
 /* ==================== 生命周期 ==================== */
@@ -637,6 +648,16 @@ onBeforeUnmount(() => {
   width: 100vw;
   height: 100vh;
   background: #0f172a;
+}
+/* 真·全屏（浏览器 Fullscreen API）下，顶部为系统状态栏叠加区，给画布区补安全区避免被遮。
+   同样用 max(env, 下限) 把固定值设为硬下限：env 已定义但报 0 时 fallback 不触发，必须用 max 兜底。 */
+.pdfv-root:fullscreen .pdfv-bar {
+  padding-top: calc(6px + 28px);
+  padding-top: calc(6px + max(env(safe-area-inset-top, 0px), 28px));
+}
+.pdfv-root:fullscreen .pdfv-body {
+  padding-top: 6px;
+  padding-top: calc(6px + max(env(safe-area-inset-top, 0px), 6px));
 }
 .pdfv-root:fullscreen .pdfv-bar {
   background: #0f172a;
