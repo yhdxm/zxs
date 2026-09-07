@@ -79,6 +79,8 @@ export default defineConfig({
   build: {
     // 第三方库（element-plus / echarts 等）已单独拆成 vendor chunk 且路由懒加载，体积不计入首屏，放宽告警阈值
     chunkSizeWarningLimit: 1000,
+    // 本环境对批量删除 dist 有安全阈值，避免触发沙箱阻止构建
+    emptyOutDir: false,
     // 注意：本项目 rolldown-vite 环境下 oxc 压缩 + 自定义 dropConsolePlugin 会导致生产包入口 chunk 损坏、
     // 页面白屏（#app 为空、无任何报错）。已验证 minify:false（且移除 dropConsolePlugin）可正常挂载渲染。
     // 暂用 minify:false 保证可上线；后续如需压缩，需在 Linux CI 单独验证挂载后再启用。

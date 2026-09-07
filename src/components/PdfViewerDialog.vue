@@ -12,7 +12,7 @@
       <!-- 工具栏 -->
       <div class="pdfv-bar">
         <div v-if="!useNative" class="pdfv-bar-left">
-          <button type="button" class="pdfv-btn" @click="toggleMode">
+          <button v-if="!isMobile" type="button" class="pdfv-btn" @click="toggleMode">
             {{ mode === 'scroll' ? '单页' : '滚动' }}
           </button>
           <button type="button" class="pdfv-btn" @click="prev" :disabled="pageNum <= 1">‹</button>
@@ -49,12 +49,13 @@
 
         <div class="pdfv-bar-right">
           <span v-if="loadSource && !useNative" class="pdfv-src">{{ loadSource }}</span>
-          <!-- 系统阅读器：常驻可切换，用浏览器原生渲染，成功率最高 -->
+          <!-- 系统阅读器：PC 端兜底；移动端 iframe 实测白屏，不显示 -->
           <button
+            v-if="!isMobile"
             type="button"
             class="pdfv-btn"
             :class="{ 'pdfv-on': useNative }"
-            title="用手机/浏览器自带的 PDF 阅读器打开，兼容性最好"
+            title="用浏览器自带的 PDF 阅读器打开，兼容性最好"
             @click="toggleNative"
           >
             {{ useNative ? '高级阅读' : '系统阅读器' }}
@@ -185,10 +186,9 @@ const isFullscreen = ref(false)
 const loadSource = ref('')
 /** 文档加载进度 0-100（含下载与解析） */
 const progress = ref(0)
-/** 是否改用系统阅读器（iframe 原生预览）。默认跟随端型：移动端=true（大 PDF 用原生渲染，不卡不闪退）、
- *  PC=false（pdf.js canvas 体验更好）。用户手动切换后记住（userMode），同一文档会话内不重置。 */
+/** 是否改用系统阅读器（iframe 原生预览）。PC 端允许用户手动切换；移动端 iframe 实测白屏，强制走 pdf.js。 */
 const useNative = ref(false)
-/** 用户手动选择的模式；null 表示未手动选，按端型默认 */
+/** 用户手动选择的模式；null 表示未手动选。仅在 PC 端生效 */
 let userMode: boolean | null = null
 
 const rootEl = ref<HTMLElement | null>(null)
@@ -255,9 +255,10 @@ async function ensurePdfjs(): Promise<any> {
 
 async function openDoc() {
   if (!props.url) return
-  // 移动端默认「系统阅读器」(iframe 原生渲染)：大 PDF 不在应用内渲染 canvas，不占内存、不卡不闪退、立刻有画面；
-  // PC 端仍默认 pdf.js canvas（体验更好）。两种模式用户均可随时切换（userMode 记住手动选择）。
-  useNative.value = userMode ?? isMobile.value
+  // 移动端强制 pdf.js 应用内渲染：IQOO 等国产 Chromium 内核 iframe 内嵌 PDF 白屏，不可依赖。
+  // PC 端尊重用户手动选择。同时移动端锁定单页，避免滚动模式多页爆内存。
+  useNative.value = isMobile.value ? false : (userMode ?? false)
+  if (mode.value === 'scroll' && isMobile.value) mode.value = 'single'
   if (useNative.value) {
     phase.value = 'ready'
     numPages.value = 0
@@ -278,9 +279,12 @@ async function openDoc() {
       }
       renderedPages.clear()
       pageCanvasMap.value = {}
-      // 进度回调：实时反馈下载/解析进度，避免"一直转圈看不到进展"
+      // 省内存三件套之一：disableAutoFetch+disableStream 走 HTTP Range 分块按需下载，
+      // 只拉当前阅读位置附近的数据块，20MB 大文件不再整本吃进内存（GitHub Pages 支持 Range）
       pdfDoc = await lib.getDocument({
         url: props.url,
+        disableAutoFetch: true,
+        disableStream: true,
         onProgress: (p: { loaded?: number; total?: number }) => {
           if (p?.loaded != null) {
             if (p.total) {
@@ -307,13 +311,18 @@ async function openDoc() {
       await renderVisiblePages()
     }
   } catch (e: any) {
-    // pdf.js 加载/解析失败：自动切「系统阅读器」兜底，保证一定有东西可看，不再卡在错误页
-    console.warn('[PdfViewer] 打开失败，自动切系统阅读器兜底', e)
-    userMode = true
-    useNative.value = true
-    phase.value = 'ready'
-    numPages.value = 0
-    errMsg.value = ''
+    // pdf.js 加载/解析失败：移动端 iframe 实测白屏，不再自动切换；直接提示下载查看。
+    console.warn('[PdfViewer] 打开失败', e)
+    if (!isMobile.value) {
+      userMode = true
+      useNative.value = true
+      phase.value = 'ready'
+      numPages.value = 0
+      errMsg.value = ''
+    } else {
+      phase.value = 'error'
+      errMsg.value = 'PDF 预览加载失败，请下载后查看'
+    }
   }
 }
 
@@ -330,8 +339,15 @@ async function renderPage(p: number, canvas: HTMLCanvasElement | null | undefine
     const containerW = rootEl.value.clientWidth - 24
     const base = page.getViewport({ scale: 1 })
     const scale = Math.max(containerW / base.width, 0.5)
-    const dpr = Math.min(window.devicePixelRatio || 1, 2)
-    const viewport = page.getViewport({ scale: scale * dpr })
+    // 省内存三件套之二：画布降采样。移动端 DPR 压到 1.0、画布物理像素宽上限 800，
+    // 单页内存从 ~15MB 降到 ~2MB，肉眼基本可用，杜绝大文件连翻闪退
+    const dprCap = isMobile.value ? 1.0 : 2
+    const dpr = Math.min(window.devicePixelRatio || 1, dprCap)
+    let viewport = page.getViewport({ scale: scale * dpr })
+    const maxPx = isMobile.value ? 800 : 1000
+    if (viewport.width > maxPx) {
+      viewport = page.getViewport({ scale: (scale * maxPx) / base.width })
+    }
 
     canvas.width = Math.floor(viewport.width)
     canvas.height = Math.floor(viewport.height)
@@ -402,6 +418,7 @@ function setupScrollObserver() {
         if (entry.isIntersecting && p) {
           void renderPage(p, pageCanvasMap.value[p])
           updateCurrentPageFromScroll()
+          trimDistantPages(pageNum.value)
         }
       })
     },
@@ -449,6 +466,21 @@ function scrollToPage(p: number) {
   }
 }
 
+/** 省内存三件套之三：滚动模式只保留当前页 ±3 页的画布，远页释放显存（保留 CSS 占位尺寸防滚动跳动） */
+function trimDistantPages(current: number) {
+  if (mode.value !== 'scroll') return
+  const keep = 3
+  for (const key of Object.keys(pageCanvasMap.value)) {
+    const p = Number(key)
+    if (!p || Math.abs(p - current) <= keep || !renderedPages.has(p)) continue
+    const canvas = pageCanvasMap.value[p]
+    if (!canvas) continue
+    canvas.width = 1
+    canvas.height = 1
+    renderedPages.delete(p)
+  }
+}
+
 async function renderVisiblePages() {
   if (!bodyEl.value) return
   const rect = bodyEl.value.getBoundingClientRect()
@@ -462,9 +494,12 @@ async function renderVisiblePages() {
       }
     }
   }
+  trimDistantPages(pageNum.value)
 }
 
 function toggleMode() {
+  // 移动端强制单页，禁止切滚动；PC 端自由切换
+  if (isMobile.value) return
   mode.value = mode.value === 'scroll' ? 'single' : 'scroll'
   renderedPages.clear()
   nextTick(() => {
@@ -483,6 +518,7 @@ function toggleMode() {
 
 /* ==================== 系统阅读器切换 ==================== */
 function toggleNative() {
+  if (isMobile.value) return
   userMode = !useNative.value
   useNative.value = userMode
   if (useNative.value) {
@@ -526,8 +562,12 @@ watch(
 watch(
   () => props.url,
   () => {
-    // URL 切换时重置状态（手动选择也回到端型默认）
-    userMode = null
+    // URL 切换时重置状态。移动端永远回 pdf.js 单页；PC 端保留手动选择。
+    if (isMobile.value) {
+      userMode = null
+      useNative.value = false
+      mode.value = 'single'
+    }
     pdfDocUrl = ''
     renderedPages.clear()
     pageCanvasMap.value = {}
