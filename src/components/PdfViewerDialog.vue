@@ -265,9 +265,13 @@ async function ensurePdfjs(): Promise<any> {
 async function openDoc() {
   if (!props.url) return
   // 移动端强制 pdf.js 应用内渲染：IQOO 等国产 Chromium 内核 iframe 内嵌 PDF 白屏，不可依赖。
-  // PC 端尊重用户手动选择。同时移动端锁定单页，避免滚动模式多页爆内存。
+  // 移动端默认「连续滚动」阅读器（上下滑看所有页，体验同普通阅读器）；PC 端尊重用户手动选择。
   useNative.value = isMobile.value ? false : (userMode ?? false)
-  if (mode.value === 'scroll' && isMobile.value) mode.value = 'single'
+  if (isMobile.value) {
+    mode.value = 'scroll'
+  } else {
+    mode.value = userMode ? 'scroll' : 'single'
+  }
   if (useNative.value) {
     phase.value = 'ready'
     numPages.value = 0
@@ -616,11 +620,13 @@ watch(
 watch(
   () => props.url,
   () => {
-    // URL 切换时重置状态。移动端永远回 pdf.js 单页；PC 端保留手动选择。
+    // URL 切换时重置状态。移动端默认 pdf.js 连续滚动；PC 端保留手动选择。
     if (isMobile.value) {
       userMode = null
       useNative.value = false
-      mode.value = 'single'
+      mode.value = 'scroll'
+    } else {
+      mode.value = userMode ? 'scroll' : 'single'
     }
     pdfDocUrl = ''
     renderedPages.clear()
@@ -676,6 +682,10 @@ onBeforeUnmount(() => {
   padding: 0;
   width: 100%;
   min-height: calc(100% - 6px);
+}
+/* 全屏滚动模式：让纵向页列表撑满可用宽度（全屏 body 是 flex，scroll 作为 item 需显式 100%） */
+.pdfv-root:fullscreen .pdfv-scroll {
+  width: 100%;
 }
 .pdfv-root:fullscreen .pdfv-bar {
   background: #0f172a;
@@ -835,6 +845,16 @@ onBeforeUnmount(() => {
   align-items: center;
   padding-bottom: 20px;
 }
+/* 滚动模式每页用 A4 比例占位（纵向 1:1.414），未渲染的 canvas 不会塌成默认 300x150 白块，
+   保证纵向滚动位置稳定、不跳动；渲染后由 canvas 真实高度接管。IQOO 自带 Chromium 支持 aspect-ratio。 */
+.pdfv-scroll .pdfv-page-wrap {
+  min-height: 0;
+  aspect-ratio: 1 / 1.414;
+}
+/* 未渲染的 canvas 设为透明，避免默认 300x150 白块在深色背景上露出；渲染后内部 fillRect 画白底 */
+.pdfv-scroll .pdfv-canvas {
+  background: transparent;
+}
 .pdfv-tip {
   padding: 60px 12px;
   font-size: 13px;
@@ -872,11 +892,12 @@ onBeforeUnmount(() => {
   z-index: 10;
 }
 
-/* 移动端 */
-@media (max-width: 768px) {
-  .pdfv-root {
-    height: 100%;
-  }
+  /* 移动端 */
+  @media (max-width: 768px) {
+    .pdfv-root {
+      height: 100vh;
+      height: 100dvh;
+    }
   .pdfv-bar {
     padding: calc(8px + env(safe-area-inset-top, 0px)) 10px 8px;
   }
