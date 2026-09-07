@@ -95,17 +95,21 @@
           </div>
           <div v-else-if="phase === 'error'" class="pdfv-tip pdfv-err">
             {{ errMsg }}
+            <div v-if="lastRenderError" class="pdfv-err-debug">{{ lastRenderError }}</div>
             <div class="pdfv-err-sub">
-              可切换到
-              <a href="javascript:void(0)" @click="toggleNative">系统阅读器</a>
-              打开，或
+              请
               <a :href="url" target="_blank" rel="noopener">下载后查看</a>
             </div>
           </div>
 
         <template v-else>
-          <!-- 单页模式：当前页 -->
-          <div v-if="mode === 'single'" class="pdfv-page-wrap pdfv-page-wrap--single">
+          <!-- 单页模式：当前页（支持左右滑动手势翻页） -->
+          <div
+            v-if="mode === 'single'"
+            class="pdfv-page-wrap pdfv-page-wrap--single"
+            @touchstart="onSwipeStart"
+            @touchend="onSwipeEnd"
+          >
             <canvas ref="canvasEl" class="pdfv-canvas"></canvas>
           </div>
 
@@ -188,6 +192,8 @@ const loadSource = ref('')
 const progress = ref(0)
 /** 是否改用系统阅读器（iframe 原生预览）。PC 端允许用户手动切换；移动端 iframe 实测白屏，强制走 pdf.js。 */
 const useNative = ref(false)
+/** 最近一次渲染失败的具体原因，用于 UI 显式提示（不再只在 console） */
+const lastRenderError = ref('')
 /** 用户手动选择的模式；null 表示未手动选。仅在 PC 端生效 */
 let userMode: boolean | null = null
 
@@ -202,6 +208,9 @@ let renderTask: any = null
 let observer: IntersectionObserver | null = null
 let scrollTimer: number | null = null
 const renderedPages = new Set<number>()
+/** 单页模式左右滑动手势起点 */
+let touchStartX = 0
+let touchStartY = 0
 
 function loadScript(src: string, timeoutMs = 8000): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -304,6 +313,8 @@ async function openDoc() {
     }
     phase.value = 'ready'
     await nextTick()
+    // 等一帧：确保 el-dialog 过渡结束、容器宽度已就绪（移动端真机 clientWidth 常为 0→canvas 白屏主因）
+    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
     if (mode.value === 'single') {
       await renderPage(pageNum.value, canvasEl.value)
     } else {
@@ -336,15 +347,18 @@ async function renderPage(p: number, canvas: HTMLCanvasElement | null | undefine
     const ctx = canvas.getContext('2d')
     if (!ctx) return
 
-    const containerW = rootEl.value.clientWidth - 24
+    // 容器宽度保护：弹窗过渡未结束时 clientWidth 可能为 0，导致 canvas 尺寸异常→真机白屏。
+    // 兜底用视口宽度减边距，保证拿到正数。
+    let containerW = (rootEl.value?.clientWidth || 0) - 24
+    if (containerW <= 0) containerW = (window.innerWidth || 390) - 40
     const base = page.getViewport({ scale: 1 })
     const scale = Math.max(containerW / base.width, 0.5)
-    // 省内存三件套之二：画布降采样。移动端 DPR 压到 1.0、画布物理像素宽上限 800，
-    // 单页内存从 ~15MB 降到 ~2MB，肉眼基本可用，杜绝大文件连翻闪退
-    const dprCap = isMobile.value ? 1.0 : 2
+    // 清晰度提升：移动端 DPR cap 从 1.0 提到 1.5（约 1.5x 清晰度），画布物理宽上限提到 1100，
+    // 单页内存约 3-4MB，肉眼清晰且不闪退（之前 1.0 cap 偏糊，用户反馈不清晰）。
+    const dprCap = isMobile.value ? 1.5 : 2
     const dpr = Math.min(window.devicePixelRatio || 1, dprCap)
     let viewport = page.getViewport({ scale: scale * dpr })
-    const maxPx = isMobile.value ? 800 : 1000
+    const maxPx = isMobile.value ? 1100 : 1400
     if (viewport.width > maxPx) {
       viewport = page.getViewport({ scale: (scale * maxPx) / base.width })
     }
@@ -353,6 +367,9 @@ async function renderPage(p: number, canvas: HTMLCanvasElement | null | undefine
     canvas.height = Math.floor(viewport.height)
     canvas.style.width = `${Math.floor(base.width * scale)}px`
     canvas.style.height = `${Math.floor(base.height * scale)}px`
+    // 先铺白底，避免某些内核渲染首帧前透明露出导致的「空白」观感
+    ctx.fillStyle = '#ffffff'
+    ctx.fillRect(0, 0, canvas.width, canvas.height)
 
     if (renderTask) {
       try {
@@ -367,6 +384,7 @@ async function renderPage(p: number, canvas: HTMLCanvasElement | null | undefine
   } catch (e: any) {
     if (e?.name !== 'RenderingCancelledException') {
       console.warn('[PdfViewer] 渲染失败', e)
+      lastRenderError.value = String(e?.message || e || '未知渲染错误')
     }
   }
 }
@@ -398,6 +416,26 @@ function jumpFromInput() {
     renderPage(n, canvasEl.value)
   } else {
     scrollToPage(n)
+  }
+}
+
+/* ==================== 移动端左右滑动手势翻页 ==================== */
+function onSwipeStart(e: TouchEvent) {
+  const t = e.changedTouches[0]
+  if (!t) return
+  touchStartX = t.clientX
+  touchStartY = t.clientY
+}
+function onSwipeEnd(e: TouchEvent) {
+  if (mode.value !== 'single') return
+  const t = e.changedTouches[0]
+  if (!t) return
+  const dx = t.clientX - touchStartX
+  const dy = t.clientY - touchStartY
+  // 横向位移 > 50px 且大于纵向，才算翻页手势（避免与上下滚动冲突）
+  if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)) {
+    if (dx < 0) next()
+    else prev()
   }
 }
 
@@ -769,6 +807,16 @@ onBeforeUnmount(() => {
   color: #93c5fd;
   font-weight: 700;
 }
+.pdfv-err-debug {
+  margin-top: 6px;
+  padding: 6px 8px;
+  font-size: 11px;
+  color: #fca5a5;
+  text-align: left;
+  word-break: break-all;
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 6px;
+}
 .pdfv-float {
   position: fixed;
   right: 18px;
@@ -785,7 +833,7 @@ onBeforeUnmount(() => {
     height: 100%;
   }
   .pdfv-bar {
-    padding: 8px 10px;
+    padding: calc(8px + env(safe-area-inset-top, 0px)) 10px 8px;
   }
   .pdfv-btn,
   .pdfv-dl {
