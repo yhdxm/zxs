@@ -3214,6 +3214,7 @@ onBeforeUnmount(() => {
 }
 .lib-filter {
   flex-wrap: wrap;
+  margin-bottom: 14px;
 }
 .lib-list {
   display: flex;
@@ -3224,19 +3225,22 @@ onBeforeUnmount(() => {
 }
 .lib-item {
   display: flex;
-  gap: 6px;
-  align-items: baseline;
-  padding: 7px 8px;
-  border-radius: 8px;
+  gap: 8px;
+  align-items: flex-start;
+  padding: 11px 12px;
+  border-radius: 10px;
   cursor: pointer;
   font-size: 13px;
-  line-height: 1.5;
+  line-height: 1.55;
+  border: 1px solid transparent;
+  transition: background 0.15s ease, border-color 0.15s ease;
 }
 .lib-item:hover {
   background: #f3f1ff;
 }
 .lib-item.active {
   background: #ece8ff;
+  border-color: #d8d0ff;
   font-weight: 600;
 }
 .lib-book {
@@ -3245,15 +3249,24 @@ onBeforeUnmount(() => {
   color: #6b5bd6;
   background: #efeaff;
   border-radius: 4px;
-  padding: 0 5px;
+  padding: 2px 6px;
+  margin-top: 1px;
+  line-height: 1.4;
+  white-space: nowrap;
 }
 .lib-title {
   color: var(--text-strong);
+  flex: 1;
+  min-width: 0;
+  word-break: break-word;
 }
 .lib-reader {
   overflow-y: auto;
-  max-height: 600px;
-  padding: 4px 8px;
+  max-height: 640px;
+  padding: 16px 18px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--color-background-primary, #fff);
 }
 .reader-head {
   display: flex;
@@ -3680,11 +3693,20 @@ onBeforeUnmount(() => {
     padding: 6px 8px;
     font-size: 12px;
   }
-  /* 资料库移动端：阅读区限高+内部滚动，避免正文顶穿底部导航 */
+  /* 资料库移动端：阅读区取消独立滚动，改为随页面整体滚动，
+     底部留足空间(90px)避开固定悬浮菜单按钮(bottom:28px 高46px≈74px)，彻底解决穿模遮挡正文 */
   .lib-reader {
-    max-height: calc(100vh - 320px);
-    padding-bottom: 24px;
+    max-height: none;
+    overflow: visible;
+    padding: 16px 12px 90px;
   }
+  .reader-head {
+    position: static;
+    top: auto;
+    flex-wrap: wrap;
+    gap: 6px 10px;
+  }
+  .reader-head .el-button { margin-left: auto; }
   .lib-list { max-height: 220px; }
 }
 
