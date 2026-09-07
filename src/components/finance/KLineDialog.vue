@@ -12,36 +12,36 @@
         <div class="kl-name">
           <span class="kl-t">{{ quote.name }}</span>
           <span class="kl-c">{{ quote.code.toUpperCase() }}</span>
+        </div>
+        <div class="kl-quote">
           <span class="kl-p" :class="trendClass(quote)">{{ formatNum(quote.price, dg) }}</span>
           <span class="kl-ch" :class="trendClass(quote)">
             {{ quote.change >= 0 ? '+' : '' }}{{ formatNum(quote.change, dg) }}
             {{ quote.changePercent >= 0 ? '+' : '' }}{{ formatNum(quote.changePercent, 2) }}%
           </span>
         </div>
-        <div class="kl-seg">
-          <span
-            v-for="p in periods"
-            :key="p.value"
-            :class="['kl-seg-item', p.value === period ? 'on' : '']"
-            @click="switchPeriod(p.value)"
-            >{{ p.label }}</span
-          >
-        </div>
       </div>
 
-      <div class="kl-kpi">
+      <div class="kl-seg">
+        <span
+          v-for="p in periods"
+          :key="p.value"
+          :class="['kl-seg-item', p.value === period ? 'on' : '']"
+          @click="switchPeriod(p.value)"
+          >{{ p.label }}</span
+        >
+      </div>
+
+      <div class="kl-info">
         <span :class="trendClassVal(quote.open)">开 <b>{{ formatNum(quote.open, dg) }}</b></span>
         <span :class="trendClassVal(quote.high)">高 <b>{{ formatNum(quote.high, dg) }}</b></span>
         <span :class="trendClassVal(quote.low)">低 <b>{{ formatNum(quote.low, dg) }}</b></span>
         <span>昨收 <b>{{ formatNum(quote.prevClose, dg) }}</b></span>
+        <span class="kl-ma-i" style="--mc:#f59e0b">MA5 <b>{{ maVals && maVals.ma5 != null ? formatNum(maVals.ma5, dg) : '—' }}</b></span>
+        <span class="kl-ma-i" style="--mc:#3b82f6">MA10 <b>{{ maVals && maVals.ma10 != null ? formatNum(maVals.ma10, dg) : '—' }}</b></span>
+        <span class="kl-ma-i" style="--mc:#a855f7">MA20 <b>{{ maVals && maVals.ma20 != null ? formatNum(maVals.ma20, dg) : '—' }}</b></span>
         <span class="kl-fresh" :class="'f-' + fresh.level">● {{ fresh.text }}</span>
         <span class="kl-time">{{ quote.time || '—' }}</span>
-      </div>
-
-      <div v-if="maVals" class="kl-ma">
-        <span class="kl-ma-i" style="--mc:#f59e0b">MA5 <b>{{ maVals.ma5 != null ? formatNum(maVals.ma5, dg) : '—' }}</b></span>
-        <span class="kl-ma-i" style="--mc:#3b82f6">MA10 <b>{{ maVals.ma10 != null ? formatNum(maVals.ma10, dg) : '—' }}</b></span>
-        <span class="kl-ma-i" style="--mc:#a855f7">MA20 <b>{{ maVals.ma20 != null ? formatNum(maVals.ma20, dg) : '—' }}</b></span>
       </div>
 
       <!-- 外盘商品（hf_）免费接口不提供 K 线，明确提示而非展示空白图表 -->
@@ -63,32 +63,23 @@
 
         <div class="kl-deal">
           <div class="kl-deal-title">五档盘口</div>
-          <template v-if="quote.asks.length > 1">
-            <div v-for="(a, i) in quote.asks.slice().reverse()" :key="'a' + i" class="kl-deal-row">
-              <span>卖{{ 5 - i }}</span>
-              <span class="kl-down">{{ formatNum(a.price, dg) }}</span>
-              <span class="kl-vol">{{ formatVol(a.vol) }}</span>
+          <div class="kl-deal-cols">
+            <div class="kl-deal-ask">
+              <div v-for="(a, i) in quote.asks.slice().reverse()" :key="'a' + i" class="kl-deal-row">
+                <span>卖{{ 5 - i }}</span>
+                <span class="kl-down">{{ formatNum(a.price, dg) }}</span>
+                <span class="kl-vol">{{ formatVol(a.vol) }}</span>
+              </div>
             </div>
-            <div class="kl-deal-split"></div>
-            <div v-for="(b, i) in quote.bids" :key="'b' + i" class="kl-deal-row">
-              <span>买{{ i + 1 }}</span>
-              <span class="kl-up">{{ formatNum(b.price, dg) }}</span>
-              <span class="kl-vol">{{ formatVol(b.vol) }}</span>
+            <div class="kl-deal-bid">
+              <div v-for="(b, i) in quote.bids" :key="'b' + i" class="kl-deal-row">
+                <span>买{{ i + 1 }}</span>
+                <span class="kl-up">{{ formatNum(b.price, dg) }}</span>
+                <span class="kl-vol">{{ formatVol(b.vol) }}</span>
+              </div>
             </div>
-          </template>
-          <template v-else>
-            <div class="kl-deal-row">
-              <span>买价</span>
-              <span class="kl-up">{{ formatNum(quote.bids[0]?.price || 0, dg) }}</span>
-              <span class="kl-vol">{{ formatVol(quote.bids[0]?.vol || 0) }}</span>
-            </div>
-            <div class="kl-deal-row">
-              <span>卖价</span>
-              <span class="kl-down">{{ formatNum(quote.asks[0]?.price || 0, dg) }}</span>
-              <span class="kl-vol">{{ formatVol(quote.asks[0]?.vol || 0) }}</span>
-            </div>
-            <p class="kl-deal-tip">外盘商品仅提供买卖一档</p>
-          </template>
+          </div>
+          <p v-if="quote.asks.length <= 1" class="kl-deal-tip">外盘商品仅提供买卖一档</p>
         </div>
       </div>
     </div>
@@ -217,16 +208,21 @@ watch(
 }
 .kl-head {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
-  flex-wrap: wrap;
 }
 .kl-name {
   display: flex;
   align-items: baseline;
   gap: 8px;
   flex-wrap: wrap;
+}
+.kl-quote {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  line-height: 1.15;
 }
 .kl-t {
   font-size: 17px;
@@ -272,29 +268,21 @@ watch(
   background: var(--nav-hover);
   font-weight: 600;
 }
-.kl-kpi {
+.kl-info {
   display: flex;
-  gap: 14px;
-  font-size: 13px;
+  gap: 12px;
+  font-size: 12px;
   color: var(--text-muted);
   margin: 10px 0;
   flex-wrap: wrap;
   align-items: center;
   font-variant-numeric: tabular-nums;
 }
-.kl-kpi b {
+.kl-info b {
   color: var(--text-strong);
   font-weight: 600;
 }
 /* MA 图例：与图内均线同色，专业行情软件即视感 */
-.kl-ma {
-  display: flex;
-  gap: 14px;
-  font-size: 11px;
-  color: var(--text-faint);
-  margin: 4px 0 6px;
-  font-variant-numeric: tabular-nums;
-}
 .kl-ma-i b {
   color: var(--mc, var(--text-strong));
   font-weight: 600;
@@ -341,6 +329,14 @@ watch(
   border-left: 1px solid var(--border);
   padding-left: 14px;
 }
+.kl-deal-cols {
+  display: block;
+}
+.kl-deal-ask,
+.kl-deal-bid {
+  display: flex;
+  flex-direction: column;
+}
 .kl-deal-title {
   font-size: 12px;
   color: var(--text-faint);
@@ -377,6 +373,16 @@ watch(
     padding-left: 0;
     padding-top: 10px;
   }
+  .kl-info {
+    font-size: 11px;
+    gap: 10px;
+    margin: 8px 0;
+  }
+  .kl-deal-cols {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0 16px;
+  }
   .kl-seg {
     width: 100%;
   }
@@ -395,22 +401,24 @@ watch(
 <style>
 @media (max-width: 768px) {
   .kl-dialog.el-dialog {
-    width: 100% !important;
-    max-width: 100vw;
+    width: 96% !important;
+    max-width: 460px;
     margin: 0 !important;
     position: fixed;
-    left: 0;
-    right: 0;
-    bottom: env(safe-area-inset-bottom, 0px);
-    top: auto !important;
-    max-height: calc(100dvh - env(safe-area-inset-bottom, 0px));
-    border-radius: 16px 16px 0 0;
+    left: 50% !important;
+    top: 50% !important;
+    transform: translate(-50%, -50%);
+    max-height: 92dvh;
+    border-radius: 16px;
     display: flex;
     flex-direction: column;
+    overflow: hidden;
   }
   .kl-dialog.el-dialog .el-dialog__body {
+    flex: 1;
+    min-height: 0;
     overflow-y: auto;
-    padding: 12px 10px calc(16px + env(safe-area-inset-bottom, 0px));
+    padding: 12px 12px calc(14px + env(safe-area-inset-bottom, 0px));
   }
 }
 </style>

@@ -108,8 +108,9 @@ const option = computed<EChartsOption>(() => {
   // 移动端（IQOO Neo9 等窄屏）右侧 Y 轴文字空间紧张，需加大 right 并压字号，避免坐标轴标签被挤压堆叠
   const isMobileView = typeof window !== 'undefined' && window.innerWidth <= 768
   // 移动端 K 线主体居中：左右边距均衡；分时因含涨跌幅副轴(%)需在右侧多留空间
-  const leftPad = isMobileView ? 16 : 8
-  const rightPad = isMobileView ? (isMinute.value ? 66 : 44) : 52
+  // 移动端坐标轴左移（同花顺风格），蜡烛主体视觉居中；右侧仅留极小边距
+  const leftPad = isMobileView ? 42 : 8
+  const rightPad = isMobileView ? (isMinute.value ? 44 : 10) : 52
   const axisLine = dark ? '#334155' : '#e2e8f0'
   const axisLabel = dark ? '#94a3b8' : '#64748b'
   const splitLine = dark ? 'rgba(148,163,184,0.14)' : 'rgba(100,116,139,0.12)'
@@ -301,7 +302,7 @@ const option = computed<EChartsOption>(() => {
       {
         scale: true,
         gridIndex: 0,
-        position: 'right',
+        position: isMobileView ? 'left' : 'right',
         axisLine: { show: false },
         axisTick: { show: false },
         axisLabel: { color: axisLabel, fontSize: isMobileView ? 8 : 10, formatter: (v: number) => v.toFixed(d) },
@@ -312,7 +313,7 @@ const option = computed<EChartsOption>(() => {
         scale: isMinute.value,
         gridIndex: 0,
         position: 'right',
-        offset: isMobileView ? 32 : 40,
+        offset: isMobileView ? 0 : 40,
         show: isMinute.value,
         axisLine: { show: false },
         axisTick: { show: false },
@@ -326,7 +327,7 @@ const option = computed<EChartsOption>(() => {
       {
         scale: true,
         gridIndex: 1,
-        position: 'right',
+        position: isMobileView ? 'left' : 'right',
         axisLine: { show: false },
         axisTick: { show: false },
         axisLabel: {
