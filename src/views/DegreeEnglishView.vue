@@ -410,8 +410,13 @@
     </section>
 
     <!-- 词组 / 语句 -->
-    <section v-if="renderedTabs.has('phrases')" v-show="activeTab === 'phrases'" class="panel">
-      <div class="toolbar">
+    <section
+      v-if="renderedTabs.has('phrases')"
+      v-show="activeTab === 'phrases'"
+      ref="phrasesSection"
+      :class="['panel', { immersive: phraseImmersive }]"
+    >
+      <div v-if="!phraseImmersive" class="toolbar">
         <el-radio-group v-model="phraseCat">
           <el-radio-button value="all">全部</el-radio-button>
           <el-radio-button value="phrase">词组表</el-radio-button>
@@ -450,6 +455,7 @@
         <div class="flashcard-progress">
           <span class="flashcard-pos">已学 {{ phraseReviewedCount }} · 剩余 {{ phraseQueue.length }} · 已掌握 {{ phraseGraduatedCount }}</span>
           <div class="flashcard-bar"><div class="flashcard-fill" :style="{ width: phrasePercent + '%' }"></div></div>
+          <button v-if="phraseImmersive" class="fc-exit-pill" @click="exitPhraseImmersiveOnly" title="退出沉浸式">退出沉浸</button>
           <button class="flashcard-exit" @click="exitPhraseMode" title="退出">✕</button>
         </div>
 
@@ -461,6 +467,7 @@
                   <span class="fc-word">{{ currentPhrase!.en }}</span>
                   <button class="speak-btn fc-speak" @click.stop="speakPhrase(currentPhrase!.en)" title="朗读">🔊</button>
                 </div>
+                <div v-if="defsReady && phrasePhonetic(currentPhrase!)" class="fc-phonetic">{{ phrasePhonetic(currentPhrase!) }}</div>
                 <div class="fc-hint">点击翻转查看释义 / 翻译</div>
               </div>
               <div class="flashcard-back">
@@ -493,6 +500,7 @@
           </div>
 
           <div class="flashcard-ops">
+            <button v-if="!phraseImmersive" class="fc-nav-btn immersible-btn" @click="togglePhraseImmersive">⛶ 进入沉浸</button>
             <div class="fc-actions">
               <el-button size="small" type="danger" @click="gradePhrase('again')">忘记</el-button>
               <el-button size="small" type="primary" @click="gradePhrase('good')">认识</el-button>
@@ -514,7 +522,7 @@
       <div v-if="showPhraseList && !phraseStarted" class="phrase-list">
         <div v-for="p in filteredPhrases" :key="p.id" class="phrase-item" :class="p.category">
           <div class="phrase-top">
-            <span class="phrase-en">{{ p.en }}<span v-if="p.productive" class="star">*</span></span>
+            <span class="phrase-en">{{ p.en }}<span v-if="p.productive" class="star">*</span><span v-if="defsReady && phrasePhonetic(p)" class="phrase-phonetic">{{ phrasePhonetic(p) }}</span></span>
             <span class="phrase-cat">{{ catLabel(p.category) }}</span>
           </div>
           <div class="phrase-zh" v-if="p.zh">{{ p.zh }}</div>
@@ -911,6 +919,8 @@ import { spokenPhrases, affixPhrases, irregularPhrases } from '../prep/degreePhr
 // 重型数据改为按需动态 import（题库约 907KB、资料库文章约 394KB），
 // 避免进入备考台时同步解析阻塞首屏 —— 见下方 ensureQuestions() / ensureArticles()
 import type { DegreeSettings, DegreeWord, WordProgress, MistakeRec, FavoriteRec, PracticeRec, QuestionType, DegreeQuestion, DegreePhrase, PhraseCategory, SourceBook, DegreeArticle } from '../prep/degreeTypes'
+// 仅类型导入（编译后移除，不会把 1.3MB 离线音标库打进首屏）；实际数据按需动态 import
+import type { OfflineWordDef } from '../data/degreeWordDefs'
 import * as svc from '../prep/degreeService'
 import { ensureContentSeeded } from '../prep/degreeDb'
 import {
@@ -1084,6 +1094,8 @@ const activeTab = ref('overview')
 const renderedTabs = ref<Set<string>>(new Set(['overview']))
 watch(activeTab, (tab) => {
   renderedTabs.value.add(tab)
+  // 切到「词组/语句」时按需拉起离线音标库（仅首次）
+  if (tab === 'phrases') void ensureOfflineDefs()
 }, { immediate: true })
 
 // 移动端响应式：记忆与掌握区在窄屏默认折叠，砍掉首屏一大段滚动
@@ -1329,6 +1341,101 @@ const phrasePercent = computed(() => {
   if (!total) return 0
   return Math.round((phraseReviewedCount.value / total) * 100)
 })
+
+// ===== 词组/语句 音标（纯离线：查项目内置 ECDICT 音标库，缺词不显示，零请求零延迟）=====
+const defsReady = ref(false)
+let offlineDefs: Record<string, OfflineWordDef> | null = null
+let defsLoading: Promise<void> | null = null
+/** 离线音标库约 1.3MB，动态 import 按需加载，避免拖慢备考台首屏 */
+async function ensureOfflineDefs() {
+  if (offlineDefs) {
+    defsReady.value = true
+    return
+  }
+  if (!defsLoading) {
+    defsLoading = import('../data/degreeWordDefs')
+      .then((m) => {
+        offlineDefs = m.DEGREE_OFFLINE_DEFS
+        defsReady.value = true
+      })
+      .catch(() => {
+        /* 加载失败则无音标，不影响其它功能 */
+      })
+  }
+  await defsLoading
+}
+
+/** 高频虚词/小词音标兜底：离线库未收录冠词、单字母等，补上后词组音标才完整（如 a lot of → /ә lɒt ɒv/） */
+const TINY_PHONETICS: Record<string, string> = {
+  a: 'ә', an: 'æn', the: 'ðә', of: 'ɒv', to: 'tu:', in: 'in', on: 'ɒn', at: 'æt', for: 'fɔ:',
+  with: 'wið', and: 'ænd', or: 'ɔ:', is: 'iz', are: 'a:', be: 'bi:', been: 'bi:n', it: 'it', its: 'its',
+  that: 'ðæt', this: 'ðis', these: 'ði:z', those: 'ðәuz', not: 'nɒt', no: 'nәu', up: 'ʌp', out: 'aut',
+  by: 'bai', from: 'frɒm', into: 'intu:', over: 'әuvә', after: 'a:ftә', all: 'ɔ:l', as: 'æz', but: 'bʌt',
+  can: 'kæn', do: 'du:', does: 'dʌz', did: 'did', get: 'get', give: 'giv', go: 'gәu', have: 'hæv', has: 'hæz',
+  had: 'hæd', he: 'hi:', her: 'hә:', him: 'him', his: 'hiz', i: 'ai', if: 'if', just: 'dʒʌst', like: 'laik',
+  make: 'meik', me: 'mi:', more: 'mɔ:', most: 'mәust', much: 'mʌtʃ', must: 'mʌst', my: 'mai', new: 'nju:',
+  now: 'nau', one: 'wʌn', only: 'әunli', other: 'ʌðә', our: 'auә', so: 'sәu', some: 'sʌm', take: 'teik',
+  than: 'ðæn', their: 'ðeә', them: 'ðem', then: 'ðen', there: 'ðeә', they: 'ðei', time: 'taim', two: 'tu:',
+  us: 'ʌs', use: 'ju:z', very: 'veri', was: 'wɒz', we: 'wi:', were: 'wә:', what: 'wɒt', when: 'wen',
+  which: 'witʃ', who: 'hu:', will: 'wil', would: 'wud', you: 'ju:', your: 'jɔ:', many: 'meni', any: 'eni',
+  how: 'hau', why: 'wai', where: 'weә', here: 'hiә', both: 'bәuθ', each: 'i:tʃ', few: 'fju:', own: 'әun',
+  same: 'seim', too: 'tu:', under: 'ʌndә', again: "ә'gein", off: 'ɔ:f', down: 'daun', back: 'bæk'
+}
+
+/** 单词音标：离线库直查 → 简单词形还原（复数/过去式/进行时）→ 高频小词兜底 */
+function lookupPhonetic(w: string): string {
+  if (!w) return ''
+  if (offlineDefs) {
+    const hit = offlineDefs[w]?.phonetic
+    if (hit) return (hit.split(/[.,;]/)[0] || '').trim()
+    for (const suf of ['es', 's', 'ed', 'ing', 'ly']) {
+      if (w.length > suf.length + 2 && w.endsWith(suf)) {
+        const base = w.slice(0, -suf.length)
+        const ph = offlineDefs[base]?.phonetic
+        if (ph) return (ph.split(/[.,;]/)[0] || '').trim()
+      }
+    }
+  }
+  return TINY_PHONETICS[w] || ''
+}
+
+const phrasePhoneticCache = new Map<string, string>()
+/** 词组音标：多变体（a lot/alot of）只取斜杠前主变体，去标点后逐词查音标拼接 */
+function phrasePhonetic(p: DegreePhrase | null | undefined): string {
+  if (!p?.en) return ''
+  const cached = phrasePhoneticCache.get(p.en)
+  if (cached !== undefined) return cached
+  let out = ''
+  if (offlineDefs) {
+    const main = (p.en.split('/')[0] || '').toLowerCase().replace(/[^a-z\s]/g, ' ')
+    const parts: string[] = []
+    for (const w of main.split(/\s+/)) {
+      if (!w) continue
+      const ph = lookupPhonetic(w)
+      if (ph) parts.push(ph)
+    }
+    out = parts.length ? `/${parts.join(' ')}/` : ''
+  }
+  phrasePhoneticCache.set(p.en, out)
+  return out
+}
+
+// ===== 词组/语句 沉浸式（与背单词卡一致：手动切换，不默认进入）=====
+const phraseImmersive = ref(false)
+const phrasesSection = ref<HTMLElement | null>(null)
+function togglePhraseImmersive() {
+  phraseImmersive.value = !phraseImmersive.value
+  const el = phrasesSection.value
+  if (phraseImmersive.value) {
+    el?.requestFullscreen?.().catch(() => {})
+  } else if (typeof document !== 'undefined' && document.fullscreenElement) {
+    document.exitFullscreen?.().catch(() => {})
+  }
+}
+function exitPhraseImmersiveOnly() {
+  phraseImmersive.value = false
+  if (typeof document !== 'undefined' && document.fullscreenElement) document.exitFullscreen?.().catch(() => {})
+}
 
 function buildPhraseQueue(dueOnly = false) {
   const phraseItems = allDegreePhrases.map((p) => ({ ...p, word: 'ph:' + p.en }))
@@ -1933,7 +2040,11 @@ onMounted(() => {
   }
 })
 function onFullscreenChange() {
-  if (typeof document !== 'undefined' && !document.fullscreenElement) immersive.value = false
+  if (typeof document !== 'undefined' && !document.fullscreenElement) {
+    immersive.value = false
+    // 系统手势/返回键退出全屏时同步关闭词组沉浸态，避免残留 fixed 全屏容器
+    phraseImmersive.value = false
+  }
 }
 onBeforeUnmount(() => {
   window.matchMedia('(max-width: ' + MOBILE_MAX + 'px)').removeEventListener('change', onMobileChange)
@@ -3299,6 +3410,13 @@ onBeforeUnmount(() => {
   font-weight: 600;
   color: var(--text-strong);
   word-break: break-word;
+}
+/* 词组表音标：离线 ECDICT 音标库拼接，缺词不显示 */
+.phrase-phonetic {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-left: 6px;
+  font-weight: 400;
 }
 .phrase-cat {
   font-size: 11px;
