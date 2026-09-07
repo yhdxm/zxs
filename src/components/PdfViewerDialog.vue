@@ -11,7 +11,7 @@
     <div ref="rootEl" class="pdfv-root" @fullscreenchange="onFullscreenChange">
       <!-- 工具栏 -->
       <div class="pdfv-bar">
-        <div class="pdfv-bar-left">
+        <div v-if="!useNative" class="pdfv-bar-left">
           <button type="button" class="pdfv-btn" @click="toggleMode">
             {{ mode === 'scroll' ? '单页' : '滚动' }}
           </button>
@@ -77,13 +77,16 @@
       <!-- 主体 -->
       <div ref="bodyEl" class="pdfv-body" @scroll="onScrollThrottled">
         <!-- 系统阅读器：浏览器原生渲染 PDF，移动端兼容性最好 -->
-        <iframe
-          v-if="useNative"
-          :src="url"
-          class="pdfv-native"
-          title="PDF 预览"
-          frameborder="0"
-        ></iframe>
+        <div v-if="useNative" class="pdfv-native-wrap">
+          <iframe :src="url" class="pdfv-native" title="PDF 预览" frameborder="0"></iframe>
+          <div class="pdfv-native-hint">
+            <p>预览已交给系统查看器。若上方区域空白（部分手机内核不支持内嵌 PDF），请用下方按钮：</p>
+            <div class="pdfv-native-acts">
+              <a class="pdfv-dl" :href="url" target="_blank" rel="noopener">📖 全屏打开</a>
+              <a class="pdfv-dl" :href="url" download rel="noopener">⬇ 下载保存</a>
+            </div>
+          </div>
+        </div>
 
         <template v-else>
           <div v-if="phase === 'loading'" class="pdfv-tip">
@@ -182,9 +185,11 @@ const isFullscreen = ref(false)
 const loadSource = ref('')
 /** 文档加载进度 0-100（含下载与解析） */
 const progress = ref(0)
-/** 是否改用系统阅读器（iframe 原生预览），用户可随时切换。默认 false：走 pdf.js 单页 canvas 渲染，
- *  全平台（含微信/国产 WebView）都能稳定显示；若某机型 pdf.js 异常，用户可点"系统阅读器"切换 iframe 兜底。 */
+/** 是否改用系统阅读器（iframe 原生预览）。默认跟随端型：移动端=true（大 PDF 用原生渲染，不卡不闪退）、
+ *  PC=false（pdf.js canvas 体验更好）。用户手动切换后记住（userMode），同一文档会话内不重置。 */
 const useNative = ref(false)
+/** 用户手动选择的模式；null 表示未手动选，按端型默认 */
+let userMode: boolean | null = null
 
 const rootEl = ref<HTMLElement | null>(null)
 const bodyEl = ref<HTMLElement | null>(null)
@@ -198,7 +203,7 @@ let observer: IntersectionObserver | null = null
 let scrollTimer: number | null = null
 const renderedPages = new Set<number>()
 
-function loadScript(src: string): Promise<void> {
+function loadScript(src: string, timeoutMs = 8000): Promise<void> {
   return new Promise((resolve, reject) => {
     const exist = document.querySelector<HTMLScriptElement>(`script[data-pdfjs="${src}"]`)
     if (exist) {
@@ -209,8 +214,20 @@ function loadScript(src: string): Promise<void> {
     s.src = src
     s.async = true
     s.dataset.pdfjs = src
-    s.onload = () => resolve()
-    s.onerror = () => reject(new Error('load fail'))
+    // 超时兜底：CDN 被墙/网络挂起时 onerror 不触发，必须定时放弃并尝试下一源，避免永远"准备中"
+    const timer = window.setTimeout(() => {
+      s.onload = null
+      s.onerror = null
+      reject(new Error('load timeout'))
+    }, timeoutMs)
+    s.onload = () => {
+      window.clearTimeout(timer)
+      resolve()
+    }
+    s.onerror = () => {
+      window.clearTimeout(timer)
+      reject(new Error('load fail'))
+    }
     document.head.appendChild(s)
   })
 }
@@ -238,9 +255,9 @@ async function ensurePdfjs(): Promise<any> {
 
 async function openDoc() {
   if (!props.url) return
-  // 每次打开重置为 pdf.js 单页渲染（最可靠），避免 el-dialog 复用残留上次的 iframe 失败状态
-  useNative.value = false
-  // 默认走 pdf.js 单页 canvas 渲染（全平台可靠）；若用户手动切到"系统阅读器"(iframe) 则走原生
+  // 移动端默认「系统阅读器」(iframe 原生渲染)：大 PDF 不在应用内渲染 canvas，不占内存、不卡不闪退、立刻有画面；
+  // PC 端仍默认 pdf.js canvas（体验更好）。两种模式用户均可随时切换（userMode 记住手动选择）。
+  useNative.value = userMode ?? isMobile.value
   if (useNative.value) {
     phase.value = 'ready'
     numPages.value = 0
@@ -290,9 +307,13 @@ async function openDoc() {
       await renderVisiblePages()
     }
   } catch (e: any) {
-    errMsg.value = 'PDF 预览加载失败（可能是网络问题）。'
-    phase.value = 'error'
-    console.warn('[PdfViewer] 打开失败', e)
+    // pdf.js 加载/解析失败：自动切「系统阅读器」兜底，保证一定有东西可看，不再卡在错误页
+    console.warn('[PdfViewer] 打开失败，自动切系统阅读器兜底', e)
+    userMode = true
+    useNative.value = true
+    phase.value = 'ready'
+    numPages.value = 0
+    errMsg.value = ''
   }
 }
 
@@ -462,7 +483,8 @@ function toggleMode() {
 
 /* ==================== 系统阅读器切换 ==================== */
 function toggleNative() {
-  useNative.value = !useNative.value
+  userMode = !useNative.value
+  useNative.value = userMode
   if (useNative.value) {
     // 系统阅读器：交给浏览器/手机原生 PDF 渲染，兼容性最好
     phase.value = 'ready'
@@ -504,7 +526,8 @@ watch(
 watch(
   () => props.url,
   () => {
-    // URL 切换时重置状态
+    // URL 切换时重置状态（手动选择也回到端型默认）
+    userMode = null
     pdfDocUrl = ''
     renderedPages.clear()
     pageCanvasMap.value = {}
@@ -628,6 +651,42 @@ onBeforeUnmount(() => {
   -webkit-overflow-scrolling: touch;
   text-align: center;
   padding: 8px;
+}
+/* 系统阅读器（iframe 原生预览）：撑满主体区域 */
+.pdfv-native-wrap {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 60vh;
+}
+.pdfv-native {
+  flex: 1;
+  width: 100%;
+  min-height: 50vh;
+  border: 0;
+  display: block;
+  background: #fff;
+  border-radius: 8px;
+}
+.pdfv-native-hint {
+  padding: 10px 12px calc(10px + env(safe-area-inset-bottom, 0px));
+  font-size: 12.5px;
+  color: #94a3b8;
+  background: #0f172a;
+  text-align: left;
+}
+.pdfv-native-hint p {
+  margin: 0 0 8px;
+}
+.pdfv-native-acts {
+  display: flex;
+  gap: 10px;
+}
+.pdfv-native-acts .pdfv-dl {
+  flex: 1;
+  justify-content: center;
+  padding: 11px 12px;
+  font-size: 13.5px;
 }
 .pdfv-page-wrap {
   display: flex;
