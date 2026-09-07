@@ -357,12 +357,13 @@ async function renderPage(p: number, canvas: HTMLCanvasElement | null | undefine
     if (containerW <= 0) containerW = (window.innerWidth || 390) - (isMobile.value ? 2 : 40)
     const base = page.getViewport({ scale: 1 })
     const scale = Math.max(containerW / base.width, 0.5)
-    // 清晰度提升：移动端 DPR cap 提到 2.0（比 1.5 再清晰 33%），物理宽上限提到 1400。
-    // 非全屏约 3-4MB，全屏约 5-6MB，单页可控；若设备 DPR 更高也统一按 2.0 渲染避免闪退。
-    const dprCap = isMobile.value ? 2 : 2
+    // 清晰度提升：移动端按设备真实 DPR 渲染（IQOO Neo9 DPR=3），使 canvas 物理像素对齐设备像素，
+    // 不再被 2.0 上限压糊（之前 360 CSS 宽只渲染 720 物理像素、被拉伸到 1080 设备像素→发虚）。
+    // 单页模式同时只渲染一页，内存约 6-7MB 完全可控；上限 3 防止超高分屏爆内存。
+    const dprCap = isMobile.value ? 3 : 2
     const dpr = Math.min(window.devicePixelRatio || 1, dprCap)
     let viewport = page.getViewport({ scale: scale * dpr })
-    const maxPx = isMobile.value ? 1400 : 1600
+    const maxPx = isMobile.value ? 1700 : 1700
     if (viewport.width > maxPx) {
       viewport = page.getViewport({ scale: (scale * maxPx) / base.width })
     }
@@ -663,7 +664,9 @@ onBeforeUnmount(() => {
   padding: 0;
   padding-top: 6px;
   padding-top: calc(6px + max(env(safe-area-inset-top, 0px), 6px));
-  /* 全屏时让单页 canvas 区真正撑满剩余高度，上下滑浏览长页 */
+  /* 全屏时让单页 canvas 区真正撑满可用空间，可上下滑浏览长页。
+     纵向 flex：justify-content:flex-start = 垂直顶部对齐（避免 center 把长页顶部裁掉无法回滚）；
+     align-items:center = 水平居中。 */
   display: flex;
   flex-direction: column;
   justify-content: flex-start;
@@ -813,7 +816,9 @@ onBeforeUnmount(() => {
 }
 .pdfv-page-wrap--single {
   min-height: 100%;
-  align-items: center;
+  /* 关键：用 flex-start 而非 center。PDF 单页常比屏幕高，若 center 会把页面顶部
+     推出滚动原点导致顶部被裁且无法向上滚动；flex-start 让页面从顶部开始、可向下滚动看完整页。 */
+  align-items: flex-start;
 }
 .pdfv-canvas {
   display: block;
