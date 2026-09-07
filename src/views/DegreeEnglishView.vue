@@ -3860,6 +3860,10 @@ section.immersive {
      固定 32px 兜底 + env() 增强（不支持 env 的旧 WebView 自动回退到 32px）。 */
   padding: 8px 8px 32px !important;
   padding: 8px 8px calc(8px + env(safe-area-inset-bottom, 24px)) !important;
+  /* 顶部同样预留挖孔/灵动岛/状态栏安全区，避免「退出沉浸」「✕」被居中摄像头遮挡。
+     固定 32px 兜底 + env(safe-area-inset-top) 增强，不支持的浏览器自动回退。 */
+  padding-top: calc(8px + 32px) !important;
+  padding-top: calc(8px + env(safe-area-inset-top, 32px)) !important;
   overflow: hidden;
   display: flex;
   flex-direction: column;
