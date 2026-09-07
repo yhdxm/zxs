@@ -348,17 +348,21 @@ async function renderPage(p: number, canvas: HTMLCanvasElement | null | undefine
     if (!ctx) return
 
     // 容器宽度保护：弹窗过渡未结束时 clientWidth 可能为 0，导致 canvas 尺寸异常→真机白屏。
-    // 兜底用视口宽度减边距，保证拿到正数。
-    let containerW = (rootEl.value?.clientWidth || 0) - 24
-    if (containerW <= 0) containerW = (window.innerWidth || 390) - 40
+    // 移动端优先用 visualViewport/innderWidth 取整屏可用宽（避免 el-dialog 内边距吃掉宽度），
+    // 非移动端/全屏用 rootEl 宽度，最后兜底保证拿到正数。
+    const vpWidth = (window as any).visualViewport?.width || window.innerWidth || 390
+    let containerW = isMobile.value
+      ? Math.max(vpWidth - (isFullscreen.value ? 0 : 2), (rootEl.value?.clientWidth || 0) - 4)
+      : (rootEl.value?.clientWidth || 0) - 24
+    if (containerW <= 0) containerW = (window.innerWidth || 390) - (isMobile.value ? 2 : 40)
     const base = page.getViewport({ scale: 1 })
     const scale = Math.max(containerW / base.width, 0.5)
-    // 清晰度提升：移动端 DPR cap 从 1.0 提到 1.5（约 1.5x 清晰度），画布物理宽上限提到 1100，
-    // 单页内存约 3-4MB，肉眼清晰且不闪退（之前 1.0 cap 偏糊，用户反馈不清晰）。
-    const dprCap = isMobile.value ? 1.5 : 2
+    // 清晰度提升：移动端 DPR cap 提到 2.0（比 1.5 再清晰 33%），物理宽上限提到 1400。
+    // 非全屏约 3-4MB，全屏约 5-6MB，单页可控；若设备 DPR 更高也统一按 2.0 渲染避免闪退。
+    const dprCap = isMobile.value ? 2 : 2
     const dpr = Math.min(window.devicePixelRatio || 1, dprCap)
     let viewport = page.getViewport({ scale: scale * dpr })
-    const maxPx = isMobile.value ? 1100 : 1400
+    const maxPx = isMobile.value ? 1400 : 1600
     if (viewport.width > maxPx) {
       viewport = page.getViewport({ scale: (scale * maxPx) / base.width })
     }
@@ -432,8 +436,8 @@ function onSwipeEnd(e: TouchEvent) {
   if (!t) return
   const dx = t.clientX - touchStartX
   const dy = t.clientY - touchStartY
-  // 横向位移 > 40px 且大于纵向，才算翻页手势（避免与上下滚动冲突）
-  if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy)) {
+  // 横向位移 > 32px 且大于纵向，才算翻页手势（避免与上下滚动冲突）
+  if (Math.abs(dx) > 32 && Math.abs(dx) > Math.abs(dy)) {
     if (dx < 0) next()
     else prev()
   }
@@ -656,8 +660,19 @@ onBeforeUnmount(() => {
   padding-top: calc(6px + max(env(safe-area-inset-top, 0px), 28px));
 }
 .pdfv-root:fullscreen .pdfv-body {
+  padding: 0;
   padding-top: 6px;
   padding-top: calc(6px + max(env(safe-area-inset-top, 0px), 6px));
+  /* 全屏时让单页 canvas 区真正撑满剩余高度，上下滑浏览长页 */
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  align-items: center;
+}
+.pdfv-root:fullscreen .pdfv-page-wrap--single {
+  padding: 0;
+  width: 100%;
+  min-height: calc(100% - 6px);
 }
 .pdfv-root:fullscreen .pdfv-bar {
   background: #0f172a;
@@ -793,16 +808,20 @@ onBeforeUnmount(() => {
   align-items: flex-start;
   min-height: 120px;
   padding: 8px 0;
+  width: 100%;
+  box-sizing: border-box;
 }
 .pdfv-page-wrap--single {
   min-height: 100%;
   align-items: center;
 }
 .pdfv-canvas {
-  display: inline-block;
+  display: block;
   background: #fff;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
   max-width: 100%;
+  width: auto;
+  height: auto;
 }
 .pdfv-scroll {
   display: flex;
@@ -865,7 +884,13 @@ onBeforeUnmount(() => {
     width: 46px;
   }
   .pdfv-body {
-    padding: 4px;
+    padding: 0;
+  }
+  .pdfv-page-wrap {
+    padding: 0;
+  }
+  .pdfv-page-wrap--single {
+    padding: 0 0 env(safe-area-inset-bottom, 8px) 0;
   }
   .pdfv-float {
     right: 10px;
