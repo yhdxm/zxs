@@ -783,7 +783,17 @@
               @click="recite.setRate(r)"
             >{{ r === 1 ? '常速' : r + 'x' }}</button>
           </div>
-          <div class="recite-tip">锁屏自动连播 · 英文有道发音 / 中文 Google TTS，均需联网；离线降级亮屏朗读</div>
+          <div class="recite-speeds">
+            <span class="recite-speed-label">读几遍</span>
+            <button
+              v-for="n in [1, 2, 3, 5]"
+              :key="n"
+              class="recite-pill"
+              :class="{ on: reciteRepeat === n }"
+              @click="recite.setRepeat(n)"
+            >{{ n }} 遍</button>
+          </div>
+          <div class="recite-tip">锁屏自动连播 · 英文/中文均走有道发音（国内可直连），需联网；离线降级亮屏朗读。进度自动记忆，下次续读</div>
         </div>
 
         <div class="recite-side">
@@ -1403,7 +1413,8 @@ const {
   accent: reciteAccent,
   spell: reciteSpell,
   autoplay: reciteAuto,
-  rate: reciteRate
+  rate: reciteRate,
+  repeatCount: reciteRepeat
 } = recite
 
 function spellLetters(t: string): string[] {
@@ -1448,7 +1459,7 @@ async function selectReciteSource(src: 'cards' | 'phrase' | 'cet4') {
       reciteLoading.value = false
     }
   }
-  recite.setItems(list, voiceAccent.value, reciteSpell.value)
+  recite.setItems(list, voiceAccent.value, reciteSpell.value, src, recite.loadProgressIndex(src))
 }
 // 进入朗读中心：首次构建默认来源（背单词卡）
 watch(activeTab, (t) => {

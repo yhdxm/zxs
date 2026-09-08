@@ -2,7 +2,7 @@
 // 核心：用单一 HTMLAudioElement 做「队列顺序播放」，每段音频（字母 / 整词 / 中文）
 // 通过同一 <audio> 媒体元素 onended 串联。媒体播放属于系统媒体会话，
 // Android / iQOO 锁屏后不中断 —— 满足「手机灭屏也能听」。
-// 网络异常时降级 speechSynthesis（亮屏）。
+// 英文与中文统一走有道 dictvoice（免费、国内可直连）；离线降级 speechSynthesis（亮屏）。
 import { ref, computed, watch, onBeforeUnmount } from 'vue'
 import { speakEn, type SpeechAccent } from '../prep/degreeSpeech'
 
@@ -21,11 +21,7 @@ type Seg = {
 }
 
 const YOUDAO = 'https://dict.youdao.com/dictvoice'
-// 中文 TTS：Google 翻译接口返回 mp3，<audio> 媒体播放，锁屏仍可听；国内镜像优先，海外兜底
-const ZH_TTS = [
-  'https://translate.google.cn/translate_tts?ie=UTF-8&tl=zh-CN&client=tw-ob&q=',
-  'https://translate.google.com/translate_tts?ie=UTF-8&tl=zh-CN&client=tw-ob&q='
-]
+const PROGRESS_KEY = 'zxs_recite_progress_v1'
 
 let audioEl: HTMLAudioElement | null = null
 let currentResolve: ((ok: boolean) => void) | null = null
@@ -35,8 +31,8 @@ function getAudio(): HTMLAudioElement {
   return audioEl
 }
 
-/** 英文/字母段：走有道 dictvoice（免费、国内可直连）。返回是否成功起播完。 */
-function segPlay(text: string, accent: SpeechAccent, rate: number): Promise<boolean> {
+/** 单段播放：走有道 dictvoice（type 1=美/2=英，对中文无影响）。返回是否成功起播完。 */
+function segPlay(text: string, type: number, rate: number): Promise<boolean> {
   return new Promise((resolve) => {
     if (typeof window === 'undefined' || typeof Audio === 'undefined') {
       resolve(false)
@@ -48,9 +44,8 @@ function segPlay(text: string, accent: SpeechAccent, rate: number): Promise<bool
     }
     try {
       const el = getAudio()
-      const vType = accent === 'en-GB' ? 1 : 2
       el.playbackRate = rate
-      el.src = `${YOUDAO}?audio=${encodeURIComponent(text)}&type=${vType}`
+      el.src = `${YOUDAO}?audio=${encodeURIComponent(text)}&type=${type}`
       let done = false
       const finish = (ok: boolean) => {
         if (!done) {
@@ -74,7 +69,7 @@ function segPlay(text: string, accent: SpeechAccent, rate: number): Promise<bool
   })
 }
 
-/** 本地 speechSynthesis 读中文（亮屏场景兜底）。 */
+/** 本地 speechSynthesis 读中文（亮屏场景兜底，仅当在线有道失败时使用）。 */
 function speakZhLocal(text: string): Promise<boolean> {
   return new Promise((resolve) => {
     if (typeof window === 'undefined' || !('speechSynthesis' in window) || !text.trim()) {
@@ -105,37 +100,11 @@ function speakZhLocal(text: string): Promise<boolean> {
   })
 }
 
-/** 中文段：优先 Google TTS（<audio> 媒体，锁屏可听），全部候选失败则降级本地 speechSynthesis 中文。 */
+/** 中文段：有道 dictvoice（国内直连、<audio> 媒体锁屏可听）为主，全部失败降级本地 speechSynthesis 中文。 */
 async function zhPlay(text: string, rate: number): Promise<boolean> {
   if (typeof window === 'undefined' || !text || !text.trim()) return true
-  for (const base of ZH_TTS) {
-    const ok = await new Promise<boolean>((resolve) => {
-      try {
-        const el = getAudio()
-        el.playbackRate = rate
-        el.src = base + encodeURIComponent(text)
-        let done = false
-        const finish = (o: boolean) => {
-          if (!done) {
-            done = true
-            el.onended = null
-            el.onerror = null
-            currentResolve = null
-            resolve(o)
-          }
-        }
-        currentResolve = finish
-        el.onended = () => finish(true)
-        el.onerror = () => finish(false)
-        const p = el.play() as Promise<void> | undefined
-        if (p && typeof p.catch === 'function') p.catch(() => finish(false))
-        window.setTimeout(() => finish(false), 9000)
-      } catch {
-        resolve(false)
-      }
-    })
-    if (ok) return true
-  }
+  const ok = await segPlay(text, 2, rate) // type 对中文无意义，占位
+  if (ok) return true
   return speakZhLocal(text)
 }
 
@@ -148,10 +117,12 @@ export function useRecitePlayer() {
   const autoplay = ref(true) // 自动连播（到末尾回到开头继续）
   const gapMs = ref(0) // 段间停顿
   const rate = ref(1) // 朗读倍速（0.75 / 1 / 1.25 / 1.5 / 2）
+  const repeatCount = ref(1) // 每个词朗读遍数（1 / 2 / 3 / 5）
   const segments = ref<Seg[]>([])
   const cursor = ref(0)
   const playing = ref(false)
   let runToken = 0
+  let currentSource = ''
 
   const currentSeg = computed<Seg | null>(() => segments.value[cursor.value] || null)
   const currentItemIndex = computed(() => currentSeg.value?.itemIndex ?? -1)
@@ -188,13 +159,39 @@ export function useRecitePlayer() {
     return idx >= 0 ? idx : 0
   }
 
+  /** 记忆：当前读到第几个词（按来源分别记录） */
+  function persist() {
+    if (!currentSource) return
+    try {
+      localStorage.setItem(PROGRESS_KEY, JSON.stringify({ source: currentSource, index: Math.max(0, currentItemIndex.value) }))
+    } catch {
+      /* 隐私模式等忽略 */
+    }
+  }
+  /** 读取某来源上次读到的词序号（无记录/不匹配返回 0） */
+  function loadProgressIndex(source: string): number {
+    try {
+      const raw = localStorage.getItem(PROGRESS_KEY)
+      if (!raw) return 0
+      const o = JSON.parse(raw)
+      if (o && o.source === source && typeof o.index === 'number') return o.index
+    } catch {
+      /* ignore */
+    }
+    return 0
+  }
+
   async function run() {
     const token = ++runToken
     playing.value = true
+    let curItem = -1
+    let repeatLeft = 0
     while (playing.value && token === runToken) {
       if (cursor.value >= segments.value.length) {
-        if (autoplay.value && items.value.length) cursor.value = 0
-        else {
+        if (autoplay.value && items.value.length) {
+          cursor.value = 0
+          curItem = -1
+        } else {
           playing.value = false
           break
         }
@@ -205,18 +202,32 @@ export function useRecitePlayer() {
         playing.value = false
         break
       }
+      // 进入新词：重置重复计数 + 记忆进度
+      if (seg.itemIndex !== curItem) {
+        curItem = seg.itemIndex
+        repeatLeft = repeatCount.value
+        persist()
+      }
       let ok: boolean
       if (seg.kind === 'zh') {
-        // 中文：专用中文 TTS，不降级英文通道
         ok = await zhPlay(seg.text, rate.value)
       } else {
-        ok = await segPlay(seg.text, accent.value, rate.value)
+        const vType = accent.value === 'en-GB' ? 1 : 2
+        ok = await segPlay(seg.text, vType, rate.value)
         // 在线英文失败 → 降级本地/在线 speechSynthesis（亮屏）
         if (!ok) await speakEn(seg.text, rate.value, accent.value)
       }
       if (token !== runToken || !playing.value) break
       if (gapMs.value > 0) await wait(gapMs.value)
       if (token !== runToken || !playing.value) break
+      // 该词是否为最后一段（zh 是每词末段）；未播够遍数则回到词首重读
+      const nextSeg = segments.value[cursor.value + 1]
+      const isItemEnd = !nextSeg || nextSeg.itemIndex !== seg.itemIndex
+      if (isItemEnd && repeatLeft > 1) {
+        repeatLeft--
+        cursor.value = firstSegOf(curItem)
+        continue
+      }
       cursor.value++
     }
     playing.value = false
@@ -238,6 +249,7 @@ export function useRecitePlayer() {
   function playItem(i: number) {
     if (i < 0 || i >= items.value.length) return
     cursor.value = firstSegOf(i)
+    persist()
     play()
   }
   function next() {
@@ -261,12 +273,17 @@ export function useRecitePlayer() {
     pauseAudio()
     cursor.value = 0
   }
-  function setItems(list: ReciteItem[], a?: SpeechAccent, spellMode?: boolean) {
+  function setItems(list: ReciteItem[], a?: SpeechAccent, spellMode?: boolean, source?: string, startIndex?: number) {
     items.value = list
     if (a) accent.value = a
     if (typeof spellMode === 'boolean') spell.value = spellMode
+    currentSource = source || ''
     cursor.value = 0
     rebuild()
+    // 续读：定位到上次进度所在词（首次进入/切回来源时生效）
+    if (typeof startIndex === 'number' && startIndex > 0 && startIndex < items.value.length) {
+      cursor.value = firstSegOf(startIndex)
+    }
   }
 
   onBeforeUnmount(stop)
@@ -282,6 +299,7 @@ export function useRecitePlayer() {
     spell,
     autoplay,
     rate,
+    repeatCount,
     gapMs,
     play,
     pause,
@@ -295,7 +313,10 @@ export function useRecitePlayer() {
     setRate: (r: number) => {
       rate.value = r
     },
-    rebuild
+    setRepeat: (n: number) => {
+      repeatCount.value = n
+    },
+    loadProgressIndex
   }
 }
 
