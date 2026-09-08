@@ -1256,14 +1256,15 @@ onUnmounted(() => {
   right: 0;
   bottom: 0;
   z-index: 45;
-  /* 高度自适应：内容(约 48px) + 顶部留白(5px) + 底部手势条安全区，
-     不再写死 80px 导致图标被顶到上半部、底部留一大截空白（用户反馈「模块提高了」）。 */
+  /* 高度自适应：内容(约 42px) + 顶部留白(4px) + 底部手势条安全区，
+     不再写死 80px 导致图标被顶到上半部、底部留一大截空白（用户反馈「模块提高了」）。
+     用户 0908 反馈 6 个 Tab 框太大太长，整体压缩一档。 */
   height: auto;
-  min-height: 56px;
-  padding-top: 5px;
-  padding-bottom: 8px;
-  /* 双写兜底：固定 8px 兼容旧 WebView；IQOO Neo9 等支持 env() 的浏览器用真实安全区高度 */
-  padding-bottom: env(safe-area-inset-bottom, 8px);
+  min-height: 50px;
+  padding-top: 4px;
+  padding-bottom: 6px;
+  /* 双写兜底：固定 6px 兼容旧 WebView；IQOO Neo9 等支持 env() 的浏览器用真实安全区高度 */
+  padding-bottom: env(safe-area-inset-bottom, 6px);
   background: var(--surface);
   background: color-mix(in srgb, var(--surface) 92%, transparent);
   backdrop-filter: saturate(160%) blur(14px);
@@ -1277,13 +1278,13 @@ onUnmounted(() => {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 3px;
-  min-height: 48px;
+  gap: 2px;
+  min-height: 42px;
   border: none;
   background: transparent;
   color: var(--text-muted);
   cursor: pointer;
-  padding: 4px 2px;
+  padding: 3px 2px;
   transition: color 0.15s ease, transform 0.12s ease;
 }
 .mobile-bottom-nav .mbn-item.active { color: var(--primary); }
@@ -1292,12 +1293,12 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 21px;
+  font-size: 18px;
   line-height: 1;
 }
-.mobile-bottom-nav .mbn-emoji { font-size: 19px; }
-.mobile-bottom-nav .mbn-icon :deep(svg) { font-size: 21px; }
-.mobile-bottom-nav .mbn-label { font-size: 12px; font-weight: 600; line-height: 1.1; }
+.mobile-bottom-nav .mbn-emoji { font-size: 16px; }
+.mobile-bottom-nav .mbn-icon :deep(svg) { font-size: 18px; }
+.mobile-bottom-nav .mbn-label { font-size: 11px; font-weight: 600; line-height: 1.1; }
 .mobile-bottom-nav .mbn-item.active .mbn-label { font-weight: 700; }
 
 /* ===== 响应式切换 ===== */
@@ -1349,6 +1350,15 @@ onUnmounted(() => {
      消除「智习欢迎你下面少一节」的断裂感。居中内容仍在安全区内。 */
   .main-content.authed-main:has(.welcome-shell) {
     padding-bottom: 0;
+  }
+  /* 欢迎页：主区背景与「智习」渐变顶端同色(#f3f0ff)，顶栏透明，
+     从状态栏到页面底部形成无缝渐变，消除顶栏(白底)与渐变之间的缝隙。 */
+  .app-main:has(.welcome-shell) {
+    background: #f3f0ff;
+  }
+  .app-shell.is-authed:has(.welcome-shell) .mobile-topbar {
+    background: transparent;
+    border-bottom-color: transparent;
   }
   /* AI 助手页面自带底部输入栏，自身处理安全区，取消全局底部留白避免输入栏上方出现空白 */
   .main-content.authed-main:has(.ai-page.ai-fixed) {
