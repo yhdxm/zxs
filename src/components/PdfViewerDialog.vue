@@ -145,6 +145,8 @@ const props = defineProps<{
   modelValue: boolean
   url: string
   title?: string
+  /** 打开时定位到的起始页（章节跳转用）；超出范围或缺失则从第 1 页开始 */
+  startPage?: number
 }>()
 const emit = defineEmits<{ (e: 'update:modelValue', v: boolean): void }>()
 
@@ -315,6 +317,10 @@ async function openDoc() {
       pageInput.value = 1
       progress.value = 100
     }
+    // 应用起始页（章节跳转）：无论是否重新加载 PDF 都生效
+    const sp = props.startPage && props.startPage >= 1 && props.startPage <= numPages.value ? props.startPage : 1
+    pageNum.value = sp
+    pageInput.value = sp
     phase.value = 'ready'
     await nextTick()
     // 等一帧：确保 el-dialog 过渡结束、容器宽度已就绪（移动端真机 clientWidth 常为 0→canvas 白屏主因）
@@ -324,6 +330,10 @@ async function openDoc() {
     } else {
       setupScrollObserver()
       await renderVisiblePages()
+      if (sp > 1) {
+        scrollToPage(sp)
+        void renderPage(sp, pageCanvasMap.value[sp])
+      }
     }
   } catch (e: any) {
     // pdf.js 加载/解析失败：移动端 iframe 实测白屏，不再自动切换；直接提示下载查看。
@@ -608,7 +618,7 @@ function onFullscreenChange() {
 
 /* ==================== 生命周期 ==================== */
 watch(
-  () => [props.modelValue, props.url],
+  () => [props.modelValue, props.url, props.startPage],
   () => {
     if (props.modelValue && props.url) {
       void openDoc()
