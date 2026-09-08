@@ -181,6 +181,65 @@ export function useRecitePlayer() {
     return 0
   }
 
+  // ===== Media Session：锁屏控制条（灭屏也能暂停 / 上一词 / 下一词）=====
+  // 朗读走单一 <audio> 媒体播放，系统锁屏默认只显示播放/暂停；注册 metadata + action handler
+  // 后可在锁屏展示当前词条（标题=英文 / 副标题=中文 / 专辑=来源）并直接控制切词。
+  const sourceLabel = ref('朗读中心')
+  const SOURCE_LABELS: Record<string, string> = { cards: '背单词卡', phrase: '词组', cet4: '四级单词' }
+  const MS_ARTWORK =
+    'data:image/svg+xml,' +
+    encodeURIComponent(
+      '<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96">' +
+        '<rect width="96" height="96" rx="18" fill="#185fa5"/>' +
+        '<text x="48" y="66" font-size="54" text-anchor="middle" fill="#ffffff" font-family="sans-serif">读</text>' +
+        '</svg>'
+    )
+
+  function updateMediaSession() {
+    if (typeof navigator === 'undefined' || !('mediaSession' in navigator)) return
+    const it = currentItem.value
+    try {
+      navigator.mediaSession.metadata = new MediaMetadata({
+        title: it ? it.text : '智习·朗读中心',
+        artist: it ? it.zh || sourceLabel.value : sourceLabel.value,
+        album: '智习·朗读中心 · ' + sourceLabel.value,
+        artwork: [{ src: MS_ARTWORK, sizes: '96x96', type: 'image/svg+xml' }]
+      })
+    } catch {
+      /* 旧浏览器不支持 metadata */
+    }
+  }
+  function updateMediaState() {
+    if (typeof navigator === 'undefined' || !('mediaSession' in navigator)) return
+    try {
+      navigator.mediaSession.playbackState = playing.value ? 'playing' : 'paused'
+    } catch {
+      /* ignore */
+    }
+  }
+  function setupMediaSession() {
+    if (typeof navigator === 'undefined' || !('mediaSession' in navigator)) return
+    try {
+      navigator.mediaSession.setActionHandler('play', () => play())
+      navigator.mediaSession.setActionHandler('pause', () => pause())
+      navigator.mediaSession.setActionHandler('previoustrack', () => prev())
+      navigator.mediaSession.setActionHandler('nexttrack', () => next())
+    } catch {
+      /* 部分浏览器不支持某些 action */
+    }
+  }
+  function teardownMediaSession() {
+    if (typeof navigator === 'undefined' || !('mediaSession' in navigator)) return
+    const ms = navigator.mediaSession
+    ;(['play', 'pause', 'previoustrack', 'nexttrack'] as const).forEach((a) => {
+      try {
+        ms.setActionHandler(a, null)
+      } catch {
+        /* ignore */
+      }
+    })
+  }
+
   async function run() {
     const token = ++runToken
     playing.value = true
@@ -278,6 +337,7 @@ export function useRecitePlayer() {
     if (a) accent.value = a
     if (typeof spellMode === 'boolean') spell.value = spellMode
     currentSource = source || ''
+    sourceLabel.value = SOURCE_LABELS[source || ''] || source || '朗读中心'
     cursor.value = 0
     rebuild()
     // 续读：定位到上次进度所在词（首次进入/切回来源时生效）
@@ -286,7 +346,15 @@ export function useRecitePlayer() {
     }
   }
 
-  onBeforeUnmount(stop)
+  // 注册锁屏控制条（仅浏览器支持时生效）；进度/来源变化同步 metadata，播放态同步 playbackState
+  setupMediaSession()
+  updateMediaSession()
+  watch([currentItem, sourceLabel], updateMediaSession)
+  watch(playing, updateMediaState)
+  onBeforeUnmount(() => {
+    teardownMediaSession()
+    stop()
+  })
 
   return {
     items,
