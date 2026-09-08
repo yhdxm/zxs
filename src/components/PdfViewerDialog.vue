@@ -198,6 +198,8 @@ const props = defineProps<{
   toc?: { title: string; page: number }[]
   /** 书籍 key，如 '模拟试卷' 启用「PDF 预览 / 原题浏览」双视图 */
   bookKey?: string
+  /** 打开时模拟卷双视图的初始视图：'pdf' 预览 / 'list' 原题浏览 */
+  mockViewInit?: 'pdf' | 'list'
   /** 模拟卷原题（双视图「原题浏览」用） */
   mockQuestions?: Array<{
     id: string
@@ -212,6 +214,8 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'update:modelValue', v: boolean): void
   (e: 'note'): void
+  /** 翻页时回报当前页，用于资料库阅读进度统计 */
+  (e: 'page', payload: { page: number; total: number }): void
 }>()
 
 const visible = computed({
@@ -254,6 +258,11 @@ const mode = ref<'single' | 'scroll'>('single')
 const isFullscreen = ref(false)
 /** 实际生效的 pdf.js 加载源（本地/CDN），用于状态提示 */
 const loadSource = ref('')
+
+/** 翻页即回报当前页（含初始定位），供上层记录阅读进度 */
+watch([pageNum, numPages], ([p, t]) => {
+  if (t && t > 0) emit('page', { page: p, total: t })
+})
 /** 文档加载进度 0-100（含下载与解析） */
 const progress = ref(0)
 /** 是否改用系统阅读器（iframe 原生预览）。PC 端允许用户手动切换；移动端 iframe 实测白屏，强制走 pdf.js。 */
@@ -744,7 +753,7 @@ watch(
       observer = null
     }
     // 切换文档时重置双视图与目录状态
-    mockView.value = 'pdf'
+    mockView.value = props.mockViewInit || 'pdf'
     showToc.value = false
   }
 )

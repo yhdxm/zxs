@@ -589,9 +589,28 @@
 
     <!-- 资料库 -->
     <section v-if="renderedTabs.has('library')" v-show="activeTab === 'library'" class="panel">
-      <!-- ===== 桌面端：保持原样（PC 一行不动） ===== -->
+      <!-- ===== 桌面端：书卡横排 + 左目录 / 右详情 ===== -->
       <template v-if="!isMobile">
-        <div class="card-title" style="margin-bottom: 10px">资料库（三本 PDF 内容已全量内置，可在线阅读讲解正文 / 浏览模拟原题）</div>
+        <div class="card-title" style="margin-bottom: 10px">资料库（三本 PDF 内置 · 像电子书逐页看，自动记录阅读进度）</div>
+        <!-- 三本书卡横排 -->
+        <div class="lib-top">
+          <div
+            v-for="b in LIB_BOOKS"
+            :key="b.key"
+            class="lib-top-card"
+            :class="{ active: libBook === b.key }"
+            @click="libBook = b.key"
+          >
+            <div class="lib-top-cover" :style="{ background: b.color }">{{ b.icon }}</div>
+            <div class="lib-top-info">
+              <div class="lib-top-name">{{ b.name }}</div>
+              <div class="lib-top-sub">{{ b.sub }}</div>
+              <div class="lib-top-bar"><div class="lib-top-fill" :style="{ width: bookPct(b.key) + '%', background: b.color }"></div></div>
+              <div class="lib-top-pct">{{ bookPct(b.key) }}%</div>
+            </div>
+            <button type="button" class="lib-top-go" :style="{ borderColor: b.color, color: b.color }" @click.stop="openBook(b)">{{ bookPct(b.key) ? '继续' : '开始' }}</button>
+          </div>
+        </div>
         <div class="lib-layout">
         <div class="lib-side">
           <el-radio-group v-model="libBook" size="small" class="lib-filter">
@@ -622,18 +641,39 @@
           </div>
         </div>
         <div class="lib-reader">
-          <div class="lib-launch">
-            <div class="lib-launch-book">{{ pcCurrentBook.name }}</div>
-            <p class="lib-launch-tip">点击左侧章节，即可在电子书阅读器中打开对应页（含目录跳章）；或打开整本逐页浏览。</p>
-            <el-button type="primary" @click="openBook(pcCurrentBook)">打开整本预览</el-button>
+          <!-- 选中书籍详情面板 -->
+          <div class="lib-detail">
+            <div class="lib-detail-cover" :style="{ background: pcCurrentBook.color }">{{ pcCurrentBook.icon }}</div>
+            <div class="lib-detail-info">
+              <div class="lib-detail-name">{{ pcCurrentBook.name }}</div>
+              <div class="lib-detail-sub">{{ pcCurrentBook.sub }}</div>
+              <div class="lib-detail-stats">
+                <div class="lib-stat"><b>{{ pcCurrentBook.pages }}</b><span>页</span></div>
+                <div v-if="pcCurrentBook.stat2" class="lib-stat"><b>{{ pcCurrentBook.stat2 }}</b><span>{{ pcCurrentBook.stat2Label }}</span></div>
+                <div v-if="bookPct(pcCurrentBook.key)" class="lib-stat lib-stat-prog"><b>{{ bookPct(pcCurrentBook.key) }}%</b><span>已读</span></div>
+              </div>
+              <div class="lib-detail-bar"><div class="lib-detail-fill" :style="{ width: bookPct(pcCurrentBook.key) + '%', background: pcCurrentBook.color }"></div></div>
+              <div class="lib-detail-actions">
+                <el-button type="primary" @click="openBook(pcCurrentBook)">打开整本预览</el-button>
+                <el-button v-if="pcCurrentBook.key === '模拟试卷'" @click="openBook(pcCurrentBook, 'list')">看原题</el-button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
       </template>
 
-      <!-- ===== 移动端：三本 PDF 书卡 → 电子书阅读器（保留预览） ===== -->
+      <!-- ===== 移动端：继续阅读 + 三本 PDF 书卡（带进度） ===== -->
       <template v-else>
-        <div class="card-title" style="margin-bottom: 10px">资料库（三本 PDF 内置 · 像电子书逐页看）</div>
+        <div class="card-title" style="margin-bottom: 10px">资料库（三本 PDF 内置 · 自动记录进度）</div>
+        <!-- 继续阅读 -->
+        <div v-if="resumeBook" class="lib-resume" @click="resumeBook && openBook(resumeBook)">
+          <div class="lib-resume-left">
+            <div class="lib-resume-label">继续阅读</div>
+            <div class="lib-resume-name">{{ resumeBook.name }} · 已读到 P{{ bookResumePage(resumeBook.key) }}</div>
+          </div>
+          <button type="button" class="lib-resume-go" :style="{ background: resumeBook.color }" @click.stop="resumeBook && openBook(resumeBook)">继续</button>
+        </div>
         <div class="lib-books">
           <div
             v-for="b in LIB_BOOKS"
@@ -644,9 +684,10 @@
             <div class="lib-book-icon" :style="{ background: b.color }">{{ b.icon }}</div>
             <div class="lib-book-main">
               <div class="lib-book-name">{{ b.name }}</div>
-              <div class="lib-book-meta">{{ b.meta }}</div>
+              <div class="lib-book-sub">{{ b.sub }}</div>
+              <div class="lib-book-bar"><div class="lib-book-fill" :style="{ width: bookPct(b.key) + '%', background: b.color }"></div></div>
             </div>
-            <button type="button" class="lib-book-go" @click.stop="openBook(b)">阅读 / 预览</button>
+            <button type="button" class="lib-book-go" :style="{ borderColor: b.color, color: b.color }" @click.stop="openBook(b)">{{ bookPct(b.key) ? '继续' : '开始' }}</button>
           </div>
         </div>
       </template>
@@ -808,7 +849,9 @@
       :toc="pdfToc"
       :book-key="pdfBookKey"
       :mock-questions="pdfMockQuestions"
+      :mock-view-init="mockViewInit"
       @note="onReaderNote"
+      @page="onReaderPage"
     />
 
     <!-- 设置 -->
@@ -1025,23 +1068,79 @@ const textChapterContent = computed(() => {
 // ===== 资料库 · 三本 PDF 作为内置电子书入口（移动端书卡 / PC 同步内容模型） =====
 // 三本 PDF 即内置内容，点开像电子书逐页看，并保留预览功能（PdfViewerDialog）。
 const LIB_BOOKS = [
-  { key: '考试大纲', name: '考试大纲', icon: '纲', color: '#185fa5', meta: '236 页 · 可整本阅读', matId: 'dagang' },
-  { key: '复习指南', name: '复习指南', icon: '指', color: '#3b6d11', meta: '162 页 · 可整本阅读', matId: 'zhinan' },
-  { key: '模拟试卷', name: '模拟试卷', icon: '模', color: '#854f0b', meta: '138 页 · 5 套卷', matId: 'moni' }
-] as const
+  { key: '考试大纲', name: '考试大纲', icon: '纲', color: '#534ab7', pages: 236, sub: '官方指定范围', stat2: '15', stat2Label: '章', matId: 'dagang' },
+  { key: '复习指南', name: '复习指南', icon: '指', color: '#0f6e56', pages: 162, sub: '分题型讲解', stat2: '8', stat2Label: '章', matId: 'zhinan' },
+  { key: '模拟试卷', name: '模拟试卷', icon: '模', color: '#d4537e', pages: 138, sub: 'PDF / 原题双视图', stat2: '', stat2Label: '套卷', matId: 'moni' }
+]
+const BOOK_PAGES: Record<string, number> = { '考试大纲': 236, '复习指南': 162, '模拟试卷': 138 }
+const bookMeta = (k: string) => LIB_BOOKS.find((b) => b.key === k)
+
+// ===== 资料库 · 阅读进度（localStorage 离线镜像，遵循铁律 1 仅作本地镜像） =====
+// 记录每本书当前页 + 百分比 + 最近阅读时间；翻页时由 PdfViewerDialog 回写。
+const LIB_PROGRESS_KEY = 'zxs_lib_progress_v1'
+interface LibProg { page: number; total: number; at: number }
+function loadLibProgress(): Record<string, LibProg> {
+  try {
+    const raw = localStorage.getItem(LIB_PROGRESS_KEY)
+    return raw ? (JSON.parse(raw) as Record<string, LibProg>) : {}
+  } catch {
+    return {}
+  }
+}
+const libProgress = ref<Record<string, LibProg>>(loadLibProgress())
+function saveLibProgress() {
+  try {
+    localStorage.setItem(LIB_PROGRESS_KEY, JSON.stringify(libProgress.value))
+  } catch {
+    /* 隐私模式忽略 */
+  }
+}
+/** 写入某书进度（翻页回调） */
+function setBookProgress(key: string, page: number, total: number) {
+  if (!key) return
+  libProgress.value[key] = { page, total, at: Date.now() }
+  saveLibProgress()
+}
+/** 进度百分比（0~100） */
+function bookPct(key: string): number {
+  const p = libProgress.value[key]
+  if (!p || !p.total) return 0
+  return Math.min(100, Math.max(0, Math.round((p.page / p.total) * 100)))
+}
+/** 续读起始页（无记录则从第 1 页） */
+function bookResumePage(key: string): number {
+  return libProgress.value[key]?.page || 1
+}
+/** 最近阅读的一本书（用于「继续阅读」卡） */
+const resumeBook = computed(() => {
+  let best: (typeof LIB_BOOKS)[number] | null = null
+  let bestAt = 0
+  for (const b of LIB_BOOKS) {
+    const p = libProgress.value[b.key]
+    if (p && p.at > bestAt && bookPct(b.key) > 0 && bookPct(b.key) < 100) {
+      bestAt = p.at
+      best = b
+    }
+  }
+  return best
+})
+// 模拟卷双视图初始模式（默认 PDF 预览；「看原题」按钮切为 list）
+const mockViewInit = ref<'pdf' | 'list'>('pdf')
 
 const pdfToc = ref<{ title: string; page: number }[]>([])
 const pdfBookKey = ref('')
 const pdfMockQuestions = ref<any[]>([])
 
-function openBook(b: { key: string; matId: string; name: string }) {
+function openBook(b: { key: string; matId: string; name: string }, view: 'pdf' | 'list' = 'pdf') {
   const mat = MATERIALS.find((x) => x.id === b.matId)
   if (!mat) return
   const B = import.meta.env.BASE_URL
   pdfBookKey.value = b.key
   previewUrl.value = B + mat.file
   previewTitle.value = mat.title
-  previewStartPage.value = 1
+  // 续读：从已读进度页打开（无记录则第 1 页）
+  previewStartPage.value = bookResumePage(b.key)
+  mockViewInit.value = b.key === '模拟试卷' ? view : 'pdf'
   if (b.key === '模拟试卷') {
     void ensureQuestions().then(() => {
       pdfToc.value = mockPapers.value.map((p) => ({ title: p.name, page: mockPaperStart.value[p.name] || 1 }))
@@ -1054,10 +1153,10 @@ function openBook(b: { key: string; matId: string; name: string }) {
   previewVisible.value = true
 }
 
-// PC：当前选中的书（用于右侧启动面板「打开整本预览」）
+// PC：当前选中的书（用于右侧详情面板「打开整本预览」）
 const pcCurrentBook = computed(() => {
   const k = libBook.value === 'all' ? '' : libBook.value
-  return LIB_BOOKS.find((b) => b.key === k) || LIB_BOOKS[0]
+  return LIB_BOOKS.find((b) => b.key === k) || LIB_BOOKS[0]!
 })
 
 function openMockPaper(name: string) {
@@ -1068,6 +1167,7 @@ function openMockPaper(name: string) {
   previewUrl.value = B + mat.file
   previewTitle.value = mat.title + ' · ' + name
   previewStartPage.value = mockPaperStart.value[name] || 1
+  mockViewInit.value = 'pdf'
   void ensureQuestions().then(() => {
     pdfToc.value = mockPapers.value.map((p) => ({ title: p.name, page: mockPaperStart.value[p.name] || 1 }))
     pdfMockQuestions.value = allDegreeQuestions.value.filter((q) => q.source.book === '模拟试卷')
@@ -1079,6 +1179,11 @@ function openMockPaper(name: string) {
 
 function onReaderNote() {
   addMaterialNote(previewTitle.value)
+}
+
+// PdfViewerDialog 翻页回报：回写该书的阅读进度（用于书卡进度条 / 继续阅读）
+function onReaderPage(p: { page: number; total: number }) {
+  setBookProgress(pdfBookKey.value, p.page, p.total)
 }
 
 // 模拟卷起始页：从题目 source.page 反推每套卷首题所在页（真实值）
@@ -4260,27 +4365,117 @@ section.immersive {
   color: #fff;
 }
 
-/* ===== 资料库 · PC 右侧启动面板（布局/样式不动，仅内容换为启动提示） ===== */
-.lib-launch {
-  height: 100%;
+/* ===== 资料库 · PC 顶部三本书卡 ===== */
+.lib-top {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.lib-top-card {
   display: flex;
-  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  background: #fff;
+  border: 1.5px solid #ece8ff;
+  border-radius: 14px;
+  padding: 12px 14px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.lib-top-card:hover { box-shadow: 0 4px 14px rgba(107, 91, 214, 0.12); }
+.lib-top-card.active { border-color: #8a7bff; box-shadow: 0 4px 14px rgba(107, 91, 214, 0.18); }
+.lib-top-cover {
+  flex: none;
+  width: 46px;
+  height: 46px;
+  border-radius: 12px;
+  color: #fff;
+  display: flex;
   align-items: center;
   justify-content: center;
-  text-align: center;
-  gap: 14px;
-  padding: 20px;
-}
-.lib-launch-book {
-  font-size: 18px;
+  font-size: 19px;
   font-weight: 700;
-  color: #2c2c3a;
 }
-.lib-launch-tip {
+.lib-top-info { flex: 1; min-width: 0; }
+.lib-top-name { font-size: 14px; font-weight: 600; color: #2c2c3a; }
+.lib-top-sub { font-size: 11.5px; color: #8a86a0; margin: 1px 0 6px; }
+.lib-top-bar { height: 5px; border-radius: 4px; background: #eceaf6; overflow: hidden; }
+.lib-top-fill { height: 100%; border-radius: 4px; transition: width 0.3s ease; }
+.lib-top-pct { font-size: 10.5px; color: #8a86a0; margin-top: 3px; }
+.lib-top-go {
+  flex: none;
+  border: 1.5px solid #5b6cff;
+  background: #fff;
+  border-radius: 9px;
+  padding: 7px 14px;
   font-size: 13px;
-  color: #8a86a0;
-  line-height: 1.7;
-  max-width: 320px;
-  margin: 0;
+  font-weight: 600;
+  cursor: pointer;
 }
+.lib-top-go:active { filter: brightness(0.96); }
+
+/* ===== 资料库 · PC 右侧书籍详情面板 ===== */
+.lib-detail {
+  height: 100%;
+  display: flex;
+  gap: 18px;
+  align-items: center;
+  padding: 24px;
+}
+.lib-detail-cover {
+  flex: none;
+  width: 84px;
+  height: 112px;
+  border-radius: 14px;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 34px;
+  font-weight: 700;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
+}
+.lib-detail-info { flex: 1; min-width: 0; }
+.lib-detail-name { font-size: 19px; font-weight: 700; color: #2c2c3a; }
+.lib-detail-sub { font-size: 13px; color: #8a86a0; margin: 4px 0 12px; }
+.lib-detail-stats { display: flex; gap: 22px; margin-bottom: 12px; }
+.lib-stat { display: flex; flex-direction: column; }
+.lib-stat b { font-size: 20px; color: #2c2c3a; line-height: 1.1; }
+.lib-stat span { font-size: 11px; color: #8a86a0; margin-top: 2px; }
+.lib-stat-prog b { color: #6b5bd6; }
+.lib-detail-bar { height: 7px; border-radius: 5px; background: #eceaf6; overflow: hidden; margin-bottom: 14px; }
+.lib-detail-fill { height: 100%; border-radius: 5px; transition: width 0.3s ease; }
+.lib-detail-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+
+/* ===== 资料库 · 移动端「继续阅读」卡 ===== */
+.lib-resume {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: linear-gradient(135deg, #6b5bd6, #8a7bff);
+  border-radius: 14px;
+  padding: 14px 16px;
+  margin-bottom: 12px;
+  cursor: pointer;
+}
+.lib-resume-left { flex: 1; min-width: 0; color: #fff; }
+.lib-resume-label { font-size: 11px; opacity: 0.8; }
+.lib-resume-name { font-size: 15px; font-weight: 600; margin-top: 2px; }
+.lib-resume-go {
+  flex: none;
+  border: none;
+  border-radius: 9px;
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #4a3fb0;
+  background: #fff;
+  cursor: pointer;
+}
+
+/* ===== 资料库 · 移动端书卡增强（副标题 + 进度条） ===== */
+.lib-book-sub { font-size: 11.5px; color: #8a86a0; margin-top: 2px; }
+.lib-book-bar { height: 5px; border-radius: 4px; background: #eceaf6; overflow: hidden; margin-top: 8px; }
+.lib-book-fill { height: 100%; border-radius: 4px; transition: width 0.3s ease; }
 </style>
