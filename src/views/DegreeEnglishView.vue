@@ -614,7 +614,7 @@
               :key="p.name"
               class="lib-item"
               :class="{ active: activeMockPaper === p.name }"
-              @click="activeMockPaper = p.name"
+              @click="activeMockPaper = p.name; openMockPaper(p.name)"
             >
               <span class="lib-book">模拟</span>
               <span class="lib-title">{{ p.name }}（{{ p.questions.length }} 题）</span>
@@ -622,124 +622,31 @@
           </div>
         </div>
         <div class="lib-reader">
-          <!-- 大纲 / 指南 正文阅读 -->
-          <template v-if="libBook !== '模拟试卷'">
-            <template v-if="activeTextChapter">
-              <div class="reader-head">
-                <span class="reader-book">{{ activeTextChapter.bookTag }}</span>
-                <h3 class="reader-title">{{ activeTextChapter.title }}</h3>
-                <el-button size="small" text :icon="Reading" @click="speakText(textChapterContent)">朗读全文</el-button>
-                <el-button size="small" text @click="openPreviewAt(activeTextChapter)">看扫描件</el-button>
-              </div>
-              <div class="reader-body">{{ textChapterContent }}</div>
-            </template>
-            <el-empty v-else description="从左侧选择章节：解说类看文字版，其余直接打开扫描件" :image-size="70" />
-          </template>
-          <!-- 模拟试卷 原题 -->
-          <template v-else>
-            <template v-if="activeMockPaper">
-              <div class="reader-head">
-                <span class="reader-book">模拟试卷</span>
-                <h3 class="reader-title">{{ activeMockPaper }}</h3>
-                <span class="muted">《全真模拟试卷及考点点睛》原题</span>
-              </div>
-              <div class="reader-body mock-reader">
-                <div v-for="q in activeMockQuestions" :key="q.id" class="mock-q">
-                  <div class="mock-q-meta">{{ typeLabel(q.type) }} · 第 {{ q.source.page }} 页</div>
-                  <div class="mock-q-stem">{{ q.stem }}</div>
-                  <ul v-if="q.options && q.options.length" class="mock-q-opts">
-                    <li v-for="(o, i) in q.options" :key="i" :class="{ on: isAnswer(o, q.answer) }">{{ o }}</li>
-                  </ul>
-                  <div class="mock-q-ans">答案：{{ q.answer }}</div>
-                  <div v-if="q.explanation" class="mock-q-exp">解析：{{ q.explanation }}</div>
-                </div>
-              </div>
-            </template>
-            <el-empty v-else description="从左侧选择一套模拟卷开始浏览" :image-size="70" />
-          </template>
+          <div class="lib-launch">
+            <div class="lib-launch-book">{{ pcCurrentBook.name }}</div>
+            <p class="lib-launch-tip">点击左侧章节，即可在电子书阅读器中打开对应页（含目录跳章）；或打开整本逐页浏览。</p>
+            <el-button type="primary" @click="openBook(pcCurrentBook)">打开整本预览</el-button>
+          </div>
         </div>
       </div>
       </template>
 
-      <!-- ===== 移动端重构：目录对齐三本 PDF 真实章节，点击打开扫描件定位到该页 ===== -->
+      <!-- ===== 移动端：三本 PDF 书卡 → 电子书阅读器（保留预览） ===== -->
       <template v-else>
-        <div class="card-title" style="margin-bottom: 10px">资料库（点章节看扫描件，内容完全对齐三本 PDF）</div>
-        <el-radio-group v-model="libBook" size="small" class="lib-filter">
-          <el-radio-button value="all">全部</el-radio-button>
-          <el-radio-button value="考试大纲">大纲</el-radio-button>
-          <el-radio-button value="复习指南">指南</el-radio-button>
-          <el-radio-button value="模拟试卷">模拟</el-radio-button>
-        </el-radio-group>
-
-        <!-- 大纲 / 指南 目录 -->
-        <div v-if="libBook !== '模拟试卷'" class="lib-mlist">
+        <div class="card-title" style="margin-bottom: 10px">资料库（三本 PDF 内置 · 像电子书逐页看）</div>
+        <div class="lib-books">
           <div
-            v-for="ch in libraryChapters"
-            :key="ch.id"
-            class="lib-mitem"
-            :class="{ active: activeTextChapter?.id === ch.id || activeScanChapterId === ch.id }"
-            @click="openChapter(ch)"
+            v-for="b in LIB_BOOKS"
+            :key="b.key"
+            class="lib-book-card"
+            @click="openBook(b)"
           >
-            <span class="lib-mbook">{{ ch.bookTag }}</span>
-            <span class="lib-mtitle">{{ ch.title }}</span>
-            <span class="lib-mpage">{{ ch.pageApprox ? '~P' + ch.page : 'P' + ch.page }}</span>
-          </div>
-          <!-- 大纲 4 篇解说章节：文字版 + 朗读（可切扫描件） -->
-          <div v-if="activeTextChapter" class="lib-mtext">
-            <div class="reader-head">
-              <span class="reader-book">{{ activeTextChapter.bookTag }}</span>
-              <h3 class="reader-title">{{ activeTextChapter.title }}</h3>
-              <el-button size="small" text :icon="Reading" @click="speakText(textChapterContent)">朗读</el-button>
-              <el-button size="small" text @click="openPreviewAt(activeTextChapter)">看扫描件</el-button>
-              <el-button size="small" text @click="activeTextChapter = null">收起</el-button>
+            <div class="lib-book-icon" :style="{ background: b.color }">{{ b.icon }}</div>
+            <div class="lib-book-main">
+              <div class="lib-book-name">{{ b.name }}</div>
+              <div class="lib-book-meta">{{ b.meta }}</div>
             </div>
-            <div class="reader-body">{{ textChapterContent }}</div>
-          </div>
-        </div>
-
-        <!-- 模拟：保留原题浏览器 + 每卷「扫描件」入口 -->
-        <div v-else class="lib-mlist">
-          <div
-            v-for="p in mockPapers"
-            :key="p.name"
-            class="lib-mitem"
-            :class="{ active: activeMockPaper === p.name }"
-            @click="activeMockPaper = p.name"
-          >
-            <span class="lib-mbook">模拟</span>
-            <span class="lib-mtitle">{{ p.name }}（{{ p.questions.length }} 题）</span>
-            <el-button size="small" text type="primary" @click.stop="openMockScan(p.name)">扫描件</el-button>
-          </div>
-          <template v-if="activeMockPaper">
-            <div class="reader-head">
-              <span class="reader-book">模拟试卷</span>
-              <h3 class="reader-title">{{ activeMockPaper }}</h3>
-              <span class="muted">《全真模拟试卷及考点点睛》原题</span>
-            </div>
-            <div class="reader-body mock-reader">
-              <div v-for="q in activeMockQuestions" :key="q.id" class="mock-q">
-                <div class="mock-q-meta">{{ typeLabel(q.type) }} · 第 {{ q.source.page }} 页</div>
-                <div class="mock-q-stem">{{ q.stem }}</div>
-                <ul v-if="q.options && q.options.length" class="mock-q-opts">
-                  <li v-for="(o, i) in q.options" :key="i" :class="{ on: isAnswer(o, q.answer) }">{{ o }}</li>
-                </ul>
-                <div class="mock-q-ans">答案：{{ q.answer }}</div>
-                <div v-if="q.explanation" class="mock-q-exp">解析：{{ q.explanation }}</div>
-              </div>
-            </div>
-          </template>
-        </div>
-
-        <!-- 原文件卡片（三本 PDF 扫描件入口） -->
-        <div class="card-title" style="margin: 16px 0 10px">原文件（点开看扫描件）</div>
-        <div class="material-grid">
-          <div v-for="m in MATERIALS" :key="m.id" class="material-card">
-            <div class="material-title">{{ m.title }}</div>
-            <div class="material-meta">{{ m.pages }} 页 · {{ m.remark }}</div>
-            <div class="material-ops">
-              <el-button size="small" type="primary" :icon="Picture" @click="openPreview(m)">预览</el-button>
-              <el-button size="small" text @click="addMaterialNote(m.title)">记笔记</el-button>
-            </div>
+            <button type="button" class="lib-book-go" @click.stop="openBook(b)">阅读 / 预览</button>
           </div>
         </div>
       </template>
@@ -893,7 +800,16 @@
     </section>
 
     <!-- PDF 预览：pdf.js 渲染到 canvas，移动端不再变成下载；仍保留「下载」入口 -->
-    <PdfViewerDialog v-model="previewVisible" :url="previewUrl" :title="previewTitle" :start-page="previewStartPage" />
+    <PdfViewerDialog
+      v-model="previewVisible"
+      :url="previewUrl"
+      :title="previewTitle"
+      :start-page="previewStartPage"
+      :toc="pdfToc"
+      :book-key="pdfBookKey"
+      :mock-questions="pdfMockQuestions"
+      @note="onReaderNote"
+    />
 
     <!-- 设置 -->
     <el-dialog v-model="settingsVisible" title="备考设置" width="min(92vw, 420px)">
@@ -1080,8 +996,13 @@ const activeMockQuestions = computed(() => {
 })
 // 进入「模拟」筛选时默认选中第一套，避免空白
 watch(libBook, (v) => {
-  if (v === '模拟试卷' && !activeMockPaper.value && mockPapers.value.length) {
-    activeMockPaper.value = mockPapers.value[0]?.name ?? ''
+  if (v === '模拟试卷') {
+    // 进入模拟筛选时确保题库就绪（PC 左栏按套卷列表、移动端由 openBook 触发）
+    void ensureQuestions().then(() => {
+      if (!activeMockPaper.value && mockPapers.value.length) {
+        activeMockPaper.value = mockPapers.value[0]?.name ?? ''
+      }
+    })
   }
   // 切换筛选时清空移动端章节选中态
   activeTextChapter.value = null
@@ -1101,6 +1022,65 @@ const textChapterContent = computed(() => {
   return allArticles.value.find((a) => a.id === id)?.content || ''
 })
 
+// ===== 资料库 · 三本 PDF 作为内置电子书入口（移动端书卡 / PC 同步内容模型） =====
+// 三本 PDF 即内置内容，点开像电子书逐页看，并保留预览功能（PdfViewerDialog）。
+const LIB_BOOKS = [
+  { key: '考试大纲', name: '考试大纲', icon: '纲', color: '#185fa5', meta: '236 页 · 可整本阅读', matId: 'dagang' },
+  { key: '复习指南', name: '复习指南', icon: '指', color: '#3b6d11', meta: '162 页 · 可整本阅读', matId: 'zhinan' },
+  { key: '模拟试卷', name: '模拟试卷', icon: '模', color: '#854f0b', meta: '138 页 · 5 套卷', matId: 'moni' }
+] as const
+
+const pdfToc = ref<{ title: string; page: number }[]>([])
+const pdfBookKey = ref('')
+const pdfMockQuestions = ref<any[]>([])
+
+function openBook(b: { key: string; matId: string; name: string }) {
+  const mat = MATERIALS.find((x) => x.id === b.matId)
+  if (!mat) return
+  const B = import.meta.env.BASE_URL
+  pdfBookKey.value = b.key
+  previewUrl.value = B + mat.file
+  previewTitle.value = mat.title
+  previewStartPage.value = 1
+  if (b.key === '模拟试卷') {
+    void ensureQuestions().then(() => {
+      pdfToc.value = mockPapers.value.map((p) => ({ title: p.name, page: mockPaperStart.value[p.name] || 1 }))
+      pdfMockQuestions.value = allDegreeQuestions.value.filter((q) => q.source.book === '模拟试卷')
+    })
+  } else {
+    pdfToc.value = tocByBook(b.key).map((c) => ({ title: c.title, page: c.page }))
+    pdfMockQuestions.value = []
+  }
+  previewVisible.value = true
+}
+
+// PC：当前选中的书（用于右侧启动面板「打开整本预览」）
+const pcCurrentBook = computed(() => {
+  const k = libBook.value === 'all' ? '' : libBook.value
+  return LIB_BOOKS.find((b) => b.key === k) || LIB_BOOKS[0]
+})
+
+function openMockPaper(name: string) {
+  const mat = MATERIALS.find((x) => x.id === 'moni')
+  if (!mat) return
+  const B = import.meta.env.BASE_URL
+  pdfBookKey.value = '模拟试卷'
+  previewUrl.value = B + mat.file
+  previewTitle.value = mat.title + ' · ' + name
+  previewStartPage.value = mockPaperStart.value[name] || 1
+  void ensureQuestions().then(() => {
+    pdfToc.value = mockPapers.value.map((p) => ({ title: p.name, page: mockPaperStart.value[p.name] || 1 }))
+    pdfMockQuestions.value = allDegreeQuestions.value.filter((q) => q.source.book === '模拟试卷')
+    // 题库加载完成后用真实起始页再定位一次（url 不变不会重下载，仅重新跳页）
+    previewStartPage.value = mockPaperStart.value[name] || 1
+  })
+  previewVisible.value = true
+}
+
+function onReaderNote() {
+  addMaterialNote(previewTitle.value)
+}
+
 // 模拟卷起始页：从题目 source.page 反推每套卷首题所在页（真实值）
 const mockPaperStart = computed<Record<string, number>>(() => {
   const m: Record<string, number> = {}
@@ -1114,14 +1094,16 @@ const mockPaperStart = computed<Record<string, number>>(() => {
 })
 
 function openChapter(ch: LibChapter) {
-  activeScanChapterId.value = ch.id
-  if (ch.proseId) {
-    // 大纲 4 篇解说章节：保留文字版 + 朗读（可再点「看扫描件」跳转）
-    activeTextChapter.value = ch
-  } else {
-    activeTextChapter.value = null
-    openPreviewAt(ch)
-  }
+  const mat = MATERIALS.find((x) => x.id === BOOK_MATERIAL[ch.book])
+  if (!mat) return
+  const B = import.meta.env.BASE_URL
+  pdfBookKey.value = ch.book
+  previewUrl.value = B + mat.file
+  previewTitle.value = mat.title + ' · ' + ch.title
+  previewStartPage.value = ch.page
+  pdfToc.value = tocByBook(ch.book).map((c) => ({ title: c.title, page: c.page }))
+  pdfMockQuestions.value = []
+  previewVisible.value = true
 }
 function openPreviewAt(ch: LibChapter) {
   const mat = MATERIALS.find((x) => x.id === BOOK_MATERIAL[ch.book])
@@ -4217,5 +4199,88 @@ section.immersive {
   .lib-mtext { margin-top: 12px; }
   .lib-mtext .reader-body { white-space: pre-wrap; word-break: break-word; }
   .material-grid { margin-bottom: 90px; }
+}
+
+/* ===== 资料库 · 三本 PDF 书卡（移动端入口） ===== */
+.lib-books {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 90px;
+}
+.lib-book-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #fff;
+  border: 0.5px solid #e3def7;
+  border-radius: 14px;
+  padding: 14px 14px;
+  cursor: pointer;
+}
+.lib-book-icon {
+  flex: none;
+  width: 42px;
+  height: 42px;
+  border-radius: 11px;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 17px;
+  font-weight: 700;
+}
+.lib-book-main {
+  flex: 1;
+  min-width: 0;
+}
+.lib-book-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: #2c2c3a;
+}
+.lib-book-meta {
+  font-size: 12px;
+  color: #8a86a0;
+  margin-top: 3px;
+}
+.lib-book-go {
+  flex: none;
+  border: 1px solid #5b6cff;
+  background: #fff;
+  color: #5b6cff;
+  border-radius: 9px;
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.lib-book-go:active {
+  background: #5b6cff;
+  color: #fff;
+}
+
+/* ===== 资料库 · PC 右侧启动面板（布局/样式不动，仅内容换为启动提示） ===== */
+.lib-launch {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 14px;
+  padding: 20px;
+}
+.lib-launch-book {
+  font-size: 18px;
+  font-weight: 700;
+  color: #2c2c3a;
+}
+.lib-launch-tip {
+  font-size: 13px;
+  color: #8a86a0;
+  line-height: 1.7;
+  max-width: 320px;
+  margin: 0;
 }
 </style>

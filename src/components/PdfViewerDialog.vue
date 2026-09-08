@@ -12,6 +12,7 @@
       <!-- 工具栏 -->
       <div class="pdfv-bar">
         <div v-if="!useNative" class="pdfv-bar-left">
+          <button v-if="toc && toc.length" type="button" class="pdfv-btn" @click="showToc = !showToc">目录</button>
           <button v-if="!isMobile" type="button" class="pdfv-btn" @click="toggleMode">
             {{ mode === 'scroll' ? '单页' : '滚动' }}
           </button>
@@ -60,11 +61,20 @@
           >
             {{ useNative ? '高级阅读' : '系统阅读器' }}
           </button>
+          <button v-if="!isMockList" type="button" class="pdfv-btn" @click="emit('note')">记笔记</button>
           <button type="button" class="pdfv-btn pdfv-fullscreen" @click="toggleFullscreen">
             {{ isFullscreen ? '退出全屏' : '全屏' }}
           </button>
           <a class="pdfv-dl" :href="url" target="_blank" rel="noopener">⬇ 下载</a>
         </div>
+      </div>
+
+      <!-- 模拟卷双视图切换 -->
+      <div v-if="bookKey === '模拟试卷' && mockQuestions && mockQuestions.length" class="pdfv-subbar">
+        <span class="pdfv-seg">
+          <button type="button" :class="{ on: mockView === 'pdf' }" @click="mockView = 'pdf'">PDF 预览</button>
+          <button type="button" :class="{ on: mockView === 'list' }" @click="mockView = 'list'">原题浏览</button>
+        </span>
       </div>
 
       <!-- 加载进度：百分比数字 + 横条，避免用户以为卡死 -->
@@ -77,54 +87,71 @@
 
       <!-- 主体 -->
       <div ref="bodyEl" class="pdfv-body" @scroll="onScrollThrottled">
-        <!-- 系统阅读器：浏览器原生渲染 PDF，移动端兼容性最好 -->
-        <div v-if="useNative" class="pdfv-native-wrap">
-          <iframe :src="url" class="pdfv-native" title="PDF 预览" frameborder="0"></iframe>
-          <div class="pdfv-native-hint">
-            <p>预览已交给系统查看器。若上方区域空白（部分手机内核不支持内嵌 PDF），请用下方按钮：</p>
-            <div class="pdfv-native-acts">
-              <a class="pdfv-dl" :href="url" target="_blank" rel="noopener">📖 全屏打开</a>
-              <a class="pdfv-dl" :href="url" download rel="noopener">⬇ 下载保存</a>
+        <!-- 模拟卷·原题浏览（双视图） -->
+        <div v-if="isMockList" class="pdfv-mock">
+          <div v-for="g in mockGroups" :key="g.name" class="pdfv-mock-group">
+            <div class="pdfv-mock-ghead">{{ g.name }}（{{ g.items.length }} 题）</div>
+            <div v-for="q in g.items" :key="q.id" class="pdfv-mock-item">
+              <div class="pdfv-mock-meta">{{ q.type }} · 第 {{ q.source?.page ?? '?' }} 页</div>
+              <div class="pdfv-mock-stem">{{ q.stem }}</div>
+              <ul v-if="q.options && q.options.length" class="pdfv-mock-opts">
+                <li v-for="(o, i) in q.options" :key="i" :class="{ on: isMockAnswer(o, q.answer) }">{{ o }}</li>
+              </ul>
+              <div class="pdfv-mock-ans">答案：{{ q.answer }}</div>
+              <div v-if="q.explanation" class="pdfv-mock-exp">解析：{{ q.explanation }}</div>
             </div>
           </div>
         </div>
-
         <template v-else>
-          <div v-if="phase === 'loading'" class="pdfv-tip">
-            正在加载 PDF…（{{ loadSource || '准备中' }}）
-          </div>
-          <div v-else-if="phase === 'error'" class="pdfv-tip pdfv-err">
-            {{ errMsg }}
-            <div v-if="lastRenderError" class="pdfv-err-debug">{{ lastRenderError }}</div>
-            <div class="pdfv-err-sub">
-              请
-              <a :href="url" target="_blank" rel="noopener">下载后查看</a>
+          <!-- 系统阅读器：浏览器原生渲染 PDF，移动端兼容性最好 -->
+          <div v-if="useNative" class="pdfv-native-wrap">
+            <iframe :src="url" class="pdfv-native" title="PDF 预览" frameborder="0"></iframe>
+            <div class="pdfv-native-hint">
+              <p>预览已交给系统查看器。若上方区域空白（部分手机内核不支持内嵌 PDF），请用下方按钮：</p>
+              <div class="pdfv-native-acts">
+                <a class="pdfv-dl" :href="url" target="_blank" rel="noopener">📖 全屏打开</a>
+                <a class="pdfv-dl" :href="url" download rel="noopener">⬇ 下载保存</a>
+              </div>
             </div>
           </div>
 
-        <template v-else>
-          <!-- 单页模式：当前页（支持左右滑动手势翻页） -->
-          <div
-            v-if="mode === 'single'"
-            class="pdfv-page-wrap pdfv-page-wrap--single"
-            @touchstart="onSwipeStart"
-            @touchend="onSwipeEnd"
-          >
-            <canvas ref="canvasEl" class="pdfv-canvas"></canvas>
-          </div>
+          <template v-else>
+            <div v-if="phase === 'loading'" class="pdfv-tip">
+              正在加载 PDF…（{{ loadSource || '准备中' }}）
+            </div>
+            <div v-else-if="phase === 'error'" class="pdfv-tip pdfv-err">
+              {{ errMsg }}
+              <div v-if="lastRenderError" class="pdfv-err-debug">{{ lastRenderError }}</div>
+              <div class="pdfv-err-sub">
+                请
+                <a :href="url" target="_blank" rel="noopener">下载后查看</a>
+              </div>
+            </div>
 
-          <!-- 连续滚动模式：所有页面容器 -->
-          <div v-else class="pdfv-scroll">
+          <template v-else>
+            <!-- 单页模式：当前页（支持左右滑动手势翻页） -->
             <div
-              v-for="i in numPages"
-              :key="i"
-              class="pdfv-page-wrap"
-              :data-page="i"
+              v-if="mode === 'single'"
+              class="pdfv-page-wrap pdfv-page-wrap--single"
+              @touchstart="onSwipeStart"
+              @touchend="onSwipeEnd"
             >
-              <canvas :ref="(el) => setPageRef(el, i)" class="pdfv-canvas"></canvas>
+              <canvas ref="canvasEl" class="pdfv-canvas"></canvas>
             </div>
-          </div>
-        </template>
+
+            <!-- 连续滚动模式：所有页面容器 -->
+            <div v-else class="pdfv-scroll">
+              <div
+                v-for="i in numPages"
+                :key="i"
+                class="pdfv-page-wrap"
+                :data-page="i"
+              >
+                <canvas :ref="(el) => setPageRef(el, i)" class="pdfv-canvas"></canvas>
+              </div>
+            </div>
+          </template>
+          </template>
         </template>
       </div>
 
@@ -132,6 +159,26 @@
       <div v-if="mode === 'scroll' && phase === 'ready'" class="pdfv-float">
         <button type="button" class="pdfv-btn" @click="scrollToPage(1)">顶部</button>
         <button type="button" class="pdfv-btn" @click="scrollToPage(numPages)">底部</button>
+      </div>
+
+      <!-- 目录抽屉：点章跳到对应页 -->
+      <div v-if="showToc && toc && toc.length" class="pdfv-toc">
+        <div class="pdfv-toc-head">
+          <span class="pdfv-toc-title">目录</span>
+          <button type="button" class="pdfv-btn" @click="showToc = false">关闭</button>
+        </div>
+        <div class="pdfv-toc-list">
+          <button
+            v-for="c in toc"
+            :key="c.title"
+            type="button"
+            class="pdfv-toc-item"
+            @click="goToPage(c.page)"
+          >
+            <span class="pdfv-toc-name">{{ c.title }}</span>
+            <span class="pdfv-toc-page">P{{ c.page }}</span>
+          </button>
+        </div>
       </div>
     </div>
   </el-dialog>
@@ -147,8 +194,25 @@ const props = defineProps<{
   title?: string
   /** 打开时定位到的起始页（章节跳转用）；超出范围或缺失则从第 1 页开始 */
   startPage?: number
+  /** 目录（章节跳转）。传入则在工具栏显示「目录」按钮，点章跳到对应页 */
+  toc?: { title: string; page: number }[]
+  /** 书籍 key，如 '模拟试卷' 启用「PDF 预览 / 原题浏览」双视图 */
+  bookKey?: string
+  /** 模拟卷原题（双视图「原题浏览」用） */
+  mockQuestions?: Array<{
+    id: string
+    type: string
+    stem: string
+    options?: string[]
+    answer: string
+    explanation?: string
+    source?: { section?: string; page?: number }
+  }>
 }>()
-const emit = defineEmits<{ (e: 'update:modelValue', v: boolean): void }>()
+const emit = defineEmits<{
+  (e: 'update:modelValue', v: boolean): void
+  (e: 'note'): void
+}>()
 
 const visible = computed({
   get: () => props.modelValue,
@@ -198,6 +262,25 @@ const useNative = ref(false)
 const lastRenderError = ref('')
 /** 用户手动选择的模式；null 表示未手动选。仅在 PC 端生效 */
 let userMode: boolean | null = null
+
+// ===== 目录抽屉（章节跳章） =====
+const showToc = ref(false)
+// 模拟卷双视图：'pdf' = PDF 预览，'list' = 原题浏览
+const mockView = ref<'pdf' | 'list'>('pdf')
+const isMockList = computed(() => mockView.value === 'list' && props.bookKey === '模拟试卷')
+// 模拟原题按套卷分组，便于浏览
+const mockGroups = computed(() => {
+  const map = new Map<string, any[]>()
+  for (const q of props.mockQuestions || []) {
+    const name = q.source?.section || '模拟卷'
+    if (!map.has(name)) map.set(name, [])
+    map.get(name)!.push(q)
+  }
+  return [...map.entries()].map(([name, items]) => ({ name, items }))
+})
+function isMockAnswer(opt: string, ans: string): boolean {
+  return opt.trim() === String(ans).trim()
+}
 
 const rootEl = ref<HTMLElement | null>(null)
 const bodyEl = ref<HTMLElement | null>(null)
@@ -438,6 +521,21 @@ function jumpFromInput() {
   }
 }
 
+/** 目录跳章：跳到指定页并关闭目录抽屉 */
+function goToPage(p: number) {
+  const total = numPages.value || p
+  const n = Math.max(1, Math.min(total, p))
+  pageNum.value = n
+  pageInput.value = n
+  if (mode.value === 'single') {
+    void renderPage(n, canvasEl.value)
+  } else {
+    scrollToPage(n)
+    void renderPage(n, pageCanvasMap.value[n])
+  }
+  showToc.value = false
+}
+
 /* ==================== 移动端左右滑动手势翻页 ==================== */
 function onSwipeStart(e: TouchEvent) {
   const t = e.changedTouches[0]
@@ -645,6 +743,9 @@ watch(
       observer.disconnect()
       observer = null
     }
+    // 切换文档时重置双视图与目录状态
+    mockView.value = 'pdf'
+    showToc.value = false
   }
 )
 
@@ -662,6 +763,7 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   height: 80vh;
+  position: relative;
 }
 
 /* 全屏模式 */
@@ -932,5 +1034,155 @@ onBeforeUnmount(() => {
     right: 10px;
     bottom: 10px;
   }
+}
+
+/* ===== 模拟卷双视图切换 ===== */
+.pdfv-subbar {
+  display: flex;
+  justify-content: center;
+  padding: 8px;
+  border-bottom: 1px solid #e2e8f0;
+  background: #f8fafc;
+}
+.pdfv-seg {
+  display: inline-flex;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.pdfv-seg button {
+  border: 0;
+  background: #fff;
+  padding: 7px 18px;
+  font-size: 12.5px;
+  cursor: pointer;
+  color: #334155;
+  font-weight: 600;
+}
+.pdfv-seg button.on {
+  background: #5b6cff;
+  color: #fff;
+}
+
+/* ===== 目录抽屉 ===== */
+.pdfv-toc {
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 300px;
+  max-width: 82%;
+  background: #fff;
+  z-index: 30;
+  box-shadow: 2px 0 14px rgba(0, 0, 0, 0.18);
+  display: flex;
+  flex-direction: column;
+}
+.pdfv-toc-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 14px;
+  border-bottom: 1px solid #e2e8f0;
+}
+.pdfv-toc-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #1e293b;
+}
+.pdfv-toc-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 0;
+}
+.pdfv-toc-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  text-align: left;
+  border: 0;
+  background: transparent;
+  padding: 11px 14px;
+  cursor: pointer;
+  border-bottom: 1px solid #f1f5f9;
+}
+.pdfv-toc-item:hover {
+  background: #f8fafc;
+}
+.pdfv-toc-name {
+  font-size: 13px;
+  color: #334155;
+}
+.pdfv-toc-page {
+  font-size: 12px;
+  color: #5b6cff;
+  font-weight: 700;
+}
+
+/* ===== 模拟原题浏览 ===== */
+.pdfv-mock {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px;
+  background: #0f172a;
+  -webkit-overflow-scrolling: touch;
+}
+.pdfv-mock-group {
+  margin-bottom: 8px;
+}
+.pdfv-mock-ghead {
+  font-size: 13px;
+  font-weight: 700;
+  color: #e2e8f0;
+  padding: 6px 2px;
+}
+.pdfv-mock-item {
+  background: #fff;
+  border-radius: 10px;
+  padding: 12px;
+  margin-bottom: 12px;
+  text-align: left;
+}
+.pdfv-mock-meta {
+  font-size: 12px;
+  color: #854f0b;
+  margin-bottom: 6px;
+}
+.pdfv-mock-stem {
+  font-size: 13.5px;
+  color: #1e293b;
+  line-height: 1.6;
+  margin-bottom: 8px;
+}
+.pdfv-mock-opts {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 8px;
+}
+.pdfv-mock-opts li {
+  padding: 7px 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  margin-bottom: 6px;
+  font-size: 13px;
+  color: #334155;
+}
+.pdfv-mock-opts li.on {
+  border-color: #5b6cff;
+  background: #eef2ff;
+  color: #3b3fae;
+  font-weight: 700;
+}
+.pdfv-mock-ans {
+  font-size: 13px;
+  color: #0f9d58;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+.pdfv-mock-exp {
+  font-size: 12.5px;
+  color: #64748b;
+  line-height: 1.6;
 }
 </style>
