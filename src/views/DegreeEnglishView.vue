@@ -728,6 +728,71 @@
         </div>
       </div>
     </section>
+
+    <!-- 朗读中心 -->
+    <section v-if="renderedTabs.has('recite')" v-show="activeTab === 'recite'" class="panel recite-panel">
+      <div class="recite-grid">
+        <div class="recite-main">
+          <div class="recite-src">
+            <button class="recite-chip" :class="{ on: reciteSource === 'cards' }" @click="selectReciteSource('cards')">背单词卡</button>
+            <button class="recite-chip" :class="{ on: reciteSource === 'phrase' }" @click="selectReciteSource('phrase')">词组</button>
+            <button class="recite-chip" :class="{ on: reciteSource === 'cet4' }" @click="selectReciteSource('cet4')">
+              四级单词<span v-if="reciteSource === 'cet4' && reciteLoading" class="recite-mini"> · 加载中</span>
+            </button>
+          </div>
+
+          <div v-if="reciteCurrent" class="recite-player">
+            <div class="recite-tag">{{ reciteSource === 'cards' ? '背单词卡 · 大纲词汇' : reciteSource === 'phrase' ? '词组' : '四级单词' }}</div>
+            <div class="recite-word">{{ reciteCurrent.text }}</div>
+            <div v-if="reciteCurrent.kind === 'word'" class="recite-spell">
+              <template v-for="(L, idx) in spellLetters(reciteCurrent.text)" :key="idx">
+                <span class="recite-l" :class="{ on: isActiveLetter(idx) }">{{ L }}</span><span v-if="idx < spellLetters(reciteCurrent.text).length - 1" class="recite-dot">·</span>
+              </template>
+            </div>
+            <div v-if="reciteCurrent.phonetic" class="recite-phon">/{{ reciteCurrent.phonetic }}/</div>
+            <div class="recite-zh">{{ reciteCurrent.zh }}</div>
+            <div class="recite-equal" :class="{ on: recitePlaying }"><i></i><i></i><i></i><i></i></div>
+          </div>
+          <el-empty v-else :description="reciteSource === 'cet4' && reciteLoading ? '正在加载四级词库…' : '该来源暂无内容'" :image-size="60" />
+
+          <div class="recite-prog">
+            <span class="recite-count">{{ reciteProg.index }} / {{ reciteProg.total }}</span>
+            <div class="recite-bar"><div class="recite-fill" :style="{ width: reciteProgPct + '%' }"></div></div>
+          </div>
+
+          <div class="recite-ctrl">
+            <button class="rc-btn" @click="recite.prev()" aria-label="上一词">‹</button>
+            <button class="rc-btn rc-play" @click="recite.toggle()">{{ recitePlaying ? '❚❚' : '▶' }}</button>
+            <button class="rc-btn" @click="recite.next()" aria-label="下一词">›</button>
+            <button class="rc-btn" @click="recite.repeat()" aria-label="重读">↺</button>
+          </div>
+
+          <div class="recite-opts">
+            <button class="recite-pill" :class="{ on: reciteAccent === 'en-US' }" @click="setReciteAccent('en-US')">美音</button>
+            <button class="recite-pill" :class="{ on: reciteAccent === 'en-GB' }" @click="setReciteAccent('en-GB')">英音</button>
+            <button class="recite-pill" :class="{ on: reciteSpell }" @click="recite.spell.value = !recite.spell.value">逐字母</button>
+            <button class="recite-pill" :class="{ on: reciteAuto }" @click="recite.autoplay.value = !recite.autoplay.value">自动连播</button>
+          </div>
+          <div class="recite-tip">锁屏自动连播 · 需联网（有道发音）；离线降级亮屏朗读</div>
+        </div>
+
+        <div class="recite-side">
+          <div class="recite-side-title">词表（点击跳转）</div>
+          <div class="recite-list">
+            <div
+              v-for="(it, i) in reciteItems"
+              :key="i"
+              class="recite-li"
+              :class="{ on: i === reciteCurIdx }"
+              @click="recite.playItem(i)"
+            >
+              <span class="rl-w">{{ it.text }}</span>
+              <span class="rl-z">{{ it.zh }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
     </template><!-- /end 今日视图 -->
 
     <!-- ===== 刷题视图：直接进入题型训练 ===== -->
@@ -970,6 +1035,8 @@ import { speakEn } from '../prep/degreeSpeech'
 import { getWordEnrich, type WordEnrichData } from '../services/wordEnrichService'
 import { getEmoji } from '../data/emojiDict'
 import { useCloudSync } from '../composables/useCloudSync'
+import { useRecitePlayer, type ReciteItem } from '../composables/useRecitePlayer'
+import { fetchMasterWords } from '../services/cetPrepService'
 import WordDetailDialog from '../components/WordDetailDialog.vue'
 import PdfViewerDialog from '../components/PdfViewerDialog.vue'
 import { tocByBook, BOOK_MATERIAL, type LibChapter } from '../prep/degreeLibraryToc'
@@ -1299,7 +1366,8 @@ const tabs = [
   { key: 'training', label: '题型训练' },
   { key: 'mock', label: '模拟考试' },
   { key: 'library', label: '资料库' },
-  { key: 'rw', label: '读写中心' }
+  { key: 'rw', label: '读写中心' },
+  { key: 'recite', label: '朗读中心' }
 ]
 const router = useRouter()
 const activeTab = ref('overview')
@@ -1309,6 +1377,73 @@ watch(activeTab, (tab) => {
   // 切到「词组/语句」时按需拉起离线音标库（仅首次）
   if (tab === 'phrases') void ensureOfflineDefs()
 }, { immediate: true })
+
+// ===== 朗读中心（新增标签，位于「读写中心」之后）=====
+const recite = useRecitePlayer()
+const reciteSource = ref<'cards' | 'phrase' | 'cet4'>('cards')
+const reciteLoading = ref(false)
+const {
+  items: reciteItems,
+  currentItem: reciteCurrent,
+  currentItemIndex: reciteCurIdx,
+  currentSeg: reciteSeg,
+  progress: reciteProg,
+  playing: recitePlaying,
+  accent: reciteAccent,
+  spell: reciteSpell,
+  autoplay: reciteAuto
+} = recite
+
+function spellLetters(t: string): string[] {
+  return (t || '').replace(/[^a-zA-Z]/g, '').toUpperCase().split('')
+}
+function isActiveLetter(idx: number): boolean {
+  const s = reciteSeg.value
+  return !!s && s.kind === 'letter' && s.letterPos === idx
+}
+const reciteProgPct = computed(() =>
+  reciteProg.value.total ? Math.round((reciteProg.value.index / reciteProg.value.total) * 100) : 0
+)
+function setReciteAccent(a: 'en-US' | 'en-GB') {
+  reciteAccent.value = a
+}
+async function selectReciteSource(src: 'cards' | 'phrase' | 'cet4') {
+  if (reciteSource.value === src && reciteItems.value.length) return
+  recite.stop()
+  reciteSource.value = src
+  let list: ReciteItem[] = []
+  if (src === 'cards') {
+    list = degreeWords.map((w) => ({ text: w.word, zh: w.definition, phonetic: w.phonetic, kind: 'word' as const }))
+  } else if (src === 'phrase') {
+    const all = [...degreePhrases, ...spokenPhrases, ...affixPhrases, ...irregularPhrases]
+    list = all.map((p) => ({ text: p.en, zh: p.zh ?? '', kind: 'phrase' as const }))
+  } else {
+    reciteLoading.value = true
+    try {
+      const rows = await fetchMasterWords()
+      list = rows.map((r) => ({ text: r[0], zh: r[3], phonetic: r[1], kind: 'word' as const }))
+    } catch {
+      ElMessage.warning('四级词库加载失败：请确认已登录且网络可用')
+      list = []
+    } finally {
+      reciteLoading.value = false
+    }
+  }
+  recite.setItems(list, voiceAccent.value, reciteSpell.value)
+}
+// 进入朗读中心：首次构建默认来源（背单词卡）
+watch(activeTab, (t) => {
+  if (t === 'recite') {
+    renderedTabs.value.add('recite')
+    if (!reciteItems.value.length) void selectReciteSource('cards')
+  } else {
+    recite.stop()
+  }
+})
+// 发音口音与全局备考台「美/英」保持一致
+watch(voiceAccent, (v) => {
+  reciteAccent.value = v
+})
 
 // 移动端响应式：记忆与掌握区在窄屏默认折叠，砍掉首屏一大段滚动
 const isMobile = ref(false)
@@ -4478,4 +4613,80 @@ section.immersive {
 .lib-book-sub { font-size: 11.5px; color: #8a86a0; margin-top: 2px; }
 .lib-book-bar { height: 5px; border-radius: 4px; background: #eceaf6; overflow: hidden; margin-top: 8px; }
 .lib-book-fill { height: 100%; border-radius: 4px; transition: width 0.3s ease; }
+
+/* ===== 朗读中心 ===== */
+.recite-panel { padding-bottom: 90px; }
+.recite-grid { display: grid; grid-template-columns: minmax(0, 1fr) 260px; gap: 18px; align-items: start; }
+.recite-main { min-width: 0; }
+.recite-src { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 14px; }
+.recite-chip {
+  border: 1px solid var(--border, #d9dcea);
+  background: #fff;
+  color: #5f5e5a;
+  border-radius: 14px;
+  padding: 7px 16px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.recite-chip.on { background: #534ab7; border-color: #534ab7; color: #fff; }
+.recite-mini { font-size: 11px; opacity: 0.85; }
+.recite-player {
+  background: #fff;
+  border: 1px solid #eceaf6;
+  border-radius: 16px;
+  padding: 18px 20px;
+  box-shadow: 0 6px 20px rgba(60, 52, 137, 0.06);
+}
+.recite-tag { font-size: 11px; color: #8a86a0; }
+.recite-word { font-size: 34px; font-weight: 700; color: #2c2c3a; margin: 8px 0 4px; word-break: break-word; }
+.recite-spell { font-size: 14px; color: #9a96b0; letter-spacing: 1px; margin-bottom: 6px; }
+.recite-l { transition: color 0.2s, background 0.2s; padding: 1px 2px; border-radius: 4px; }
+.recite-l.on { color: #534ab7; background: #eeedfe; font-weight: 700; }
+.recite-dot { color: #cfcbe0; margin: 0 1px; }
+.recite-phon { font-size: 13px; font-style: italic; color: #8a86a0; }
+.recite-zh { font-size: 15px; color: #444; margin-top: 10px; }
+.recite-equal { display: flex; gap: 4px; align-items: flex-end; height: 18px; margin-top: 12px; opacity: 0.35; }
+.recite-equal.on { opacity: 1; }
+.recite-equal i { width: 5px; background: #7f77dd; border-radius: 2px; animation: req-eq 0.9s ease-in-out infinite; }
+.recite-equal i:nth-child(1) { height: 8px; animation-delay: 0s; }
+.recite-equal i:nth-child(2) { height: 16px; animation-delay: 0.15s; }
+.recite-equal i:nth-child(3) { height: 11px; animation-delay: 0.3s; }
+.recite-equal i:nth-child(4) { height: 14px; animation-delay: 0.45s; }
+@keyframes req-eq { 0%, 100% { transform: scaleY(0.5); } 50% { transform: scaleY(1); } }
+.recite-prog { display: flex; align-items: center; gap: 12px; margin: 16px 0 10px; }
+.recite-count { font-size: 12px; color: #8a86a0; white-space: nowrap; }
+.recite-bar { flex: 1; height: 6px; border-radius: 3px; background: #eceaf6; overflow: hidden; }
+.recite-fill { height: 100%; background: #534ab7; border-radius: 3px; transition: width 0.3s ease; }
+.recite-ctrl { display: flex; justify-content: center; gap: 16px; margin: 14px 0; }
+.rc-btn {
+  width: 44px; height: 44px; border-radius: 50%;
+  border: 1px solid #d9dcea; background: #fff; color: #5f5e5a;
+  font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center;
+}
+.rc-btn:active { transform: scale(0.94); }
+.rc-play { width: 56px; height: 56px; background: #534ab7; border-color: #534ab7; color: #fff; font-size: 20px; }
+.recite-opts { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
+.recite-pill {
+  border: 1px solid #d9dcea; background: #fff; color: #5f5e5a;
+  border-radius: 14px; padding: 6px 14px; font-size: 12px; cursor: pointer;
+}
+.recite-pill.on { background: #eaf3de; border-color: #97c459; color: #3b6d11; }
+.recite-tip { text-align: center; font-size: 11px; color: #8a86a0; margin-top: 10px; }
+.recite-side { min-width: 0; }
+.recite-side-title { font-size: 13px; color: #8a86a0; margin-bottom: 8px; }
+.recite-list { max-height: 460px; overflow: auto; border: 1px solid #eceaf6; border-radius: 12px; background: #fff; }
+.recite-li { display: flex; gap: 8px; padding: 9px 12px; border-bottom: 1px solid #f3f1f9; cursor: pointer; align-items: baseline; }
+.recite-li:last-child { border-bottom: none; }
+.recite-li.on { background: #f5f3ff; }
+.recite-li.on .rl-w { color: #534ab7; font-weight: 700; }
+.rl-w { font-size: 13px; color: #2c2c3a; flex: none; max-width: 50%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rl-z { font-size: 12px; color: #8a86a0; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* 移动端：单列堆叠，避开备考台底部导航 */
+@media (max-width: 768px) {
+  .recite-grid { grid-template-columns: 1fr; }
+  .recite-side { order: 2; }
+  .recite-list { max-height: 320px; }
+  .recite-panel { padding-bottom: 96px; }
+}
 </style>
