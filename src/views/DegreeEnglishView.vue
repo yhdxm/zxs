@@ -773,7 +773,17 @@
             <button class="recite-pill" :class="{ on: reciteSpell }" @click="recite.spell.value = !recite.spell.value">逐字母</button>
             <button class="recite-pill" :class="{ on: reciteAuto }" @click="recite.autoplay.value = !recite.autoplay.value">自动连播</button>
           </div>
-          <div class="recite-tip">锁屏自动连播 · 需联网（有道发音）；离线降级亮屏朗读</div>
+          <div class="recite-speeds">
+            <span class="recite-speed-label">倍速</span>
+            <button
+              v-for="r in [0.75, 1, 1.25, 1.5, 2]"
+              :key="r"
+              class="recite-pill"
+              :class="{ on: reciteRate === r }"
+              @click="recite.setRate(r)"
+            >{{ r === 1 ? '常速' : r + 'x' }}</button>
+          </div>
+          <div class="recite-tip">锁屏自动连播 · 英文有道发音 / 中文 Google TTS，均需联网；离线降级亮屏朗读</div>
         </div>
 
         <div class="recite-side">
@@ -1037,6 +1047,7 @@ import { getEmoji } from '../data/emojiDict'
 import { useCloudSync } from '../composables/useCloudSync'
 import { useRecitePlayer, type ReciteItem } from '../composables/useRecitePlayer'
 import { fetchMasterWords } from '../services/cetPrepService'
+import { MASTER_WORDS_BUNDLE } from '../prep/masterWordsBundle'
 import WordDetailDialog from '../components/WordDetailDialog.vue'
 import PdfViewerDialog from '../components/PdfViewerDialog.vue'
 import { tocByBook, BOOK_MATERIAL, type LibChapter } from '../prep/degreeLibraryToc'
@@ -1391,7 +1402,8 @@ const {
   playing: recitePlaying,
   accent: reciteAccent,
   spell: reciteSpell,
-  autoplay: reciteAuto
+  autoplay: reciteAuto,
+  rate: reciteRate
 } = recite
 
 function spellLetters(t: string): string[] {
@@ -1421,10 +1433,17 @@ async function selectReciteSource(src: 'cards' | 'phrase' | 'cet4') {
     reciteLoading.value = true
     try {
       const rows = await fetchMasterWords()
-      list = rows.map((r) => ({ text: r[0], zh: r[3], phonetic: r[1], kind: 'word' as const }))
+      if (rows.length) {
+        list = rows.map((r) => ({ text: r[0], zh: r[3], phonetic: r[1], kind: 'word' as const }))
+      } else {
+        // Supabase 表为空：用内置全量四级词库兜底，与备考台一致
+        list = MASTER_WORDS_BUNDLE.map((r) => ({ text: r[0], zh: r[3], phonetic: r[1], kind: 'word' as const }))
+        ElMessage.info('四级词库云端为空，已切换内置词库（4544 词）')
+      }
     } catch {
-      ElMessage.warning('四级词库加载失败：请确认已登录且网络可用')
-      list = []
+      // 网络/表未创建：同样兜底到内置词库，保证离线也能读
+      list = MASTER_WORDS_BUNDLE.map((r) => ({ text: r[0], zh: r[3], phonetic: r[1], kind: 'word' as const }))
+      ElMessage.warning('四级词库云端不可用，已切换内置词库（4544 词）')
     } finally {
       reciteLoading.value = false
     }
@@ -4671,6 +4690,8 @@ section.immersive {
   border-radius: 14px; padding: 6px 14px; font-size: 12px; cursor: pointer;
 }
 .recite-pill.on { background: #eaf3de; border-color: #97c459; color: #3b6d11; }
+.recite-speeds { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; align-items: center; margin-top: 10px; }
+.recite-speed-label { font-size: 12px; color: #8a86a0; margin-right: 2px; }
 .recite-tip { text-align: center; font-size: 11px; color: #8a86a0; margin-top: 10px; }
 .recite-side { min-width: 0; }
 .recite-side-title { font-size: 13px; color: #8a86a0; margin-bottom: 8px; }

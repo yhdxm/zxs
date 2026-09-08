@@ -21,24 +21,35 @@ type Seg = {
 }
 
 const YOUDAO = 'https://dict.youdao.com/dictvoice'
+// 中文 TTS：Google 翻译接口返回 mp3，<audio> 媒体播放，锁屏仍可听；国内镜像优先，海外兜底
+const ZH_TTS = [
+  'https://translate.google.cn/translate_tts?ie=UTF-8&tl=zh-CN&client=tw-ob&q=',
+  'https://translate.google.com/translate_tts?ie=UTF-8&tl=zh-CN&client=tw-ob&q='
+]
 
 let audioEl: HTMLAudioElement | null = null
 let currentResolve: ((ok: boolean) => void) | null = null
 
-function segPlay(text: string, accent: SpeechAccent): Promise<boolean> {
+function getAudio(): HTMLAudioElement {
+  if (!audioEl) audioEl = new Audio()
+  return audioEl
+}
+
+/** 英文/字母段：走有道 dictvoice（免费、国内可直连）。返回是否成功起播完。 */
+function segPlay(text: string, accent: SpeechAccent, rate: number): Promise<boolean> {
   return new Promise((resolve) => {
     if (typeof window === 'undefined' || typeof Audio === 'undefined') {
       resolve(false)
       return
     }
     if (!text || !text.trim()) {
-      resolve(true)
+      resolve(true) // 空文本视为跳过
       return
     }
     try {
-      audioEl = audioEl || new Audio()
-      const el = audioEl
+      const el = getAudio()
       const vType = accent === 'en-GB' ? 1 : 2
+      el.playbackRate = rate
       el.src = `${YOUDAO}?audio=${encodeURIComponent(text)}&type=${vType}`
       let done = false
       const finish = (ok: boolean) => {
@@ -55,29 +66,77 @@ function segPlay(text: string, accent: SpeechAccent): Promise<boolean> {
       el.onerror = () => finish(false)
       const p = el.play() as Promise<void> | undefined
       if (p && typeof p.catch === 'function') p.catch(() => finish(false))
-      // 兜底：单段最长等 20s，避免网络异常时永久悬挂
-      window.setTimeout(() => finish(false), 20000)
+      // 单段超时 8s，避免网络异常时悬挂拖垮自动连播
+      window.setTimeout(() => finish(false), 8000)
     } catch {
       resolve(false)
     }
   })
 }
 
-function pauseAudio() {
-  try {
-    if (audioEl) {
-      audioEl.pause()
-      audioEl.onended = null
-      audioEl.onerror = null
+/** 本地 speechSynthesis 读中文（亮屏场景兜底）。 */
+function speakZhLocal(text: string): Promise<boolean> {
+  return new Promise((resolve) => {
+    if (typeof window === 'undefined' || !('speechSynthesis' in window) || !text.trim()) {
+      resolve(false)
+      return
     }
-  } catch {
-    /* noop */
+    try {
+      const synth = window.speechSynthesis
+      const vs = synth.getVoices?.() || []
+      const zh = vs.find((v) => /zh|chinese|中文|普通话/i.test(v.lang))
+      const u = new SpeechSynthesisUtterance(text)
+      u.lang = 'zh-CN'
+      if (zh) u.voice = zh
+      let done = false
+      const finish = (ok: boolean) => {
+        if (!done) {
+          done = true
+          resolve(ok)
+        }
+      }
+      u.onend = () => finish(true)
+      u.onerror = () => finish(false)
+      synth.speak(u)
+      window.setTimeout(() => finish(false), 9000)
+    } catch {
+      resolve(false)
+    }
+  })
+}
+
+/** 中文段：优先 Google TTS（<audio> 媒体，锁屏可听），全部候选失败则降级本地 speechSynthesis 中文。 */
+async function zhPlay(text: string, rate: number): Promise<boolean> {
+  if (typeof window === 'undefined' || !text || !text.trim()) return true
+  for (const base of ZH_TTS) {
+    const ok = await new Promise<boolean>((resolve) => {
+      try {
+        const el = getAudio()
+        el.playbackRate = rate
+        el.src = base + encodeURIComponent(text)
+        let done = false
+        const finish = (o: boolean) => {
+          if (!done) {
+            done = true
+            el.onended = null
+            el.onerror = null
+            currentResolve = null
+            resolve(o)
+          }
+        }
+        currentResolve = finish
+        el.onended = () => finish(true)
+        el.onerror = () => finish(false)
+        const p = el.play() as Promise<void> | undefined
+        if (p && typeof p.catch === 'function') p.catch(() => finish(false))
+        window.setTimeout(() => finish(false), 9000)
+      } catch {
+        resolve(false)
+      }
+    })
+    if (ok) return true
   }
-  if (currentResolve) {
-    const f = currentResolve
-    currentResolve = null
-    f(false)
-  }
+  return speakZhLocal(text)
 }
 
 const wait = (ms: number) => new Promise((r) => window.setTimeout(r, ms))
@@ -88,6 +147,7 @@ export function useRecitePlayer() {
   const spell = ref(true) // 逐字母拼写（单词恒拼写；词组受此开关影响）
   const autoplay = ref(true) // 自动连播（到末尾回到开头继续）
   const gapMs = ref(0) // 段间停顿
+  const rate = ref(1) // 朗读倍速（0.75 / 1 / 1.25 / 1.5 / 2）
   const segments = ref<Seg[]>([])
   const cursor = ref(0)
   const playing = ref(false)
@@ -145,10 +205,15 @@ export function useRecitePlayer() {
         playing.value = false
         break
       }
-      const ok = await segPlay(seg.text, accent.value)
-      if (token !== runToken || !playing.value) break
-      // 在线音频失败 → 降级本地/在线 speechSynthesis（亮屏）
-      if (!ok) await speakEn(seg.text, 0.95, accent.value)
+      let ok: boolean
+      if (seg.kind === 'zh') {
+        // 中文：专用中文 TTS，不降级英文通道
+        ok = await zhPlay(seg.text, rate.value)
+      } else {
+        ok = await segPlay(seg.text, accent.value, rate.value)
+        // 在线英文失败 → 降级本地/在线 speechSynthesis（亮屏）
+        if (!ok) await speakEn(seg.text, rate.value, accent.value)
+      }
       if (token !== runToken || !playing.value) break
       if (gapMs.value > 0) await wait(gapMs.value)
       if (token !== runToken || !playing.value) break
@@ -216,6 +281,7 @@ export function useRecitePlayer() {
     accent,
     spell,
     autoplay,
+    rate,
     gapMs,
     play,
     pause,
@@ -226,6 +292,26 @@ export function useRecitePlayer() {
     repeat,
     stop,
     setItems,
+    setRate: (r: number) => {
+      rate.value = r
+    },
     rebuild
+  }
+}
+
+function pauseAudio() {
+  try {
+    if (audioEl) {
+      audioEl.pause()
+      audioEl.onended = null
+      audioEl.onerror = null
+    }
+  } catch {
+    /* noop */
+  }
+  if (currentResolve) {
+    const f = currentResolve
+    currentResolve = null
+    f(false)
   }
 }
