@@ -21,6 +21,7 @@ type Seg = {
 }
 
 const YOUDAO = 'https://dict.youdao.com/dictvoice'
+const BAIDU_TTS = 'https://fanyi.baidu.com/gettts'
 const PROGRESS_KEY = 'zxs_recite_progress_v1'
 
 let audioEl: HTMLAudioElement | null = null
@@ -31,21 +32,17 @@ function getAudio(): HTMLAudioElement {
   return audioEl
 }
 
-/** 单段播放：走有道 dictvoice（type 1=美/2=英，对中文无影响）。返回是否成功起播完。 */
-function segPlay(text: string, type: number, rate: number): Promise<boolean> {
+/** 核心：播放任意 url 的音频（单一 <audio> 媒体，锁屏可听）。返回是否成功播完。 */
+function playUrl(url: string, rate: number): Promise<boolean> {
   return new Promise((resolve) => {
-    if (typeof window === 'undefined' || typeof Audio === 'undefined') {
+    if (typeof window === 'undefined' || typeof Audio === 'undefined' || !url) {
       resolve(false)
-      return
-    }
-    if (!text || !text.trim()) {
-      resolve(true) // 空文本视为跳过
       return
     }
     try {
       const el = getAudio()
       el.playbackRate = rate
-      el.src = `${YOUDAO}?audio=${encodeURIComponent(text)}&type=${type}`
+      el.src = url
       let done = false
       const finish = (ok: boolean) => {
         if (!done) {
@@ -67,6 +64,12 @@ function segPlay(text: string, type: number, rate: number): Promise<boolean> {
       resolve(false)
     }
   })
+}
+
+/** 单段播放：走有道 dictvoice（英文/字母，type 1=美/2=英）。 */
+function segPlay(text: string, type: number, rate: number): Promise<boolean> {
+  if (!text || !text.trim()) return Promise.resolve(true) // 空文本视为跳过
+  return playUrl(`${YOUDAO}?audio=${encodeURIComponent(text)}&type=${type}`, rate)
 }
 
 /** 本地 speechSynthesis 读中文（亮屏场景兜底，仅当在线有道失败时使用）。 */
@@ -100,11 +103,16 @@ function speakZhLocal(text: string): Promise<boolean> {
   })
 }
 
-/** 中文段：有道 dictvoice（国内直连、<audio> 媒体锁屏可听）为主，全部失败降级本地 speechSynthesis 中文。 */
+/** 中文段：百度 gettts 真·中文发音为主（国内直连、<audio> 媒体锁屏可听）；
+ *  有道 dictvoice 对中文实为英文发音引擎（不出中文），仅作兜底；再不行降级本地 speechSynthesis 中文。 */
 async function zhPlay(text: string, rate: number): Promise<boolean> {
   if (typeof window === 'undefined' || !text || !text.trim()) return true
-  const ok = await segPlay(text, 2, rate) // type 对中文无意义，占位
-  if (ok) return true
+  // 1) 百度中文 TTS（真正中文发音）
+  const baidu = `${BAIDU_TTS}?lan=zh&text=${encodeURIComponent(text)}&spd=5&source=web`
+  if (await playUrl(baidu, rate)) return true
+  // 2) 有道 dictvoice 中文（英文音兜底，至少出声）
+  if (await playUrl(`${YOUDAO}?audio=${encodeURIComponent(text)}&type=2`, rate)) return true
+  // 3) 本地 speechSynthesis 中文（亮屏兜底，仅当在线全部失败）
   return speakZhLocal(text)
 }
 

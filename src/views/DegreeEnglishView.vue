@@ -793,7 +793,7 @@
               @click="recite.setRepeat(n)"
             >{{ n }} 遍</button>
           </div>
-          <div class="recite-tip">锁屏可继续听，且支持锁屏暂停 / 上一词 / 下一词 · 英文/中文均走有道发音（国内可直连），需联网；离线降级亮屏朗读。进度自动记忆，下次续读</div>
+          <div class="recite-tip">锁屏可继续听，且支持锁屏暂停 / 上一词 / 下一词 · 英文走有道、中文走百度 TTS（均国内可直连），需联网；离线降级亮屏朗读。进度自动记忆，下次续读</div>
         </div>
 
         <div class="recite-side">
