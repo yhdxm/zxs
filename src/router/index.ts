@@ -82,6 +82,14 @@ const router = createRouter({
       meta: { requirePermission: 'database' }
     },
     {
+      // 差值台：单路由 + ?view= 切换 9 个视图（与 /dashboard?view= 同构）。
+      // 9 个视图共用一个权限，故意不加 view 级映射，避免第二处维护。
+      path: '/gapdesk',
+      name: 'gapdesk',
+      component: () => import('../views/GapDeskView.vue'),
+      meta: { requirePermission: 'gapdesk' }
+    },
+    {
       path: '/automation',
       name: 'automation',
       component: () => import('../views/AutomationInfoView.vue'),

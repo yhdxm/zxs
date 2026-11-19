@@ -246,7 +246,16 @@ const TABLE_DESC: Record<string, string> = {
   user_json_blobs: '通用 KV 表：自选股、学习掌握、模拟盘、AI 用量等单用户单 key 的 JSON 数据',
   push_subscriptions: '消息推送·订阅表：用户浏览器/设备推送订阅端点与公钥，按账号隔离',
   notifications: '消息推送·通知表：系统生成的站内通知与待推送消息（标题/正文/类型/已读状态）',
-  push_reminder_log: '消息推送·发送日志表：每次提醒/推送的实际发送记录与结果，用于去重与排查'
+  push_reminder_log: '消息推送·发送日志表：每次提醒/推送的实际发送记录与结果，用于去重与排查',
+  gap_events: '差值·事件主表：25 路免费信源聚类后的事件（标题指纹/行业/维度/四维分/双轨热度/48h 过期）',
+  gap_event_sources: '差值·事件证据链：同一事件由哪些源、哪一层、何时报道（谁先报一目了然）',
+  gap_event_platform: '差值·平台首触与热度：微博/知乎/抖音/决策圈等平台的首触时刻与热度，只增不改',
+  gap_sources: '差值·信源健康：25 路源的连续成功/失败次数、延迟、条数与失败原因',
+  gap_favorites: '差值·收藏表：用户收藏的差值事件，按 user_id 隔离',
+  gap_reads: '差值·已读表：用户已读的差值事件（重复标记不刷新 read_at）',
+  gap_subscriptions: '差值·行业订阅表：用户订阅的 8 个行业键，用于「仅订阅」筛选',
+  gap_rules: '差值·预警规则表：用户级规则 DSL（行业/维度/阈值/源数/时间窗/通道）',
+  gap_seats: '差值·席位与用量表：套餐、席位数、48h 配额已用/总量'
 }
 
 /** Supabase 平台托管的系统表（多建在 public 模式下但由平台管理、默认不开 RLS），不纳入「业务表未开 RLS」告警，避免误报 */
@@ -277,6 +286,9 @@ const TABLE_GROUP: Record<string, string> = {
   degree_practice: 'degree', degree_mistakes: 'degree', degree_favorites: 'degree',
   degree_words: 'degree', degree_questions: 'degree', degree_phrases: 'degree',
   degree_exam_records: 'degree',
+  gap_events: 'gapdesk', gap_event_sources: 'gapdesk', gap_event_platform: 'gapdesk',
+  gap_sources: 'gapdesk', gap_favorites: 'gapdesk', gap_reads: 'gapdesk',
+  gap_subscriptions: 'gapdesk', gap_rules: 'gapdesk', gap_seats: 'gapdesk',
   study_module_settings: 'learn', user_json_blobs: 'biz'
 }
 
@@ -290,6 +302,7 @@ const GROUP_META: Record<string, { label: string; color: string }> = {
   third: { label: '第三方 API', color: '#14b8a6' },
   feedback: { label: '意见反馈', color: '#6366f1' },
   degree: { label: '学位英语备考', color: '#534AB7' },
+  gapdesk: { label: '差值', color: '#4F46E5' },
   archive: { label: '消息归档', color: '#ec4899' },
   other: { label: '其他表', color: '#64748b' }
 }

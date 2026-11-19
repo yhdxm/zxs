@@ -22,6 +22,7 @@ import {
   Document,
   Aim,
   DataBoard,
+  DataLine,
   List,
   Setting,
   User,
@@ -63,6 +64,15 @@ export const APP_MENU: SideItem[] = [
     icon: Coin,
     permissionKey: 'database',
     to: '/database'
+  },
+  {
+    // 差值台：9 个视图共用一个权限（靠 ?view= 切换），故只登记一个 permissionKey。
+    // 不加 visible：可见性一律交给权限树（普通用户默认不可见，见 appDataService 的 USER_ALLOWED_BASES）。
+    key: 'gapdesk',
+    label: '差值',
+    icon: DataLine,
+    permissionKey: 'gapdesk',
+    to: '/gapdesk'
   },
   {
     key: 'lianzhicang',

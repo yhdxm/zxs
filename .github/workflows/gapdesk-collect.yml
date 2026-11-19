@@ -1,0 +1,84 @@
+# =============================================================
+# 差值台 GAPDESK · 采集任务（每 30 分钟一轮）
+# =============================================================
+# 前置（仓库 Settings → Secrets and variables → Actions 里配置）：
+#   SUPABASE_SERVICE_ROLE_KEY  必填，Supabase 的 service_role key
+#                              （JWT 里的 role 必须是 service_role，否则脚本启动即退出）
+#   SUPABASE_URL               可选，默认复用已有的 VITE_SUPABASE_URL
+#
+# 设计要点：
+#   · 服务端密钥只在这一条 workflow 里注入，前端构建（deploy.yml）用的是 anon key；
+#   · concurrency 不取消进行中的轮次 —— 采集有写入动作，中途 kill 会留下半轮证据链；
+#   · timeout-minutes: 5 —— 单轮实测 13s，留出 GitHub 队列与网络抖动的余量；
+#   · 最后一步 if: always() —— 失败也要把日志贴进 Step Summary，否则只在 Actions 里翻原始日志。
+# =============================================================
+name: GAPDESK Collect
+
+on:
+  schedule:
+    # 每 30 分钟：与 src/config/gapdeskConfig.ts 的 GAP_REFRESH_MS（30s 前端补偿刷新）配合，
+    # 前端靠 Realtime 拿增量，这里负责把新事件写进库。
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: gapdesk-collect
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  collect:
+    name: 采集一轮
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      TZ: Asia/Shanghai
+      CI: 'true'
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL || secrets.VITE_SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 安装 Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: 冒烟前置检查（密钥形态）
+        run: |
+          node - <<'NODE'
+          const key = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+          if (!key) {
+            console.log('::error::缺少 secrets.SUPABASE_SERVICE_ROLE_KEY');
+            process.exit(1);
+          }
+          // 只解 payload 看 role，不打印任何密钥内容
+          const p = key.split('.');
+          let role = '(无法解析)';
+          try { role = JSON.parse(Buffer.from(p[1], 'base64url').toString('utf8')).role || role; } catch {}
+          console.log(`key role = ${role}`);
+          if (role !== 'service_role') {
+            console.log('::error::密钥不是 service_role，写入会被 RLS 拒绝');
+            process.exit(1);
+          }
+          NODE
+
+      - name: 采集并写库
+        run: |
+          set -o pipefail
+          node scripts/gapdesk/collect.mjs 2>&1 | tee "$RUNNER_TEMP/gapdesk.log"
+
+      - name: 写入 Step Summary（成功/失败都写）
+        if: always()
+        run: |
+          LOG="$RUNNER_TEMP/gapdesk.log"
+          {
+            echo "## 差值 GAPDESK 采集结果"
+            echo ''
+            echo '```'
+            if [ -f "$LOG" ]; then tail -n 40 "$LOG"; else echo '(没有日志输出)'; fi
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
