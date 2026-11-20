@@ -2,8 +2,8 @@
 # 差值台 GAPDESK · 采集任务（每 30 分钟一轮）
 # =============================================================
 # 前置（仓库 Settings → Secrets and variables → Actions 里配置）：
-#   SUPABASE_SERVICE_ROLE_KEY  必填，Supabase 的 service_role key
-#                              （JWT 里的 role 必须是 service_role，否则脚本启动即退出）
+#   SUPABASE_SERVICE_ROLE_KEY  必填，旧版 service_role JWT 或新版 sb_secret_ 开头的 secret key
+#                              （形态不符脚本启动即退出；新版 key 不是 JWT，不要再解 payload）
 #   SUPABASE_URL               可选，默认复用已有的 VITE_SUPABASE_URL
 #
 # 设计要点：
@@ -55,13 +55,16 @@ jobs:
             console.log('::error::缺少 secrets.SUPABASE_SERVICE_ROLE_KEY');
             process.exit(1);
           }
-          // 只解 payload 看 role，不打印任何密钥内容
+          // 两种合法形态：新版 sb_secret_ 前缀 secret key（非 JWT，本身就是 service_role，
+          // 不要再解 payload）；旧版 JWT 只解 payload 看 role。不打印任何密钥内容。
+          const isSecret = key.startsWith('sb_secret_') && key.length >= 20;
           const p = key.split('.');
           let role = '(无法解析)';
           try { role = JSON.parse(Buffer.from(p[1], 'base64url').toString('utf8')).role || role; } catch {}
-          console.log(`key role = ${role}`);
-          if (role !== 'service_role') {
-            console.log('::error::密钥不是 service_role，写入会被 RLS 拒绝');
+          const ok = isSecret || role === 'service_role';
+          console.log(`key 形态 = ${isSecret ? 'sb_secret_ (service_role)' : `JWT role=${role}`}`);
+          if (!ok) {
+            console.log('::error::密钥不是 service_role：需要 service_role JWT 或 sb_secret_ 开头的 secret key，写入会被 RLS 拒绝');
             process.exit(1);
           }
           NODE

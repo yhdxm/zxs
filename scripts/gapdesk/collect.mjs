@@ -8,7 +8,7 @@
 
    环境变量：
      SUPABASE_URL               必填（真实写库时）
-     SUPABASE_SERVICE_ROLE_KEY  必填，且 JWT 的 role 必须是 service_role
+     SUPABASE_SERVICE_ROLE_KEY  必填，service_role JWT 或 sb_secret_ 开头的新版 secret key
      CI=true                    Actions 里自动为 true；本地必须显式 --force 才写库
 
    命令行：
@@ -254,11 +254,14 @@ export async function runPipeline(opts = {}) {
    ========================================================= */
 export function createClient({ url, key }) {
   const base = String(url || '').replace(/\/+$/, '')
+  /* 新版 sb_secret_ key 不是 JWT：Supabase 官方要求只放 apikey 头，若同时带
+     Authorization: Bearer，网关会尝试按 JWT 解析并可能返回 401 Invalid JWT。
+     旧版 service_role JWT 仍需两个头都发，故按 key 形态分别构造。 */
   const headers = {
     apikey: key,
-    Authorization: `Bearer ${key}`,
     'content-type': 'application/json',
   }
+  if (!isSecretKey(key)) headers.Authorization = `Bearer ${key}`
 
   async function req(path, { method = 'GET', body, prefer } = {}) {
     const res = await fetch(base + path, {
@@ -307,9 +310,36 @@ export function createClient({ url, key }) {
   }
 }
 
-/** JWT payload 解出 role（只解 payload，不验签 —— 验签是服务端的责任） */
+/** 新版 Supabase secret key 前缀（形如 sb_secret_3Vth_...）：不是 JWT，但等价于 service_role */
+const SECRET_KEY_PREFIX = 'sb_secret_'
+/** 前缀 10 字符 + 至少 10 字符密钥体；挡住「只填前缀」这类手滑输入 */
+const SECRET_KEY_MIN_LENGTH = 20
+
+/**
+ * 是否为新版 Supabase secret key。
+ * 官方定义：secret key 解析到 Postgres 的 service_role 角色并带 BYPASSRLS，本身不是 JWT，
+ * 因此只校验前缀 + 长度，绝不再尝试解 payload（解不开正是旧逻辑误判的根因）。
+ * @param {string} key 待校验密钥
+ * @returns {boolean}
+ */
+export function isSecretKey(key) {
+  const k = String(key || '')
+  return k.startsWith(SECRET_KEY_PREFIX) && k.length >= SECRET_KEY_MIN_LENGTH
+}
+
+/**
+ * 取密钥对应的 Postgres role（只解 payload，不验签 —— 验签是服务端的责任）。
+ * 兼容两种形态：
+ *   1) 新版 sb_secret_xxx：非 JWT，语义上就是 service_role，直接返回该 role；
+ *   2) 旧版 JWT：解 payload 取 role。
+ * 无法识别（空串 / 乱串 / anon JWT 之外的坏格式）时返回 null。
+ * @param {string} token 待解析密钥
+ * @returns {string|null}
+ */
 export function jwtRole(token) {
-  const parts = String(token || '').split('.')
+  const k = String(token || '')
+  if (isSecretKey(k)) return 'service_role'
+  const parts = k.split('.')
   if (parts.length !== 3) return null
   try {
     const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8'))
@@ -317,6 +347,17 @@ export function jwtRole(token) {
   } catch {
     return null
   }
+}
+
+/**
+ * 服务端密钥形态总校验：只接受 service_role JWT 或 sb_secret_ 开头的 secret key。
+ * anon JWT、空串、乱填一律拒绝。不打印也不返回任何密钥内容。
+ * @param {string} key 待校验密钥
+ * @returns {boolean}
+ */
+export function isServiceRoleKey(key) {
+  if (isSecretKey(key)) return true
+  return jwtRole(key) === 'service_role'
 }
 
 /* =========================================================
@@ -414,9 +455,12 @@ export async function collectOnce(opts = {}) {
     if (!supabaseUrl || !serviceKey) {
       throw new Error('缺少 SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY')
     }
-    const role = jwtRole(serviceKey)
-    if (role !== 'service_role') {
-      throw new Error(`SERVICE_ROLE_KEY 的 JWT role 是 ${role || '(无法解析)'}，必须是 service_role`)
+    if (!isServiceRoleKey(serviceKey)) {
+      const role = jwtRole(serviceKey)
+      const detail = role ? `JWT role=${role}` : '既不是 sb_secret_ 开头的 secret key，也不是可解析的 JWT'
+      throw new Error(
+        `SERVICE_ROLE_KEY 形态不合法：需要 service_role JWT 或 sb_secret_ 开头的 secret key（${detail}）`
+      )
     }
   }
 
