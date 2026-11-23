@@ -42,6 +42,7 @@ import {
   EMPTY_PHASE_TITLE,
   EMPTY_STALE,
   EMPTY_WAIT,
+  EMPTY_WINDOW,
   EMPTY_WHY_TITLE
 } from '../../config/gapdeskConfig'
 
@@ -72,8 +73,8 @@ interface EmptyCopy {
 }
 
 const COPY: Record<EmptyType, EmptyCopy> = {
-  // 空池场景只说「没有差值」：不套用回打/导出/趋势口径，需要解释的调用点自己传 desc。
-  empty: { title: EMPTY_GENERIC, desc: '', reason: '', phase2: '' },
+  // 空池场景只说可观测事实：不套用回打/导出/趋势口径，也不替采集链路背书
+  empty: { title: EMPTY_GENERIC, desc: EMPTY_WINDOW, reason: '', phase2: '' },
   loading: { title: EMPTY_WAIT, desc: EMPTY_LOADING, reason: EMPTY_HISTORY, phase2: '' },
   error: { title: EMPTY_ERROR, desc: EMPTY_DEMO, reason: EMPTY_WAIT, phase2: '' },
   stale: { title: EMPTY_STALE, desc: EMPTY_DEMO, reason: EMPTY_HISTORY, phase2: '' }

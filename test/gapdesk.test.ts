@@ -12,8 +12,10 @@
  *  4. 顺带锁死前端权限与路由门禁（gapdesk 普通用户默认不可见）
  */
 import { afterEach, describe, expect, it } from 'vitest'
+import { mount } from '@vue/test-utils'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
+import GapEmptyState from '../src/components/gapdesk/GapEmptyState.vue'
 
 import {
   clamp,
@@ -36,7 +38,7 @@ import {
 } from '../scripts/gapdesk/cluster.mjs'
 import { scoreEvents } from '../scripts/gapdesk/score.mjs'
 import { gapDiv, useGapDesk } from '../src/composables/useGapDesk'
-import { GAP_TTL_HOURS } from '../src/config/gapdeskConfig'
+import { EMPTY_WINDOW, GAP_TTL_HOURS } from '../src/config/gapdeskConfig'
 import {
   DEFAULT_ROLE_CONFIG,
   PERMISSION_TREE,
@@ -725,5 +727,17 @@ describe('useGapDesk.ruleCount · 读到 0 条与读失败可区分', () => {
 
     store.ruleRows.value = [{ id: 'r1' } as unknown as GapRuleRow]
     expect(store.ruleCount.value).toBe(1)
+  })
+})
+
+describe('GapEmptyState · 空池默认文案不再串台', () => {
+  it('type=empty 使用 EMPTY_WINDOW，不出现回打 / 导出 / 趋势口径', () => {
+    const wrapper = mount(GapEmptyState, { props: { type: 'empty' } })
+    const text = wrapper.text()
+    expect(text).toContain(EMPTY_WINDOW)
+    expect(text).not.toContain('回打样本积累中')
+    expect(text).not.toContain('检索/导出')
+    expect(text).not.toContain('历史序列需快照积累')
+    wrapper.unmount()
   })
 })

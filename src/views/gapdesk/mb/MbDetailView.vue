@@ -47,7 +47,7 @@
       </section>
     </template>
 
-    <GapEmptyState v-else type="empty" />
+    <GapEmptyState v-else type="empty" :desc="EMPTY_MISSING" />
   </div>
 </template>
 
@@ -57,7 +57,7 @@ import { useRoute } from 'vue-router'
 import GapDualTrack from '../../../components/gapdesk/GapDualTrack.vue'
 import GapEmptyState from '../../../components/gapdesk/GapEmptyState.vue'
 import GapScoreBlock from '../../../components/gapdesk/GapScoreBlock.vue'
-import { EMPTY_ECHO } from '../../../config/gapdeskConfig'
+import { EMPTY_ECHO, EMPTY_MISSING } from '../../../config/gapdeskConfig'
 import { useGapDesk } from '../../../composables/useGapDesk'
 import { fmtClock } from '../../../utils/gapdeskFormat'
 

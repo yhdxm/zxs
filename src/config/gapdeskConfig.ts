@@ -343,6 +343,12 @@ export const EMPTY_ERROR = '数据暂时取不到，已保留上一次成功加�
 export const EMPTY_STALE = '当前展示的是本地镜像，分数与热度可能已过期'
 export const EMPTY_GENERIC = '当前时间窗内没有可展示的差值'
 
+/** 事件池为空：只说明当前筛选下无可展示事件，不替采集链路背书 */
+export const EMPTY_WINDOW = '当前时间窗与筛选条件下没有达到展示阈值的事件；不补条目凑数'
+
+/** 单条详情取不到：列表仍在，只是这条已过期或未加载 */
+export const EMPTY_MISSING = '这条差值未加载或已过期（入库保留 48 小时），请回列表重试'
+
 /** 空态组件的结构标签也放这里，避免组件里散落硬编码文案 */
 export const EMPTY_WHY_TITLE = '为什么没有'
 export const EMPTY_PHASE_TITLE = '二期标记'
