@@ -1,92 +1,99 @@
 <!--
-  统一空态 / 失败态 / 陈旧态
+  统一空态
   ---------------------------------------------------------------
-  一条铁律：**没有数据就明说没有，不许补演示数据**。
-  旧版差值台在没有网关时会静默回退 32 条演示数据，顶栏还写「实时」——
-  那是最坏的一种产品行为（看起来正常，实际全是假的）。
-  所以这里四种状态各自有明确文案，失败态还会把每个 DOWN 源的 last_msg 摊开。
+  四段固定结构：标题 → 说明 → 「为什么没有」→ 二期标记。
+  所有文案只从 config 的 EMPTY_* 常量取，组件内零硬编码；
+  失败态额外把失败源 last_msg 原样摊开（最多 8 行），便于定位。
 -->
 <template>
   <div class="ges" :class="`ges-${type}`">
-    <div class="ges-icon">
-      <el-icon :class="{ 'ges-spin': type === 'loading' }">
-        <component :is="iconComp" />
-      </el-icon>
+    <div class="ges-mark gd-mono" aria-hidden="true">{{ mark }}</div>
+    <p class="ges-title">{{ resolved.title }}</p>
+    <p v-if="resolved.desc" class="ges-desc">{{ resolved.desc }}</p>
+
+    <div v-if="resolved.reason" class="ges-block">
+      <span class="ges-label">{{ EMPTY_WHY_TITLE }}</span>
+      <p>{{ resolved.reason }}</p>
     </div>
 
-    <p class="ges-title">{{ title || defaultTitle }}</p>
-    <p v-if="desc || defaultDesc" class="ges-desc">{{ desc || defaultDesc }}</p>
+    <div v-if="resolved.phase2" class="ges-block ges-phase">
+      <span class="ges-label">{{ EMPTY_PHASE_TITLE }}</span>
+      <p>{{ resolved.phase2 }}</p>
+    </div>
 
-    <ul v-if="detail && detail.length" class="ges-detail">
+    <ul v-if="detail.length" class="ges-detail">
       <li v-for="(line, i) in detail.slice(0, 8)" :key="i">{{ line }}</li>
     </ul>
 
-    <el-button
-      v-if="actionText"
-      class="ges-action"
-      size="small"
-      type="primary"
-      plain
-      @click="emit('action')"
-    >
+    <button v-if="actionText" type="button" class="ges-action gd-mono" @click="emit('action')">
       {{ actionText }}
-    </el-button>
+    </button>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { Clock, Document, Loading, WarningFilled } from '@element-plus/icons-vue'
+import {
+  EMPTY_DEMO,
+  EMPTY_ERROR,
+  EMPTY_GENERIC,
+  EMPTY_HISTORY,
+  EMPTY_LOADING,
+  EMPTY_PHASE_TITLE,
+  EMPTY_STALE,
+  EMPTY_WAIT,
+  EMPTY_WHY_TITLE
+} from '../../config/gapdeskConfig'
+
+type EmptyType = 'empty' | 'loading' | 'error' | 'stale'
 
 const props = withDefaults(
   defineProps<{
-    /** empty=确实没有 / loading=加载中 / error=请求失败 / stale=展示的是旧镜像 */
-    type: 'empty' | 'loading' | 'error' | 'stale'
+    type?: EmptyType
     title?: string
     desc?: string
-    /** 失败源与 last_msg 等明细，最多展示 8 行 */
+    /** 覆盖「为什么没有」；缺省按 type 取口径常量 */
+    reason?: string
+    /** 覆盖二期标记；缺省按 type 取口径常量 */
+    phase2?: string
     detail?: string[]
     actionText?: string
   }>(),
-  { title: '', desc: '', detail: () => [], actionText: '' }
+  { type: 'empty', title: '', desc: '', reason: '', phase2: '', detail: () => [], actionText: '' }
 )
 
-const emit = defineEmits<{ (e: 'action'): void }>()
+const emit = defineEmits<{ action: [] }>()
 
-const ICONS = {
-  empty: Document,
-  loading: Loading,
-  error: WarningFilled,
-  stale: Clock
-} as const
+interface EmptyCopy {
+  title: string
+  desc: string
+  reason: string
+  phase2: string
+}
 
-const iconComp = computed(() => ICONS[props.type])
+const COPY: Record<EmptyType, EmptyCopy> = {
+  // 空池场景只说「没有差值」：不套用回打/导出/趋势口径，需要解释的调用点自己传 desc。
+  empty: { title: EMPTY_GENERIC, desc: '', reason: '', phase2: '' },
+  loading: { title: EMPTY_WAIT, desc: EMPTY_LOADING, reason: EMPTY_HISTORY, phase2: '' },
+  error: { title: EMPTY_ERROR, desc: EMPTY_DEMO, reason: EMPTY_WAIT, phase2: '' },
+  stale: { title: EMPTY_STALE, desc: EMPTY_DEMO, reason: EMPTY_HISTORY, phase2: '' }
+}
 
-/** 缺省文案：把「为什么空」说清楚，而不是一句「暂无数据」 */
-const defaultTitle = computed(() => {
-  switch (props.type) {
-    case 'loading':
-      return '正在拉取本轮差值…'
-    case 'error':
-      return '数据暂时取不到'
-    case 'stale':
-      return '当前展示的是离线镜像'
-    default:
-      return '这一屏暂时没有差值'
+const resolved = computed<EmptyCopy>(() => {
+  const base = COPY[props.type] ?? COPY.empty
+  return {
+    title: props.title || base.title,
+    desc: props.desc || base.desc,
+    reason: props.reason || base.reason,
+    phase2: props.phase2 || base.phase2
   }
 })
 
-const defaultDesc = computed(() => {
-  switch (props.type) {
-    case 'loading':
-      return '采集任务每 30 分钟跑一轮，稍等片刻'
-    case 'error':
-      return '网络或数据库不可达。已保留上一次成功加载的内容，恢复后会自动补齐'
-    case 'stale':
-      return '云端暂时不可达，下面是本地缓存的上一份结果 —— 分数与热度可能已过期'
-    default:
-      return '差值阈值为 85 分，当前时间窗内没有达到阈值的事件；可放宽行业筛选或等待下一轮采集'
-  }
+const mark = computed(() => {
+  if (props.type === 'error') return '!'
+  if (props.type === 'stale') return '~'
+  if (props.type === 'loading') return '…'
+  return '—'
 })
 </script>
 
@@ -95,73 +102,85 @@ const defaultDesc = computed(() => {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 36px 20px;
-  border-radius: 10px;
-  border: 1px solid var(--el-border-color-lighter);
-  background: var(--surface, #fff);
+  gap: 9px;
+  padding: 30px 20px;
+  border-radius: var(--gd-r-panel);
+  border: 1px dashed var(--gd-line2);
+  background: var(--gd-card);
   text-align: center;
 }
-.ges-icon {
-  width: 44px;
-  height: 44px;
+.ges-mark {
+  width: 40px;
+  height: 40px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 50%;
-  background: var(--surface-soft, rgba(0, 0, 0, 0.04));
-  font-size: 22px;
-  color: var(--text-muted, #909399);
+  border-radius: 999px;
+  background: var(--gd-sub);
+  color: var(--gd-ink3);
+  font-size: var(--gd-fs-phead);
 }
-.ges-error .ges-icon {
-  color: #ff3358;
-  background: rgba(255, 51, 88, 0.1);
-}
-.ges-stale .ges-icon {
-  color: #f59e0b;
-  background: rgba(245, 158, 11, 0.12);
-}
-.ges-loading .ges-icon {
-  color: #0ea5e9;
-  background: rgba(14, 165, 233, 0.1);
-}
+.ges-error .ges-mark { color: var(--gd-gap); background: color-mix(in srgb, var(--gd-gap) 10%, var(--gd-card)); }
+.ges-stale .ges-mark { color: var(--gd-warn); background: color-mix(in srgb, var(--gd-warn) 12%, var(--gd-card)); }
+.ges-loading .ges-mark { color: var(--gd-cyan); background: color-mix(in srgb, var(--gd-cyan) 10%, var(--gd-card)); }
 .ges-title {
   margin: 0;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text-strong, #303133);
+  font-size: var(--gd-fs-phead);
+  font-weight: 700;
+  color: var(--gd-ink);
 }
 .ges-desc {
   margin: 0;
   max-width: 460px;
-  font-size: 12px;
+  font-size: var(--gd-fs-why);
   line-height: 1.6;
-  color: var(--text-muted, #909399);
+  color: var(--gd-ink2);
+}
+.ges-block {
+  width: 100%;
+  max-width: 520px;
+  text-align: left;
+  padding: 9px 12px;
+  border-radius: var(--gd-r-nav);
+  background: var(--gd-sub);
+}
+.ges-block p {
+  margin: 3px 0 0;
+  font-size: var(--gd-fs-panels);
+  line-height: 1.6;
+  color: var(--gd-ink2);
+}
+.ges-label {
+  font-family: var(--gd-mono);
+  font-size: var(--gd-fs-kick);
+  color: var(--gd-ink3);
+  letter-spacing: .6px;
+}
+.ges-phase {
+  border: 1px dashed var(--gd-line2);
+  background: var(--gd-card);
 }
 .ges-detail {
-  margin: 4px 0 0;
+  margin: 0;
   padding: 0;
   list-style: none;
   text-align: left;
   max-width: 520px;
-  font-size: 11px;
+  font-size: var(--gd-fs-panels);
   line-height: 1.7;
-  color: var(--text-muted, #909399);
+  color: var(--gd-ink3);
 }
 .ges-detail li::before {
   content: '· ';
 }
 .ges-action {
-  margin-top: 6px;
   min-height: 44px;
-}
-.ges-spin {
-  animation: ges-rotate 1s linear infinite;
-}
-@keyframes ges-rotate {
-  to {
-    transform: rotate(360deg);
-  }
+  padding: 0 15px;
+  border: 0;
+  border-radius: var(--gd-r-nav);
+  background: var(--gd-grad);
+  color: var(--gd-card);
+  font-size: var(--gd-fs-panels);
+  cursor: pointer;
 }
 </style>

@@ -1,0 +1,279 @@
+/* ============================================================
+   差值台 GAPDESK · 外壳布局（T01）
+   ------------------------------------------------------------
+   只负责「舞台铺满 + 三栏骨架 + 手机壳 + 响应式断点」。
+   组件长相（胶囊 / 导航项 / 面板）在 components.css。
+   作用域原则：除 body.gd-fullbleed 这一组「拆外壳」覆盖外，
+   其余选择器一律以 .gd-stage / .gd-mb-stage 开头。
+   ============================================================ */
+
+/* ---------- 0. 拆掉 App.vue 的全局外壳（body 加类时生效） ----------
+   真实 DOM：#app > .app-shell.is-authed > .app-sidebar / .mobile-menu-fab /
+   .app-main > .main-content.authed-main > router-view。
+   main.css 在 ≤768px 给表单控件加了 font-size:16px!important（防 iOS 聚焦缩放），
+   这里用更高特异性 + !important 还原到终端的紧凑字号。 */
+body.gd-fullbleed #app {
+  max-width: none;
+  margin: 0;
+}
+body.gd-fullbleed .app-shell.is-authed {
+  display: block;
+}
+body.gd-fullbleed .app-sidebar,
+body.gd-fullbleed .mobile-bottom-nav,
+body.gd-fullbleed .mobile-menu-fab {
+  display: none !important;
+}
+body.gd-fullbleed .app-main,
+body.gd-fullbleed .main-content {
+  padding: 0 !important;
+  height: 100dvh;
+  overflow: hidden;
+}
+body.gd-fullbleed input,
+body.gd-fullbleed select,
+body.gd-fullbleed textarea {
+  font-size: inherit !important;
+}
+
+/* ---------- 1. 舞台：铺满视口，零圆角零阴影，不缩稿 ---------- */
+.gd-stage {
+  width: 100vw;
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  background: var(--gd-bg);
+  color: var(--gd-ink);
+  font-family: var(--gd-sans);
+  overflow: hidden;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+/* ---------- 2. PC 三栏 ---------- */
+.gd-topbar {
+  min-height: 52px;
+  flex-shrink: 0;
+  position: relative;
+  background: var(--gd-card);
+  border-bottom: 1px solid var(--gd-line);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 16px;
+}
+.gd-topbar::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 2px;
+  background: var(--gd-grad);
+}
+
+.gd-workspace {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+  min-width: 0;
+}
+.gd-sidebar {
+  width: 160px;
+  flex: none;
+  background: var(--gd-card);
+  border-right: 1px solid var(--gd-line);
+  padding: 12px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+.gd-main {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  min-width: 0;
+  min-height: 0;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.gd-rightcol {
+  width: 200px;
+  flex: none;
+  background: var(--gd-card);
+  border-left: 1px solid var(--gd-line);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* 关键守卫：这些容器都是纵向 flex，一旦允许收缩，卡片会被压扁后由
+   overflow:hidden 裁掉正文（原型的单源情报遮挡就是这么来的）。 */
+.gd-main > *,
+.gd-vcol > *,
+.gd-gcard {
+  flex-shrink: 0;
+  min-width: 0;
+}
+.gd-sidebar > *,
+.gd-rightcol > * {
+  flex-shrink: 0;
+  min-width: 0;
+}
+.gd-vcol {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  min-height: 0;
+}
+
+/* ---------- 3. 手机壳（不是把 PC 缩稿，是独立布局） ---------- */
+/* 桌面预览：420×933 样机；真机在 @media (max-width:768px) 里铺满 */
+.gd-stage-mb {
+  align-items: center;
+  justify-content: center;
+  background: var(--gd-body);
+  padding: 16px;
+}
+.gd-mb-stage {
+  width: 420px;
+  height: 933px;
+  max-height: calc(100dvh - 32px);
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--gd-bg);
+  border-radius: var(--gd-r-phone);
+  box-shadow: 0 20px 60px rgba(12, 16, 48, .28);
+  overflow: hidden;
+  position: relative;
+}
+.p-status {
+  height: 44px;
+  flex-shrink: 0;
+  background: var(--gd-card);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 18px;
+  font-size: 12px;
+  position: relative;
+}
+.p-status::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 2px;
+  background: var(--gd-grad);
+}
+.p-head {
+  height: 54px;
+  flex-shrink: 0;
+  background: var(--gd-card);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--gd-line);
+}
+.p-note {
+  flex-shrink: 0;
+  background: linear-gradient(135deg, #F6F4FF, #FFF6F8);
+  padding: 10px 16px;
+  font-size: 11px;
+  color: var(--gd-ink2);
+  border-bottom: 1px solid var(--gd-line);
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.p-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 13px;
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+  background: var(--gd-bg);
+}
+.p-body > * {
+  flex-shrink: 0;
+  min-width: 0;
+}
+.p-tab {
+  background: var(--gd-card);
+  border-top: 1px solid var(--gd-line);
+  flex-shrink: 0;
+}
+.p-tabrow {
+  height: 58px;
+  display: flex;
+  align-items: center;
+}
+.p-safe {
+  height: 18px;
+  background: var(--gd-card);
+}
+
+/* ---------- 4. 响应式断点（放末尾，同优先级下后定义者生效） ---------- */
+@media (min-width: 1680px) {
+  .gd-sidebar { width: 188px; }
+  .gd-rightcol { width: 248px; }
+  .gd-main { padding: 16px 20px; gap: 12px; }
+  .gd-topbar { min-height: 56px; padding: 0 20px; }
+}
+@media (min-width: 2200px) {
+  .gd-sidebar { width: 208px; }
+  .gd-rightcol { width: 284px; }
+  .gd-main { padding: 18px 26px; gap: 14px; }
+}
+@media (max-width: 1360px) {
+  .gd-sidebar { width: 152px; }
+  .gd-rightcol { width: 184px; }
+}
+@media (max-width: 1140px) {
+  .gd-sidebar { width: 148px; }
+  .gd-rightcol { display: none; }
+}
+@media (max-width: 980px) {
+  .gd-sidebar { width: 140px; }
+  .gd-main { padding: 12px; }
+}
+
+/* 真机：样机外框全部拆掉，让出刘海与手势条安全区。
+   缺口由 GapDeskView 的 matchMedia 同步切到 mbShell（≤768px 强制手机壳）。 */
+@media (max-width: 768px) {
+  .gd-stage-mb { padding: 0; background: var(--gd-bg); }
+  .gd-mb-stage {
+    width: 100vw;
+    height: 100dvh;
+    max-height: none;
+    border-radius: 0;
+    box-shadow: none;
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+  .p-status { display: none; }
+  .p-head { position: relative; }
+  .p-head::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    height: 2px;
+    background: var(--gd-grad);
+  }
+  .p-safe { height: calc(18px + env(safe-area-inset-bottom)); }
+  .p-tab { padding-bottom: env(safe-area-inset-bottom); }
+}

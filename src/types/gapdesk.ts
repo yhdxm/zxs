@@ -45,6 +45,19 @@ export type GapSeatPlan = 'trial' | 'insight' | 'team' | 'business' | 'enterpris
 /** 差值分档，供 UI 选色 */
 export type GapTone = 'hot' | 'warm' | 'cool'
 
+/**
+ * 展示分层：按完整事件池的强度排名分位，不用绝对分数阈值。
+ * L0 = 前 10%（必读）· L1 = 10–40%（关注）· L2 = 其余 60%（存档）。
+ * 池子在增长，所以各层条数会变动，这是实时相对分层的正常表现。
+ */
+export type GapTier = 'L0' | 'L1' | 'L2'
+
+/** 排名后的事件：rank 从 1 起，tier 由 rank 在池内的分位决定 */
+export type RankedEvent = GapEventRow & { tier: GapTier; rank: number }
+
+/** 展示用六维（由库里 8 个 dim 归并，无对应源的维度留空 = 待采） */
+export type GapDim6Key = 'policy' | 'price' | 'supply' | 'capital' | 'talent' | 'tech'
+
 /** 大众探针平台 */
 export type GapPlatform = '微博' | '知乎' | '抖音'
 
@@ -225,6 +238,38 @@ export interface GapHealth {
   status: GapSourceStatus
 }
 
+/**
+ * 日期胶囊：按 ts_published 归日；ts=0 的条目单列「时间未知」。
+ * kind 决定 UI 形态：live=渐变强调 / today=普通胶囊 / date=日期 / unknown=待采口径。
+ */
+export interface GapDateBand {
+  key: string
+  label: string
+  count: number
+  kind: 'live' | 'today' | 'date' | 'unknown'
+  /** 该日 00:00 的 epoch ms；未知时间为 null */
+  ts: number | null
+}
+
+/** 6 维矩阵单元格：空格返回 null，UI 标「待采」，绝不补 0 */
+export interface GapMatrix6Cell {
+  maxGap: number
+  count: number
+  /** 该格最高分事件 id，供点击下钻 */
+  topId: number
+}
+
+/** 8 行业 × 6 维展示矩阵 */
+export type GapMatrix6 = Record<GapInd, Record<GapDim6Key, GapMatrix6Cell | null>>
+
+/** 逐源分组：silent=true 表示该源今日没有带真实发布时间的证据行 */
+export interface SourceGroup {
+  source: string
+  layer: GapLayer | null
+  events: GapEventRow[]
+  silent: boolean
+}
+
 /** 采集脚本注入结果（一期只读表结构，二期采集侧写入后回传） */
 export interface GapInjectResult {
   /** 新增事件数 */
@@ -235,6 +280,47 @@ export interface GapInjectResult {
   skipped: number
   /** 过期清理条数（gapdesk_purge 返回） */
   purged: number
+}
+
+// ============================================================
+// 三·补、T01 派生聚合类型（组件层消费，不落库）
+// ============================================================
+
+/** 每日供给序列：本地归日后的真实条数与分层条数（ts=0 不计入） */
+export interface SupplyDayRow {
+  key: string
+  label: string
+  count: number
+  l0: number
+  l1: number
+  l2: number
+}
+
+/** 信源分级档位：mass 探针归可靠层、tech 归探针层，其余归官方层 */
+export type SourceGradeTier = 'reliable' | 'official' | 'probe'
+
+/** 信源运行态：cool=冷却 / down=离线 / warn=降级 / ok=在线 / idle=待验证 */
+export type SourceStatusKind = 'ok' | 'warn' | 'down' | 'cool' | 'idle'
+
+/** 单源分级行：分数来自 gap_sources 的 ok/fail 实测，无样本时 score=null */
+export interface SourceGradeRow {
+  id: string
+  name: string
+  layer: GapLayer
+  tier: SourceGradeTier
+  score: number | null
+  status: SourceStatusKind
+  msg: string
+  items: number | null
+  ok: number | null
+  fail: number | null
+}
+
+/** 分级汇总：avg 只对 score≠null 的源求均，不把待验证源算成 0 分 */
+export interface SourceGradeAgg {
+  tier: SourceGradeTier
+  count: number
+  avg: number | null
 }
 
 // ============================================================

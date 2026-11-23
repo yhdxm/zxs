@@ -11,7 +11,9 @@
  *  3. `scripts/gapdesk/score.mjs`（四维打分 / 分位映射）
  *  4. 顺带锁死前端权限与路由门禁（gapdesk 普通用户默认不可见）
  */
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 
 import {
   clamp,
@@ -33,7 +35,8 @@ import {
   sameEvent
 } from '../scripts/gapdesk/cluster.mjs'
 import { scoreEvents } from '../scripts/gapdesk/score.mjs'
-import { gapDiv } from '../src/composables/useGapDesk'
+import { gapDiv, useGapDesk } from '../src/composables/useGapDesk'
+import { GAP_TTL_HOURS } from '../src/config/gapdeskConfig'
 import {
   DEFAULT_ROLE_CONFIG,
   PERMISSION_TREE,
@@ -41,7 +44,7 @@ import {
   type PermissionNode
 } from '../src/services/appDataService'
 import router from '../src/router'
-import type { GapEventRow } from '../src/types/gapdesk'
+import type { GapEventRow, GapRuleRow, GapSourceRow } from '../src/types/gapdesk'
 
 /** 固定「当前时刻」：所有相对时间断言都用它，避免跑测试的时刻影响结果 */
 const NOW = 1_700_000_000_000
@@ -496,9 +499,231 @@ describe('路由：/gapdesk 有权限门禁', () => {
     expect(route?.meta?.requirePermission).toBe('gapdesk')
   })
 
-  it('9 个视图通过 ?view= 切换，不额外占用权限键', () => {
+  it('17 个 PC 入口 + 移动二级页通过 ?view= 切换，不额外占用权限键', () => {
     const route = router.getRoutes().find((r) => r.path === '/gapdesk')
     // 只登记一个粗粒度权限键：view 级不做权限映射，避免第二处维护
     expect(Object.keys(route?.meta ?? {})).toEqual(['requirePermission'])
+  })
+})
+
+/* ============================================================
+   六、T02/T03 增量：注册表 / 侧栏计数 / 4 个新 computed
+   ============================================================ */
+const readSource = (rel: string): string => readFileSync(resolve(process.cwd(), rel), 'utf8')
+const sliceBlock = (src: string, start: string, end: string): string => {
+  const i = src.indexOf(start)
+  const j = src.indexOf(end, i)
+  return i >= 0 && j > i ? src.slice(i, j) : ''
+}
+
+/** 17 个侧栏入口，硬编码作为期望集合（改导航必须同步改这里） */
+const SIDEBAR_KEYS = [
+  'profile',
+  'latest',
+  'timeline',
+  'matrix',
+  'spread',
+  'source',
+  'alert',
+  'report',
+  'seats',
+  'pricing',
+  'brief',
+  'source-risk',
+  'echo',
+  'cycle',
+  'score',
+  'archive',
+  'ai'
+] as const
+
+describe('注册表：侧栏 17 项与 PC 视图一一对应', () => {
+  it('RAW_GROUPS 恰好 17 个 key，编号 00-16 连续', () => {
+    const src = readSource('src/components/gapdesk/GapSidebar.vue')
+    const block = sliceBlock(src, 'const RAW_GROUPS', 'const NAV_GROUPS')
+    const keys = [...block.matchAll(/key: '([a-z-]+)'/g)].map((m) => m[1])
+    const nums = [...block.matchAll(/num: '(\d{2})'/g)].map((m) => m[1])
+    expect(keys.length).toBe(17)
+    expect(new Set(keys)).toEqual(new Set(SIDEBAR_KEYS))
+    expect(nums).toEqual(Array.from({ length: 17 }, (_, i) => String(i).padStart(2, '0')))
+  })
+
+  it('GapDeskView.VIEWS 覆盖同样 17 个 key（detail 是二级，不计入）', () => {
+    const src = readSource('src/views/GapDeskView.vue')
+    const block = sliceBlock(src, 'const VIEWS:', '/** 5 个手机主 tab */')
+    const keys = [...block.matchAll(/\{ key: '([a-z-]+)'/g)]
+      .map((m) => m[1])
+      .filter((key) => key !== 'detail')
+    expect(new Set(keys)).toEqual(new Set(SIDEBAR_KEYS))
+  })
+})
+
+describe('侧栏 countOf：6 个真值口径', () => {
+  it('profile/latest/source/alert/brief/source-risk 齐全，total=0 时 source-risk 显示「—」', () => {
+    const src = readSource('src/components/gapdesk/GapSidebar.vue')
+    const block = sliceBlock(src, 'const countOf', 'interface NavItem')
+    for (const token of ["profile:", "latest:", "source:", "alert:", "brief:", "'source-risk':"]) {
+      expect(block).toContain(token)
+    }
+    expect(block).toContain('health.value.total === 0')
+  })
+})
+
+/* ---------- store 单例：每个用例前重置，避免互相污染 ---------- */
+const store = useGapDesk()
+
+function resetStore(): void {
+  store.events.value = []
+  store.sources.value = []
+  store.ruleRows.value = []
+  store.ruleLoaded.value = false
+  store.filters.inds = []
+  store.filters.windowH = GAP_TTL_HOURS
+  store.filters.sort = 'gap'
+  store.filters.keyword = ''
+  store.filters.dim6 = ''
+  store.filters.dateBand = ''
+  store.filters.onlySub = false
+}
+
+afterEach(resetStore)
+
+function makeEvent(over: Partial<GapEventRow> & { id: number }): GapEventRow {
+  const now = Date.now()
+  return {
+    event_key: `k-${over.id}`,
+    uniq_keep: '',
+    title: `t-${over.id}`,
+    summary: '',
+    url: '',
+    ind: 'ai',
+    dim: 'policy',
+    kind: 'insider',
+    gap: 80,
+    gap_raw: 50,
+    b_json: [20, 20, 20, 20],
+    tags: [],
+    ts_published: now,
+    ts_first_seen: now,
+    ins_heat: 10,
+    pub_heat: 5,
+    mass_on: null,
+    mass_heat: 0,
+    lag_h: 0,
+    src_count: 1,
+    reason: '',
+    action: '',
+    is_foreign: false,
+    expire_at: '',
+    created_at: '',
+    updated_at: '',
+    ...over
+  } as GapEventRow
+}
+
+describe('useGapDesk.loneCount · 孤证计数不受列表截断影响', () => {
+  it('只数 src_count<=1 且 mass_heat==0 的条目，15 条时计数仍是 15（underground 仍截 12）', () => {
+    store.events.value = [
+      ...Array.from({ length: 15 }, (_, i) =>
+        makeEvent({ id: i + 1, gap: 95 - i, src_count: 1, mass_heat: 0 })
+      ),
+      makeEvent({ id: 16, gap: 50, src_count: 2, mass_heat: 0 }),
+      makeEvent({ id: 17, gap: 40, src_count: 1, mass_heat: 50 })
+    ]
+    expect(store.loneCount.value).toBe(15)
+    expect(store.underground.value.length).toBe(12)
+  })
+})
+
+describe('useGapDesk.supplyByDay · 本地归日与分层聚合', () => {
+  it('升序、跳过 ts<=0、l0/l1/l2 取自 ranked 的 tier', () => {
+    const now = new Date()
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 10, 0, 0).getTime()
+    const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 10, 0, 0).getTime()
+    store.events.value = [
+      makeEvent({ id: 1, gap: 100, ts_published: today }),
+      makeEvent({ id: 2, gap: 90, ts_published: today }),
+      makeEvent({ id: 3, gap: 80, ts_published: today }),
+      makeEvent({ id: 4, gap: 70, ts_published: today }),
+      makeEvent({ id: 5, gap: 60, ts_published: yesterday }),
+      makeEvent({ id: 6, gap: 50, ts_published: yesterday }),
+      // ts=0 的榜单条目没有日点、不进 supplyByDay，但仍占 ranked 末位（L2）
+      makeEvent({ id: 7, gap: 10, ts_published: 0 })
+    ]
+    const rows = store.supplyByDay.value
+    expect(rows.length).toBe(2)
+    expect(rows[0]!.key < rows[1]!.key).toBe(true)
+    expect(rows.map((row) => row.count)).toEqual([2, 4])
+    expect(rows.map((row) => row.l0 + row.l1 + row.l2)).toEqual([2, 4])
+    expect(rows[0]!.l2).toBe(2)
+    expect(rows[1]!.l0).toBe(1)
+    expect(rows[1]!.l1).toBe(2)
+  })
+})
+
+describe('useGapDesk.sourceGrade · 分数 / 状态 / 汇总口径', () => {
+  it('denom=0 时 score=null；冷却优先于 DOWN；avg 只对非 null 求均', () => {
+    const row = (
+      id: string,
+      layer: 'insider' | 'main' | 'rare' | 'tech' | 'mass',
+      ok: number,
+      fail: number,
+      status: 'ok' | 'warn' | 'fail' | 'unknown',
+      msg: string | null
+    ): GapSourceRow => ({
+      id,
+      name: id.toUpperCase(),
+      layer,
+      ttl: null,
+      ok,
+      fail,
+      last_ok: null,
+      last_fail: null,
+      latency_ms: null,
+      items: null,
+      status,
+      msg
+    })
+    store.sources.value = [
+      row('a', 'main', 9, 1, 'ok', null),
+      row('b', 'tech', 0, 5, 'fail', 'timeout'),
+      row('c', 'rare', 0, 0, 'unknown', null),
+      row('d', 'mass', 3, 0, 'ok', null),
+      row('e', 'insider', 0, 3, 'warn', 'skip: 冷却')
+    ]
+    const grade = store.sourceGrade.value
+    const byId = new Map(grade.rows.map((item) => [item.id, item]))
+    expect(byId.get('a')?.score).toBe(90)
+    expect(byId.get('b')?.score).toBe(0)
+    expect(byId.get('c')?.score).toBeNull()
+    expect(byId.get('b')?.status).toBe('down')
+    expect(byId.get('e')?.status).toBe('cool')
+    expect(grade.down).toBe(1)
+    expect(grade.total).toBe(5)
+
+    const aggs = new Map(grade.aggs.map((item) => [item.tier, item]))
+    expect(aggs.get('reliable')?.count).toBe(1)
+    expect(aggs.get('reliable')?.avg).toBe(100)
+    // official = a(90) + c(null) + e(0)：null 不参与均值 → (90+0)/2=45，若把 null 当 0 会是 30
+    expect(aggs.get('official')?.count).toBe(3)
+    expect(aggs.get('official')?.avg).toBe(45)
+    expect(aggs.get('probe')?.count).toBe(1)
+    expect(aggs.get('probe')?.avg).toBe(0)
+  })
+})
+
+describe('useGapDesk.ruleCount · 读到 0 条与读失败可区分', () => {
+  it('ruleLoaded 标记读取状态，ruleCount 只数条数', () => {
+    store.ruleRows.value = []
+    store.ruleLoaded.value = true
+    expect(store.ruleCount.value).toBe(0)
+    expect(store.ruleLoaded.value).toBe(true)
+
+    store.ruleLoaded.value = false
+    expect(store.ruleCount.value).toBe(0)
+    expect(store.ruleLoaded.value).toBe(false)
+
+    store.ruleRows.value = [{ id: 'r1' } as unknown as GapRuleRow]
+    expect(store.ruleCount.value).toBe(1)
   })
 })

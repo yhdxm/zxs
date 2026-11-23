@@ -11,7 +11,7 @@
     <!-- 顶部汇总 -->
     <div class="gsh-sum" :class="{ 'gsh-sum-bad': total > 0 && ok === 0 }">
       <div class="gsh-sum-main">
-        <b>{{ ok }}/{{ total }}</b>
+        <b class="gd-mono">{{ ok }}/{{ total }}</b>
         <span>路正常</span>
       </div>
       <p v-if="ok === 0 && total > 0" class="gsh-sum-msg">本轮采集全部失败，不补假数据</p>
@@ -33,9 +33,9 @@
         <li v-for="s in group.rows" :key="s.id" class="gsh-row" :class="{ 'gsh-row-bad': s.status !== 'ok' }">
           <i class="gsh-dot" :class="dotClass(s)" />
           <span class="gsh-name" :title="s.id">{{ s.name }}</span>
-          <span class="gsh-items">{{ s.items ?? 0 }} 条</span>
-          <span class="gsh-lat">{{ s.latency_ms ?? 0 }}ms</span>
-          <span class="gsh-ok-at">{{ s.last_ok ? fmtAgo(Date.parse(s.last_ok)) : '—' }}</span>
+          <span class="gsh-items gd-mono">{{ s.items ?? 0 }} 条</span>
+          <span class="gsh-lat gd-mono">{{ s.latency_ms ?? 0 }}ms</span>
+          <span class="gsh-ok-at gd-mono">{{ s.last_ok ? fmtAgo(Date.parse(s.last_ok)) : '—' }}</span>
           <p v-if="s.status !== 'ok' && s.msg" class="gsh-msg">{{ s.msg }}</p>
         </li>
       </ul>
@@ -123,11 +123,11 @@ function dotClass(s: GapSourceRow): string {
   gap: 2px;
   padding: 8px 10px;
   border-radius: 8px;
-  background: var(--surface-soft, rgba(0, 0, 0, 0.03));
+  background: var(--gd-sub);
 }
 .gsh-sum-bad {
-  background: rgba(255, 51, 88, 0.1);
-  box-shadow: inset 0 0 0 1px rgba(255, 51, 88, 0.24);
+  background: color-mix(in srgb, var(--gd-gap) 10%, var(--gd-card));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--gd-gap) 24%, transparent);
 }
 .gsh-sum-main {
   display: flex;
@@ -138,29 +138,29 @@ function dotClass(s: GapSourceRow): string {
   font-size: 16px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
-  color: var(--text-strong, #303133);
+  color: var(--gd-ink);
 }
 .gsh-sum-bad .gsh-sum-main b {
-  color: #ff3358;
+  color: var(--gd-gap);
 }
 .gsh-sum-main span {
   font-size: 10px;
-  color: var(--text-muted, #909399);
+  color: var(--gd-ink3);
 }
 .gsh-sum-msg {
   margin: 0;
   font-size: 10px;
   line-height: 1.5;
-  color: var(--text-muted, #909399);
+  color: var(--gd-ink3);
 }
 .gsh-sum-ok {
-  color: #0ba36f;
+  color: var(--gd-ok);
 }
 .gsh-sum-warn {
-  color: #b45309;
+  color: var(--gd-warn);
 }
 .gsh-group {
-  border-top: 1px solid var(--el-border-color-lighter);
+  border-top: 1px solid var(--gd-line);
   padding-top: 6px;
 }
 .gsh-group-head {
@@ -177,7 +177,7 @@ function dotClass(s: GapSourceRow): string {
 }
 .gsh-caret {
   font-size: 10px;
-  color: var(--text-muted, #909399);
+  color: var(--gd-ink3);
   transition: transform 0.15s ease;
 }
 .gsh-caret-open {
@@ -186,17 +186,17 @@ function dotClass(s: GapSourceRow): string {
 .gsh-group-lb {
   font-size: 11px;
   font-weight: 600;
-  color: var(--text-strong, #303133);
+  color: var(--gd-ink);
 }
 .gsh-group-n {
   font-size: 10px;
-  color: var(--text-muted, #909399);
+  color: var(--gd-ink3);
   font-variant-numeric: tabular-nums;
 }
 .gsh-group-bad {
   margin-left: auto;
   font-size: 10px;
-  color: #ff3358;
+  color: var(--gd-gap);
   font-variant-numeric: tabular-nums;
 }
 .gsh-rows {
@@ -214,7 +214,7 @@ function dotClass(s: GapSourceRow): string {
   gap: 5px;
   padding: 4px 2px;
   font-size: 11px;
-  color: var(--text-muted, #606266);
+  color: var(--gd-ink2);
   min-width: 0;
 }
 .gsh-dot {
@@ -224,18 +224,18 @@ function dotClass(s: GapSourceRow): string {
   border-radius: 50%;
 }
 .gsh-dot-ok {
-  background: #0ba36f;
+  background: var(--gd-ok);
 }
 .gsh-dot-fail {
-  background: #ff3358;
+  background: var(--gd-gap);
 }
 .gsh-dot-warn {
-  background: #d97706;
+  background: var(--gd-warn);
 }
 .gsh-name {
   flex: 1;
   min-width: 0;
-  color: var(--text-strong, #303133);
+  color: var(--gd-ink);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -246,14 +246,14 @@ function dotClass(s: GapSourceRow): string {
   flex: none;
   font-variant-numeric: tabular-nums;
   font-size: 10px;
-  color: var(--text-muted, #909399);
+  color: var(--gd-ink3);
 }
 .gsh-msg {
   flex-basis: 100%;
   margin: 0 0 0 11px;
   font-size: 10px;
   line-height: 1.4;
-  color: #ff3358;
+  color: var(--gd-gap);
   word-break: break-all;
 }
 .gsh-funnel {
@@ -262,22 +262,22 @@ function dotClass(s: GapSourceRow): string {
   flex-wrap: wrap;
   gap: 6px;
   padding-top: 6px;
-  border-top: 1px solid var(--el-border-color-lighter);
+  border-top: 1px solid var(--gd-line);
 }
 .gsh-funnel-lb {
   font-size: 10px;
-  color: var(--text-muted, #909399);
+  color: var(--gd-ink3);
 }
 .gsh-funnel-v {
   font-size: 11px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
-  color: var(--text-strong, #303133);
+  color: var(--gd-ink);
 }
 .gsh-funnel-cam {
   flex-basis: 100%;
   font-size: 9px;
-  color: #c0c4cc;
+  color: var(--gd-line2);
 }
 
 /* 窄屏隐藏（由壳改为 PageHeader 按钮 + 抽屉承载）；抽屉内实例通过 drawer 关闭此规则 */

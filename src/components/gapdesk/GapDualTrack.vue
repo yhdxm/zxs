@@ -14,22 +14,22 @@
         <span class="gdt-track">
           <i class="gdt-fill gdt-ins" :style="{ width: `${insPct}%` }" />
         </span>
-        <span class="gdt-num">{{ insHeat }}</span>
+        <span class="gdt-num gd-mono">{{ insHeat }}</span>
       </div>
       <div class="gdt-row">
         <span class="gdt-label">大众</span>
         <span class="gdt-track">
           <i class="gdt-fill gdt-pub" :style="{ width: `${pubPct}%` }" />
         </span>
-        <span class="gdt-num">{{ pubHeat }}</span>
+        <span class="gdt-num gd-mono">{{ pubHeat }}</span>
       </div>
     </div>
 
     <div class="gdt-center">
-      <span class="gdt-div" :style="{ color: divColor }">
+      <span class="gdt-div gd-mono" :style="{ color: divColor }">
         <span v-if="div > 0" class="gdt-plus">+</span>{{ div }}
       </span>
-      <span class="gdt-cap">差值</span>
+      <span class="gdt-cap gd-mono">差值</span>
       <span v-if="!compact" class="gdt-gap">gap {{ gap }}</span>
     </div>
   </div>
@@ -65,9 +65,9 @@ const div = computed(() => clampPct(props.insHeat) - clampPct(props.pubHeat))
 
 /** 正=红（差值大，决策圈已热而大众未热）；负=绿（大众比决策圈更热，差值已闭合）；0=灰 */
 const divColor = computed(() => {
-  if (div.value > 0) return '#FF3358'
-  if (div.value < 0) return '#0BA36F'
-  return '#909399'
+  if (div.value > 0) return 'var(--gd-gap)'
+  if (div.value < 0) return 'var(--gd-ok)'
+  return 'var(--gd-ink3)'
 })
 </script>
 
@@ -96,7 +96,7 @@ const divColor = computed(() => {
   width: 44px;
   flex: none;
   font-size: 11px;
-  color: var(--text-muted, #909399);
+  color: var(--gd-ink3);
   letter-spacing: 0.02em;
 }
 .gdt-track {
@@ -104,7 +104,7 @@ const divColor = computed(() => {
   flex: 1;
   height: 7px;
   min-width: 0;
-  background: var(--surface-soft, rgba(0, 0, 0, 0.04));
+  background: var(--gd-sub);
   border-radius: 4px;
   overflow: hidden;
 }
@@ -115,10 +115,10 @@ const divColor = computed(() => {
   transition: width 0.35s ease;
 }
 .gdt-ins {
-  background: linear-gradient(90deg, #ff7a92, #ff3358);
+  background: linear-gradient(90deg, var(--gd-gap2), var(--gd-gap));
 }
 .gdt-pub {
-  background: linear-gradient(90deg, #9fd6c8, #0ba36f);
+  background: linear-gradient(90deg, var(--gd-cyan), var(--gd-ok));
 }
 .gdt-num {
   width: 26px;
@@ -126,7 +126,7 @@ const divColor = computed(() => {
   text-align: right;
   font-size: 11px;
   font-variant-numeric: tabular-nums;
-  color: var(--text-strong, #303133);
+  color: var(--gd-ink);
 }
 .gdt-center {
   flex: none;
@@ -147,13 +147,13 @@ const divColor = computed(() => {
 }
 .gdt-cap {
   font-size: 10px;
-  color: var(--text-muted, #909399);
+  color: var(--gd-ink3);
   letter-spacing: 0.08em;
 }
 .gdt-gap {
   margin-top: 2px;
   font-size: 10px;
-  color: var(--text-muted, #909399);
+  color: var(--gd-ink3);
   font-variant-numeric: tabular-nums;
 }
 

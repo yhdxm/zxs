@@ -1,157 +1,135 @@
 <!--
-  筛选栏（情报流 5 个视图共用）
+  筛选栏（PC 与移动共用）
   ---------------------------------------------------------------
-  直接读写 useGapDesk().filters 单例：筛选状态必须跨视图共享，
-  在「今日」里筛了 AI，切到「矩阵」还应该是 AI —— 这是用户对同一台仪器的预期。
-  props 不传数据，避免出现「父传一份、store 一份」的双源。
+  原生 chipbar / select，不引入任何 UI 库组件。
+  直接读写 useGapDesk().filters 单例：在「最新信息」里筛了 AI，
+  切到「全景矩阵」还应该是 AI —— 用户对同一台仪器的预期。
 -->
 <template>
   <div class="gfb">
-    <!-- 行业 chips：PC 与移动端都用，移动端横向滚动 -->
     <div class="gfb-inds">
       <button
         v-for="ind in GAP_IND"
         :key="ind.key"
         type="button"
         class="gfb-chip"
-        :class="{ 'gfb-chip-on': filters.inds.includes(ind.key) }"
-        :style="filters.inds.includes(ind.key) ? { borderColor: ind.color, color: ind.color, background: `${ind.color}14` } : undefined"
+        :class="{ on: filters.inds.includes(ind.key) }"
+        :style="filters.inds.includes(ind.key) ? { borderColor: ind.color, color: ind.color } : undefined"
         :title="`${ind.label}（⌘/Ctrl + 点击可多选）`"
         @click="onInd(ind.key, $event)"
       >
-        <i class="gfb-dot" :style="{ background: ind.color }" />
+        <i class="gfb-dot" :style="{ background: ind.color }" aria-hidden="true" />
         {{ ind.label }}
       </button>
-      <button v-if="filters.inds.length" type="button" class="gfb-clear" @click="filters.inds = []">
-        全部
-      </button>
-
-      <!-- 移动端：其余控件收进抽屉 -->
-      <button type="button" class="gfb-more" @click="drawer = true">筛选</button>
+      <button v-if="filters.inds.length" type="button" class="gfb-clear gd-mono" @click="filters.inds = []">全部</button>
     </div>
 
-    <!-- 桌面端：窗口 / 排序 / 关键词 / 订阅 / 命中数 -->
     <div class="gfb-ctl">
-      <div class="gfb-group">
-        <span class="gfb-lb">时间窗</span>
-        <el-radio-group :model-value="filters.windowH" size="small" @update:model-value="onWindow">
-          <el-radio-button v-for="h in GAP_WINDOW_OPTIONS" :key="h" :value="h">{{ h }}h</el-radio-button>
-        </el-radio-group>
-      </div>
+      <label class="gfb-group">
+        <span class="gfb-lb">维度</span>
+        <select class="gfb-select gd-mono" :value="filters.dim6" @change="onDim">
+          <option value="">全部维度</option>
+          <option v-for="d in GAP_DIM6" :key="d.key" :value="d.key">{{ d.label }}</option>
+        </select>
+      </label>
 
       <div class="gfb-group">
         <span class="gfb-lb">排序</span>
-        <el-radio-group :model-value="filters.sort" size="small" @update:model-value="onSort">
-          <el-radio-button value="gap">差值优先</el-radio-button>
-          <el-radio-button value="latest">最新优先</el-radio-button>
-        </el-radio-group>
+        <button
+          v-for="opt in SORTS"
+          :key="opt.key"
+          type="button"
+          class="gfb-chip gd-mono"
+          :class="{ on: filters.sort === opt.key }"
+          @click="setSort(opt.key)"
+        >{{ opt.label }}</button>
       </div>
 
-      <el-input
+      <div class="gfb-group">
+        <span class="gfb-lb">时间窗</span>
+        <button
+          v-for="opt in WINDOWS"
+          :key="opt.h"
+          type="button"
+          class="gfb-chip gd-mono"
+          :class="{ on: filters.windowH === opt.h }"
+          @click="setWindow(opt.h)"
+        >{{ opt.label }}</button>
+      </div>
+
+      <input
         v-model="keywordInput"
-        class="gfb-kw"
-        size="small"
-        clearable
+        class="gfb-kw gd-mono"
+        type="search"
         placeholder="标题 / 摘要关键词"
+        aria-label="标题或摘要关键词"
       />
 
-      <el-switch
-        v-model="onlySubModel"
-        size="small"
-        :disabled="!mySubs.length"
-        :title="mySubs.length ? '只看我订阅的行业' : '还没有订阅任何行业（去「雷达」页打开行业开关）'"
-        active-text="仅订阅"
-      />
-
-      <span class="gfb-count">{{ pool.length }} 条</span>
+      <span class="gfb-count gd-mono">{{ pool.length }} 条</span>
     </div>
-
-    <!-- 移动端抽屉：与桌面同一套控件（同一份 store，改哪边都一样） -->
-    <el-drawer v-model="drawer" title="筛选" direction="btt" size="46%" class="gfb-drawer">
-      <div class="gfb-drawer-body">
-        <div class="gfb-group">
-          <span class="gfb-lb">时间窗</span>
-          <el-radio-group :model-value="filters.windowH" size="small" @update:model-value="onWindow">
-            <el-radio-button v-for="h in GAP_WINDOW_OPTIONS" :key="h" :value="h">{{ h }}h</el-radio-button>
-          </el-radio-group>
-        </div>
-        <div class="gfb-group">
-          <span class="gfb-lb">排序</span>
-          <el-radio-group :model-value="filters.sort" size="small" @update:model-value="onSort">
-            <el-radio-button value="gap">差值优先</el-radio-button>
-            <el-radio-button value="latest">最新优先</el-radio-button>
-          </el-radio-group>
-        </div>
-        <el-input v-model="keywordInput" size="small" clearable placeholder="标题 / 摘要关键词" />
-        <el-switch
-          v-model="onlySubModel"
-          size="small"
-          :disabled="!mySubs.length"
-          :title="mySubs.length ? '只看我订阅的行业' : '还没有订阅任何行业'"
-          active-text="仅订阅"
-        />
-        <el-button size="small" plain @click="reset">重置筛选</el-button>
-      </div>
-    </el-drawer>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
-import { GAP_IND } from '../../config/gapdeskConfig'
-import { GAP_WINDOW_OPTIONS, useGapDesk } from '../../composables/useGapDesk'
-import type { GapInd } from '../../types/gapdesk'
+import { onBeforeUnmount, ref, watch } from 'vue'
+import { GAP_DIM6, GAP_IND } from '../../config/gapdeskConfig'
+import { useGapDesk } from '../../composables/useGapDesk'
+import type { GapDim6Key, GapInd } from '../../types/gapdesk'
 
-const { filters, pool, mySubs, setWindow, setSort, setKeyword, toggleInd, resetFilters } = useGapDesk()
+const { filters, pool, setWindow, setSort, setDim6, setKeyword, resetFilters } = useGapDesk()
 
-const drawer = ref(false)
+const SORTS: ReadonlyArray<{ key: 'latest' | 'gap' | 'heat'; label: string }> = [
+  { key: 'latest', label: '最新' },
+  { key: 'gap', label: '差值评分' },
+  { key: 'heat', label: '热度差' }
+]
 
-/** 关键词防抖：输入框本地受控，300ms 后才写进 store，避免每敲一个字就重算整池 */
+/** 全天 = 库里 48h 保留窗口；近 3 天只用于检索，超出保留期的条目本就不在池里 */
+const WINDOWS: ReadonlyArray<{ h: number; label: string }> = [
+  { h: 48, label: '全天' },
+  { h: 3, label: '3h' },
+  { h: 12, label: '12h' },
+  { h: 24, label: '24h' },
+  { h: 72, label: '近3天' }
+]
+
+/** 关键词防抖：本地受控，300ms 后才写 store，避免每敲一字重算整池 */
 const keywordInput = ref(filters.keyword)
 let kwTimer: ReturnType<typeof setTimeout> | null = null
-watch(keywordInput, (v) => {
+watch(keywordInput, (value) => {
   if (kwTimer) clearTimeout(kwTimer)
-  kwTimer = setTimeout(() => setKeyword(v), 300)
+  kwTimer = setTimeout(() => setKeyword(value), 300)
 })
 onBeforeUnmount(() => {
   if (kwTimer) clearTimeout(kwTimer)
 })
 
-const onlySubModel = computed({
-  get: () => filters.onlySub,
-  set: (v: boolean) => {
-    filters.onlySub = v
-  }
-})
-
 /**
- * 行业选择语义：
- *   普通点击 = 单选（再点同一个 → 取消，回到「全部」）
- *   ⌘/Ctrl + 点击 = 多选追加/移除
- * 不做「默认全选」，因为「全部」和「选了 8 个」在语义上不同（前者不限制，后者是显式白名单）。
+ * 行业语义：普通点击 = 单选（再点同一项回到「全部」），
+ * ⌘/Ctrl + 点击 = 多选。不做默认全选：「全部」与「选了 8 个」语义不同。
  */
-function onInd(ind: GapInd, ev: MouseEvent): void {
-  if (ev.metaKey || ev.ctrlKey) {
-    toggleInd(ind)
+function onInd(ind: GapInd, event: MouseEvent): void {
+  if (event.metaKey || event.ctrlKey) {
+    const index = filters.inds.indexOf(ind)
+    if (index >= 0) filters.inds.splice(index, 1)
+    else filters.inds.push(ind)
     return
   }
-  const isOnlyThis = filters.inds.length === 1 && filters.inds[0] === ind
-  filters.inds = isOnlyThis ? [] : [ind]
+  const onlyThis = filters.inds.length === 1 && filters.inds[0] === ind
+  filters.inds = onlyThis ? [] : [ind]
 }
 
-function onWindow(v: string | number | boolean | undefined): void {
-  const h = Number(v)
-  if (Number.isFinite(h) && h > 0) setWindow(h)
+function onDim(event: Event): void {
+  const value = (event.target as HTMLSelectElement).value
+  setDim6(value === '' ? '' : (value as GapDim6Key))
 }
 
-function onSort(v: string | number | boolean | undefined): void {
-  if (v === 'gap' || v === 'latest') setSort(v)
-}
-
+/** 暴露给宿主做「重置筛选」；本组件自身不额外画按钮，避免重复入口 */
 function reset(): void {
   keywordInput.value = ''
   resetFilters()
 }
+defineExpose({ reset })
 </script>
 
 <style scoped>
@@ -159,128 +137,125 @@ function reset(): void {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding: 10px 12px;
-  background: var(--surface, #fff);
-  border: 1px solid var(--el-border-color-lighter);
-  border-radius: 10px;
+  padding: 9px 11px;
+  border: 1px solid var(--gd-line);
+  border-radius: var(--gd-r-panel);
+  background: var(--gd-card);
+  min-width: 0;
+  flex-shrink: 0;
 }
-
-/* ---------- 行业 chips ---------- */
 .gfb-inds {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
   min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.gfb-inds::-webkit-scrollbar {
+  display: none;
 }
 .gfb-chip {
   display: inline-flex;
   align-items: center;
   gap: 5px;
   flex: none;
-  min-height: 32px;
-  padding: 0 10px;
+  min-height: 30px;
+  padding: 0 9px;
   border-radius: 999px;
-  border: 1px solid var(--el-border-color-lighter);
-  background: var(--surface, #fff);
-  color: var(--text-muted, #606266);
-  font-size: 12px;
+  border: 1px solid var(--gd-line);
+  background: var(--gd-card);
+  color: var(--gd-ink2);
+  font-family: var(--gd-sans);
+  font-size: var(--gd-fs-panels);
   cursor: pointer;
-  transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+  white-space: nowrap;
+  transition: all .15s var(--gd-ease);
 }
-.gfb-chip-on {
+.gfb-chip:hover {
+  border-color: var(--gd-brand);
+  color: var(--gd-brand);
+}
+.gfb-chip.on {
+  background: var(--gd-grad);
+  border-color: transparent;
+  color: var(--gd-card);
   font-weight: 600;
 }
 .gfb-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  flex-shrink: 0;
 }
 .gfb-clear {
   flex: none;
-  min-height: 32px;
-  padding: 0 8px;
-  border: none;
-  background: none;
-  color: var(--text-muted, #909399);
-  font-size: 12px;
-  text-decoration: underline;
+  min-height: 30px;
+  border: 0;
+  background: transparent;
+  color: var(--gd-ink3);
+  font-size: var(--gd-fs-pill);
   cursor: pointer;
+  text-decoration: underline;
 }
-.gfb-more {
-  display: none;
-}
-
-/* ---------- 桌面控件行 ---------- */
 .gfb-ctl {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: 10px;
   min-width: 0;
 }
 .gfb-group {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
+  min-width: 0;
 }
 .gfb-lb {
-  font-size: 11px;
-  color: var(--text-muted, #909399);
+  font-size: var(--gd-fs-panels);
+  color: var(--gd-ink3);
   white-space: nowrap;
 }
+.gfb-select {
+  height: 30px;
+  padding: 0 8px;
+  border: 1px solid var(--gd-line2);
+  border-radius: var(--gd-r-nav);
+  background: var(--gd-sub);
+  color: var(--gd-ink2);
+  font-size: var(--gd-fs-pill);
+  max-width: 140px;
+}
 .gfb-kw {
-  width: 200px;
+  flex: 1;
+  min-width: 120px;
+  max-width: 220px;
+  height: 30px;
+  padding: 0 9px;
+  border: 1px solid var(--gd-line);
+  border-radius: var(--gd-r-nav);
+  background: var(--gd-sub);
+  color: var(--gd-ink);
+  font-size: var(--gd-fs-panels);
+}
+.gfb-kw::placeholder {
+  color: var(--gd-ink3);
 }
 .gfb-count {
   margin-left: auto;
-  font-size: 12px;
-  font-variant-numeric: tabular-nums;
-  color: var(--text-muted, #909399);
+  font-size: var(--gd-fs-panels);
+  color: var(--gd-ink2);
   white-space: nowrap;
 }
-.gfb-drawer-body {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
-/* ---------- 移动端 ---------- */
 @media (max-width: 768px) {
-  .gfb-inds {
-    overflow-x: auto;
-    padding-bottom: 2px;
-    scrollbar-width: none;
-    -webkit-overflow-scrolling: touch;
-  }
-  .gfb-inds::-webkit-scrollbar {
-    display: none;
-  }
-  .gfb-more {
-    display: inline-flex;
-    align-items: center;
-    flex: none;
-    min-height: 44px;
-    padding: 0 12px;
-    margin-left: auto;
-    border-radius: 999px;
-    border: 1px solid var(--el-color-primary-light-5);
-    background: var(--surface, #fff);
-    color: var(--el-color-primary);
-    font-size: 12px;
-    cursor: pointer;
-  }
-  .gfb-ctl {
-    display: none;
-  }
   .gfb-chip,
   .gfb-clear {
     min-height: 44px;
   }
-  /* 底部安全区：筛选抽屉 teleport 到 body，吃不到 App.vue 主内容区的补偿 */
-  .gfb-drawer-body,
-  .gfb-drawer :deep(.el-drawer__body) {
-    padding-bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+  .gfb-kw,
+  .gfb-select {
+    height: 44px;
+    max-width: none;
   }
 }
 </style>

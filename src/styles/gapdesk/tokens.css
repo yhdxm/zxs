@@ -1,0 +1,79 @@
+/* ============================================================
+   差值台 GAPDESK · 设计令牌（T01）
+   ------------------------------------------------------------
+   1. 字体走 @fontsource 本地打包：GitHub Pages 纯静态，不依赖外部 CDN。
+      只取 latin 子集：中文字形回退到系统的 PingFang / 微软雅黑。
+   2. 所有令牌只挂在 .gd-stage 作用域，绝不污染全局主题（base/main/theme.css）。
+      例外的工具类 .gd-mono 本身不定义令牌，只消费令牌。
+   ============================================================ */
+@import '@fontsource/inter/latin-400.css';
+@import '@fontsource/inter/latin-500.css';
+@import '@fontsource/inter/latin-600.css';
+@import '@fontsource/inter/latin-700.css';
+@import '@fontsource/jetbrains-mono/latin-400.css';
+@import '@fontsource/jetbrains-mono/latin-500.css';
+@import '@fontsource/jetbrains-mono/latin-700.css';
+
+.gd-stage {
+  /* 色板 */
+  --gd-bg: #F5F7FC;
+  --gd-body: #EDF1F8;
+  --gd-card: #FFFFFF;
+  --gd-sub: #FAFCFF;
+  --gd-line: #E6EBF4;
+  --gd-line2: #D7DEF0;
+  --gd-ink: #0C1030;
+  --gd-ink2: #54608A;
+  --gd-ink3: #93A1C4;
+  --gd-brand: #4F46E5;
+  --gd-brand2: #A855F7;
+  --gd-gap: #FF3358;
+  --gd-gap2: #FF7A3D;
+  --gd-ok: #00B87A;
+  --gd-cyan: #00BFD4;
+  --gd-warn: #FF9F0A;
+
+  /* 渐变 */
+  --gd-grad: linear-gradient(135deg, #6366F1 0%, #A855F7 55%, #FF3358 100%);
+  --gd-grad2: linear-gradient(135deg, #00BFD4 0%, #6366F1 100%);
+
+  /* 阴影 */
+  --gd-sh-xs: 0 1px 2px rgba(12, 16, 48, .04);
+  --gd-sh-sm: 0 2px 10px rgba(12, 16, 48, .06);
+  --gd-sh-md: 0 8px 28px rgba(12, 16, 48, .09);
+  --gd-sh-lg: 0 18px 56px rgba(12, 16, 48, .16);
+
+  /* 字族 */
+  --gd-sans: 'Inter', 'PingFang SC', 'Noto Sans SC', 'Microsoft YaHei', system-ui, sans-serif;
+  --gd-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  /* 字号层级：原型是紧凑终端 UI，整体比 Element Plus 默认小一档 */
+  --gd-fs-kick: 10px;
+  --gd-fs-nav: 11.5px;
+  --gd-fs-ttl: 14px;
+  --gd-fs-why: 12px;
+  --gd-fs-hcard: 26px;
+  --gd-fs-gscore: 17px;
+  --gd-fs-pill: 10px;
+  --gd-fs-panelh: 12.5px;
+  --gd-fs-panels: 10.5px;
+  --gd-fs-phead: 17.5px;
+  --gd-fs-pcard: 15px;
+  --gd-fs-tab: 10px;
+
+  /* 圆角 */
+  --gd-r-nav: 8px;
+  --gd-r-hcard: 12px;
+  --gd-r-gcard: 11px;
+  --gd-r-panel: 12px;
+  --gd-r-phone: 28px;
+
+  /* 缓动 */
+  --gd-ease: cubic-bezier(.2, .8, .2, 1);
+}
+
+/* 数字 / 英文统一等宽 + 表格数字对齐，避免刷新时数字宽度跳动 */
+.gd-mono {
+  font-family: var(--gd-mono);
+  font-variant-numeric: tabular-nums;
+}

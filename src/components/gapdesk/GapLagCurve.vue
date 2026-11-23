@@ -42,7 +42,7 @@
 
         <!-- x 轴刻度（相对最晚触达时刻，故为负值） -->
         <template v-for="tk in xTicks" :key="`x${tk}`">
-          <text class="glc-xt" :x="xOf(tk)" :y="H - 6" text-anchor="middle">{{ fmtTick(tk) }}</text>
+          <text class="glc-xt gd-mono" :x="xOf(tk)" :y="H - 6" text-anchor="middle">{{ fmtTick(tk) }}</text>
         </template>
       </svg>
 
@@ -161,22 +161,22 @@ function fmtTick(t: number): string {
   overflow: visible;
 }
 .glc-grid line {
-  stroke: var(--el-border-color-lighter);
+  stroke: var(--gd-line);
   stroke-width: 1;
   stroke-dasharray: 3 3;
 }
 .glc-grid text {
-  fill: #c0c4cc;
+  fill: var(--gd-line2);
   font-size: 9px;
   font-variant-numeric: tabular-nums;
 }
 .glc-xt {
-  fill: var(--text-muted, #909399);
+  fill: var(--gd-ink3);
   font-size: 9px;
   font-variant-numeric: tabular-nums;
 }
 .glc-area {
-  fill: #d97706;
+  fill: var(--gd-warn);
   fill-opacity: 0.18;
   stroke: none;
 }
@@ -187,10 +187,10 @@ function fmtTick(t: number): string {
   stroke-linecap: round;
 }
 .glc-line-ins {
-  stroke: #ff3358;
+  stroke: var(--gd-gap);
 }
 .glc-line-pub {
-  stroke: #0ba36f;
+  stroke: var(--gd-ok);
 }
 .glc-legend {
   display: flex;
@@ -198,7 +198,7 @@ function fmtTick(t: number): string {
   gap: 12px;
   margin-top: 4px;
   font-size: 11px;
-  color: var(--text-muted, #909399);
+  color: var(--gd-ink3);
 }
 .glc-lg {
   display: inline-flex;
@@ -211,14 +211,14 @@ function fmtTick(t: number): string {
   border-radius: 2px;
 }
 .glc-sw-ins {
-  background: #ff3358;
+  background: var(--gd-gap);
 }
 .glc-sw-pub {
-  background: #0ba36f;
+  background: var(--gd-ok);
 }
 .glc-sw-area {
   height: 8px;
   border-radius: 2px;
-  background: rgba(217, 119, 6, 0.28);
+  background: color-mix(in srgb, var(--gd-warn) 28%, transparent);
 }
 </style>

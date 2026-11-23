@@ -30,8 +30,8 @@
             @click="pick(ind.key, d.key)"
           >
             <template v-if="cellOf(ind.key, d.key)">
-              <span class="gmg-gap">{{ cellOf(ind.key, d.key)?.maxGap }}</span>
-              <span class="gmg-n">{{ cellOf(ind.key, d.key)?.count }} 条</span>
+              <span class="gmg-gap gd-mono">{{ cellOf(ind.key, d.key)?.maxGap }}</span>
+              <span class="gmg-n gd-mono">{{ cellOf(ind.key, d.key)?.count }} 条</span>
             </template>
             <span v-else class="gmg-todo">待采</span>
           </td>
@@ -87,7 +87,7 @@ function cellStyle(ind: string, dim: string): Record<string, string> {
   const cell = cellOf(ind, dim)
   if (!cell) return {}
   const alpha = 0.06 + (Math.max(0, Math.min(100, cell.maxGap)) / 100) * 0.24
-  return { background: `rgba(79, 70, 229, ${alpha.toFixed(3)})` }
+  return { background: `color-mix(in srgb, var(--gd-brand) ${(alpha * 100).toFixed(1)}%, transparent)` }
 }
 
 function cellTitle(ind: string, dim: string): string {
@@ -107,8 +107,8 @@ function pick(ind: string, dim: string): void {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
   border-radius: 10px;
-  border: 1px solid var(--el-border-color-lighter);
-  background: var(--surface, #fff);
+  border: 1px solid var(--gd-line);
+  background: var(--gd-card);
 }
 .gmg {
   width: 100%;
@@ -121,17 +121,17 @@ function pick(ind: string, dim: string): void {
 .gmg td {
   padding: 0;
   text-align: center;
-  border-bottom: 1px solid var(--el-border-color-lighter);
-  border-right: 1px solid var(--el-border-color-lighter);
+  border-bottom: 1px solid var(--gd-line);
+  border-right: 1px solid var(--gd-line);
 }
 .gmg thead th {
   position: sticky;
   top: 0;
   z-index: 2;
   height: 34px;
-  background: var(--surface-soft, #fafafa);
+  background: var(--gd-sub);
   font-weight: 600;
-  color: var(--text-strong, #303133);
+  color: var(--gd-ink);
   white-space: nowrap;
 }
 /* 左上角与行业列双重 sticky（左侧固定） */
@@ -142,7 +142,7 @@ function pick(ind: string, dim: string): void {
   min-width: 108px;
   padding: 0 10px !important;
   text-align: left !important;
-  color: var(--text-muted, #909399) !important;
+  color: var(--gd-ink3) !important;
 }
 .gmg-ind {
   position: sticky;
@@ -152,7 +152,7 @@ function pick(ind: string, dim: string): void {
   height: 44px;
   padding: 0 10px !important;
   text-align: left !important;
-  background: var(--surface, #fff);
+  background: var(--gd-card);
   font-weight: 500;
   white-space: nowrap;
 }
@@ -178,29 +178,29 @@ function pick(ind: string, dim: string): void {
   transition: box-shadow 0.15s ease;
 }
 .gmg-cell:hover {
-  box-shadow: inset 0 0 0 1px var(--el-color-primary);
+  box-shadow: inset 0 0 0 1px var(--gd-brand);
 }
 .gmg-cell-on {
-  box-shadow: inset 0 0 0 2px var(--el-color-primary);
+  box-shadow: inset 0 0 0 2px var(--gd-brand);
 }
 .gmg-gap {
   display: block;
   font-size: 13px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
-  color: var(--text-strong, #303133);
+  color: var(--gd-ink);
   line-height: 1.2;
 }
 .gmg-n {
   display: block;
   font-size: 10px;
   font-variant-numeric: tabular-nums;
-  color: var(--text-muted, #909399);
+  color: var(--gd-ink3);
 }
 .gmg-todo {
   font-size: 10px;
   letter-spacing: 0.06em;
-  color: #c0c4cc;
+  color: var(--gd-line2);
 }
 @media (max-width: 768px) {
   .gmg {

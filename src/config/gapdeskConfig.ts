@@ -12,10 +12,12 @@
  */
 import type {
   GapDim,
+  GapDim6Key,
   GapInd,
   GapLayer,
   GapPlatform,
-  GapSeatPlan
+  GapSeatPlan,
+  SourceGradeTier
 } from '../types/gapdesk'
 
 // ============================================================
@@ -231,3 +233,158 @@ export const GAP_GAP_MAX = 100
 
 /** 单页事件条数 */
 export const GAP_PAGE_SIZE = 20
+
+// ============================================================
+// 九、展示六维（T02）
+// ============================================================
+
+/**
+ * 库里 8 个 dim 归并为展示六维。
+ * `from` 是归并口径：没映射到任何库维度的「人才薪酬」会一直是待采，
+ * 这是真实覆盖情况，不用假数据填格子。
+ */
+export interface GapDim6Option {
+  key: GapDim6Key
+  label: string
+  from: readonly GapDim[]
+}
+
+export const GAP_DIM6: readonly GapDim6Option[] = [
+  { key: 'policy', label: '政策准入', from: ['policy', 'regulation'] },
+  { key: 'price', label: '价格成本', from: ['cost'] },
+  { key: 'supply', label: '供给产能', from: ['supply', 'channel'] },
+  { key: 'capital', label: '资金交易', from: ['capital', 'capex'] },
+  { key: 'talent', label: '人才薪酬', from: [] },
+  { key: 'tech', label: '技术路线', from: ['tech'] }
+] as const
+
+export const GAP_DIM6_MAP: Readonly<Record<GapDim6Key, GapDim6Option>> = keyedByKey(GAP_DIM6)
+
+/** 库维度 → 展示六维；用于筛选与矩阵归格 */
+export const GAP_DIM6_OF: Readonly<Record<GapDim, GapDim6Key>> = {
+  policy: 'policy',
+  regulation: 'policy',
+  cost: 'price',
+  supply: 'supply',
+  channel: 'supply',
+  capital: 'capital',
+  capex: 'capital',
+  tech: 'tech'
+}
+
+// ============================================================
+// 十、模块元数据（T02：13 PC + 5 移动，供侧栏 / 顶栏 / 路由壳共用）
+// ============================================================
+
+export interface GapModuleMeta {
+  key: string
+  label: string
+  /** 分组名：看信息 / 分析 / 溯源 / 工作台 / 移动 */
+  group: string
+  /** 两位编号（mono 展示） */
+  num: string
+  scope: 'pc' | 'mb'
+}
+
+const MODULE_SEED: ReadonlyArray<Omit<GapModuleMeta, 'num'>> = [
+  { key: 'brief', label: '今日简报', group: '看信息', scope: 'pc' },
+  { key: 'latest', label: '最新信息', group: '看信息', scope: 'pc' },
+  { key: 'source-risk', label: '信源分级', group: '看信息', scope: 'pc' },
+  { key: 'echo', label: '命中率', group: '看信息', scope: 'pc' },
+  { key: 'cycle', label: '周期视图', group: '看信息', scope: 'pc' },
+  { key: 'profile', label: '行业档案', group: '分析', scope: 'pc' },
+  { key: 'timeline', label: '时间线', group: '分析', scope: 'pc' },
+  { key: 'matrix', label: '全景矩阵', group: '分析', scope: 'pc' },
+  { key: 'spread', label: '传播路径', group: '分析', scope: 'pc' },
+  { key: 'score', label: '评分模式', group: '分析', scope: 'pc' },
+  { key: 'source', label: '单源情报', group: '溯源', scope: 'pc' },
+  { key: 'archive', label: '归档检索', group: '溯源', scope: 'pc' },
+  { key: 'ai', label: 'AI 研判', group: '溯源', scope: 'pc' },
+  { key: 'alert', label: '订阅提醒', group: '工作台', scope: 'pc' },
+  { key: 'report', label: '导出报告', group: '工作台', scope: 'pc' },
+  { key: 'seats', label: '团队席位', group: '工作台', scope: 'pc' },
+  { key: 'pricing', label: '价格', group: '工作台', scope: 'pc' },
+  { key: 'detail', label: '详情', group: '二级', scope: 'pc' },
+  { key: 'm-latest', label: '最新', group: '移动', scope: 'mb' },
+  { key: 'm-profile', label: '行业', group: '移动', scope: 'mb' },
+  { key: 'm-matrix', label: '全景', group: '移动', scope: 'mb' },
+  { key: 'm-source', label: '单源', group: '移动', scope: 'mb' },
+  { key: 'm-pricing', label: '价格', group: '移动', scope: 'mb' }
+]
+
+/** 13 个 PC 注册表 key（含二级 detail）+ 5 个移动 key 的元数据 */
+export const GAP_MODULE_META: readonly GapModuleMeta[] = MODULE_SEED.map((m, i) => ({
+  ...m,
+  num: String(i).padStart(2, '0')
+}))
+
+export const GAP_MODULE_MAP: Readonly<Record<string, GapModuleMeta>> = Object.fromEntries(
+  GAP_MODULE_META.map((m) => [m.key, m])
+)
+
+// ============================================================
+// 十一、空态文案唯一真源（T02）
+//     组件只读这里，禁止在各视图里另写一份「暂无数据」。
+// ============================================================
+
+export const EMPTY_ARCHIVE = '历史归档需二期（当前仅保留 48h）'
+export const EMPTY_ECHO = '回打样本积累中'
+export const EMPTY_EXPORT = '检索/导出 未接线'
+export const EMPTY_MEMBERS = '无成员数据源，不造人'
+export const EMPTY_LLM = '本段由真实事件按固定规则归纳，非大模型生成'
+export const EMPTY_PUSH = '规则已存，真实推送待二期'
+export const EMPTY_HISTORY = '历史序列需快照积累，不补假趋势'
+export const EMPTY_WAIT = '待采'
+export const EMPTY_DEMO = 'DEMO · 演示数据　未连上网关，以下内容不是实时源数据'
+
+/** 空态组件的四态标题/说明也走这里，组件内零文案硬编码 */
+export const EMPTY_LOADING = '采集任务每 30 分钟跑一轮，稍等片刻'
+export const EMPTY_ERROR = '数据暂时取不到，已保留上一次成功加载的结果'
+export const EMPTY_STALE = '当前展示的是本地镜像，分数与热度可能已过期'
+export const EMPTY_GENERIC = '当前时间窗内没有可展示的差值'
+
+/** 空态组件的结构标签也放这里，避免组件里散落硬编码文案 */
+export const EMPTY_WHY_TITLE = '为什么没有'
+export const EMPTY_PHASE_TITLE = '二期标记'
+
+// ============================================================
+// 十二、T01 增量口径常量（新视图只读这里，组件内零硬编码）
+// ============================================================
+
+/** 供给序列空态：48h 内通常只有 1-3 个真实日点，不补假历史 */
+export const EMPTY_SUPPLY = '供给序列积累中'
+
+/** 网关不可用时的信源健康空态：运维依据不能填假数字 */
+export const EMPTY_SR_GATEWAY = '网关未连接，读不到信源健康度。此处不展示演示数据——信源状态是运维依据，填假数字比空着更危险'
+
+/** 兑现率口径：样本不足就不出数，宁可留白 */
+export const EMPTY_ECHO_RULE = '样本≥30 才显示兑现率；只统计 L0/L1；同源跟发不计入；窗口未满记待验证、不计入分母'
+
+/** AI 模块边界：有输入框但明确告知不会得到回答 */
+export const EMPTY_AI_INPUT = '追问任意一条差值（本模块未接入对话模型，输入不会产生回答）'
+
+/** 推送 / 在线学习的二期边界，避免把「已配置」说成「已接入」 */
+export const EMPTY_AI_PUSH = '企微 / 钉钉 / 飞书定时推送尚未接入'
+export const EMPTY_AI_WEIGHT = '按反馈在线更新权重尚未实现'
+
+/**
+ * 四维权重（T01 先落常量，视图只读不写）。
+ * rare>1 鼓励孤证早报，action<1 抑制不可执行项。
+ */
+export const GAP_WEIGHTS = { time: 0.90, rare: 1.10, impact: 0.85, action: 0.75 } as const
+
+/**
+ * 信源层级 → 分级档位（唯一真源，composable 与视图共用）。
+ * mass 只做出圈探针、不进情报池，但稳定性最好，故归可靠层；
+ * tech 海外源波动大，归探针层；其余官方层。
+ */
+export const SR_TIER_OF: Readonly<Record<GapLayer, SourceGradeTier>> = {
+  mass: 'reliable',
+  tech: 'probe',
+  insider: 'official',
+  main: 'official',
+  rare: 'official'
+}
+
+/** 分级展示顺序：汇总卡片按此顺序渲染，避免各视图自己排一遍 */
+export const SR_TIERS: readonly SourceGradeTier[] = ['reliable', 'official', 'probe']

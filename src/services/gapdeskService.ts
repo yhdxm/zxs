@@ -65,6 +65,8 @@ export interface GapFeedData {
   platforms: GapPlatformRow[]
   sources: GapSourceRow[]
   meta: GapFeedMeta | null
+  /** 本批事件的证据链（批量一次取回，失败为空数组，不阻断 feed） */
+  evidences: GapEventSourceRow[]
 }
 
 /** 预警规则的可写字段（id 缺省时前端生成） */
@@ -127,6 +129,35 @@ async function loadPlatformsByEvents(eventIds: number[]): Promise<GapResult<GapP
   return { data: out, error: null }
 }
 
+/**
+ * 批量取一批事件的证据链（T02）。
+ * 按 200 个 id 一批 .in('event_id', chunk)，与平台轨迹同规格；
+ * 任一失败返回已取到的部分 + error，绝不抛异常给 UI。
+ */
+export async function loadEventSourcesBulk(eventIds: number[]): Promise<GapResult<GapEventSourceRow[]>> {
+  const out: GapEventSourceRow[] = []
+  if (!eventIds.length) return { data: out, error: null }
+  try {
+    for (let i = 0; i < eventIds.length; i += IN_CHUNK) {
+      const chunk = eventIds.slice(i, i + IN_CHUNK)
+      const { data, error } = await supabase
+        .from('gap_event_sources')
+        .select('*')
+        .in('event_id', chunk)
+        .order('publish_ts', { ascending: true })
+      if (error) {
+        console.warn('[gapdesk] 证据链批量读取失败', error.message)
+        return { data: out, error: error.message }
+      }
+      out.push(...((data ?? []) as GapEventSourceRow[]))
+    }
+    return { data: out, error: null }
+  } catch (e) {
+    console.warn('[gapdesk] 证据链批量读取异常', errMsg(e))
+    return { data: out, error: errMsg(e) }
+  }
+}
+
 /** 信源健康（15-25 路，量小，直接全量） */
 export async function loadSources(): Promise<GapResult<GapSourceRow[]>> {
   try {
@@ -164,11 +195,11 @@ export async function loadFeedMeta(): Promise<GapResult<GapFeedMeta | null>> {
 
 /**
  * 加载 feed 全部数据。
- * 事件必须先拿到 id，平台轨迹才能按 event_id 过滤，所以是「1 请求 + 3 并发」：
- *   events →（platforms ‖ sources ‖ meta）
+ * 事件必须先拿到 id，子表才能按 event_id 过滤，所以是「1 请求 + 4 并发」：
+ *   events →（platforms ‖ sources ‖ meta ‖ evidences）
  */
 export async function loadFeed(limit: number = FEED_LIMIT): Promise<GapResult<GapFeedData>> {
-  const empty: GapFeedData = { events: [], platforms: [], sources: [], meta: null }
+  const empty: GapFeedData = { events: [], platforms: [], sources: [], meta: null, evidences: [] }
   try {
     const { data, error } = await supabase
       .from('gap_events')
@@ -184,10 +215,11 @@ export async function loadFeed(limit: number = FEED_LIMIT): Promise<GapResult<Ga
 
     const events = (data ?? []) as GapEventRow[]
     const ids = events.map((e) => e.id)
-    const [platformRes, sourcesRes, metaRes] = await Promise.all([
+    const [platformRes, sourcesRes, metaRes, evidenceRes] = await Promise.all([
       ids.length ? loadPlatformsByEvents(ids) : Promise.resolve({ data: [] as GapPlatformRow[], error: null }),
       loadSources(),
-      loadFeedMeta()
+      loadFeedMeta(),
+      ids.length ? loadEventSourcesBulk(ids) : Promise.resolve({ data: [] as GapEventSourceRow[], error: null })
     ])
 
     return {
@@ -195,10 +227,11 @@ export async function loadFeed(limit: number = FEED_LIMIT): Promise<GapResult<Ga
         events,
         platforms: platformRes.data,
         sources: sourcesRes.data,
-        meta: metaRes.data
+        meta: metaRes.data,
+        evidences: evidenceRes.data
       },
       // 任一子请求失败都算「部分成功」：把第一条错误带出去，界面仍能展示已有部分
-      error: platformRes.error || sourcesRes.error || metaRes.error
+      error: platformRes.error || sourcesRes.error || metaRes.error || evidenceRes.error
     }
   } catch (e) {
     console.warn('[gapdesk] feed 加载异常', errMsg(e))

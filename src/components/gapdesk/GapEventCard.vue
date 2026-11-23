@@ -1,295 +1,327 @@
 <!--
-  差值事件卡
+  差值事件卡 · gcard 皮肤
   ---------------------------------------------------------------
-  信息层级（从上到下就是用户的判断顺序）：
-     ① 哪个行业 / 哪一层先报  → ② 差多少（双轨标尺）→ ③ 为什么算差（reason）
-     → ④ 原文在哪（可点开核对，绝不截断后当结论）
-  所有数字都来自库里的真实列，卡片不做任何推测；没有链接就不显示链接位。
+  信息顺序就是判断顺序：层级/行业/序号 → GAP 分 → 标题 → 四维微条
+  → 为什么算差 → 双轨差值 → 操作（详情/稍后读/归档/喜欢）。
+  没有的字段不渲染假值：理由为空显示「—」，无原文链接就不给链接位。
 -->
 <template>
   <article
-    class="gec"
-    :class="[`gec-${tone}`, { 'gec-active': active }]"
+    class="gd-gcard gcard"
+    :class="[tier ? `t-${tier}` : '', { focus: active }]"
     @click="emit('open', event.id)"
   >
-    <header class="gec-top">
-      <span class="gec-ind">
-        <i class="gec-dot" :style="{ background: indOption.color }" />
-        {{ indOption.label }}
-      </span>
-      <span class="gec-layer">{{ layerLabel }}</span>
-      <span class="gec-spacer" />
-      <span class="gec-score" :title="`原始分 ${event.gap_raw}｜池内分位`">{{ event.gap }}</span>
-    </header>
+    <div class="gc-main">
+      <div class="row1">
+        <i class="dot" :style="{ background: indOption.color }" aria-hidden="true" />
+        <span class="ind">{{ indOption.label }}</span>
+        <span v-if="tier" class="badge gd-mono" :class="tier.toLowerCase()">{{ tier }}</span>
+        <span class="num gd-mono">#{{ rank ?? '—' }}</span>
+        <span class="tm gd-mono">{{ timeText }}</span>
+      </div>
 
-    <h3 class="gec-title">{{ event.title }}</h3>
+      <h3 class="ttl">{{ event.title }}</h3>
 
-    <div class="gec-meta">
-      <span class="gec-time">{{ timeText }}</span>
-      <span class="gec-sep">·</span>
-      <span>{{ event.src_count }} 路源</span>
-      <template v-if="(event.mass_heat ?? 0) > 0">
-        <span class="gec-sep">·</span>
-        <span class="gec-mass">已出圈 {{ event.mass_on || '' }}</span>
-      </template>
+      <div class="gc-dims" aria-label="四维分解">
+        <span v-for="seg in dims" :key="seg.label" class="gc-dim">
+          <span>{{ seg.label }}</span>
+          <i><b :style="{ width: `${seg.pct}%` }" /></i>
+          <em class="gd-mono">{{ seg.value }}</em>
+        </span>
+      </div>
+
+      <p class="why">{{ event.reason || '—' }}</p>
+
+      <GapDualTrack
+        compact
+        :ins-heat="event.ins_heat ?? 0"
+        :pub-heat="event.pub_heat ?? 0"
+        :gap="event.gap"
+      />
+
+      <div class="cardfoot">
+        <span class="gscore gd-mono" :class="tier ? tier.toLowerCase() : ''">{{ event.gap }}</span>
+        <span class="glab gd-mono">GAP</span>
+        <span class="dims gd-mono">{{ event.src_count }} 路源 · {{ layerLabel }}</span>
+        <div class="acts" @click.stop>
+          <button type="button" class="act gd-mono" @click="emit('open', event.id)">详情</button>
+          <button
+            type="button"
+            class="act gd-mono"
+            :class="{ on: later }"
+            :title="later ? '移出稍后读' : '加入稍后读（仅本机）'"
+            @click="emit('later', event.id)"
+          >稍后读</button>
+          <button type="button" class="act gd-mono" :title="EMPTY_ARCHIVE" @click="emit('archive', event.id)">归档</button>
+          <button
+            type="button"
+            class="act gd-mono"
+            :class="{ on: favorite }"
+            :title="favorite ? '取消喜欢' : '喜欢'"
+            @click="onLike"
+          >喜欢</button>
+        </div>
+      </div>
     </div>
 
-    <GapDualTrack
-      class="gec-track"
-      compact
-      :ins-heat="event.ins_heat ?? 0"
-      :pub-heat="event.pub_heat ?? 0"
-      :gap="event.gap"
-    />
-
-    <p v-if="event.reason" class="gec-reason">{{ event.reason }}</p>
-
-    <footer class="gec-foot" @click.stop>
-      <a
-        v-if="event.url"
-        class="gec-link"
-        :href="event.url"
-        target="_blank"
-        rel="noopener"
-        @click.stop
-      >
-        原文
-      </a>
-      <span v-else class="gec-link gec-link-off">无原文链接</span>
-      <span class="gec-spacer" />
-      <el-button
-        class="gec-fav"
-        size="small"
-        text
-        :title="favorite ? '取消收藏' : '收藏'"
-        @click.stop="emit('favorite', event.id)"
-      >
-        <el-icon :class="{ 'gec-fav-on': favorite }">
-          <StarFilled v-if="favorite" />
-          <Star v-else />
-        </el-icon>
-      </el-button>
-    </footer>
+    <div class="gc-side">
+      <span class="conf gd-mono" :class="confClass">{{ confText }}</span>
+    </div>
   </article>
 </template>
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { Star, StarFilled } from '@element-plus/icons-vue'
 import GapDualTrack from './GapDualTrack.vue'
-import { GAP_IND_MAP, GAP_LAYER_LABEL } from '../../config/gapdeskConfig'
-import { fmtAgo, gapTone } from '../../utils/gapdeskFormat'
-import type { GapEventRow, GapInd } from '../../types/gapdesk'
+import { EMPTY_ARCHIVE, GAP_IND_MAP, GAP_LAYER_LABEL } from '../../config/gapdeskConfig'
+import { fmtAgo, safeJson } from '../../utils/gapdeskFormat'
+import type { GapEventRow, GapInd, GapTier, RankedEvent } from '../../types/gapdesk'
 
 const props = withDefaults(
   defineProps<{
-    event: GapEventRow
-    /** 详情抽屉打开时高亮当前卡 */
+    /** 新版传 RankedEvent；旧视图仍传 GapEventRow，此时层级/序号显示「—」不伪造 */
+    event: RankedEvent | GapEventRow
     active?: boolean
-    /** 收藏态由父级统一持有（列表里多个入口共享同一份状态） */
     favorite?: boolean
+    later?: boolean
   }>(),
-  { active: false, favorite: false }
+  { active: false, favorite: false, later: false }
 )
 
 const emit = defineEmits<{
-  (e: 'open', eventId: number): void
-  (e: 'favorite', eventId: number): void
+  open: [id: number]
+  later: [id: number]
+  archive: [id: number]
+  like: [id: number]
+  /** 兼容旧视图的事件名 */
+  favorite: [id: number]
 }>()
 
-/** 行业标签：库里 ind 理论上受约束，但历史脏数据不能让卡片炸掉，故带兜底 */
+/** 喜欢/收藏双事件名一起发，新视图听 like，旧视图听 favorite */
+function onLike(): void {
+  emit('like', props.event.id)
+  emit('favorite', props.event.id)
+}
+
+const tier = computed<GapTier | null>(() => ('tier' in props.event ? props.event.tier : null))
+const rank = computed<number | null>(() => ('rank' in props.event ? props.event.rank : null))
+
 const indOption = computed(() => {
   const hit = GAP_IND_MAP[props.event.ind as GapInd]
-  return hit ?? { key: props.event.ind, label: String(props.event.ind || '未分类'), color: '#909399' }
+  return hit ?? { key: props.event.ind, label: String(props.event.ind || '未分类'), color: 'var(--gd-ink3)' }
 })
 
-/** 来源层：kind 存的是主层（insider/main/rare/tech） */
 const layerLabel = computed(() => GAP_LAYER_LABEL[props.event.kind] ?? '情报')
 
-/** 差值分档决定卡片左侧色条 */
-const tone = computed(() => gapTone(props.event.gap))
+/** 有发布时间显示「发布距今」，ts=0 如实写「入池距今」 */
+const timeText = computed(() =>
+  props.event.ts_published > 0
+    ? fmtAgo(props.event.ts_published)
+    : `入池 ${fmtAgo(props.event.ts_first_seen)}`
+)
 
-/**
- * 时间口径：
- *   · 有发布时间 → 显示「发布距今」（这是差值台的核心时间语义）
- *   · 无发布时间（榜单类 ts=0）→ 只能显示「入池距今」，并如实说明是入池时间
- */
-const timeText = computed(() => {
-  if (props.event.ts_published > 0) return fmtAgo(props.event.ts_published)
-  return `入池 ${fmtAgo(props.event.ts_first_seen)}`
+const DIM_LABELS = ['时效', '稀缺', '影响', '可行动'] as const
+const dims = computed(() => {
+  const raw = typeof props.event.b_json === 'string'
+    ? safeJson<unknown>(props.event.b_json, null)
+    : props.event.b_json
+  const values = Array.isArray(raw) && raw.length === 4 ? raw : [0, 0, 0, 0]
+  return DIM_LABELS.map((label, i) => {
+    const n = Number(values[i])
+    const value = Number.isFinite(n) ? Math.max(0, Math.min(25, Math.round(n))) : 0
+    return { label, value, pct: Math.round((value / 25) * 100) }
+  })
 })
+
+/** 孤证系数：仅 1 路源时显式降级显示，不用百分比伪装置信度 */
+const confClass = computed(() => (props.event.src_count <= 1 ? 'c1' : props.event.src_count >= 3 ? 'c3' : 'c2'))
+const confText = computed(() => (props.event.src_count <= 1 ? '孤证' : `${props.event.src_count} 源`))
 </script>
 
 <style scoped>
-.gec {
-  position: relative;
+/* 只消费 .gd-stage 上的令牌，不写死色值/字号 */
+.gcard {
   display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 14px 16px 12px 18px;
-  background: var(--surface, #fff);
-  border: 1px solid var(--el-border-color-lighter);
-  border-radius: 10px;
+  gap: 10px;
+  padding: 10px 12px;
   cursor: pointer;
-  transition: box-shadow 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+  transition: all .18s var(--gd-ease);
+  position: relative;
+  overflow: hidden;
 }
-.gec:hover {
-  border-color: var(--el-color-primary-light-5);
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06);
+.gcard:hover {
+  border-color: var(--gd-line2);
+  box-shadow: var(--gd-sh-md);
+  transform: translateY(-2px);
 }
-.gec-active {
-  border-color: var(--el-color-primary);
-  box-shadow: 0 0 0 2px var(--el-color-primary-light-8);
+.gcard.focus {
+  border-color: var(--gd-brand);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--gd-brand) 13%, transparent);
 }
-/* 左侧色条：hot 红 / warm 橙 / cool 灰 */
-.gec::before {
+.gcard::before {
   content: '';
   position: absolute;
   left: 0;
-  top: 12px;
-  bottom: 12px;
+  top: 0;
+  bottom: 0;
   width: 3px;
-  border-radius: 0 3px 3px 0;
-  background: #c0c4cc;
+  opacity: 1;
 }
-.gec-hot::before {
-  background: #ff3358;
-}
-.gec-warm::before {
-  background: #f59e0b;
-}
-.gec-cool::before {
-  background: #c0c4cc;
-}
+.gcard.t-L0::before { background: linear-gradient(180deg, var(--gd-gap), var(--gd-gap2)); }
+.gcard.t-L1::before { background: linear-gradient(180deg, var(--gd-brand), var(--gd-brand2)); }
+.gcard.t-L2::before { background: var(--gd-line2); }
 
-.gec-top {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 11px;
-  color: var(--text-muted, #909399);
-  min-width: 0;
-}
-.gec-ind {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.gec-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  flex: none;
-}
-.gec-layer {
-  flex: none;
-  padding: 1px 6px;
-  border-radius: 4px;
-  background: var(--surface-soft, rgba(0, 0, 0, 0.04));
-  color: var(--text-muted, #909399);
-}
-.gec-spacer {
+.gc-main {
   flex: 1;
-}
-.gec-score {
-  flex: none;
-  padding: 1px 7px;
-  border-radius: 6px;
-  font-size: 13px;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-  color: #ff3358;
-  background: rgba(255, 51, 88, 0.08);
-}
-.gec-warm .gec-score {
-  color: #f59e0b;
-  background: rgba(245, 158, 11, 0.1);
-}
-.gec-cool .gec-score {
-  color: #909399;
-  background: rgba(144, 147, 153, 0.12);
-}
-
-.gec-title {
-  margin: 0;
-  font-size: 14px;
-  font-weight: 600;
-  line-height: 1.45;
-  color: var(--text-strong, #303133);
-  /* 标题最多两行，超出省略：差值台的标题必须能被一眼扫完 */
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-.gec-meta {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 11px;
-  color: var(--text-muted, #909399);
   min-width: 0;
-  overflow: hidden;
-  white-space: nowrap;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  overflow-wrap: anywhere;
 }
-.gec-sep {
-  opacity: 0.6;
+.gc-side {
+  width: 60px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  min-width: 0;
 }
-.gec-mass {
-  color: #0ba36f;
-}
-.gec-reason {
-  margin: 0;
-  font-size: 11px;
-  line-height: 1.5;
-  color: var(--text-muted, #909399);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.gec-foot {
+.row1 {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-top: 2px;
+  min-width: 0;
+  flex-wrap: wrap;
 }
-.gec-link {
-  font-size: 12px;
-  color: var(--el-color-primary);
-  text-decoration: none;
-  /* 触控目标 ≥44px */
-  min-height: 44px;
+.dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+.ind {
+  font-size: var(--gd-fs-panels);
+  color: var(--gd-ink2);
+}
+.badge {
+  height: 18px;
+  padding: 0 7px;
+  border-radius: 5px;
   display: inline-flex;
   align-items: center;
+  font-size: var(--gd-fs-pill);
+  font-weight: 700;
+  color: var(--gd-card);
 }
-.gec-link:hover {
-  text-decoration: underline;
+.badge.l0 { background: linear-gradient(135deg, var(--gd-gap), var(--gd-gap2)); }
+.badge.l1 { background: var(--gd-grad2); color: var(--gd-card); }
+.badge.l2 { background: var(--gd-line); color: var(--gd-ink2); }
+.num, .tm {
+  font-size: var(--gd-fs-pill);
+  color: var(--gd-ink3);
 }
-.gec-link-off {
-  color: var(--text-muted, #909399);
-  cursor: default;
+.ttl {
+  margin: 0;
+  font-size: var(--gd-fs-ttl);
+  font-weight: 600;
+  line-height: 1.4;
+  letter-spacing: -.1px;
+  color: var(--gd-ink);
+  overflow-wrap: anywhere;
 }
-.gec-fav {
-  width: 44px;
-  height: 44px;
-  padding: 0;
+.gc-dims {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
 }
-.gec-fav-on {
-  color: #f59e0b;
+.gc-dim {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--gd-fs-pill);
+  color: var(--gd-ink3);
 }
-
-/* 移动端：内边距收紧，标题字号略降，收藏按钮保持 44px 触控区 */
-@media (max-width: 768px) {
-  .gec {
-    padding: 12px 12px 10px 14px;
-  }
-  .gec-title {
-    font-size: 13.5px;
-  }
+.gc-dim i {
+  display: block;
+  width: 34px;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--gd-line);
+  overflow: hidden;
 }
+.gc-dim b {
+  display: block;
+  height: 100%;
+  background: var(--gd-brand);
+}
+.gc-dim em {
+  font-style: normal;
+  font-size: var(--gd-fs-pill);
+  color: var(--gd-ink2);
+}
+.why {
+  margin: 0;
+  font-size: var(--gd-fs-why);
+  line-height: 1.55;
+  color: var(--gd-ink2);
+  overflow-wrap: anywhere;
+}
+.cardfoot {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+.gscore {
+  font-size: var(--gd-fs-gscore);
+  font-weight: 700;
+  line-height: 1;
+  color: var(--gd-ink);
+}
+.gscore.l0 { background: var(--gd-grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.gscore.l2 { color: var(--gd-ink3); }
+.glab, .dims {
+  font-size: var(--gd-fs-pill);
+  color: var(--gd-ink3);
+}
+.acts {
+  display: flex;
+  gap: 3px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+.act {
+  min-height: 44px;
+  padding: 0 8px;
+  border: 1px solid var(--gd-line);
+  background: var(--gd-card);
+  color: var(--gd-ink2);
+  font-size: var(--gd-fs-pill);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all .15s var(--gd-ease);
+}
+.act:hover {
+  border-color: var(--gd-brand);
+  color: var(--gd-brand);
+}
+.act.on {
+  background: var(--gd-grad);
+  border-color: transparent;
+  color: var(--gd-card);
+}
+.conf {
+  height: 18px;
+  padding: 0 7px;
+  border-radius: 5px;
+  display: inline-flex;
+  align-items: center;
+  font-size: var(--gd-fs-pill);
+}
+.conf.c3 { background: color-mix(in srgb, var(--gd-ok) 12%, var(--gd-card)); color: var(--gd-ok); }
+.conf.c2 { background: var(--gd-sub); color: var(--gd-ink2); }
+.conf.c1 { background: color-mix(in srgb, var(--gd-warn) 12%, var(--gd-card)); color: var(--gd-warn); }
 </style>
