@@ -15,7 +15,10 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
+import { defineComponent, h } from 'vue'
+import { createMemoryHistory, createRouter } from 'vue-router'
 import GapEmptyState from '../src/components/gapdesk/GapEmptyState.vue'
+import GapDeskView from '../src/views/GapDeskView.vue'
 
 import {
   clamp,
@@ -738,6 +741,42 @@ describe('GapEmptyState · 空池默认文案不再串台', () => {
     expect(text).not.toContain('回打样本积累中')
     expect(text).not.toContain('检索/导出')
     expect(text).not.toContain('历史序列需快照积累')
+    wrapper.unmount()
+  })
+})
+
+describe('GapDeskView · 移动壳未知 view 回落（P2-2 回归）', () => {
+  /** 用真实 router 挂整页：只验 query → current → 底栏高亮这条链路 */
+  async function mountAtMb(query: Record<string, string>) {
+    const Host = defineComponent({ render: () => h(GapDeskView) })
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [{ path: '/:pathMatch(.*)*', component: Host }]
+    })
+    await router.push({ path: '/', query })
+    await router.isReady()
+    const wrapper = mount(Host, { global: { plugins: [router] } })
+    await new Promise((r) => setTimeout(r, 0))
+    await wrapper.vm.$nextTick()
+    return wrapper
+  }
+
+  it('?dev=mb&view=unknown 落 m-latest，底栏仍 5 格且只高亮「最新」', async () => {
+    const wrapper = await mountAtMb({ dev: 'mb', view: 'unknown' })
+    const tabs = wrapper.findAll('.p-tabbtn')
+    expect(tabs.map((t) => t.text().replace(/\s+/g, ''))).toEqual(['最新', '行业', '全景', '单源', '价格'])
+
+    const on = wrapper.findAll('.p-tabbtn.on')
+    expect(on.length).toBe(1)
+    expect(on[0].text()).toContain('最新')
+    expect(on[0].attributes('aria-current')).toBe('page')
+
+    // 主区必须是移动二级页（MbLatestView 的「二级入口」+ mbview 根类），不能渲染 PC 三栏
+    const html = wrapper.html()
+    expect(html).toContain('gd-stage-mb')
+    expect(html).toContain('mbview')
+    expect(html).toContain('二级入口')
+    expect(html).not.toContain('gd-drawer-host')
     wrapper.unmount()
   })
 })
