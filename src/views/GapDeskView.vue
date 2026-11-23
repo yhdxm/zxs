@@ -159,6 +159,13 @@ for (const meta of [...VIEWS, ...MOBILE_VIEWS, ...MOBILE_SECONDARY]) ALL_META[me
 
 const hasView = (key: string): boolean => Object.prototype.hasOwnProperty.call(ALL_META, key)
 
+/** 移动壳能渲染的 key 白名单。PC 专属视图（timeline/spread/score/archive…）也是 known key，
+ *  但在手机壳里既没有移动版布局、底栏也找不到对应 tab，所以只认移动注册表 */
+const MOBILE_KEYS = new Set([...MOBILE_VIEWS, ...MOBILE_SECONDARY].map((m) => m.key))
+
+/** 移动首屏：未知 key 与 PC 专属 key 在移动设备上都回落到这里 */
+const MOBILE_FIRST = MOBILE_VIEWS[0]?.key ?? 'm-latest'
+
 /* ============================================================
    二、路由解析：?view= 与 ?dev=（非法值回落，保留其它 query）
    ============================================================ */
@@ -191,9 +198,12 @@ const effectiveDev = computed<'pc' | 'mb'>(() => {
 
 const current = computed<string>(() => {
   const raw = firstQuery(route.query.view)
-  if (hasView(raw)) return raw
   // 手机壳没有 timeline/spread/score/archive 形态：回落到移动首个主 tab，而不是 PC 三栏稿
-  return effectiveDev.value === 'mb' ? 'm-latest' : FALLBACK_VIEW
+  const fallback = effectiveDev.value === 'mb' ? MOBILE_FIRST : FALLBACK_VIEW
+  if (!raw || !hasView(raw)) return fallback
+  // known key 也未必有移动形态：PC 三栏稿塞进手机壳会让底栏一个 tab 都不高亮
+  if (effectiveDev.value === 'mb' && !MOBILE_KEYS.has(raw)) return MOBILE_FIRST
+  return raw
 })
 
 const FALLBACK_META: GapViewMeta = {

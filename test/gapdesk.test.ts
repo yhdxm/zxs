@@ -11,13 +11,14 @@
  *  3. `scripts/gapdesk/score.mjs`（四维打分 / 分位映射）
  *  4. 顺带锁死前端权限与路由门禁（gapdesk 普通用户默认不可见）
  */
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { defineComponent, h } from 'vue'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import GapEmptyState from '../src/components/gapdesk/GapEmptyState.vue'
+import GapDetailDrawer from '../src/components/gapdesk/GapDetailDrawer.vue'
 import GapDeskView from '../src/views/GapDeskView.vue'
 
 import {
@@ -40,7 +41,7 @@ import {
   sameEvent
 } from '../scripts/gapdesk/cluster.mjs'
 import { scoreEvents } from '../scripts/gapdesk/score.mjs'
-import { gapDiv, useGapDesk } from '../src/composables/useGapDesk'
+import { gapDiv, loadGapFeed, useGapDesk } from '../src/composables/useGapDesk'
 import { EMPTY_WINDOW, GAP_TTL_HOURS } from '../src/config/gapdeskConfig'
 import {
   DEFAULT_ROLE_CONFIG,
@@ -50,6 +51,40 @@ import {
 } from '../src/services/appDataService'
 import router from '../src/router'
 import type { GapEventRow, GapRuleRow, GapSourceRow } from '../src/types/gapdesk'
+
+/* ---------- 用户态读接口可切换桩 ----------
+   规则读取的「成功但 0 条」与「读失败」是两条不同分支（useGapDesk.loadUserState），
+   要真实触发只能控制 service 的返回，故把四个用户态读接口换成桩；
+   其余导出（loadFeed / loadSources 等）继续用原实现，不影响本文件其它用例。 */
+const svcStub = vi.hoisted(() => ({
+  listRules: vi.fn(),
+  listFavorites: vi.fn(),
+  listSubscriptions: vi.fn()
+}))
+
+vi.mock('../src/services/gapdeskService', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../src/services/gapdeskService')>()
+  return {
+    ...actual,
+    // 固定已登录，否则 loadUserState 会走「未登录静默跳过」分支，两条规则分支都碰不到
+    resolveUserId: () => Promise.resolve('u-test'),
+    listFavorites: svcStub.listFavorites,
+    listSubscriptions: svcStub.listSubscriptions,
+    listRules: svcStub.listRules,
+    // feed 走空数据：本文件验的是视图回落与用户态读取，不验网络层。
+    // （全局 supabase 桩会返回代理对象当 error，模板里插值会抛，与本文件无关）
+    loadFeed: () =>
+      Promise.resolve({
+        data: { events: [], platforms: [], sources: [], meta: null, evidences: [] },
+        error: null
+      })
+  }
+})
+
+/** 默认成功且为空：让不关心用户态的用例（如整页挂载）拿到稳定返回 */
+svcStub.listFavorites.mockResolvedValue({ data: [], error: null })
+svcStub.listSubscriptions.mockResolvedValue({ data: [], error: null })
+svcStub.listRules.mockResolvedValue({ data: [], error: null })
 
 /** 固定「当前时刻」：所有相对时间断言都用它，避免跑测试的时刻影响结果 */
 const NOW = 1_700_000_000_000
@@ -718,18 +753,28 @@ describe('useGapDesk.sourceGrade · 分数 / 状态 / 汇总口径', () => {
 })
 
 describe('useGapDesk.ruleCount · 读到 0 条与读失败可区分', () => {
-  it('ruleLoaded 标记读取状态，ruleCount 只数条数', () => {
-    store.ruleRows.value = []
-    store.ruleLoaded.value = true
-    expect(store.ruleCount.value).toBe(0)
+  it('listRules 成功但返回 0 条 → ruleLoaded=true、ruleCount=0（「确实没有规则」）', async () => {
+    svcStub.listRules.mockResolvedValueOnce({ data: [], error: null })
+    await loadGapFeed(true)
     expect(store.ruleLoaded.value).toBe(true)
-
-    store.ruleLoaded.value = false
     expect(store.ruleCount.value).toBe(0)
-    expect(store.ruleLoaded.value).toBe(false)
+  })
 
-    store.ruleRows.value = [{ id: 'r1' } as unknown as GapRuleRow]
-    expect(store.ruleCount.value).toBe(1)
+  it('listRules reject → ruleLoaded=false、ruleCount=0（「读失败」，不能被当成 0 条）', async () => {
+    // 先放一份旧数据：读失败必须清空，不能把上一次的条数当成当前值
+    store.ruleRows.value = [{ id: 'stale' } as unknown as GapRuleRow]
+    store.ruleLoaded.value = true
+
+    svcStub.listRules.mockRejectedValueOnce(new Error('rules down'))
+    await loadGapFeed(true)
+    expect(store.ruleLoaded.value).toBe(false)
+    expect(store.ruleCount.value).toBe(0)
+    expect(store.ruleRows.value).toEqual([])
+  })
+
+  it('ruleCount 只数条数，与读取状态解耦', () => {
+    store.ruleRows.value = [{ id: 'r1' }, { id: 'r2' }] as unknown as GapRuleRow[]
+    expect(store.ruleCount.value).toBe(2)
   })
 })
 
@@ -745,7 +790,7 @@ describe('GapEmptyState · 空池默认文案不再串台', () => {
   })
 })
 
-describe('GapDeskView · 移动壳未知 view 回落（P2-2 回归）', () => {
+describe('GapDeskView · view 回落（P2-1 回归）', () => {
   /** 用真实 router 挂整页：只验 query → current → 底栏高亮这条链路 */
   async function mountAtMb(query: Record<string, string>) {
     const Host = defineComponent({ render: () => h(GapDeskView) })
@@ -778,5 +823,63 @@ describe('GapDeskView · 移动壳未知 view 回落（P2-2 回归）', () => {
     expect(html).toContain('二级入口')
     expect(html).not.toContain('gd-drawer-host')
     wrapper.unmount()
+  })
+
+  it('?dev=mb&view=timeline（已注册但没有移动形态）同样落 m-latest，底栏有高亮', async () => {
+    const wrapper = await mountAtMb({ dev: 'mb', view: 'timeline' })
+    const on = wrapper.findAll('.p-tabbtn.on')
+    expect(on.length).toBe(1)
+    expect(on[0].text()).toContain('最新')
+
+    const html = wrapper.html()
+    expect(html).toContain('mbview')
+    // PC 三栏的类名不能出现在手机壳里
+    expect(html).not.toContain('class="pcview"')
+    expect(html).not.toContain('tlbar')
+    wrapper.unmount()
+  })
+
+  it('?dev=pc&view=timeline 行为不变，仍渲染 PC 时间线', async () => {
+    const wrapper = await mountAtMb({ dev: 'pc', view: 'timeline' })
+    const html = wrapper.html()
+    expect(html).toContain('pcview')
+    expect(html).toContain('tlbar')
+    expect(html).not.toContain('mbview')
+    expect(html).not.toContain('p-tabbtn')
+    wrapper.unmount()
+  })
+})
+
+describe('GapDetailDrawer · Teleport 到 body 后仍能取到令牌（P0 回归）', () => {
+  it('打开后节点确实在 .gd-stage 之外，故根节点必须自带 .gd-portal 承接令牌', () => {
+    const host = document.createElement('div')
+    host.className = 'gd-stage'
+    document.body.appendChild(host)
+
+    const wrapper = mount(GapDetailDrawer, {
+      props: { modelValue: true, event: null },
+      attachTo: host
+    })
+
+    const wrap = document.body.querySelector('.gdd-wrap')
+    expect(wrap).not.toBeNull()
+    expect(wrap.classList.contains('gd-portal')).toBe(true)
+    // 这就是缺陷成因：祖先链上没有 .gd-stage，custom property 不继承
+    expect(wrap.closest('.gd-stage')).toBeNull()
+    // 白面板靠 var(--gd-card)，必须是 .gd-portal 的后代才能继承到
+    expect(wrap.querySelector('.gdd')).not.toBeNull()
+
+    wrapper.unmount()
+    host.remove()
+  })
+  it('令牌块选择器组含 .gd-portal，抽屉根节点带该类，且未写进 :root', () => {
+    const tokens = readFileSync(resolve(process.cwd(), 'src/styles/gapdesk/tokens.css'), 'utf8')
+    // 抽屉 teleport 到 body 后祖先链上没有 .gd-stage，令牌必须由 .gd-portal 一并承接
+    expect(tokens).toMatch(/\.gd-stage,\s*\.gd-portal\s*\{/)
+    // 依旧不写进 :root：两套客户端共用宿主主题，不能污染
+    expect(tokens).not.toMatch(/:root\s*\{/)
+
+    const drawer = readFileSync(resolve(process.cwd(), 'src/components/gapdesk/GapDetailDrawer.vue'), 'utf8')
+    expect(drawer).toContain('class="gdd-wrap gd-portal"')
   })
 })

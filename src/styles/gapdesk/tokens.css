@@ -4,6 +4,8 @@
    1. 字体走 @fontsource 本地打包：GitHub Pages 纯静态，不依赖外部 CDN。
       只取 latin 子集：中文字形回退到系统的 PingFang / 微软雅黑。
    2. 所有令牌只挂在 .gd-stage 作用域，绝不污染全局主题（base/main/theme.css）。
+      Teleport 到 body 的浮层（详情抽屉）不在 .gd-stage 祖先链上，靠 .gd-portal
+      单独承接同一套令牌；仍然不写进 :root，所以依旧不污染宿主主题。
       例外的工具类 .gd-mono 本身不定义令牌，只消费令牌。
    ============================================================ */
 @import '@fontsource/inter/latin-400.css';
@@ -14,7 +16,8 @@
 @import '@fontsource/jetbrains-mono/latin-500.css';
 @import '@fontsource/jetbrains-mono/latin-700.css';
 
-.gd-stage {
+.gd-stage,
+.gd-portal {
   /* 色板 */
   --gd-bg: #F5F7FC;
   --gd-body: #EDF1F8;

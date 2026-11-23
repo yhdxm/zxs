@@ -349,6 +349,9 @@ export const EMPTY_WINDOW = '当前时间窗与筛选条件下没有达到展示
 /** 单条详情取不到：列表仍在，只是这条已过期或未加载 */
 export const EMPTY_MISSING = '这条差值未加载或已过期（入库保留 48 小时），请回列表重试'
 
+/** 单条详情标题：与池级空态区分开，避免标题说「时间窗为空」、正文说「这条过期了」 */
+export const EMPTY_MISSING_TITLE = '这条差值读不到'
+
 /** 空态组件的结构标签也放这里，避免组件里散落硬编码文案 */
 export const EMPTY_WHY_TITLE = '为什么没有'
 export const EMPTY_PHASE_TITLE = '二期标记'

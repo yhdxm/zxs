@@ -6,9 +6,10 @@
   证据链只展示真实行；平台未触达写「未触达 · 不补假数据」。
 -->
 <template>
-  <!-- 挂到 body：避免被父级 transform / overflow 裁切，也不再依赖宿主的空节点 -->
+  <!-- 挂到 body：避免被父级 transform / overflow 裁切，也不再依赖宿主的空节点。
+       离开 .gd-stage 后令牌不继承，故补 gd-portal 承接同一套 --gd-*（见 tokens.css） -->
   <Teleport to="body">
-    <div v-if="modelValue" class="gdd-wrap" @click.self="close">
+    <div v-if="modelValue" class="gdd-wrap gd-portal" @click.self="close">
     <aside class="gdd" role="dialog" aria-modal="true" aria-label="差值详情">
       <template v-if="event">
         <header class="gdd-h">
