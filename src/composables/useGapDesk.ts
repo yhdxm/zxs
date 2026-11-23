@@ -189,6 +189,18 @@ async function loadUserState(): Promise<void> {
 }
 
 /**
+ * 只信字符串：service 误传对象时降级成可读文本。
+ * 模板里 `${error}` 插值遇到不可转原始值的对象会直接抛 TypeError 并让整页白，
+ * 这是最坏的失败模式，所以在赋值这一层就收敛掉，不往 service 里撒 String()。
+ */
+function errText(e: unknown): string | null {
+  if (e == null) return null
+  if (typeof e === 'string') return e
+  const msg = (e as { message?: unknown }).message
+  return typeof msg === 'string' ? msg : '未知错误'
+}
+
+/**
  * 加载 feed。
  * @param force true = 忽略 TTL 强制重拉（手动刷新 / Realtime 推送 / 切回前台）
  */
@@ -212,7 +224,7 @@ export async function loadGapFeed(force = false): Promise<void> {
           stale.value = true
           staleAgeMs.value = mirror.ageMs
         }
-        error.value = res.error
+        error.value = errText(res.error)
         console.warn('[gapdesk] feed 拉取失败，已回退离线镜像', res.error)
       } else {
         applyFeed(res.data)
@@ -220,7 +232,7 @@ export async function loadGapFeed(force = false): Promise<void> {
         staleAgeMs.value = 0
         lastLoadedAt.value = Date.now()
         // 部分失败也把错误带出去（界面可提示「信源面板暂不可用」），但数据照常展示
-        error.value = res.error
+        error.value = errText(res.error)
         cacheSet(CACHE_KEY, res.data)
       }
 

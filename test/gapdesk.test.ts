@@ -52,15 +52,19 @@ import {
 import router from '../src/router'
 import type { GapEventRow, GapRuleRow, GapSourceRow } from '../src/types/gapdesk'
 
-/* ---------- 用户态读接口可切换桩 ----------
-   规则读取的「成功但 0 条」与「读失败」是两条不同分支（useGapDesk.loadUserState），
-   要真实触发只能控制 service 的返回，故把四个用户态读接口换成桩；
-   其余导出（loadFeed / loadSources 等）继续用原实现，不影响本文件其它用例。 */
+/* ---------- service 可切换桩 ----------
+   「规则读取成功但 0 条」与「读失败」是两条不同分支（useGapDesk.loadUserState），
+   feed 的错误分支也要能喂进不可转原始值的对象（验 errText 防线），
+   所以把这几处换成可切换的桩；其余导出继续用原实现，不影响本文件其它用例。 */
 const svcStub = vi.hoisted(() => ({
   listRules: vi.fn(),
   listFavorites: vi.fn(),
-  listSubscriptions: vi.fn()
+  listSubscriptions: vi.fn(),
+  loadFeed: vi.fn()
 }))
+
+/** 空 feed：视图级用例只需要稳定的空数据，不验网络层 */
+const EMPTY_FEED = { events: [], platforms: [], sources: [], meta: null, evidences: [] }
 
 vi.mock('../src/services/gapdeskService', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../src/services/gapdeskService')>()
@@ -71,13 +75,7 @@ vi.mock('../src/services/gapdeskService', async (importOriginal) => {
     listFavorites: svcStub.listFavorites,
     listSubscriptions: svcStub.listSubscriptions,
     listRules: svcStub.listRules,
-    // feed 走空数据：本文件验的是视图回落与用户态读取，不验网络层。
-    // （全局 supabase 桩会返回代理对象当 error，模板里插值会抛，与本文件无关）
-    loadFeed: () =>
-      Promise.resolve({
-        data: { events: [], platforms: [], sources: [], meta: null, evidences: [] },
-        error: null
-      })
+    loadFeed: svcStub.loadFeed
   }
 })
 
@@ -85,6 +83,7 @@ vi.mock('../src/services/gapdeskService', async (importOriginal) => {
 svcStub.listFavorites.mockResolvedValue({ data: [], error: null })
 svcStub.listSubscriptions.mockResolvedValue({ data: [], error: null })
 svcStub.listRules.mockResolvedValue({ data: [], error: null })
+svcStub.loadFeed.mockResolvedValue({ data: EMPTY_FEED, error: null })
 
 /** 固定「当前时刻」：所有相对时间断言都用它，避免跑测试的时刻影响结果 */
 const NOW = 1_700_000_000_000
@@ -628,6 +627,21 @@ function resetStore(): void {
 
 afterEach(resetStore)
 
+/** 用真实 router 挂整页：验的是 query → current → 底栏高亮 / 主区组件这条链路 */
+async function mountGapDeskView(query: Record<string, string>) {
+  const Host = defineComponent({ render: () => h(GapDeskView) })
+  const router = createRouter({
+    history: createMemoryHistory(),
+    routes: [{ path: '/:pathMatch(.*)*', component: Host }]
+  })
+  await router.push({ path: '/', query })
+  await router.isReady()
+  const wrapper = mount(Host, { global: { plugins: [router] } })
+  await new Promise((r) => setTimeout(r, 0))
+  await wrapper.vm.$nextTick()
+  return wrapper
+}
+
 function makeEvent(over: Partial<GapEventRow> & { id: number }): GapEventRow {
   const now = Date.now()
   return {
@@ -791,23 +805,8 @@ describe('GapEmptyState · 空池默认文案不再串台', () => {
 })
 
 describe('GapDeskView · view 回落（P2-1 回归）', () => {
-  /** 用真实 router 挂整页：只验 query → current → 底栏高亮这条链路 */
-  async function mountAtMb(query: Record<string, string>) {
-    const Host = defineComponent({ render: () => h(GapDeskView) })
-    const router = createRouter({
-      history: createMemoryHistory(),
-      routes: [{ path: '/:pathMatch(.*)*', component: Host }]
-    })
-    await router.push({ path: '/', query })
-    await router.isReady()
-    const wrapper = mount(Host, { global: { plugins: [router] } })
-    await new Promise((r) => setTimeout(r, 0))
-    await wrapper.vm.$nextTick()
-    return wrapper
-  }
-
   it('?dev=mb&view=unknown 落 m-latest，底栏仍 5 格且只高亮「最新」', async () => {
-    const wrapper = await mountAtMb({ dev: 'mb', view: 'unknown' })
+    const wrapper = await mountGapDeskView({ dev: 'mb', view: 'unknown' })
     const tabs = wrapper.findAll('.p-tabbtn')
     expect(tabs.map((t) => t.text().replace(/\s+/g, ''))).toEqual(['最新', '行业', '全景', '单源', '价格'])
 
@@ -826,7 +825,7 @@ describe('GapDeskView · view 回落（P2-1 回归）', () => {
   })
 
   it('?dev=mb&view=timeline（已注册但没有移动形态）同样落 m-latest，底栏有高亮', async () => {
-    const wrapper = await mountAtMb({ dev: 'mb', view: 'timeline' })
+    const wrapper = await mountGapDeskView({ dev: 'mb', view: 'timeline' })
     const on = wrapper.findAll('.p-tabbtn.on')
     expect(on.length).toBe(1)
     expect(on[0].text()).toContain('最新')
@@ -840,12 +839,35 @@ describe('GapDeskView · view 回落（P2-1 回归）', () => {
   })
 
   it('?dev=pc&view=timeline 行为不变，仍渲染 PC 时间线', async () => {
-    const wrapper = await mountAtMb({ dev: 'pc', view: 'timeline' })
+    const wrapper = await mountGapDeskView({ dev: 'pc', view: 'timeline' })
     const html = wrapper.html()
     expect(html).toContain('pcview')
     expect(html).toContain('tlbar')
     expect(html).not.toContain('mbview')
     expect(html).not.toContain('p-tabbtn')
+    wrapper.unmount()
+  })
+})
+
+describe('useGapDesk · feed 错误对象不能打穿模板（整页白防线）', () => {
+  it('service 误传不可转原始值的对象时，error 被降级成可读字符串', async () => {
+    // Object.create(null) 正是 `String(x)` 会抛 TypeError 的那类对象
+    svcStub.loadFeed.mockResolvedValueOnce({ data: EMPTY_FEED, error: Object.create(null) })
+    await loadGapFeed(true)
+    expect(typeof store.error.value).toBe('string')
+    expect(store.error.value).toBe('未知错误')
+  })
+
+  it('错误对象带 message 时取 message，不吞掉真实原因', async () => {
+    svcStub.loadFeed.mockResolvedValueOnce({ data: EMPTY_FEED, error: { message: 'db down' } })
+    await loadGapFeed(true)
+    expect(store.error.value).toBe('db down')
+  })
+
+  it('PC 整页在错误对象下仍能渲染（GapTopbar 插值不再抛）', async () => {
+    svcStub.loadFeed.mockResolvedValueOnce({ data: EMPTY_FEED, error: Object.create(null) })
+    const wrapper = await mountGapDeskView({ dev: 'pc', view: 'latest' })
+    expect(wrapper.html()).toContain('pcview')
     wrapper.unmount()
   })
 })
