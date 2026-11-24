@@ -37,7 +37,7 @@
       </div>
     </article>
 
-    <p v-if="l0.length" class="end gd-mono">{{ filters.dateBand ? '以上是该日期全部必看' : '以上是今日全部必看' }}</p>
+    <p v-if="l0.length" class="end gd-mono">{{ closingText }}</p>
     <GapEmptyState v-if="!displayList.length" type="empty" :desc="EMPTY_WINDOW" />
 
     <template v-if="rest.length">
@@ -112,6 +112,18 @@ const displayList = computed<RankedEvent[]>(() => {
 
 const l0 = computed(() => displayList.value.filter((item) => item.tier === 'L0'))
 const rest = computed(() => displayList.value.filter((item) => item.tier !== 'L0'))
+
+/**
+ * 列表收尾语：live / unknown 不是日期，说「该日期」不成立。
+ * 取值与 bandKeyOf 的返回同名，不另立一套判断。
+ */
+const closingText = computed<string>(() => {
+  const band = filters.dateBand
+  if (!band) return '以上是今日全部必看'
+  if (band === 'live') return '以上是 1 小时内的全部必看'
+  if (band === 'unknown') return '以上是时间未知的全部必看'
+  return '以上是该日期全部必看'
+})
 
 /** 首触来源（谁先报），只取 feed 里真实带回的证据链；没有就返回 null */
 const sourceMap = computed<Map<number, { name: string; url: string | null }>>(() => {

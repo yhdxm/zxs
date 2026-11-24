@@ -1457,13 +1457,37 @@ describe('移动端日期胶囊 · 与 PC 同口径接通 dateBand', () => {
     one.unmount()
   })
 
-  it('筛选日期且有必看条目时，收尾语换成「该日期」而不是「今日」', () => {
-    store.events.value = [makeEvent({ id: 1, gap: 90, ts_published: dayTs(-1) })]
+  it('收尾语四态：今日 / 1 小时内 / 时间未知 / 具体日期，各说各的话', () => {
+    // 无筛选 → 今日
+    store.events.value = [makeEvent({ id: 1, gap: 90, ts_published: Date.now() })]
+    store.filters.dateBand = ''
+    const none = mount(MbLatestView)
+    expect(none.text()).toContain('以上是今日全部必看')
+    none.unmount()
+
+    // live 不是日期，不能说「该日期」
+    store.events.value = [makeEvent({ id: 2, gap: 90, ts_published: Date.now() - 10 * 60_000 })]
+    store.filters.dateBand = 'live'
+    const live = mount(MbLatestView)
+    expect(live.text()).toContain('以上是 1 小时内的全部必看')
+    expect(live.text()).not.toContain('该日期')
+    live.unmount()
+
+    // unknown 不是日期，不能说「该日期」
+    store.events.value = [makeEvent({ id: 3, gap: 90, ts_published: 0 })]
+    store.filters.dateBand = 'unknown'
+    const unknown = mount(MbLatestView)
+    expect(unknown.text()).toContain('以上是时间未知的全部必看')
+    expect(unknown.text()).not.toContain('该日期')
+    unknown.unmount()
+
+    // 具体日期 → 该日期，且不能说「今日」
+    store.events.value = [makeEvent({ id: 4, gap: 90, ts_published: dayTs(-1) })]
     store.filters.dateBand = dayKey(-1)
-    const wrapper = mount(MbLatestView)
-    expect(wrapper.text()).toContain('以上是该日期全部必看')
-    expect(wrapper.text()).not.toContain('以上是今日全部必看')
-    wrapper.unmount()
+    const day = mount(MbLatestView)
+    expect(day.text()).toContain('以上是该日期全部必看')
+    expect(day.text()).not.toContain('以上是今日全部必看')
+    day.unmount()
   })
 
   it('点胶囊写 filters.dateBand，再点一次取消（toggle）', async () => {
