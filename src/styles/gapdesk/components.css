@@ -571,6 +571,37 @@
   min-width: 0;
   flex-shrink: 0;
 }
+/* 加载更多：PC 与移动端共用；文案「已显示 X / 共 Y」让用户知道还有多少没看 */
+.gd-stage .gd-more {
+  display: flex;
+  justify-content: center;
+  padding: 4px 0 2px;
+  flex-shrink: 0;
+}
+.gd-stage .gd-more-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 0 18px;
+  border: 1px solid var(--gd-line);
+  border-radius: var(--gd-r-nav);
+  background: var(--gd-card);
+  color: var(--gd-ink2);
+  font-family: var(--gd-sans);
+  font-size: var(--gd-fs-panels);
+  cursor: pointer;
+  transition: all .18s var(--gd-ease);
+}
+.gd-stage .gd-more-btn:hover {
+  color: var(--gd-ink);
+  border-color: var(--gd-brand);
+  box-shadow: var(--gd-sh-md);
+}
+.gd-stage .gd-more-btn .gd-mono {
+  font-size: var(--gd-fs-kick);
+  color: var(--gd-ink3);
+}
 .gd-stage .hcard {
   flex: 1 1 150px;
   min-width: 0;
@@ -851,5 +882,11 @@
   }
   .gd-searchbox input {
     min-height: 44px;
+  }
+  /* 加载更多：触屏给足 44px 并铺满宽度，PC 保持紧凑条 */
+  .gd-stage .gd-more-btn {
+    min-height: 44px;
+    width: 100%;
+    justify-content: center;
   }
 }

@@ -29,12 +29,12 @@ import { computed } from 'vue'
 import { GAP_IND } from '../../config/gapdeskConfig'
 import { useGapDesk } from '../../composables/useGapDesk'
 
-const { tierCounts, top14, loneCount, ruleLoaded, ruleCount, health } = useGapDesk()
+const { tierCounts, topList, loneCount, ruleLoaded, ruleCount, health } = useGapDesk()
 
 /** 只有能算真的入口给计数，其余保持「—」；不拿假数撑门面 */
 const countOf = computed<Record<string, string>>(() => ({
   profile: String(GAP_IND.length),
-  latest: String(top14.value.length),
+  latest: String(topList.value.length),
   source: String(loneCount.value),
   alert: ruleLoaded.value ? String(ruleCount.value) : '—',
   brief: String(tierCounts.value.L0),

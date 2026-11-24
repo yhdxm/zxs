@@ -1,8 +1,9 @@
 <!--
   PC-01 最新信息
-  数据来源：store 的 top14 / ranked / tierCounts / lagMedianHours / filters.dateBand。
-  14 条硬上限作用在「筛选后的集合」上：选具体日期时在该日期池内重新取前 14，
-  不是「全池取 14 再筛日期」——后者在昨天事件排 14 名开外时会筛成空列表。
+  数据来源：store 的 topList / ranked / tierCounts / lagMedianHours / filters.dateBand。
+  首屏铺 20 条，底部「加载更多」每次追加 20，可一直展开到全池——不一次铺满 48h 池，也不限死在 14。
+  批次上限作用在「筛选后的集合」上：选具体日期时在该日期池内重新展开，
+  不是「全池取前 N 再筛日期」——后者在昨天事件排 N 名开外时会筛成空列表。
   日期带与筛选由外壳统一提供。首屏是事件流，Hero 五卡放列表末尾（统计不该挡住「差」）。
 -->
 <template>
@@ -31,6 +32,13 @@
       </template>
     </template>
 
+    <div v-if="displayList.length && hasMoreShown" class="gd-more">
+      <button type="button" class="gd-more-btn" @click="loadMoreTop">
+        加载更多
+        <span class="gd-mono">已显示 {{ displayList.length }} / 共 {{ totalShown }}</span>
+      </button>
+    </div>
+
     <div class="hero">
       <div class="hcard"><span class="n grad">{{ tierCounts.L0 }}</span><span class="l">L0 · 今日必看</span><span class="d">池内前 10%</span></div>
       <div class="hcard"><span class="n">{{ tierCounts.L1 }}</span><span class="l">L1 · 值得看</span><span class="d">池内 10–40%</span></div>
@@ -50,8 +58,8 @@ import { bandKeyOf } from '../../../utils/gapdeskFormat'
 import { GAP_OPEN_DETAIL_KEY, useGapDesk } from '../../../composables/useGapDesk'
 import type { GapEventRow, RankedEvent } from '../../../types/gapdesk'
 
-// ranked 是有意保留的：选了具体日期时要在该日期池内重新取前 14，不能只靠 top14
-const { ranked, top14, tierCounts, lagMedianHours, filters, favorites, laterIds, toggleLater, toggleFavoriteEvent, firstSourceOf } = useGapDesk()
+// ranked 是有意保留的：选了具体日期时要在该日期池内重新展开，不能只靠 topList
+const { ranked, topList, loadMoreTop, tierCounts, lagMedianHours, filters, favorites, laterIds, toggleLater, toggleFavoriteEvent, firstSourceOf } = useGapDesk()
 const openDetail = inject(GAP_OPEN_DETAIL_KEY, (_id: number) => {})
 
 /** 卡片要的是 {name,url}；没有来源名就返回 null，卡片不占位也不编造 */
@@ -81,14 +89,24 @@ const sections = [
 ] as const
 
 /**
- * 展示集合：14 条硬上限作用在「筛选后的集合」上。
- * 无日期筛选 = 今日前 14；选了具体日期 = 该日期池内重新取前 14。
- * 先全池取 14 再筛日期，会在「昨天事件排在 14 名开外」时筛成空列表。
+ * 展示集合：展开批次作用在「筛选后的集合」上。
+ * 无日期筛选 = ranked 前已展开条数；选了具体日期 = 该日期池内重新展开到同样的条数。
+ * 先全池取前 N 再筛日期，会在「昨天事件排 N 名开外」时筛成空列表。
  */
 const displayList = computed<RankedEvent[]>(() => {
-  if (!filters.dateBand) return top14.value
-  return ranked.value.filter((event) => bandKeyOf(event) === filters.dateBand).slice(0, 14)
+  if (!filters.dateBand) return topList.value
+  return ranked.value.filter((event) => bandKeyOf(event) === filters.dateBand).slice(0, topList.value.length)
 })
+
+/** 当前筛选下的池内总条数（不受展开批次限制），用于「已显示 X / 共 Y」 */
+const totalShown = computed<number>(() =>
+  filters.dateBand
+    ? ranked.value.filter((event) => bandKeyOf(event) === filters.dateBand).length
+    : ranked.value.length
+)
+
+/** 当前筛选下是否还有未展开的条目 */
+const hasMoreShown = computed<boolean>(() => totalShown.value > displayList.value.length)
 
 /** 分段只做分流，日期筛选已经在 displayList 里做完了 */
 const eventsOf = computed(() => (key: string) =>

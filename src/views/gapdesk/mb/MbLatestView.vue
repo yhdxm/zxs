@@ -37,7 +37,6 @@
       </div>
     </article>
 
-    <p v-if="l0.length" class="end gd-mono">{{ closingText }}</p>
     <GapEmptyState v-if="!displayList.length" type="empty" :desc="EMPTY_WINDOW" />
 
     <template v-if="rest.length">
@@ -65,6 +64,15 @@
       </article>
     </template>
 
+    <!-- 展开批次：还有未展开的条目就给「加载更多」，全展开后才说「以上是全部」 -->
+    <div v-if="displayList.length && hasMoreShown" class="gd-more">
+      <button type="button" class="gd-more-btn" @click="loadMoreTop">
+        加载更多
+        <span class="gd-mono">已显示 {{ displayList.length }} / 共 {{ totalShown }}</span>
+      </button>
+    </div>
+    <p v-if="displayList.length && !hasMoreShown" class="end gd-mono">{{ closingText }}</p>
+
     <!-- 统计与入口不该挡在「差」前面：二级入口整块下移 -->
     <div class="p-sec"><div class="h">二级入口</div></div>
     <div class="entries">
@@ -91,7 +99,7 @@ import { GAP_OPEN_DETAIL_KEY, useGapDesk } from '../../../composables/useGapDesk
 import { bandKeyOf, fmtAgo } from '../../../utils/gapdeskFormat'
 import type { GapInd, RankedEvent } from '../../../types/gapdesk'
 
-const { ranked, top14, filters, favorites, laterIds, toggleLater, toggleFavoriteEvent, firstSourceOf } = useGapDesk()
+const { ranked, topList, loadMoreTop, filters, favorites, laterIds, toggleLater, toggleFavoriteEvent, firstSourceOf } = useGapDesk()
 const openDetail = inject(GAP_OPEN_DETAIL_KEY, (_id: number) => {})
 const emit = defineEmits<{ navigate: [key: string] }>()
 
@@ -104,11 +112,21 @@ const ENTRIES = [
   { key: 'm-ai', label: 'AI', desc: '权重与引用' }
 ] as const
 
-/** 与 PC-01 同口径：14 条硬上限作用在筛选后的集合上，不是「全池取 14 再筛日期」 */
+/** 与 PC-01 同口径：展开批次作用在筛选后的集合上，不是「全池取前 N 再筛日期」 */
 const displayList = computed<RankedEvent[]>(() => {
-  if (!filters.dateBand) return top14.value
-  return ranked.value.filter((event) => bandKeyOf(event) === filters.dateBand).slice(0, 14)
+  if (!filters.dateBand) return topList.value
+  return ranked.value.filter((event) => bandKeyOf(event) === filters.dateBand).slice(0, topList.value.length)
 })
+
+/** 当前筛选下的池内总条数（不受展开批次限制） */
+const totalShown = computed<number>(() =>
+  filters.dateBand
+    ? ranked.value.filter((event) => bandKeyOf(event) === filters.dateBand).length
+    : ranked.value.length
+)
+
+/** 当前筛选下是否还有未展开的条目 */
+const hasMoreShown = computed<boolean>(() => totalShown.value > displayList.value.length)
 
 const l0 = computed(() => displayList.value.filter((item) => item.tier === 'L0'))
 const rest = computed(() => displayList.value.filter((item) => item.tier !== 'L0'))

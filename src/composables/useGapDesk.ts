@@ -522,8 +522,22 @@ const ranked = computed<RankedEvent[]>(() => {
   })
 })
 
-/** 今日 Top14：直接切 ranked 前 14 条（ranked 已按 gap 降序 + 首见时间次级排序，并带 tier/rank） */
-const top14 = computed<RankedEvent[]>(() => ranked.value.slice(0, 14))
+/** 首屏批次：一次铺 20 条，点「加载更多」再追加 20，直到全池 */
+export const FEED_BATCH = 20
+
+/** 当前已展开条数；不随筛选复位，用户翻到哪就停在哪 */
+const feedCount = ref<number>(FEED_BATCH)
+
+/** 今日最新信息：ranked 前 feedCount 条（ranked 已按 gap 降序 + 首见时间次级排序，并带 tier/rank） */
+const topList = computed<RankedEvent[]>(() => ranked.value.slice(0, feedCount.value))
+
+/** 全池是否还有未展开的条目 */
+const hasMoreTop = computed<boolean>(() => ranked.value.length > feedCount.value)
+
+/** 加载更多：再展开一批 */
+function loadMoreTop(): void {
+  feedCount.value += FEED_BATCH
+}
 
 const tierCounts = computed<Record<GapTier, number>>(() => {
   const out: Record<GapTier, number> = { L0: 0, L1: 0, L2: 0 }
@@ -866,6 +880,8 @@ function resetFilters(): void {
   filters.dim6 = ''
   filters.dateBand = ''
   filters.onlySub = false
+  // 重置筛选等于回到首屏：展开批次一并收回，避免用户重置后仍面对一长串列表
+  feedCount.value = FEED_BATCH
 }
 
 /** 稍后读：本机列表，写 localStorage 失败也不影响内存状态 */
@@ -951,7 +967,9 @@ export function useGapDesk() {
     // derived
     purgeMsg,
     pool,
-    top14,
+    topList,
+    hasMoreTop,
+    feedCount,
     stats,
     matrix,
     lag,
@@ -975,6 +993,7 @@ export function useGapDesk() {
     ruleCount,
     // actions
     load: loadGapFeed,
+    loadMoreTop,
     purgeAndRefresh,
     toggleInd,
     setWindow,

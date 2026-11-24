@@ -41,7 +41,7 @@ import {
   sameEvent
 } from '../scripts/gapdesk/cluster.mjs'
 import { scoreEvents } from '../scripts/gapdesk/score.mjs'
-import { gapDiv, loadGapFeed, purgeAndRefresh, useGapDesk } from '../src/composables/useGapDesk'
+import { FEED_BATCH, gapDiv, loadGapFeed, purgeAndRefresh, useGapDesk } from '../src/composables/useGapDesk'
 import {
   EMPTY_PURGE_EMPTY,
   EMPTY_PURGE_ERROR,
@@ -672,6 +672,8 @@ function resetStore(): void {
   store.filters.dim6 = ''
   store.filters.dateBand = ''
   store.filters.onlySub = false
+  // 展开批次是模块级 ref，用例之间必须复位，否则「加载更多」会污染后续用例
+  store.feedCount.value = FEED_BATCH
 }
 
 afterEach(resetStore)
@@ -1277,15 +1279,45 @@ describe('useGapDesk.lagMedianHours · 小时口径（不再用天）', () => {
   })
 })
 
-describe('useGapDesk.top14 · 今日 14 条硬上限走 ranked 口径', () => {
-  it('20 条池子只切 14 条，且带 ranked 的 tier/rank、按 gap 降序', () => {
-    store.events.value = Array.from({ length: 20 }, (_, i) => makeEvent({ id: i + 1, gap: 100 - i }))
-    expect(store.top14.value.length).toBe(14)
-    expect(store.top14.value[0]?.id).toBe(1)
-    expect(store.top14.value[0]?.tier).toBe('L0')
-    expect(store.top14.value[0]?.rank).toBe(1)
-    // 不再是「重新排一次 pool」，与 ranked 前 14 条逐项一致
-    expect(store.top14.value.map((e) => e.id)).toEqual(store.ranked.value.slice(0, 14).map((e) => e.id))
+describe('useGapDesk.topList · 首屏批次走 ranked 口径，可加载更多', () => {
+  it('池子比批次大时只切一批，且带 ranked 的 tier/rank、按 gap 降序', () => {
+    store.events.value = Array.from({ length: FEED_BATCH + 5 }, (_, i) => makeEvent({ id: i + 1, gap: 100 - i }))
+    expect(store.topList.value.length).toBe(FEED_BATCH)
+    expect(store.topList.value[0]?.id).toBe(1)
+    expect(store.topList.value[0]?.tier).toBe('L0')
+    expect(store.topList.value[0]?.rank).toBe(1)
+    // 不再是「重新排一次 pool」，与 ranked 前 N 条逐项一致
+    expect(store.topList.value.map((e) => e.id)).toEqual(store.ranked.value.slice(0, FEED_BATCH).map((e) => e.id))
+  })
+
+  it('loadMoreTop 每次追加一批，铺满全池后 hasMoreTop 转 false', () => {
+    store.events.value = Array.from({ length: FEED_BATCH + 3 }, (_, i) => makeEvent({ id: i + 1, gap: 100 - i }))
+    expect(store.topList.value.length).toBe(FEED_BATCH)
+    expect(store.hasMoreTop.value).toBe(true)
+
+    store.loadMoreTop()
+    expect(store.topList.value.length).toBe(FEED_BATCH + 3)
+    expect(store.hasMoreTop.value).toBe(false)
+
+    // 已经铺满，再点也不越界
+    store.loadMoreTop()
+    expect(store.topList.value.length).toBe(FEED_BATCH + 3)
+  })
+
+  it('池子比批次小时全铺，hasMoreTop 为 false，不出现空白的「加载更多」', () => {
+    store.events.value = Array.from({ length: 5 }, (_, i) => makeEvent({ id: i + 1, gap: 100 - i }))
+    expect(store.topList.value.length).toBe(5)
+    expect(store.hasMoreTop.value).toBe(false)
+  })
+
+  it('resetFilters 把展开批次收回首屏，避免重置后仍是一长串', () => {
+    store.events.value = Array.from({ length: FEED_BATCH + 10 }, (_, i) => makeEvent({ id: i + 1, gap: 100 - i }))
+    store.loadMoreTop()
+    store.loadMoreTop()
+    expect(store.topList.value.length).toBe(FEED_BATCH + 10)
+
+    store.resetFilters()
+    expect(store.topList.value.length).toBe(FEED_BATCH)
   })
 
   it('同分沿用 ranked 的 ts_first_seen 次级排序，不重新排一次', () => {
@@ -1293,7 +1325,7 @@ describe('useGapDesk.top14 · 今日 14 条硬上限走 ranked 口径', () => {
       makeEvent({ id: 1, gap: 90, ts_first_seen: 2_000 }),
       makeEvent({ id: 2, gap: 90, ts_first_seen: 1_000 })
     ]
-    expect(store.top14.value.map((e) => e.id)).toEqual(store.ranked.value.map((e) => e.id))
+    expect(store.topList.value.map((e) => e.id)).toEqual(store.ranked.value.map((e) => e.id))
   })
 })
 
@@ -1368,19 +1400,21 @@ describe('PcLatestView · 14 条上限作用在筛选后的集合（dateBand 回
     return d.getTime()
   }
 
-  /** 15 条今天的高分 + 1 条昨天的低分（必然排在 15 名之外，top14 里不含它） */
+  /** 一整批今天的高分 + 1 条昨天的低分（必然排在首屏批次之外，topList 里不含它） */
   function seed(): void {
     store.events.value = [
-      ...Array.from({ length: 15 }, (_, i) => makeEvent({ id: i + 1, gap: 100 - i, ts_published: dayTs(0) })),
+      ...Array.from({ length: FEED_BATCH + 1 }, (_, i) => makeEvent({ id: i + 1, gap: 100 - i, ts_published: dayTs(0) })),
       makeEvent({ id: 101, gap: 10, title: '昨天那条低分事件', ts_published: dayTs(-1) })
     ]
   }
 
-  it('不设 dateBand 出今日 14 条；设成昨天后出那 1 条真实事件（不是 0 条 + 撒谎空态）', () => {
+  it('不设 dateBand 只出首屏批次；设成昨天后出那 1 条真实事件（不是 0 条 + 撒谎空态）', () => {
     seed()
     store.filters.dateBand = ''
     const all = mount(PcLatestView)
-    expect(all.findAll('.gd-gcard').length).toBe(14)
+    expect(all.findAll('.gd-gcard').length).toBe(FEED_BATCH)
+    // 首屏批次之外还有条目 → 必须给「加载更多」，不能假装已经看完了
+    expect(all.find('.gd-more-btn').exists()).toBe(true)
     all.unmount()
 
     store.filters.dateBand = dayKey(-1)
@@ -1392,6 +1426,23 @@ describe('PcLatestView · 14 条上限作用在筛选后的集合（dateBand 回
     one.unmount()
   })
 
+  it('加载更多把剩余条目铺出来，铺满后按钮消失并给出总数', () => {
+    store.events.value = Array.from({ length: FEED_BATCH + 4 }, (_, i) =>
+      makeEvent({ id: i + 1, gap: 100 - i, ts_published: dayTs(0) })
+    )
+    const wrapper = mount(PcLatestView)
+    expect(wrapper.findAll('.gd-gcard').length).toBe(FEED_BATCH)
+    expect(wrapper.find('.gd-more-btn').text()).toContain(`已显示 ${FEED_BATCH} / 共 ${FEED_BATCH + 4}`)
+
+    void wrapper.find('.gd-more-btn').trigger('click')
+    return nextTick().then(() => {
+      expect(wrapper.findAll('.gd-gcard').length).toBe(FEED_BATCH + 4)
+      // 全铺完就没有「加载更多」了，不能留一个点了没反应的按钮
+      expect(wrapper.find('.gd-more-btn').exists()).toBe(false)
+      wrapper.unmount()
+    })
+  })
+
   it('选中池里完全没有事件的日期：0 条 + 空态（这才是空态该管的场景）', () => {
     seed()
     store.filters.dateBand = dayKey(-9)
@@ -1401,13 +1452,14 @@ describe('PcLatestView · 14 条上限作用在筛选后的集合（dateBand 回
     wrapper.unmount()
   })
 
-  it('选中日期池内 20 条时仍只出 14 条（硬上限不因筛选放宽）', () => {
-    store.events.value = Array.from({ length: 20 }, (_, i) =>
+  it('选中日期池内条目多于批次时，仍只铺一批（批次不因筛选放宽）', () => {
+    store.events.value = Array.from({ length: FEED_BATCH + 10 }, (_, i) =>
       makeEvent({ id: i + 1, gap: 100 - i, ts_published: dayTs(-1) })
     )
     store.filters.dateBand = dayKey(-1)
     const wrapper = mount(PcLatestView)
-    expect(wrapper.findAll('.gd-gcard').length).toBe(14)
+    expect(wrapper.findAll('.gd-gcard').length).toBe(FEED_BATCH)
+    expect(wrapper.find('.gd-more-btn').text()).toContain(`共 ${FEED_BATCH + 10}`)
     wrapper.unmount()
   })
 })
@@ -1431,19 +1483,19 @@ describe('移动端日期胶囊 · 与 PC 同口径接通 dateBand', () => {
     d.setHours(10, 0, 0, 0)
     return d.getTime()
   }
-  /** 15 条今天高分 + 1 条昨天低分（排 15 名外，top14 不含它） */
+  /** 一整批今天高分 + 1 条昨天低分（排首屏批次外，topList 不含它） */
   function seed(): void {
     store.events.value = [
-      ...Array.from({ length: 15 }, (_, i) => makeEvent({ id: i + 1, gap: 100 - i, ts_published: dayTs(0) })),
+      ...Array.from({ length: FEED_BATCH + 1 }, (_, i) => makeEvent({ id: i + 1, gap: 100 - i, ts_published: dayTs(0) })),
       makeEvent({ id: 101, gap: 10, title: '昨天那条低分事件', ts_published: dayTs(-1) })
     ]
   }
 
-  it('MbLatestView 同口径：不设日期 14 条，设昨天 1 条', () => {
+  it('MbLatestView 同口径：不设日期只出首屏批次，设昨天出 1 条', () => {
     seed()
     store.filters.dateBand = ''
     const all = mount(MbLatestView)
-    expect(all.findAll('.p-card').length).toBe(14)
+    expect(all.findAll('.p-card').length).toBe(FEED_BATCH)
     all.unmount()
 
     store.filters.dateBand = dayKey(-1)
