@@ -29,7 +29,7 @@
         </span>
         <span class="gd-pill gd-pill-acc gd-mono" :title="EMPTY_ECHO">兑现率 —</span>
         <span class="gd-pill gd-pill-okk gd-mono" title="源间时差取中位数，避免历史长尾带偏均值">
-          时差中位 {{ lagMedianDays === null ? '—' : `${lagMedianDays} 天` }}
+          时差中位 {{ lagMedianHours === null ? '—' : `${lagMedianHours} 小时` }}
         </span>
       </div>
 
@@ -78,7 +78,7 @@ const props = withDefaults(
   { title: '最新信息', live: false }
 )
 
-const { tierCounts, lagMedianDays, isLive, demoReasons, canPurge, filters, setKeyword } = useGapDesk()
+const { tierCounts, lagMedianHours, isLive, demoReasons, canPurge, filters, setKeyword } = useGapDesk()
 
 const liveNow = computed<boolean>(() => props.live || isLive.value)
 const demoTitle = computed<string>(() => demoReasons.value.join('；') || '未连上网关')

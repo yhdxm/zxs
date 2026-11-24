@@ -384,12 +384,6 @@ const pool = computed<GapEventRow[]>(() => {
   })
 })
 
-/** 今日 Top14：按 gap 降序的前 14 条（今日视图首屏） */
-const top14 = computed<GapEventRow[]>(() => {
-  const sorted = [...pool.value].sort((a, b) => b.gap - a.gap)
-  return sorted.slice(0, 14)
-})
-
 /** 概览数字 */
 const stats = computed(() => {
   const list = pool.value
@@ -481,6 +475,20 @@ const lag = computed<GapLagRow[]>(() => {
     })
 })
 
+/**
+ * 首触来源：同一事件取 publish_ts 最小的一条（谁先报是第一信息）。
+ * evidences 为空（子请求失败）时返回 null —— 界面不许编造来源名。
+ */
+const firstSourceOf = computed<(id: number) => GapEventSourceRow | null>(() => {
+  const map = new Map<number, GapEventSourceRow>()
+  for (const row of evidences.value) {
+    const prev = map.get(row.event_id)
+    const ts = row.publish_ts ?? Number.MAX_SAFE_INTEGER
+    if (!prev || ts < (prev.publish_ts ?? Number.MAX_SAFE_INTEGER)) map.set(row.event_id, row)
+  }
+  return (id: number): GapEventSourceRow | null => map.get(id) ?? null
+})
+
 /** 暗流：只有单一信源、且还没出圈 —— 这是差值台最值钱的那一批 */
 const underground = computed<GapEventRow[]>(() => {
   return pool.value
@@ -513,6 +521,9 @@ const ranked = computed<RankedEvent[]>(() => {
     return { ...e, tier, rank: i + 1 }
   })
 })
+
+/** 今日 Top14：直接切 ranked 前 14 条（ranked 已按 gap 降序 + 首见时间次级排序，并带 tier/rank） */
+const top14 = computed<RankedEvent[]>(() => ranked.value.slice(0, 14))
 
 const tierCounts = computed<Record<GapTier, number>>(() => {
   const out: Record<GapTier, number> = { L0: 0, L1: 0, L2: 0 }
@@ -622,18 +633,19 @@ const bySource = computed<SourceGroup[]>(() => {
   }))
 })
 
-/** 源间时差中位数（天）：均值会被历史长尾带偏，故取中位；无有效样本返回 null */
-const lagMedianDays = computed<number | null>(() => {
-  const days = lag.value
+/** 源间时差中位数（小时）：均值会被历史长尾带偏，故取中位；无有效样本返回 null */
+const lagMedianHours = computed<number | null>(() => {
+  const hours = lag.value
     .map((row) => row.spanH)
     .filter((h) => h > 0)
-    .map((h) => h / 24)
     .sort((a, b) => a - b)
-  if (!days.length) return null
-  const mid = days.length >> 1
-  const hit = days[mid]
+  if (!hours.length) return null
+  const mid = hours.length >> 1
+  const hit = hours[mid]
   if (hit == null) return null
-  return days.length % 2 ? hit : Math.round(((days[mid - 1] ?? 0) + hit) / 2)
+  // 一位小数：6 小时级的差用「天」看不见，但也不需要 18 位小数
+  if (hours.length % 2) return Math.round(hit * 10) / 10
+  return Math.round((((hours[mid - 1] ?? 0) + hit) / 2) * 10) / 10
 })
 
 /** LIVE 三条件同时成立：采集在 40 分钟内、非镜像、无错误 */
@@ -680,7 +692,7 @@ const dailyBriefText = computed<string>(() => {
       ? `最高分一条：「${best.title.slice(0, 34)}${best.title.length > 34 ? '…' : ''}」（GAP ${best.gap}）。${(best.reason ?? '').slice(0, 60)}`
       : '',
     `风险提示：${lone} 条为孤证（仅 1 路源，已按孤证系数降权）。`,
-    `时差中位 ${lagMedianDays.value ?? '—'} 天；Echo ${EMPTY_ECHO}。`,
+    `时差中位 ${lagMedianHours.value ?? '—'} 小时；Echo ${EMPTY_ECHO}。`,
     `${EMPTY_LLM}；本段由当日 ${list.length} 条真实事件按固定规则归纳。`
   ]
   return lines.filter((line) => Boolean(line)).join('\n')
@@ -943,6 +955,7 @@ export function useGapDesk() {
     stats,
     matrix,
     lag,
+    firstSourceOf,
     underground,
     health,
     ranked,
@@ -951,7 +964,7 @@ export function useGapDesk() {
     byIndustry,
     matrix6,
     bySource,
-    lagMedianDays,
+    lagMedianHours,
     isLive,
     demoReasons,
     dailyBriefText,

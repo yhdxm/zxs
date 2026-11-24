@@ -74,7 +74,7 @@
             <span class="v">{{ row.ts === null ? '未触达' : row.ts }}</span>
           </div>
           <p v-if="!firstTouchRows.length" class="panel-note">— 该条暂无可列出的信源明细。</p>
-          <p class="panel-note">全站时差中位 {{ lagMedianDays === null ? '—' : `${lagMedianDays} 天` }}。</p>
+          <p class="panel-note">全站时差中位 {{ lagMedianHours === null ? '—' : `${lagMedianHours} 小时` }}。</p>
         </section>
       </div>
     </template>
@@ -89,7 +89,7 @@ import { EMPTY_GENERIC, EMPTY_HISTORY, GAP_PLATFORM } from '../../../config/gapd
 import { useGapDesk } from '../../../composables/useGapDesk'
 import { fmtAgo } from '../../../utils/gapdeskFormat'
 
-const { ranked, platforms, evidences, lagMedianDays } = useGapDesk()
+const { ranked, platforms, evidences, lagMedianHours } = useGapDesk()
 const sample = computed(() => ranked.value[0] ?? null)
 
 /** 大众探针平台唯一真源在 config.GAP_PLATFORM，不再就地抄第三份 */

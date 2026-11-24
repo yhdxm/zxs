@@ -88,7 +88,7 @@ const {
   ranked,
   tierCounts,
   byIndustry,
-  lagMedianDays,
+  lagMedianHours,
   dailyBriefText,
   supplyByDay,
   favorites,
@@ -103,8 +103,8 @@ const heroItems = computed(() => [
   { label: 'L1 · 值得看', n: tierCounts.value.L1, d: '池内 10–40%', grad: false },
   { label: '兑现率', n: '—', d: EMPTY_ECHO, grad: false },
   {
-    label: '时差中位（天）',
-    n: lagMedianDays.value === null ? '—' : lagMedianDays.value,
+    label: '时差中位（小时）',
+    n: lagMedianHours.value === null ? '—' : lagMedianHours.value,
     d: '取中位，避免长尾带偏',
     grad: false
   }

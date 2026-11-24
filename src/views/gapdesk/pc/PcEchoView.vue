@@ -60,7 +60,7 @@ import GapRing from '../../../components/gapdesk/GapRing.vue'
 import { EMPTY_ECHO, EMPTY_ECHO_RULE } from '../../../config/gapdeskConfig'
 import { useGapDesk } from '../../../composables/useGapDesk'
 
-const { ranked, lagMedianDays, stats } = useGapDesk()
+const { ranked, lagMedianHours, stats } = useGapDesk()
 
 /** 有效样本只数 L0/L1：L2 是存档层，不进兑现口径 */
 const sampleN = computed(() => ranked.value.filter((row) => row.tier === 'L0' || row.tier === 'L1').length)
@@ -69,8 +69,8 @@ const heroItems = computed(() => [
   { label: '兑现率', n: '—', d: EMPTY_ECHO, grad: true },
   { label: '有效样本 N', n: sampleN.value, d: '仅统计 L0/L1', grad: false },
   {
-    label: '时差中位（天）',
-    n: lagMedianDays.value === null ? '—' : lagMedianDays.value,
+    label: '时差中位（小时）',
+    n: lagMedianHours.value === null ? '—' : lagMedianHours.value,
     d: '源间实测',
     grad: false
   },

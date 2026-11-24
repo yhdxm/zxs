@@ -43,6 +43,15 @@
         <span class="gscore gd-mono" :class="tier ? tier.toLowerCase() : ''">{{ event.gap }}</span>
         <span class="glab gd-mono">GAP</span>
         <span class="dims gd-mono">{{ event.src_count }} 路源 · {{ layerLabel }}</span>
+        <span v-if="source?.name" class="src gd-mono" :title="`首触来源：${source.name}`">{{ source.name }}</span>
+        <a
+          v-if="source?.url"
+          class="orig gd-mono"
+          :href="source.url"
+          target="_blank"
+          rel="noopener"
+          @click.stop
+        >原文 ↗</a>
         <div class="acts" @click.stop>
           <button type="button" class="act gd-mono" @click="emit('open', event.id)">详情</button>
           <button
@@ -84,8 +93,10 @@ const props = withDefaults(
     active?: boolean
     favorite?: boolean
     later?: boolean
+    /** 首触来源（谁先报）：不传就整块不渲染，绝不编造来源名 */
+    source?: { name: string; url: string | null } | null
   }>(),
-  { active: false, favorite: false, later: false }
+  { active: false, favorite: false, later: false, source: null }
 )
 
 const emit = defineEmits<{
@@ -286,6 +297,26 @@ const confText = computed(() => (props.event.src_count <= 1 ? '孤证' : `${prop
 .glab, .dims {
   font-size: var(--gd-fs-pill);
   color: var(--gd-ink3);
+}
+.src {
+  font-size: var(--gd-fs-pill);
+  color: var(--gd-ink2);
+  max-width: 148px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.orig {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 4px;
+  font-size: var(--gd-fs-pill);
+  color: var(--gd-brand);
+  text-decoration: none;
+}
+.orig:hover {
+  text-decoration: underline;
 }
 .acts {
   display: flex;

@@ -4,20 +4,6 @@
 -->
 <template>
   <div class="mbview">
-    <div class="p-sec"><div class="h">二级入口</div></div>
-    <div class="entries">
-      <button
-        v-for="entry in ENTRIES"
-        :key="entry.key"
-        type="button"
-        class="entry"
-        @click="emit('navigate', entry.key)"
-      >
-        <b>{{ entry.label }}</b>
-        <span class="gd-mono">{{ entry.desc }}</span>
-      </button>
-    </div>
-
     <div class="p-sec">
       <div class="h">L0 · 今日必看 <b class="gd-mono">{{ l0.length }}</b></div>
     </div>
@@ -34,6 +20,15 @@
       <div class="ft">
         <span>{{ fmtAgo(item.ts_published || item.ts_first_seen) }}</span>
         <span>{{ item.src_count }} 路源</span>
+        <span v-if="sourceOf(item.id)" class="src">{{ sourceOf(item.id)?.name }}</span>
+        <a
+          v-if="sourceOf(item.id)?.url"
+          class="orig"
+          :href="sourceOf(item.id)?.url ?? undefined"
+          target="_blank"
+          rel="noopener"
+          @click.stop
+        >原文 ↗</a>
       </div>
       <div class="row" @click.stop>
         <button type="button" @click="openDetail(item.id)">详情</button>
@@ -43,7 +38,7 @@
     </article>
 
     <p v-if="l0.length" class="end gd-mono">以上是今日全部必看</p>
-    <GapEmptyState v-if="!ranked.length" type="empty" />
+    <GapEmptyState v-if="!top14.length" type="empty" />
 
     <template v-if="rest.length">
       <div class="p-sec"><div class="h">L1 / L2 · 按评分排序 <b class="gd-mono">{{ rest.length }}</b></div></div>
@@ -54,9 +49,36 @@
           <span class="gd-mono score">{{ item.gap }}</span>
         </div>
         <div class="ttl">{{ item.title }}</div>
-        <div class="ft"><span>{{ item.tier }}</span><span>{{ fmtAgo(item.ts_published || item.ts_first_seen) }}</span></div>
+        <div class="ft">
+          <span>{{ item.tier }}</span>
+          <span>{{ fmtAgo(item.ts_published || item.ts_first_seen) }}</span>
+          <span v-if="sourceOf(item.id)" class="src">{{ sourceOf(item.id)?.name }}</span>
+          <a
+            v-if="sourceOf(item.id)?.url"
+            class="orig"
+            :href="sourceOf(item.id)?.url ?? undefined"
+            target="_blank"
+            rel="noopener"
+            @click.stop
+          >原文 ↗</a>
+        </div>
       </article>
     </template>
+
+    <!-- 统计与入口不该挡在「差」前面：二级入口整块下移 -->
+    <div class="p-sec"><div class="h">二级入口</div></div>
+    <div class="entries">
+      <button
+        v-for="entry in ENTRIES"
+        :key="entry.key"
+        type="button"
+        class="entry"
+        @click="emit('navigate', entry.key)"
+      >
+        <b>{{ entry.label }}</b>
+        <span class="gd-mono">{{ entry.desc }}</span>
+      </button>
+    </div>
   </div>
 </template>
 
@@ -69,7 +91,7 @@ import { GAP_OPEN_DETAIL_KEY, useGapDesk } from '../../../composables/useGapDesk
 import { fmtAgo } from '../../../utils/gapdeskFormat'
 import type { GapInd } from '../../../types/gapdesk'
 
-const { ranked, favorites, laterIds, toggleLater, toggleFavoriteEvent } = useGapDesk()
+const { top14, favorites, laterIds, toggleLater, toggleFavoriteEvent, firstSourceOf } = useGapDesk()
 const openDetail = inject(GAP_OPEN_DETAIL_KEY, (_id: number) => {})
 const emit = defineEmits<{ navigate: [key: string] }>()
 
@@ -82,8 +104,21 @@ const ENTRIES = [
   { key: 'm-ai', label: 'AI', desc: '权重与引用' }
 ] as const
 
-const l0 = computed(() => ranked.value.filter((item) => item.tier === 'L0'))
-const rest = computed(() => ranked.value.filter((item) => item.tier !== 'L0'))
+const l0 = computed(() => top14.value.filter((item) => item.tier === 'L0'))
+const rest = computed(() => top14.value.filter((item) => item.tier !== 'L0'))
+
+/** 首触来源（谁先报），只取 feed 里真实带回的证据链；没有就返回 null */
+const sourceMap = computed<Map<number, { name: string; url: string | null }>>(() => {
+  const map = new Map<number, { name: string; url: string | null }>()
+  for (const item of top14.value) {
+    const row = firstSourceOf.value(item.id)
+    if (row?.source_name) map.set(item.id, { name: row.source_name, url: row.url })
+  }
+  return map
+})
+function sourceOf(id: number): { name: string; url: string | null } | null {
+  return sourceMap.value.get(id) ?? null
+}
 
 const indColor = (ind: GapInd): string => GAP_IND_MAP[ind]?.color ?? 'var(--gd-ink3)'
 const indLabel = (ind: GapInd): string => GAP_IND_MAP[ind]?.label ?? '未分类'
@@ -176,5 +211,26 @@ const indLabel = (ind: GapInd): string => GAP_IND_MAP[ind]?.label ?? '未分类'
   font-size: var(--gd-fs-pill);
   color: var(--gd-ink3);
   padding: 4px 0;
+}
+/* 来源与原文：真实数据才渲染；原文链接给足 44px 触控高度 */
+.ft {
+  flex-wrap: wrap;
+  row-gap: 2px;
+}
+.src {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--gd-ink2);
+}
+.orig {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 4px;
+  color: var(--gd-brand);
+  font-family: var(--gd-mono);
+  text-decoration: none;
 }
 </style>

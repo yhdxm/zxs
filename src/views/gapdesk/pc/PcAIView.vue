@@ -86,7 +86,7 @@ import {
 } from '../../../config/gapdeskConfig'
 import { GAP_OPEN_DETAIL_KEY, useGapDesk } from '../../../composables/useGapDesk'
 
-const { ranked, tierCounts, lagMedianDays, health, dailyBriefText } = useGapDesk()
+const { ranked, tierCounts, lagMedianHours, health, dailyBriefText } = useGapDesk()
 const openDetail = inject(GAP_OPEN_DETAIL_KEY, (_id: number) => {})
 
 const SUGGESTS = ['孤证为什么降权？', '时差中位怎么取？', 'L0 是怎么分的？'] as const
@@ -94,7 +94,7 @@ const SUGGESTS = ['孤证为什么降权？', '时差中位怎么取？', 'L0 �
 const contextChips = computed<string[]>(() => [
   `L0 ${tierCounts.value.L0}`,
   `样本 ${ranked.value.length}`,
-  `时差 ${lagMedianDays.value === null ? '—' : lagMedianDays.value} 天`,
+  `时差 ${lagMedianHours.value === null ? '—' : lagMedianHours.value} 小时`,
   `信源 ${health.value.ok}/${health.value.total}`
 ])
 

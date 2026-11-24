@@ -9,7 +9,7 @@
     <div class="stats">
       <div><b class="gd-mono">—</b><span>兑现率 · {{ EMPTY_ECHO }}</span></div>
       <div><b class="gd-mono">{{ sampleN }}</b><span>有效样本 N（L0+L1）</span></div>
-      <div><b class="gd-mono">{{ lagMedianDays === null ? '—' : lagMedianDays }}</b><span>时差中位（天）</span></div>
+      <div><b class="gd-mono">{{ lagMedianHours === null ? '—' : lagMedianHours }}</b><span>时差中位（小时）</span></div>
       <div><b class="gd-mono">积累中</b><span>待验证队列</span></div>
     </div>
 
@@ -40,7 +40,7 @@ import { computed } from 'vue'
 import { EMPTY_ECHO, EMPTY_ECHO_RULE } from '../../../config/gapdeskConfig'
 import { useGapDesk } from '../../../composables/useGapDesk'
 
-const { ranked, lagMedianDays, stats } = useGapDesk()
+const { ranked, lagMedianHours, stats } = useGapDesk()
 const emit = defineEmits<{ navigate: [key: string] }>()
 const sampleN = computed(() => ranked.value.filter((row) => row.tier === 'L0' || row.tier === 'L1').length)
 </script>

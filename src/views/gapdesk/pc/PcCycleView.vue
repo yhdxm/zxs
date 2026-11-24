@@ -86,7 +86,7 @@ const GRANS: ReadonlyArray<{ key: Gran; label: string }> = [
 ]
 const WEEKDAYS = ['一', '二', '三', '四', '五', '六', '日'] as const
 
-const { supplyByDay, byIndustry, lagMedianDays } = useGapDesk()
+const { supplyByDay, byIndustry, lagMedianHours } = useGapDesk()
 const gran = ref<Gran>('day')
 
 function keyOf(ts: number): string {
@@ -171,7 +171,7 @@ const conclusions = computed(() => {
   const last = supplyByDay.value[supplyByDay.value.length - 1]
   return [
     { label: '行业结构', text: active ? `${active.label} ${active.count} 条` : EMPTY_GENERIC },
-    { label: '时差结构', text: lagMedianDays.value === null ? EMPTY_WAIT : `${lagMedianDays.value} 天` },
+    { label: '时差结构', text: lagMedianHours.value === null ? EMPTY_WAIT : `${lagMedianHours.value} 小时` },
     { label: '回打进度', text: EMPTY_ECHO },
     {
       label: '供给跨度',

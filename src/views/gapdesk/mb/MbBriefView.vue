@@ -9,7 +9,7 @@
     <div class="stats">
       <div><b class="gd-mono">{{ tierCounts.L0 }}</b><span>L0 · 必看</span></div>
       <div><b class="gd-mono">{{ tierCounts.L1 }}</b><span>L1 · 关注</span></div>
-      <div><b class="gd-mono">{{ lagMedianDays === null ? '—' : lagMedianDays }}</b><span>时差中位（天）</span></div>
+      <div><b class="gd-mono">{{ lagMedianHours === null ? '—' : lagMedianHours }}</b><span>时差中位（小时）</span></div>
       <div><b class="gd-mono">—</b><span>兑现率 · {{ EMPTY_ECHO }}</span></div>
     </div>
 
@@ -53,7 +53,7 @@ import { EMPTY_ECHO, EMPTY_GENERIC, EMPTY_LLM, GAP_IND, GAP_IND_MAP } from '../.
 import { GAP_OPEN_DETAIL_KEY, useGapDesk } from '../../../composables/useGapDesk'
 import type { GapInd } from '../../../types/gapdesk'
 
-const { ranked, tierCounts, byIndustry, lagMedianDays, dailyBriefText } = useGapDesk()
+const { ranked, tierCounts, byIndustry, lagMedianHours, dailyBriefText } = useGapDesk()
 const openDetail = inject(GAP_OPEN_DETAIL_KEY, (_id: number) => {})
 /** 返回复用宿主 navigate 通道，不新造路由 */
 const emit = defineEmits<{ navigate: [key: string] }>()

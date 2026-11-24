@@ -54,6 +54,7 @@ import { parsePurgeResult } from '../src/services/gapdeskService'
 import GapTopbar from '../src/components/gapdesk/GapTopbar.vue'
 import GapMobileShell from '../src/components/gapdesk/GapMobileShell.vue'
 import GapPurgeConfirm from '../src/components/gapdesk/GapPurgeConfirm.vue'
+import PcLatestView from '../src/views/gapdesk/pc/PcLatestView.vue'
 import {
   DEFAULT_ROLE_CONFIG,
   PERMISSION_TREE,
@@ -61,7 +62,13 @@ import {
   type PermissionNode
 } from '../src/services/appDataService'
 import router from '../src/router'
-import type { GapEventRow, GapRuleRow, GapSourceRow } from '../src/types/gapdesk'
+import type {
+  GapEventRow,
+  GapEventSourceRow,
+  GapPlatformRow,
+  GapRuleRow,
+  GapSourceRow
+} from '../src/types/gapdesk'
 
 /* ---------- service 可切换桩 ----------
    「规则读取成功但 0 条」与「读失败」是两条不同分支（useGapDesk.loadUserState），
@@ -1224,5 +1231,125 @@ describe('顶栏对齐 PageHeader 与移动端触控（UI 打磨回归）', () =
     // 媒体查询之外，PC 仍是 32px 终端风
     const outside = css.replace(touch, '')
     expect(outside).toMatch(/\.gd-nav[^{]*\{[^}]*height:[ ]*32px/)
+  })
+})
+
+describe('useGapDesk.lagMedianHours · 小时口径（不再用天）', () => {
+  function platformRow(id: number, eventId: number, touchTs: number): GapPlatformRow {
+    return {
+      id,
+      event_id: eventId,
+      platform: `p${id}`,
+      first_touch_ts: touchTs,
+      heat: 1,
+      updated_at: ''
+    }
+  }
+
+  it('奇数样本取中位、保留一位小数（6.25 小时 → 6.3，不再是 0.26 天）', () => {
+    store.events.value = [makeEvent({ id: 1, gap: 90 })]
+    store.platforms.value = [
+      platformRow(1, 1, 1_000),
+      platformRow(2, 1, 1_000 + 6.25 * 3600_000)
+    ]
+    expect(store.lagMedianHours.value).toBe(6.3)
+  })
+
+  it('偶数样本取中间两值均值并保留一位小数（6h 与 9h → 7.5）', () => {
+    store.events.value = [
+      makeEvent({ id: 1, gap: 90 }),
+      makeEvent({ id: 2, gap: 80 })
+    ]
+    store.platforms.value = [
+      platformRow(1, 1, 0 + 1_000),
+      platformRow(2, 1, 6 * 3600_000 + 1_000),
+      platformRow(3, 2, 1_000),
+      platformRow(4, 2, 9 * 3600_000 + 1_000)
+    ]
+    expect(store.lagMedianHours.value).toBe(7.5)
+  })
+
+  it('无有效样本返回 null，不返回 0 冒充真值', () => {
+    store.events.value = [makeEvent({ id: 1, gap: 90 })]
+    store.platforms.value = [platformRow(1, 1, 1_000)]
+    expect(store.lagMedianHours.value).toBeNull()
+  })
+})
+
+describe('useGapDesk.top14 · 今日 14 条硬上限走 ranked 口径', () => {
+  it('20 条池子只切 14 条，且带 ranked 的 tier/rank、按 gap 降序', () => {
+    store.events.value = Array.from({ length: 20 }, (_, i) => makeEvent({ id: i + 1, gap: 100 - i }))
+    expect(store.top14.value.length).toBe(14)
+    expect(store.top14.value[0]?.id).toBe(1)
+    expect(store.top14.value[0]?.tier).toBe('L0')
+    expect(store.top14.value[0]?.rank).toBe(1)
+    // 不再是「重新排一次 pool」，与 ranked 前 14 条逐项一致
+    expect(store.top14.value.map((e) => e.id)).toEqual(store.ranked.value.slice(0, 14).map((e) => e.id))
+  })
+
+  it('同分沿用 ranked 的 ts_first_seen 次级排序，不重新排一次', () => {
+    store.events.value = [
+      makeEvent({ id: 1, gap: 90, ts_first_seen: 2_000 }),
+      makeEvent({ id: 2, gap: 90, ts_first_seen: 1_000 })
+    ]
+    expect(store.top14.value.map((e) => e.id)).toEqual(store.ranked.value.map((e) => e.id))
+  })
+})
+
+describe('useGapDesk.firstSourceOf · 首触来源取 publish_ts 最小', () => {
+  function evidence(over: Partial<GapEventSourceRow> & { id: number; event_id: number }): GapEventSourceRow {
+    return {
+      source_name: null,
+      layer: null,
+      url: null,
+      publish_ts: null,
+      heat: null,
+      ...over
+    } as GapEventSourceRow
+  }
+
+  it('同事件取最早一条；null 时间排到最后；无证据返回 null', () => {
+    store.evidences.value = [
+      evidence({ id: 1, event_id: 7, source_name: '晚到的', publish_ts: 2_000 }),
+      evidence({ id: 2, event_id: 7, source_name: '最早报的', publish_ts: 1_000, url: 'https://a' }),
+      evidence({ id: 3, event_id: 8, source_name: '无时间', publish_ts: null }),
+      evidence({ id: 4, event_id: 8, source_name: '有时间', publish_ts: 500 })
+    ]
+    expect(store.firstSourceOf.value(7)?.source_name).toBe('最早报的')
+    expect(store.firstSourceOf.value(7)?.url).toBe('https://a')
+    expect(store.firstSourceOf.value(8)?.source_name).toBe('有时间')
+    expect(store.firstSourceOf.value(999)).toBeNull()
+  })
+
+  it('evidences 为空时必须返回 null，不许编造来源', () => {
+    store.evidences.value = []
+    expect(store.firstSourceOf.value(7)).toBeNull()
+  })
+})
+
+describe('PcLatestView · 首屏是事件、来源与原文来自真数据', () => {
+  it('Hero 统计块在事件卡之后；卡片渲染来源名与原文链接', () => {
+    store.events.value = [makeEvent({ id: 1, gap: 92, src_count: 3 })]
+    store.evidences.value = [
+      {
+        id: 1,
+        event_id: 1,
+        source_name: '路透社',
+        layer: 'main',
+        url: 'https://example.com/a',
+        publish_ts: 1_000,
+        heat: 1
+      } as GapEventSourceRow
+    ]
+    const wrapper = mount(PcLatestView)
+    const html = wrapper.html()
+    expect(html).toContain('路透社')
+    expect(html).toContain('href="https://example.com/a"')
+    // 首屏第一眼是事件卡，不是统计：hero 必须排在第一个 gcard 之后
+    const firstCard = html.indexOf('gd-gcard')
+    const hero = html.indexOf('class="hero"')
+    expect(firstCard).toBeGreaterThan(-1)
+    expect(hero).toBeGreaterThan(firstCard)
+    wrapper.unmount()
   })
 })
