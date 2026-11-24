@@ -1354,33 +1354,6 @@ describe('PcLatestView · 首屏是事件、来源与原文来自真数据', () 
   })
 })
 
-describe('PcLatestView · 日期胶囊筛空时必须给空态（top14 收口回归）', () => {
-  it('池子有数据但 dateBand 把 14 条全筛掉时，显示窗口口径空态而不是纯白列表', () => {
-    const today = Date.now()
-    const d = new Date()
-    const yesterday = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate() - 1).padStart(2, '0')}`
-    store.events.value = [makeEvent({ id: 1, gap: 92, ts_published: today })]
-    store.filters.dateBand = yesterday
-
-    const wrapper = mount(PcLatestView)
-    const html = wrapper.html()
-    expect(wrapper.findAll('.gd-gcard').length).toBe(0)
-    expect(wrapper.text()).toContain(EMPTY_WINDOW)
-    // 统计卡仍在（只是移到末尾），空态不该把 hero 一起吞掉
-    expect(html).toContain('class="hero"')
-    wrapper.unmount()
-  })
-
-  it('不筛日期时同样一条数据能正常出卡，空态不误报', () => {
-    store.events.value = [makeEvent({ id: 1, gap: 92, ts_published: Date.now() })]
-    store.filters.dateBand = ''
-    const wrapper = mount(PcLatestView)
-    expect(wrapper.findAll('.gd-gcard').length).toBe(1)
-    expect(wrapper.text()).not.toContain(EMPTY_WINDOW)
-    wrapper.unmount()
-  })
-})
-
 describe('PcLatestView · 14 条上限作用在筛选后的集合（dateBand 回归）', () => {
   function dayKey(offset: number): string {
     const d = new Date()
@@ -1394,49 +1367,46 @@ describe('PcLatestView · 14 条上限作用在筛选后的集合（dateBand 回
     return d.getTime()
   }
 
-  /** 14 条今天的高分 + 3 条 3 天前的低分（必然排在 14 名之外） */
+  /** 15 条今天的高分 + 1 条昨天的低分（必然排在 15 名之外，top14 里不含它） */
   function seed(): void {
     store.events.value = [
-      ...Array.from({ length: 14 }, (_, i) => makeEvent({ id: i + 1, gap: 100 - i, ts_published: dayTs(0) })),
-      makeEvent({ id: 101, gap: 10, ts_published: dayTs(-1) }),
-      makeEvent({ id: 102, gap: 9, ts_published: dayTs(-1) }),
-      makeEvent({ id: 103, gap: 8, ts_published: dayTs(-1) })
+      ...Array.from({ length: 15 }, (_, i) => makeEvent({ id: i + 1, gap: 100 - i, ts_published: dayTs(0) })),
+      makeEvent({ id: 101, gap: 10, title: '昨天那条低分事件', ts_published: dayTs(-1) })
     ]
   }
 
-  it('选昨天：在该日期池内取前 14，能出 3 条（改动前是 0 条白屏）', () => {
-    seed()
-    store.filters.dateBand = dayKey(-1)
-    const wrapper = mount(PcLatestView)
-    expect(wrapper.findAll('.gd-gcard').length).toBe(3)
-    expect(wrapper.text()).not.toContain(EMPTY_WINDOW)
-    wrapper.unmount()
-  })
-
-  it('不选日期：仍只出今日 14 条，一条不多', () => {
+  it('不设 dateBand 出今日 14 条；设成昨天后出那 1 条真实事件（不是 0 条 + 撒谎空态）', () => {
     seed()
     store.filters.dateBand = ''
+    const all = mount(PcLatestView)
+    expect(all.findAll('.gd-gcard').length).toBe(14)
+    all.unmount()
+
+    store.filters.dateBand = dayKey(-1)
+    const one = mount(PcLatestView)
+    const cards = one.findAll('.gd-gcard')
+    expect(cards.length).toBe(1)
+    expect(cards[0].text()).toContain('昨天那条低分事件')
+    expect(one.text()).not.toContain(EMPTY_WINDOW)
+    one.unmount()
+  })
+
+  it('选中池里完全没有事件的日期：0 条 + 空态（这才是空态该管的场景）', () => {
+    seed()
+    store.filters.dateBand = dayKey(-9)
     const wrapper = mount(PcLatestView)
-    expect(wrapper.findAll('.gd-gcard').length).toBe(14)
+    expect(wrapper.findAll('.gd-gcard').length).toBe(0)
+    expect(wrapper.text()).toContain(EMPTY_WINDOW)
     wrapper.unmount()
   })
 
-  it('选中日期池内超过 14 条时，也只出 14 条（硬上限不放宽）', () => {
+  it('选中日期池内 20 条时仍只出 14 条（硬上限不因筛选放宽）', () => {
     store.events.value = Array.from({ length: 20 }, (_, i) =>
       makeEvent({ id: i + 1, gap: 100 - i, ts_published: dayTs(-1) })
     )
     store.filters.dateBand = dayKey(-1)
     const wrapper = mount(PcLatestView)
     expect(wrapper.findAll('.gd-gcard').length).toBe(14)
-    wrapper.unmount()
-  })
-
-  it('选中日期池内 0 条（该日无事件）时，空态如实出现且文案是窗口口径', () => {
-    seed()
-    store.filters.dateBand = dayKey(-9)
-    const wrapper = mount(PcLatestView)
-    expect(wrapper.findAll('.gd-gcard').length).toBe(0)
-    expect(wrapper.text()).toContain(EMPTY_WINDOW)
     wrapper.unmount()
   })
 })
