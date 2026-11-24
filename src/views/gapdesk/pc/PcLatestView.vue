@@ -1,13 +1,14 @@
 <!--
   PC-01 最新信息
-  数据来源：store 的 top14（今日前 14 条硬上限）/ tierCounts / lagMedianHours / filters.dateBand。
+  数据来源：store 的 top14 / ranked / tierCounts / lagMedianHours / filters.dateBand。
+  14 条硬上限作用在「筛选后的集合」上：选具体日期时在该日期池内重新取前 14，
+  不是「全池取 14 再筛日期」——后者在昨天事件排 14 名开外时会筛成空列表。
   日期带与筛选由外壳统一提供。首屏是事件流，Hero 五卡放列表末尾（统计不该挡住「差」）。
 -->
 <template>
   <div class="pcview">
-    <!-- 首屏第一眼必须是事件卡，不是统计：Hero 五卡移到列表末尾。
-         池子非空但被日期胶囊筛空时也要给空态，否则只剩统计卡、列表纯白 -->
-    <GapEmptyState v-if="!top14.length || totalShown === 0" type="empty" :desc="EMPTY_WINDOW" />
+    <!-- 首屏第一眼必须是事件卡，不是统计：Hero 五卡移到列表末尾 -->
+    <GapEmptyState v-if="!displayList.length" type="empty" :desc="EMPTY_WINDOW" />
 
     <template v-else v-for="section in sections" :key="section.key">
       <template v-if="eventsOf(section.key).length">
@@ -46,15 +47,16 @@ import GapEmptyState from '../../../components/gapdesk/GapEmptyState.vue'
 import GapEventCard from '../../../components/gapdesk/GapEventCard.vue'
 import { EMPTY_ECHO, EMPTY_WINDOW } from '../../../config/gapdeskConfig'
 import { GAP_OPEN_DETAIL_KEY, useGapDesk } from '../../../composables/useGapDesk'
-import type { GapEventRow } from '../../../types/gapdesk'
+import type { GapEventRow, RankedEvent } from '../../../types/gapdesk'
 
-const { top14, tierCounts, lagMedianHours, filters, favorites, laterIds, toggleLater, toggleFavoriteEvent, firstSourceOf } = useGapDesk()
+// ranked 是有意保留的：选了具体日期时要在该日期池内重新取前 14，不能只靠 top14
+const { ranked, top14, tierCounts, lagMedianHours, filters, favorites, laterIds, toggleLater, toggleFavoriteEvent, firstSourceOf } = useGapDesk()
 const openDetail = inject(GAP_OPEN_DETAIL_KEY, (_id: number) => {})
 
 /** 卡片要的是 {name,url}；没有来源名就返回 null，卡片不占位也不编造 */
 const sourceMap = computed<Map<number, { name: string; url: string | null }>>(() => {
   const map = new Map<number, { name: string; url: string | null }>()
-  for (const item of top14.value) {
+  for (const item of displayList.value) {
     const row = firstSourceOf.value(item.id)
     if (row?.source_name) map.set(item.id, { name: row.source_name, url: row.url })
   }
@@ -89,14 +91,18 @@ const sections = [
   { key: 'unknown', label: '时间未知' }
 ] as const
 
-const eventsOf = computed(() => (key: string) =>
-  top14.value.filter(
-    (event) => inSection(event, key) && (!filters.dateBand || filters.dateBand === bandKeyOf(event))
-  )
-)
+/**
+ * 展示集合：14 条硬上限作用在「筛选后的集合」上。
+ * 无日期筛选 = 今日前 14；选了具体日期 = 该日期池内重新取前 14。
+ * 先全池取 14 再筛日期，会在「昨天事件排在 14 名开外」时筛成空列表。
+ */
+const displayList = computed<RankedEvent[]>(() => {
+  if (!filters.dateBand) return top14.value
+  return ranked.value.filter((event) => bandKeyOf(event) === filters.dateBand).slice(0, 14)
+})
 
-/** 四段实际渲染条数之和：为 0 时说明当前日期胶囊把 14 条全筛掉了，必须给空态而不是留白 */
-const totalShown = computed<number>(() =>
-  sections.reduce((sum, section) => sum + eventsOf.value(section.key).length, 0)
+/** 分段只做分流，日期筛选已经在 displayList 里做完了 */
+const eventsOf = computed(() => (key: string) =>
+  displayList.value.filter((event) => inSection(event, key))
 )
 </script>

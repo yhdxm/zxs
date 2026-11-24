@@ -1380,3 +1380,63 @@ describe('PcLatestView · 日期胶囊筛空时必须给空态（top14 收口回
     wrapper.unmount()
   })
 })
+
+describe('PcLatestView · 14 条上限作用在筛选后的集合（dateBand 回归）', () => {
+  function dayKey(offset: number): string {
+    const d = new Date()
+    d.setDate(d.getDate() + offset)
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  }
+  function dayTs(offset: number): number {
+    const d = new Date()
+    d.setDate(d.getDate() + offset)
+    d.setHours(10, 0, 0, 0)
+    return d.getTime()
+  }
+
+  /** 14 条今天的高分 + 3 条 3 天前的低分（必然排在 14 名之外） */
+  function seed(): void {
+    store.events.value = [
+      ...Array.from({ length: 14 }, (_, i) => makeEvent({ id: i + 1, gap: 100 - i, ts_published: dayTs(0) })),
+      makeEvent({ id: 101, gap: 10, ts_published: dayTs(-1) }),
+      makeEvent({ id: 102, gap: 9, ts_published: dayTs(-1) }),
+      makeEvent({ id: 103, gap: 8, ts_published: dayTs(-1) })
+    ]
+  }
+
+  it('选昨天：在该日期池内取前 14，能出 3 条（改动前是 0 条白屏）', () => {
+    seed()
+    store.filters.dateBand = dayKey(-1)
+    const wrapper = mount(PcLatestView)
+    expect(wrapper.findAll('.gd-gcard').length).toBe(3)
+    expect(wrapper.text()).not.toContain(EMPTY_WINDOW)
+    wrapper.unmount()
+  })
+
+  it('不选日期：仍只出今日 14 条，一条不多', () => {
+    seed()
+    store.filters.dateBand = ''
+    const wrapper = mount(PcLatestView)
+    expect(wrapper.findAll('.gd-gcard').length).toBe(14)
+    wrapper.unmount()
+  })
+
+  it('选中日期池内超过 14 条时，也只出 14 条（硬上限不放宽）', () => {
+    store.events.value = Array.from({ length: 20 }, (_, i) =>
+      makeEvent({ id: i + 1, gap: 100 - i, ts_published: dayTs(-1) })
+    )
+    store.filters.dateBand = dayKey(-1)
+    const wrapper = mount(PcLatestView)
+    expect(wrapper.findAll('.gd-gcard').length).toBe(14)
+    wrapper.unmount()
+  })
+
+  it('选中日期池内 0 条（该日无事件）时，空态如实出现且文案是窗口口径', () => {
+    seed()
+    store.filters.dateBand = dayKey(-9)
+    const wrapper = mount(PcLatestView)
+    expect(wrapper.findAll('.gd-gcard').length).toBe(0)
+    expect(wrapper.text()).toContain(EMPTY_WINDOW)
+    wrapper.unmount()
+  })
+})
