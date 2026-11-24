@@ -55,6 +55,7 @@ import GapTopbar from '../src/components/gapdesk/GapTopbar.vue'
 import GapMobileShell from '../src/components/gapdesk/GapMobileShell.vue'
 import GapPurgeConfirm from '../src/components/gapdesk/GapPurgeConfirm.vue'
 import PcLatestView from '../src/views/gapdesk/pc/PcLatestView.vue'
+import MbLatestView from '../src/views/gapdesk/mb/MbLatestView.vue'
 import {
   DEFAULT_ROLE_CONFIG,
   PERMISSION_TREE,
@@ -1408,5 +1409,100 @@ describe('PcLatestView · 14 条上限作用在筛选后的集合（dateBand 回
     const wrapper = mount(PcLatestView)
     expect(wrapper.findAll('.gd-gcard').length).toBe(14)
     wrapper.unmount()
+  })
+})
+
+
+describe('移动端日期胶囊 · 与 PC 同口径接通 dateBand', () => {
+  function dayKey(offset: number): string {
+    const d = new Date()
+    d.setDate(d.getDate() + offset)
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  }
+  /** 胶囊显示的是 M-DD（不带年份），点击时要按它找到对应按钮 */
+  function pillLabel(offset: number): string {
+    const d = new Date()
+    d.setDate(d.getDate() + offset)
+    return `${d.getMonth() + 1}-${String(d.getDate()).padStart(2, '0')}`
+  }
+  function dayTs(offset: number): number {
+    const d = new Date()
+    d.setDate(d.getDate() + offset)
+    d.setHours(10, 0, 0, 0)
+    return d.getTime()
+  }
+  /** 15 条今天高分 + 1 条昨天低分（排 15 名外，top14 不含它） */
+  function seed(): void {
+    store.events.value = [
+      ...Array.from({ length: 15 }, (_, i) => makeEvent({ id: i + 1, gap: 100 - i, ts_published: dayTs(0) })),
+      makeEvent({ id: 101, gap: 10, title: '昨天那条低分事件', ts_published: dayTs(-1) })
+    ]
+  }
+
+  it('MbLatestView 同口径：不设日期 14 条，设昨天 1 条', () => {
+    seed()
+    store.filters.dateBand = ''
+    const all = mount(MbLatestView)
+    expect(all.findAll('.p-card').length).toBe(14)
+    all.unmount()
+
+    store.filters.dateBand = dayKey(-1)
+    const one = mount(MbLatestView)
+    const cards = one.findAll('.p-card')
+    expect(cards.length).toBe(1)
+    expect(cards[0].text()).toContain('昨天那条低分事件')
+    expect(one.text()).not.toContain(EMPTY_WINDOW)
+    // 筛选了具体日期时不能再说「今日」——那句会撒谎；本用例那条是 L2，无收尾语
+    expect(one.text()).not.toContain('以上是今日全部必看')
+    one.unmount()
+  })
+
+  it('筛选日期且有必看条目时，收尾语换成「该日期」而不是「今日」', () => {
+    store.events.value = [makeEvent({ id: 1, gap: 90, ts_published: dayTs(-1) })]
+    store.filters.dateBand = dayKey(-1)
+    const wrapper = mount(MbLatestView)
+    expect(wrapper.text()).toContain('以上是该日期全部必看')
+    expect(wrapper.text()).not.toContain('以上是今日全部必看')
+    wrapper.unmount()
+  })
+
+  it('点胶囊写 filters.dateBand，再点一次取消（toggle）', async () => {
+    seed()
+    store.filters.dateBand = ''
+    const wrapper = mount(GapMobileShell)
+    const pill = wrapper.findAll('.gds-pill').find((p) => p.text().includes(pillLabel(-1)))
+    expect(pill).toBeTruthy()
+    await pill!.trigger('click')
+    expect(store.filters.dateBand).toBe(dayKey(-1))
+    await pill!.trigger('click')
+    expect(store.filters.dateBand).toBe('')
+    wrapper.unmount()
+  })
+
+  it('高亮只有单一数据源：filters.dateBand 决定胶囊 on 态', async () => {
+    seed()
+    store.filters.dateBand = dayKey(-1)
+    const wrapper = mount(GapMobileShell)
+    const on = wrapper.findAll('.gds-pill.on')
+    expect(on.length).toBe(1)
+    expect(on[0].text()).toContain(pillLabel(-1))
+
+    // 外部改 store，高亮跟着变（证明不是本地 ref 碰巧相同）
+    store.filters.dateBand = ''
+    await nextTick()
+    expect(wrapper.findAll('.gds-pill.on').length).toBe(0)
+    wrapper.unmount()
+  })
+
+  it('PC 与 MB 在同样数据 + 同样 dateBand 下渲染条数一致', () => {
+    seed()
+    for (const band of ['', dayKey(-1)]) {
+      store.filters.dateBand = band
+      const pc = mount(PcLatestView)
+      const mb = mount(MbLatestView)
+      expect(mb.findAll('.p-card').length).toBe(pc.findAll('.gd-gcard').length)
+      pc.unmount()
+      mb.unmount()
+    }
   })
 })

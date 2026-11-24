@@ -165,3 +165,21 @@ export function eventKeyOf(title: string): string {
   }
   return (hash >>> 0).toString(16)
 }
+
+/**
+ * 事件归日 key：live（1 小时内）/ today（今天更早）/ YYYY-MM-DD / unknown（源站无时间）。
+ * PC 最新信息的分段、移动端最新信息的分段、日期胶囊筛选必须共用这一份，
+ * 否则同一事件在两端会被分到不同日期、或筛出空列表。
+ */
+export function bandKeyOf(event: { ts_published: number }, nowMs: number = Date.now()): string {
+  if (!(event.ts_published > 0)) return 'unknown'
+  if (nowMs - event.ts_published < 3600_000) return 'live'
+  const d = new Date(event.ts_published)
+  const today = new Date(nowMs)
+  const sameDay =
+    d.getFullYear() === today.getFullYear() &&
+    d.getMonth() === today.getMonth() &&
+    d.getDate() === today.getDate()
+  if (sameDay) return 'today'
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}

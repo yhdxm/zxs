@@ -46,6 +46,7 @@ import { computed, inject } from 'vue'
 import GapEmptyState from '../../../components/gapdesk/GapEmptyState.vue'
 import GapEventCard from '../../../components/gapdesk/GapEventCard.vue'
 import { EMPTY_ECHO, EMPTY_WINDOW } from '../../../config/gapdeskConfig'
+import { bandKeyOf } from '../../../utils/gapdeskFormat'
 import { GAP_OPEN_DETAIL_KEY, useGapDesk } from '../../../composables/useGapDesk'
 import type { GapEventRow, RankedEvent } from '../../../types/gapdesk'
 
@@ -64,18 +65,6 @@ const sourceMap = computed<Map<number, { name: string; url: string | null }>>(()
 })
 function sourceOf(id: number): { name: string; url: string | null } | null {
   return sourceMap.value.get(id) ?? null
-}
-
-/** 与 store.dateBands 同一归日口径：live / today / YYYY-MM-DD / unknown */
-function bandKeyOf(event: GapEventRow): string {
-  if (!(event.ts_published > 0)) return 'unknown'
-  const now = Date.now()
-  if (now - event.ts_published < 3600_000) return 'live'
-  const d = new Date(event.ts_published)
-  const today = new Date()
-  const sameDay = d.getFullYear() === today.getFullYear() && d.getMonth() === today.getMonth() && d.getDate() === today.getDate()
-  if (sameDay) return 'today'
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
 function inSection(event: GapEventRow, key: string): boolean {

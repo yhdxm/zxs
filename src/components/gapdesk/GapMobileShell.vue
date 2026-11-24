@@ -81,16 +81,16 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed } from 'vue'
 import GapDateStrip from './GapDateStrip.vue'
 import { EMPTY_DEMO } from '../../config/gapdeskConfig'
 import { useGapDesk } from '../../composables/useGapDesk'
 
-const { dateBands, canPurge } = useGapDesk()
-/** 默认高亮「今天更早」胶囊（渐变紫底白字）；无当日数据时自然不高亮 */
-const activeBand = ref('today')
+const { dateBands, canPurge, filters } = useGapDesk()
+/** 高亮只从 store 的筛选派生，不允许有第二份本地状态（否则筛了日期再切视图会漂移） */
+const activeBand = computed<string>(() => filters.dateBand)
 function onPick(key: string): void {
-  activeBand.value = activeBand.value === key ? '' : key
+  filters.dateBand = filters.dateBand === key ? '' : key
 }
 
 interface MobileTab {

@@ -104,4 +104,10 @@ const emit = defineEmits<{ pick: [key: string] }>()
   color: var(--gd-ink3);
   white-space: nowrap;
 }
+/* 真机 / 粗指针：胶囊触控高度提到 44px（PC 保持 30px 紧凑条） */
+@media (max-width: 768px), (hover: none) and (pointer: coarse) {
+  .gds-pill {
+    min-height: 44px;
+  }
+}
 </style>

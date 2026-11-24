@@ -37,8 +37,8 @@
       </div>
     </article>
 
-    <p v-if="l0.length" class="end gd-mono">以上是今日全部必看</p>
-    <GapEmptyState v-if="!top14.length" type="empty" />
+    <p v-if="l0.length" class="end gd-mono">{{ filters.dateBand ? '以上是该日期全部必看' : '以上是今日全部必看' }}</p>
+    <GapEmptyState v-if="!displayList.length" type="empty" :desc="EMPTY_WINDOW" />
 
     <template v-if="rest.length">
       <div class="p-sec"><div class="h">L1 / L2 · 按评分排序 <b class="gd-mono">{{ rest.length }}</b></div></div>
@@ -86,12 +86,12 @@
 import { computed, inject } from 'vue'
 import GapDualTrack from '../../../components/gapdesk/GapDualTrack.vue'
 import GapEmptyState from '../../../components/gapdesk/GapEmptyState.vue'
-import { GAP_IND_MAP } from '../../../config/gapdeskConfig'
+import { EMPTY_WINDOW, GAP_IND_MAP } from '../../../config/gapdeskConfig'
 import { GAP_OPEN_DETAIL_KEY, useGapDesk } from '../../../composables/useGapDesk'
-import { fmtAgo } from '../../../utils/gapdeskFormat'
-import type { GapInd } from '../../../types/gapdesk'
+import { bandKeyOf, fmtAgo } from '../../../utils/gapdeskFormat'
+import type { GapInd, RankedEvent } from '../../../types/gapdesk'
 
-const { top14, favorites, laterIds, toggleLater, toggleFavoriteEvent, firstSourceOf } = useGapDesk()
+const { ranked, top14, filters, favorites, laterIds, toggleLater, toggleFavoriteEvent, firstSourceOf } = useGapDesk()
 const openDetail = inject(GAP_OPEN_DETAIL_KEY, (_id: number) => {})
 const emit = defineEmits<{ navigate: [key: string] }>()
 
@@ -104,13 +104,19 @@ const ENTRIES = [
   { key: 'm-ai', label: 'AI', desc: '权重与引用' }
 ] as const
 
-const l0 = computed(() => top14.value.filter((item) => item.tier === 'L0'))
-const rest = computed(() => top14.value.filter((item) => item.tier !== 'L0'))
+/** 与 PC-01 同口径：14 条硬上限作用在筛选后的集合上，不是「全池取 14 再筛日期」 */
+const displayList = computed<RankedEvent[]>(() => {
+  if (!filters.dateBand) return top14.value
+  return ranked.value.filter((event) => bandKeyOf(event) === filters.dateBand).slice(0, 14)
+})
+
+const l0 = computed(() => displayList.value.filter((item) => item.tier === 'L0'))
+const rest = computed(() => displayList.value.filter((item) => item.tier !== 'L0'))
 
 /** 首触来源（谁先报），只取 feed 里真实带回的证据链；没有就返回 null */
 const sourceMap = computed<Map<number, { name: string; url: string | null }>>(() => {
   const map = new Map<number, { name: string; url: string | null }>()
-  for (const item of top14.value) {
+  for (const item of displayList.value) {
     const row = firstSourceOf.value(item.id)
     if (row?.source_name) map.set(item.id, { name: row.source_name, url: row.url })
   }
