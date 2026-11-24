@@ -3,26 +3,33 @@
    ------------------------------------------------------------
    只负责「舞台铺满 + 三栏骨架 + 手机壳 + 响应式断点」。
    组件长相（胶囊 / 导航项 / 面板）在 components.css。
-   作用域原则：除 body.gd-fullbleed 这一组「拆外壳」覆盖外，
+   作用域原则：除 body.gd-fullbleed 这一组外壳覆盖（仅真机拆壳）外，
    其余选择器一律以 .gd-stage / .gd-mb-stage 开头。
    ============================================================ */
 
-/* ---------- 0. 拆掉 App.vue 的全局外壳（body 加类时生效） ----------
+/* ---------- 0. 外壳覆盖（body 加类时生效） ----------
    真实 DOM：#app > .app-shell.is-authed > .app-sidebar / .mobile-menu-fab /
    .app-main > .main-content.authed-main > router-view。
-   main.css 在 ≤768px 给表单控件加了 font-size:16px!important（防 iOS 聚焦缩放），
-   这里用更高特异性 + !important 还原到终端的紧凑字号。 */
-body.gd-fullbleed #app {
-  max-width: none;
-  margin: 0;
-}
-body.gd-fullbleed .app-shell.is-authed {
-  display: block;
-}
-body.gd-fullbleed .app-sidebar,
-body.gd-fullbleed .mobile-bottom-nav,
-body.gd-fullbleed .mobile-menu-fab {
-  display: none !important;
+
+   拆壳只在真机（≤768px）做：差值台自带 5 个底 tab 与安全区，不能和全局底栏叠加。
+   PC 端必须保留宿主侧栏与 #app 的 max-width —— 从侧栏点「差值」就把侧栏藏掉、
+   内容从 1600px 中央列突然铺满整屏，用户看到的就是「直接放大了」。
+
+   表单字号：紧凑字号只在 PC 还原；移动端保留 main.css 的 16px!important，
+   那是 iOS 聚焦不自动放大视口的保护，不能被 inherit 冲掉。 */
+@media (max-width: 768px) {
+  body.gd-fullbleed #app {
+    max-width: none;
+    margin: 0;
+  }
+  body.gd-fullbleed .app-shell.is-authed {
+    display: block;
+  }
+  body.gd-fullbleed .app-sidebar,
+  body.gd-fullbleed .mobile-bottom-nav,
+  body.gd-fullbleed .mobile-menu-fab {
+    display: none !important;
+  }
 }
 body.gd-fullbleed .app-main,
 body.gd-fullbleed .main-content {
@@ -30,15 +37,19 @@ body.gd-fullbleed .main-content {
   height: 100dvh;
   overflow: hidden;
 }
-body.gd-fullbleed input,
-body.gd-fullbleed select,
-body.gd-fullbleed textarea {
-  font-size: inherit !important;
+@media (min-width: 769px) {
+  body.gd-fullbleed input,
+  body.gd-fullbleed select,
+  body.gd-fullbleed textarea {
+    font-size: inherit !important;
+  }
 }
 
 /* ---------- 1. 舞台：铺满视口，零圆角零阴影，不缩稿 ---------- */
 .gd-stage {
-  width: 100vw;
+  /* 100% 而非 100vw：100vw 计入纵向滚动条宽度，会让布局视口比可视区更宽，
+     在移动 WebView 里触发自动缩放；父级 .main-content 已铺满，100% 就是全宽 */
+  width: 100%;
   height: 100dvh;
   display: flex;
   flex-direction: column;
@@ -256,7 +267,7 @@ body.gd-fullbleed textarea {
 @media (max-width: 768px) {
   .gd-stage-mb { padding: 0; background: var(--gd-bg); }
   .gd-mb-stage {
-    width: 100vw;
+    width: 100%;
     height: 100dvh;
     max-height: none;
     border-radius: 0;

@@ -905,3 +905,46 @@ describe('GapDetailDrawer · Teleport 到 body 后仍能取到令牌（P0 回归
     expect(drawer).toContain('class="gdd-wrap gd-portal"')
   })
 })
+
+describe('GapDeskView · 外壳不再整页「放大」（BugFix 回归）', () => {
+  /** 取 CSS 中某条 at-rule 的完整块（按大括号配平），避免正则跨块误判 */
+  function atBlock(css: string, head: string): string {
+    const start = css.indexOf(head)
+    expect(start).toBeGreaterThanOrEqual(0)
+    let depth = 0
+    for (let i = start + head.length - 1; i < css.length; i += 1) {
+      if (css[i] === '{') depth += 1
+      else if (css[i] === '}') {
+        depth -= 1
+        if (depth === 0) return css.slice(start, i + 1)
+      }
+    }
+    throw new Error(`未闭合的 CSS 块：${head}`)
+  }
+
+  it('拆壳只在真机做，PC 保留宿主侧栏与 #app 居中宽度', () => {
+    const css = readFileSync(resolve(process.cwd(), 'src/styles/gapdesk/layout.css'), 'utf8')
+    const mobile = atBlock(css, '@media (max-width: 768px)')
+    expect(mobile).toContain('body.gd-fullbleed #app')
+    expect(mobile).toContain('body.gd-fullbleed .app-shell.is-authed')
+    expect(mobile).toContain('body.gd-fullbleed .app-sidebar')
+
+    // 移掉这个媒体块后，全局再无「藏掉宿主侧栏 / 拆 flex / 去掉 max-width」的规则
+    const outside = css.replace(mobile, '')
+    expect(outside).not.toContain('body.gd-fullbleed .app-sidebar')
+    expect(outside).not.toMatch(/body\.gd-fullbleed \.app-shell\.is-authed\s*\{/)
+    expect(outside).not.toMatch(/body\.gd-fullbleed #app/)
+  })
+
+  it('紧凑表单字号只在 PC 还原；移动端保留 16px 防聚焦缩放；舞台不用 100vw', () => {
+    const css = readFileSync(resolve(process.cwd(), 'src/styles/gapdesk/layout.css'), 'utf8')
+    const pcOnly = atBlock(css, '@media (min-width: 769px)')
+    expect(pcOnly).toContain('body.gd-fullbleed input')
+    expect(pcOnly).toContain('font-size: inherit !important')
+
+    const outside = css.replace(pcOnly, '')
+    expect(outside).not.toContain('body.gd-fullbleed input')
+    expect(css).not.toContain('width: 100vw')
+    expect(css).toContain('width: 100%')
+  })
+})
