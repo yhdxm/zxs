@@ -15,7 +15,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { defineComponent, h } from 'vue'
+import { defineComponent, h, nextTick } from 'vue'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import GapEmptyState from '../src/components/gapdesk/GapEmptyState.vue'
 import GapDetailDrawer from '../src/components/gapdesk/GapDetailDrawer.vue'
@@ -41,8 +41,19 @@ import {
   sameEvent
 } from '../scripts/gapdesk/cluster.mjs'
 import { scoreEvents } from '../scripts/gapdesk/score.mjs'
-import { gapDiv, loadGapFeed, useGapDesk } from '../src/composables/useGapDesk'
-import { EMPTY_WINDOW, GAP_TTL_HOURS } from '../src/config/gapdeskConfig'
+import { gapDiv, loadGapFeed, purgeAndRefresh, useGapDesk } from '../src/composables/useGapDesk'
+import {
+  EMPTY_PURGE_EMPTY,
+  EMPTY_PURGE_ERROR,
+  EMPTY_PURGE_RUNNING,
+  EMPTY_WINDOW,
+  GAP_FEED_CACHE_KEY,
+  GAP_TTL_HOURS
+} from '../src/config/gapdeskConfig'
+import { parsePurgeResult } from '../src/services/gapdeskService'
+import GapTopbar from '../src/components/gapdesk/GapTopbar.vue'
+import GapMobileShell from '../src/components/gapdesk/GapMobileShell.vue'
+import GapPurgeConfirm from '../src/components/gapdesk/GapPurgeConfirm.vue'
 import {
   DEFAULT_ROLE_CONFIG,
   PERMISSION_TREE,
@@ -60,8 +71,29 @@ const svcStub = vi.hoisted(() => ({
   listRules: vi.fn(),
   listFavorites: vi.fn(),
   listSubscriptions: vi.fn(),
-  loadFeed: vi.fn()
+  loadFeed: vi.fn(),
+  purgeExpired: vi.fn(),
+  getSavedUser: vi.fn(),
+  cacheClear: vi.fn()
 }))
+
+/* 监听清缓存动作本身：重拉成功后 cacheSet 会把新数据写回，不能靠最终 localStorage 值判断 */
+vi.mock('../src/services/cloudSyncService', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../src/services/cloudSyncService')>()
+  return {
+    ...actual,
+    cacheClear: (key: string) => {
+      svcStub.cacheClear(key)
+      actual.cacheClear(key)
+    }
+  }
+})
+
+/* 用户角色可切换：清理按钮只认 app_accounts 的 admin/superadmin */
+vi.mock('../src/services/appDataService', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../src/services/appDataService')>()
+  return { ...actual, getSavedUser: svcStub.getSavedUser }
+})
 
 /** 空 feed：视图级用例只需要稳定的空数据，不验网络层 */
 const EMPTY_FEED = { events: [], platforms: [], sources: [], meta: null, evidences: [] }
@@ -75,7 +107,8 @@ vi.mock('../src/services/gapdeskService', async (importOriginal) => {
     listFavorites: svcStub.listFavorites,
     listSubscriptions: svcStub.listSubscriptions,
     listRules: svcStub.listRules,
-    loadFeed: svcStub.loadFeed
+    loadFeed: svcStub.loadFeed,
+    purgeExpired: svcStub.purgeExpired
   }
 })
 
@@ -84,6 +117,8 @@ svcStub.listFavorites.mockResolvedValue({ data: [], error: null })
 svcStub.listSubscriptions.mockResolvedValue({ data: [], error: null })
 svcStub.listRules.mockResolvedValue({ data: [], error: null })
 svcStub.loadFeed.mockResolvedValue({ data: EMPTY_FEED, error: null })
+svcStub.getSavedUser.mockResolvedValue(null)
+svcStub.purgeExpired.mockResolvedValue({ data: 0, error: null })
 
 /** 固定「当前时刻」：所有相对时间断言都用它，避免跑测试的时刻影响结果 */
 const NOW = 1_700_000_000_000
@@ -616,6 +651,12 @@ function resetStore(): void {
   store.sources.value = []
   store.ruleRows.value = []
   store.ruleLoaded.value = false
+  store.canPurge.value = false
+  store.purgeState.value = 'idle'
+  store.purgeDeleted.value = 0
+  store.purgeLastAt.value = 0
+  store.purgeError.value = null
+  localStorage.removeItem('zxsv2_cache_' + GAP_FEED_CACHE_KEY)
   store.filters.inds = []
   store.filters.windowH = GAP_TTL_HOURS
   store.filters.sort = 'gap'
@@ -946,5 +987,140 @@ describe('GapDeskView · 外壳不再整页「放大」（BugFix 回归）', () 
     expect(outside).not.toContain('body.gd-fullbleed input')
     expect(css).not.toContain('width: 100vw')
     expect(css).toContain('width: 100%')
+  })
+})
+
+describe('管理员清理 · RPC / 清镜像 / 强制重拉（BugFix 交付回归）', () => {
+  const CACHE_KEY_LS = 'zxsv2_cache_' + GAP_FEED_CACHE_KEY
+
+  /** 先走一次真实 loadUserState，让 canPurge 由 mock 的角色驱动 */
+  async function signInAs(role: 'admin' | 'superadmin' | 'user' | null): Promise<void> {
+    svcStub.getSavedUser.mockResolvedValue(role ? { role } : null)
+    await loadGapFeed(true)
+  }
+
+  it('成功后：真实条数入 state，清镜像，强制重拉一次', async () => {
+    await signInAs('admin')
+    expect(store.canPurge.value).toBe(true)
+    localStorage.setItem(CACHE_KEY_LS, JSON.stringify({ data: EMPTY_FEED, ts: Date.now() }))
+    // 稍后读是用户清单，不是缓存：清缓存不能碰它
+    localStorage.setItem('gapdesk_later_ids', '[101,102]')
+    svcStub.purgeExpired.mockResolvedValueOnce({ data: 7, error: null })
+    svcStub.loadFeed.mockClear()
+
+    const res = await purgeAndRefresh()
+
+    expect(res).toEqual({ ok: true, deleted: 7, state: 'done', error: null })
+    expect(store.purgeDeleted.value).toBe(7)
+    expect(store.purgeMsg.value).toBe('已清除 7 条过期数据并刷新')
+    // 只清 gapdesk_feed 这一个 key，且发生在重拉之前；重拉成功后 cacheSet 写回新数据是预期行为
+    expect(svcStub.cacheClear).toHaveBeenCalledTimes(1)
+    expect(svcStub.cacheClear).toHaveBeenCalledWith(GAP_FEED_CACHE_KEY)
+    expect(localStorage.getItem('gapdesk_later_ids')).toBe('[101,102]')
+    // force=true 绕过 TTL：重拉必须真的打一次 loadFeed
+    expect(svcStub.loadFeed).toHaveBeenCalledTimes(1)
+  })
+
+  it('0 条：state=empty 且文案如实说没有可清理项', async () => {
+    await signInAs('superadmin')
+    svcStub.purgeExpired.mockResolvedValueOnce({ data: 0, error: null })
+
+    const res = await purgeAndRefresh()
+
+    expect(res.state).toBe('empty')
+    expect(res.deleted).toBe(0)
+    expect(store.purgeMsg.value).toBe(EMPTY_PURGE_EMPTY)
+    expect(store.purgeMsg.value).not.toContain('已清除 0 条')
+  })
+
+  it('RPC 失败：不清缓存、不重拉、镜像保留，state=error', async () => {
+    await signInAs('admin')
+    localStorage.setItem(CACHE_KEY_LS, JSON.stringify({ data: EMPTY_FEED, ts: Date.now() }))
+    const before = localStorage.getItem(CACHE_KEY_LS)
+    svcStub.loadFeed.mockClear()
+    svcStub.purgeExpired.mockResolvedValueOnce({ data: 0, error: 'PGRST202 function does not exist' })
+
+    const res = await purgeAndRefresh()
+
+    expect(res).toEqual({ ok: false, deleted: 0, state: 'error', error: 'PGRST202 function does not exist' })
+    expect(localStorage.getItem(CACHE_KEY_LS)).toBe(before)
+    expect(svcStub.cacheClear).not.toHaveBeenCalled()
+    expect(svcStub.loadFeed).not.toHaveBeenCalled()
+    expect(store.purgeMsg.value).toContain(EMPTY_PURGE_ERROR)
+    expect(store.purgeMsg.value).toContain('PGRST202')
+  })
+
+  it('非 admin 不渲染按钮；admin 两端都渲染', async () => {
+    await signInAs('user')
+    expect(store.canPurge.value).toBe(false)
+    expect(mount(GapTopbar).find('.gd-purge-btn').exists()).toBe(false)
+    expect(mount(GapMobileShell).find('.p-purge').exists()).toBe(false)
+
+    await signInAs('admin')
+    expect(store.canPurge.value).toBe(true)
+    const pc = mount(GapTopbar)
+    expect(pc.find('.gd-purge-btn').exists()).toBe(true)
+    expect(pc.find('.gd-purge-btn').attributes('aria-label')).toBe('清理过期数据')
+    const mb = mount(GapMobileShell)
+    expect(mb.find('.p-purge').exists()).toBe(true)
+    expect(mb.find('.p-purge').attributes('aria-label')).toBe('清理过期数据')
+    pc.unmount()
+    mb.unmount()
+  })
+
+  it('60s 节流：连点两次只打一次 RPC，running 态文案来自 config', async () => {
+    await signInAs('admin')
+    svcStub.purgeExpired.mockClear()
+    svcStub.purgeExpired.mockResolvedValue({ data: 3, error: null })
+
+    const first = purgeAndRefresh()
+    expect(store.purgeState.value).toBe('running')
+    expect(store.purgeMsg.value).toBe(EMPTY_PURGE_RUNNING)
+    await first
+    await purgeAndRefresh()
+
+    expect(svcStub.purgeExpired).toHaveBeenCalledTimes(1)
+  })
+
+  it('PostgREST 标量两种形态都解析成真实数字', () => {
+    expect(parsePurgeResult(5)).toEqual({ deleted: 5, error: null })
+    expect(parsePurgeResult({ data: 5, error: null })).toEqual({ deleted: 5, error: null })
+    expect(parsePurgeResult({ data: 0, error: null })).toEqual({ deleted: 0, error: null })
+    expect(parsePurgeResult({ error: { message: 'forbidden' } })).toEqual({ deleted: 0, error: 'forbidden' })
+  })
+})
+
+describe('GapPurgeConfirm · Teleport 令牌与六态交互', () => {
+  it('浮层挂到 body 且自带 gd-portal；running 期间不能关闭，结果态手动完成', async () => {
+    store.purgeState.value = 'confirm'
+    store.purgeDeleted.value = 0
+    const wrapper = mount(GapPurgeConfirm, { props: { modelValue: true }, attachTo: document.body })
+    await nextTick()
+
+    const wrap = document.body.querySelector('.gpc-wrap') as HTMLElement
+    expect(wrap).not.toBeNull()
+    expect(wrap.classList.contains('gd-portal')).toBe(true)
+    expect(wrap.closest('.gd-stage')).toBeNull()
+    const primary = wrap.querySelector('.gpc-primary') as HTMLButtonElement
+    expect(primary.textContent).toContain('确认清除并刷新')
+
+    // running：两个按钮都禁用，点遮罩不触发关闭
+    store.purgeState.value = 'running'
+    await nextTick()
+    expect(primary.disabled).toBe(true)
+    expect((wrap.querySelector('.gpc-x') as HTMLButtonElement).disabled).toBe(true)
+    wrap.click()
+    await nextTick()
+    expect(wrapper.emitted('update:modelValue')).toBeUndefined()
+
+    // done：不改状态、不自动关闭，按钮变「完成」由用户手动收起
+    store.purgeState.value = 'done'
+    store.purgeDeleted.value = 4
+    await nextTick()
+    expect((wrap.querySelector('.gpc-primary') as HTMLButtonElement).textContent).toContain('完成')
+    expect(store.purgeMsg.value).toContain('4')
+    expect(document.body.querySelector('.gpc-wrap')).not.toBeNull()
+
+    wrapper.unmount()
   })
 })

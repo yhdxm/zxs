@@ -131,6 +131,25 @@
   color: var(--gd-brand);
   box-shadow: var(--gd-sh-sm);
 }
+/* 管理员清理入口：危险色复用 --gd-gap，不新增令牌 */
+.gd-purge-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--gd-gap);
+  border-radius: var(--gd-r-nav);
+  background: transparent;
+  color: var(--gd-gap);
+  font-size: var(--gd-fs-nav);
+  box-shadow: var(--gd-sh-xs);
+  cursor: pointer;
+}
+.gd-purge-btn:hover {
+  background: var(--gd-gap);
+  color: var(--gd-card);
+}
 .gd-avatar-btn {
   width: 26px;
   height: 26px;
@@ -357,6 +376,38 @@
   font-family: var(--gd-sans);
   font-size: 10px;
   color: var(--gd-ink3);
+}
+/* 清理入口：44×44 触控区，图标与退出键同规格、危险色区分 */
+.p-purge {
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.p-purge i {
+  display: block;
+  width: 26px;
+  height: 26px;
+  border: 1px solid var(--gd-gap);
+  border-radius: 999px;
+  background: var(--gd-card);
+  box-shadow: var(--gd-sh-xs);
+  position: relative;
+}
+.p-purge i::after {
+  content: '';
+  position: absolute;
+  left: 7px;
+  top: 11px;
+  width: 10px;
+  height: 2px;
+  background: var(--gd-gap);
 }
 .p-exit {
   width: 44px;

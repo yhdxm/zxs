@@ -9,8 +9,10 @@
 //
 // 数据来源：scripts/gapdesk/collect.mjs（GitHub Actions 每 30 分钟写一轮）。
 import { supabase } from '../lib/supabaseClient'
+import { cacheClear } from './cloudSyncService'
 import { getSavedUser, type AppUser } from './appDataService'
 import { canManageSystem } from '../config/appMenu'
+import { GAP_FEED_CACHE_KEY } from '../config/gapdeskConfig'
 import type {
   GapEventRow,
   GapEventSourceRow,
@@ -520,4 +522,48 @@ export async function loadSeats(): Promise<GapResult<GapSeatRow[]>> {
     console.warn('[gapdesk] 席位读取异常', errMsg(e))
     return { data: [], error: errMsg(e) }
   }
+}
+
+/* ============================================================
+   管理员清理（gapdesk_purge_admin）
+   RPC 本体在服务端二次校验角色；这里只负责把 PostgREST 的两种标量返回形态
+   统一成 number，并把失败收敛成 { data: 0, error }，绝不向 UI 抛异常。
+   ============================================================ */
+/**
+ * PostgREST 对 returns integer 的函数有两种返回形态：裸 number，或 { data: number, error }。
+ * 抽成纯函数便于钉死这两种形态，避免管理员点了清理却被告知「0 条」这种假数字。
+ */
+export function parsePurgeResult(res: unknown): { deleted: number; error: string | null } {
+  if (typeof res === 'number') {
+    return Number.isFinite(res)
+      ? { deleted: res, error: null }
+      : { deleted: 0, error: '无效的清理条数' }
+  }
+  const obj = (res ?? {}) as { data?: unknown; error?: { message?: unknown } | null }
+  if (obj.error?.message) return { deleted: 0, error: String(obj.error.message) }
+  const raw = obj.data
+  return {
+    deleted: typeof raw === 'number' && Number.isFinite(raw) ? raw : 0,
+    error: null
+  }
+}
+
+export async function purgeExpired(): Promise<GapResult<number>> {
+  try {
+    const res = await supabase.rpc('gapdesk_purge_admin')
+    const parsed = parsePurgeResult(res)
+    if (parsed.error) {
+      console.warn('[gapdesk] 清理 RPC 失败', parsed.error)
+      return { data: 0, error: parsed.error }
+    }
+    return { data: parsed.deleted, error: null }
+  } catch (e) {
+    console.warn('[gapdesk] 清理 RPC 异常', errMsg(e))
+    return { data: 0, error: errMsg(e) }
+  }
+}
+
+/** 只清 feed 镜像；laterIds 是用户清单，不在这里动 */
+export function clearFeedCache(): void {
+  cacheClear(GAP_FEED_CACHE_KEY)
 }

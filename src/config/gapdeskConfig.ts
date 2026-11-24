@@ -397,3 +397,27 @@ export const SR_TIER_OF: Readonly<Record<GapLayer, SourceGradeTier>> = {
 
 /** 分级展示顺序：汇总卡片按此顺序渲染，避免各视图自己排一遍 */
 export const SR_TIERS: readonly SourceGradeTier[] = ['reliable', 'official', 'probe']
+
+/* ============================================================
+   十二·补 管理员清理：缓存 key / 状态机 / 文案唯一真源
+   ============================================================ */
+
+/** 本地 feed 镜像 key（cloudSyncService 的缓存信封名），清缓存只清这一个 */
+export const GAP_FEED_CACHE_KEY = 'gapdesk_feed'
+
+/** 清理浮层的六个状态：confirm → running → done/empty/error，idle 为未打开 */
+export type PurgeState = 'idle' | 'confirm' | 'running' | 'done' | 'empty' | 'error'
+
+/** 确认说明：把删除范围与「绝不动」的范围都写清，避免用户误以为会清空全部数据 */
+export const EMPTY_PURGE_CONFIRM =
+  '将删除 48 小时外的过期事件及其证据链、48 小时外的平台首触记录、7 天无成功记录的死源；收藏 / 已读 / 订阅 / 预警规则 / 席位 / 稍后读不受影响。清除后立即重新拉取最新一批。'
+/** 执行中：结果未回来之前不显示任何数字 */
+export const EMPTY_PURGE_RUNNING = '正在清除过期数据并重新拉取最新一批…'
+/** 成功（{n} 由 store 用 RPC 返回的真实条数替换，不编数字） */
+export const EMPTY_PURGE_DONE = '已清除 {n} 条过期数据并刷新'
+/** 0 条：如实说明没有可清理项，不造一个「清理成功」的数字 */
+export const EMPTY_PURGE_EMPTY = '没有需要清理的过期数据，已刷新到最新一批'
+/** 失败：明确告知缓存与镜像都未动，可重试 */
+export const EMPTY_PURGE_ERROR = '清理失败，本地缓存与已展示数据均未改动，可稍后重试'
+/** 无权限：按钮不渲染，这是兜底提示 */
+export const EMPTY_PURGE_DENIED = '仅管理员可执行清理'

@@ -17,6 +17,7 @@
         :live="isLive"
         @switch-dev="onSwitchDev('mb')"
         @exit="onExit"
+        @purge="openPurge"
       />
       <div class="gd-workspace">
         <GapSidebar :active="current" @navigate="onNavigate" />
@@ -45,6 +46,7 @@
       @tab="onMobileTab"
       @switch-dev="onSwitchDev('pc')"
       @exit="onExit"
+      @purge="openPurge"
     >
       <div class="gd-vcol">
         <component :is="activeComp" v-bind="activeProps" @navigate="onNavigate" />
@@ -53,6 +55,9 @@
 
     <!-- 详情抽屉由宿主统一持有，内部 Teleport 到 body；视图通过 GAP_OPEN_DETAIL_KEY 打开 -->
     <GapDetailDrawer v-model="drawerOpen" :event="activeEvent" @navigate="openDetail" />
+
+    <!-- 管理员清理浮层：PC / 移动共用同一个实例；内部同样 Teleport + gd-portal -->
+    <GapPurgeConfirm v-model="purgeOpen" @confirm="onPurgeConfirm" />
   </div>
 </template>
 
@@ -64,6 +69,7 @@ import GapSidebar from '../components/gapdesk/GapSidebar.vue'
 import GapRightCol from '../components/gapdesk/GapRightCol.vue'
 import GapMobileShell from '../components/gapdesk/GapMobileShell.vue'
 import GapDetailDrawer from '../components/gapdesk/GapDetailDrawer.vue'
+import GapPurgeConfirm from '../components/gapdesk/GapPurgeConfirm.vue'
 import GapDateStrip from '../components/gapdesk/GapDateStrip.vue'
 import GapFilterBar from '../components/gapdesk/GapFilterBar.vue'
 import PcLatestView from './gapdesk/pc/PcLatestView.vue'
@@ -277,15 +283,38 @@ function onExit(): void {
   void router.push('/dashboard')
 }
 
+function openPurge(): void {
+  purgeError.value = null
+  purgeState.value = 'confirm'
+  purgeOpen.value = true
+}
+
+/** 浮层只负责交互，真正的 RPC / 清缓存 / 重拉全部由 store 收敛 */
+async function onPurgeConfirm(): Promise<void> {
+  await purgeAndRefresh()
+}
+
 /* ============================================================
    三、生命周期
    ============================================================ */
 const BODY_CLASS = 'gd-fullbleed'
 
 /** 抽屉宿主 + 首次加载；各视图注入 openDetail 即可，不必各自挂抽屉 */
-const { ranked, load, isLive, tierCounts, dateBands, filters } = useGapDesk()
+const {
+  ranked,
+  load,
+  isLive,
+  tierCounts,
+  dateBands,
+  filters,
+  purgeState,
+  purgeError,
+  purgeAndRefresh
+} = useGapDesk()
 
 const drawerOpen = ref(false)
+/** 清理浮层开关：PC 顶栏与移动头共用，不新造路由 */
+const purgeOpen = ref(false)
 const activeId = ref<number | null>(null)
 const activeEvent = computed(() => {
   const id = activeId.value

@@ -10,15 +10,19 @@
 //   2) 失败不抛错：network 挂了就退到 localStorage 镜像，并置 stale=true 让界面显式说明
 //      「数据可能不是最新」—— 静默展示旧数据是这类工具最致命的体验问题；
 //   3) useGapDeskRealtime() 内部调用 useCloudSync()，**必须在组件 setup 内调用**。
-import { computed, reactive, ref, type InjectionKey } from 'vue'
+import { computed, reactive, ref, type InjectionKey, type Ref, type ComputedRef } from 'vue'
 import { useCloudSync } from './useCloudSync'
 import { cacheGetStale, cacheSet } from '../services/cloudSyncService'
+import { getSavedUser, type AppUser } from '../services/appDataService'
+import { canManageSystem } from '../config/appMenu'
 import {
+  clearFeedCache,
   loadFeed,
   listFavorites,
   listRules,
   listSubscriptions,
   markRead,
+  purgeExpired,
   resolveUserId,
   toggleFavorite as toggleFavoriteRemote,
   toggleSubscribe as toggleSubscribeRemote,
@@ -28,7 +32,15 @@ import {
 import {
   EMPTY_ECHO,
   EMPTY_LLM,
+  EMPTY_PURGE_CONFIRM,
+  EMPTY_PURGE_DENIED,
+  EMPTY_PURGE_DONE,
+  EMPTY_PURGE_EMPTY,
+  EMPTY_PURGE_ERROR,
+  EMPTY_PURGE_RUNNING,
   GAP_CACHE_TTL,
+  GAP_FEED_CACHE_KEY,
+  type PurgeState,
   GAP_DIM,
   GAP_DIM6,
   GAP_DIM6_OF,
@@ -61,7 +73,10 @@ import type {
 } from '../types/gapdesk'
 
 /** 本地镜像 key（与 cloudSyncService 的缓存信封同名约定） */
-const CACHE_KEY = 'gapdesk_feed'
+const CACHE_KEY = GAP_FEED_CACHE_KEY
+
+/** 清理按钮 throttle：60s 内重复点击不重复打 RPC */
+const PURGE_THROTTLE_MS = 60_000
 
 /** 可选时间窗（小时）：产品只承诺近 48 小时，更窄的窗口是用户自己的取舍 */
 export const GAP_WINDOW_OPTIONS = [6, 12, 24, 48] as const
@@ -118,6 +133,14 @@ const ruleLoaded = ref(false)
 /** 当前登录用户的 auth uid（空 = 未登录，写操作直接跳过） */
 const userId = ref('')
 
+/** 管理员清理：权限、状态机、RPC 真实条数、节流时间戳 */
+const canPurge: Ref<boolean> = ref(false)
+const purgeState: Ref<PurgeState> = ref<PurgeState>('idle')
+const purgeDeleted: Ref<number> = ref(0)
+const purgeLastAt: Ref<number> = ref(0)
+/** 失败原因（真实 RPC error），只用于提示，不伪造条数 */
+const purgeError: Ref<string | null> = ref<string | null>(null)
+
 const filters = reactive<GapFilters>({
   inds: [],
   windowH: GAP_TTL_HOURS,
@@ -166,8 +189,18 @@ async function loadUserState(): Promise<void> {
     mySubs.value = []
     ruleRows.value = []
     ruleLoaded.value = false
+    canPurge.value = false
     return
   }
+  // 清理权限按 app_accounts 的 role 判定；读不到用户就当普通用户，按钮不渲染。
+  let user: AppUser | null = null
+  try {
+    user = await getSavedUser()
+  } catch {
+    user = null
+  }
+  canPurge.value = canManageSystem(user)
+
   // 规则读取与收藏/订阅同轮发起，但单独兜底：规则读失败不能拖累其它用户态。
   const [fav, sub, rules] = await Promise.all([
     listFavorites(uid),
@@ -253,6 +286,46 @@ export async function loadGapFeed(force = false): Promise<void> {
   })
 
   return inflight
+}
+
+export interface PurgeResult {
+  ok: boolean
+  deleted: number
+  state: PurgeState
+  error: string | null
+}
+
+/**
+ * 管理员清理：RPC → 清镜像 → 强制重拉。
+ * 顺序不可换：RPC 失败时缓存、镜像、已展示数据一概不动；只有成功才清缓存并重拉。
+ * 条数只认 RPC 的返回值，0 条如实报 empty，绝不编造「清理成功 N 条」。
+ */
+export async function purgeAndRefresh(): Promise<PurgeResult> {
+  if (!canPurge.value) {
+    return { ok: false, deleted: 0, state: 'error', error: EMPTY_PURGE_DENIED }
+  }
+  const now = Date.now()
+  // 重复点击 / running 期间都不再打 RPC；不刷新 throttle 时间戳，避免把 60s 窗口越点越长
+  if (purgeState.value === 'running' || now - purgeLastAt.value < PURGE_THROTTLE_MS) {
+    return { ok: false, deleted: purgeDeleted.value, state: purgeState.value, error: null }
+  }
+  purgeLastAt.value = now
+  purgeError.value = null
+  purgeState.value = 'running'
+
+  const res = await purgeExpired()
+  if (res.error) {
+    purgeError.value = res.error
+    purgeState.value = 'error'
+    return { ok: false, deleted: 0, state: 'error', error: res.error }
+  }
+
+  purgeDeleted.value = res.data
+  clearFeedCache()
+  await loadGapFeed(true)
+  // isLive 跟随 meta 自动重算：重拉成功后即恢复实时态，失败则走既有的退镜像/降级链路
+  purgeState.value = res.data > 0 ? 'done' : 'empty'
+  return { ok: true, deleted: res.data, state: purgeState.value, error: null }
 }
 
 /**
@@ -720,6 +793,24 @@ const sourceGrade = computed<{
 /** 预警规则条数（读失败时侧栏按 ruleLoaded 显示「—」，不把 0 冒充真值） */
 const ruleCount = computed<number>(() => ruleRows.value.length)
 
+/** 清理浮层文案唯一真源：组件只读这个 computed，不在模板里拼字符串 */
+const purgeMsg: ComputedRef<string> = computed<string>(() => {
+  switch (purgeState.value) {
+    case 'confirm':
+      return EMPTY_PURGE_CONFIRM
+    case 'running':
+      return EMPTY_PURGE_RUNNING
+    case 'done':
+      return EMPTY_PURGE_DONE.replace('{n}', String(purgeDeleted.value))
+    case 'empty':
+      return EMPTY_PURGE_EMPTY
+    case 'error':
+      return `${EMPTY_PURGE_ERROR}${purgeError.value ? `（${purgeError.value}）` : ''}`
+    default:
+      return ''
+  }
+})
+
 /** 收藏判定（模板里每个卡片都会问一次，故做成 Set） */
 const favoriteSet = computed(() => new Set(favorites.value))
 function isFavorite(eventId: number): boolean {
@@ -837,7 +928,13 @@ export function useGapDesk() {
     userId,
     evidences,
     laterIds,
+    canPurge,
+    purgeState,
+    purgeDeleted,
+    purgeLastAt,
+    purgeError,
     // derived
+    purgeMsg,
     pool,
     top14,
     stats,
@@ -862,6 +959,7 @@ export function useGapDesk() {
     ruleCount,
     // actions
     load: loadGapFeed,
+    purgeAndRefresh,
     toggleInd,
     setWindow,
     setSort,

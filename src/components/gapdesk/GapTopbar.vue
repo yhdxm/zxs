@@ -34,6 +34,15 @@
     </div>
     <span class="gd-pill gd-pill-soft">{{ title }}</span>
 
+    <!-- 清理入口：仅 admin/superadmin 渲染，普通用户连按钮都看不到 -->
+    <button
+      v-if="canPurge"
+      class="gd-purge-btn"
+      type="button"
+      title="清理过期数据"
+      aria-label="清理过期数据"
+      @click="emit('purge')"
+    >清理</button>
     <button class="gd-viewbtn" type="button" title="切到手机视图" @click="emit('switch-dev')">手机版</button>
     <!-- 全屏外壳下唯一的返回工作台入口 -->
     <button class="gd-avatar-btn" type="button" title="返回工作台" aria-label="返回工作台" @click="emit('exit')" />
@@ -55,7 +64,7 @@ const props = withDefaults(
   { title: '最新信息', live: false }
 )
 
-const { tierCounts, lagMedianDays, isLive, demoReasons } = useGapDesk()
+const { tierCounts, lagMedianDays, isLive, demoReasons, canPurge } = useGapDesk()
 
 const liveNow = computed(() => props.live || isLive.value)
 const demoTitle = computed(() => demoReasons.value.join('；') || '未连上网关')
@@ -63,5 +72,6 @@ const demoTitle = computed(() => demoReasons.value.join('；') || '未连上网�
 const emit = defineEmits<{
   'switch-dev': []
   exit: []
+  purge: []
 }>()
 </script>

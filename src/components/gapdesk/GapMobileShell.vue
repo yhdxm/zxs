@@ -27,6 +27,16 @@
         <span class="gd-pill gd-pill-acc gd-mono p-pill-sm">{{ l0Count === null ? '—' : l0Count }} 条 L0</span>
       </span>
 
+      <!-- 清理入口：44×44 触控区，不占底部 5 tab；仅管理员渲染 -->
+      <button
+        v-if="canPurge"
+        class="p-purge"
+        type="button"
+        title="清理过期数据"
+        aria-label="清理过期数据"
+        @click="emit('purge')"
+      ><i aria-hidden="true" /></button>
+
       <!-- 桌面样机上的回 PC 入口；真机按 ≤768px 强制手机壳，点了也会自动回手机壳 -->
       <button class="p-pillbtn p-pcbtn" type="button" title="切回 PC 版" @click="emit('switch-dev')">
         <span class="gd-pill gd-pill-soft gd-mono p-pill-sm">PC</span>
@@ -76,7 +86,7 @@ import GapDateStrip from './GapDateStrip.vue'
 import { EMPTY_DEMO } from '../../config/gapdeskConfig'
 import { useGapDesk } from '../../composables/useGapDesk'
 
-const { dateBands } = useGapDesk()
+const { dateBands, canPurge } = useGapDesk()
 /** 默认高亮「今天更早」胶囊（渐变紫底白字）；无当日数据时自然不高亮 */
 const activeBand = ref('today')
 function onPick(key: string): void {
@@ -112,5 +122,6 @@ const emit = defineEmits<{
   tab: [key: string]
   'switch-dev': []
   exit: []
+  purge: []
 }>()
 </script>

@@ -295,7 +295,26 @@ end $$;
 
 revoke all on function public.gapdesk_purge() from public, anon, authenticated;
 
--- 挂定时任务（每 2 小时的第 17 分钟）：没有 pg_cron 就静默跳过，不报错
+-- 管理员手动清理入口：本体继续只对 service_role / security definer 开放，
+-- 这里包一层函数内二次校验角色，认证用户可调用但不能越权。
+-- 不改动 gapdesk_purge() 本体与它的 revoke 句。
+create or replace function public.gapdesk_purge_admin()
+returns integer language plpgsql security definer set search_path = public as $$
+declare n integer;
+begin
+  if not exists (select 1 from public.app_accounts a
+      where a.auth_user_id = auth.uid()
+        and a.role in ('admin','superadmin')
+        and coalesce(a.disabled,false)=false) then
+    raise exception 'forbidden';
+  end if;
+  n := public.gapdesk_purge();
+  return n;
+end $$;
+revoke all on function public.gapdesk_purge_admin() from public, anon;
+grant execute on function public.gapdesk_purge_admin() to authenticated;
+
+-- 挂定时任务（每 30 分钟）：没有 pg_cron 就静默跳过，不报错
 do $$
 begin
   if exists (select 1 from pg_extension where extname = 'pg_cron') then
@@ -304,7 +323,7 @@ begin
     exception when others then
       null;                                        -- 旧版 pg_cron 卸载不存在的任务会抛错，忽略
     end;
-    perform cron.schedule('gapdesk_purge', '17 */2 * * *', 'select public.gapdesk_purge();');
+    perform cron.schedule('gapdesk_purge', '*/30 * * * *', 'select public.gapdesk_purge();');
   else
     raise notice 'gapdesk: 未启用 pg_cron，跳过定时清理注册（可手动 select public.gapdesk_purge();）';
   end if;
