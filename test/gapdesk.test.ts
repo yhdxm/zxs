@@ -1353,3 +1353,30 @@ describe('PcLatestView · 首屏是事件、来源与原文来自真数据', () 
     wrapper.unmount()
   })
 })
+
+describe('PcLatestView · 日期胶囊筛空时必须给空态（top14 收口回归）', () => {
+  it('池子有数据但 dateBand 把 14 条全筛掉时，显示窗口口径空态而不是纯白列表', () => {
+    const today = Date.now()
+    const d = new Date()
+    const yesterday = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate() - 1).padStart(2, '0')}`
+    store.events.value = [makeEvent({ id: 1, gap: 92, ts_published: today })]
+    store.filters.dateBand = yesterday
+
+    const wrapper = mount(PcLatestView)
+    const html = wrapper.html()
+    expect(wrapper.findAll('.gd-gcard').length).toBe(0)
+    expect(wrapper.text()).toContain(EMPTY_WINDOW)
+    // 统计卡仍在（只是移到末尾），空态不该把 hero 一起吞掉
+    expect(html).toContain('class="hero"')
+    wrapper.unmount()
+  })
+
+  it('不筛日期时同样一条数据能正常出卡，空态不误报', () => {
+    store.events.value = [makeEvent({ id: 1, gap: 92, ts_published: Date.now() })]
+    store.filters.dateBand = ''
+    const wrapper = mount(PcLatestView)
+    expect(wrapper.findAll('.gd-gcard').length).toBe(1)
+    expect(wrapper.text()).not.toContain(EMPTY_WINDOW)
+    wrapper.unmount()
+  })
+})

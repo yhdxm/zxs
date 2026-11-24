@@ -5,8 +5,9 @@
 -->
 <template>
   <div class="pcview">
-    <!-- 首屏第一眼必须是事件卡，不是统计：Hero 五卡移到列表末尾 -->
-    <GapEmptyState v-if="!top14.length" type="empty" />
+    <!-- 首屏第一眼必须是事件卡，不是统计：Hero 五卡移到列表末尾。
+         池子非空但被日期胶囊筛空时也要给空态，否则只剩统计卡、列表纯白 -->
+    <GapEmptyState v-if="!top14.length || totalShown === 0" type="empty" :desc="EMPTY_WINDOW" />
 
     <template v-else v-for="section in sections" :key="section.key">
       <template v-if="eventsOf(section.key).length">
@@ -43,7 +44,7 @@
 import { computed, inject } from 'vue'
 import GapEmptyState from '../../../components/gapdesk/GapEmptyState.vue'
 import GapEventCard from '../../../components/gapdesk/GapEventCard.vue'
-import { EMPTY_ECHO } from '../../../config/gapdeskConfig'
+import { EMPTY_ECHO, EMPTY_WINDOW } from '../../../config/gapdeskConfig'
 import { GAP_OPEN_DETAIL_KEY, useGapDesk } from '../../../composables/useGapDesk'
 import type { GapEventRow } from '../../../types/gapdesk'
 
@@ -92,5 +93,10 @@ const eventsOf = computed(() => (key: string) =>
   top14.value.filter(
     (event) => inSection(event, key) && (!filters.dateBand || filters.dateBand === bandKeyOf(event))
   )
+)
+
+/** 四段实际渲染条数之和：为 0 时说明当前日期胶囊把 14 条全筛掉了，必须给空态而不是留白 */
+const totalShown = computed<number>(() =>
+  sections.reduce((sum, section) => sum + eventsOf.value(section.key).length, 0)
 )
 </script>
