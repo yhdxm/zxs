@@ -25,7 +25,7 @@
 
         <div class="gpc-body">
           <p class="gpc-msg">{{ purgeMsg }}</p>
-          <p v-if="hasResult" class="gpc-count gd-mono">实际删除 {{ purgeDeleted }} 条</p>
+          <p v-if="hasCount" class="gpc-count gd-mono">实际删除 {{ purgeDeleted }} 条</p>
         </div>
 
         <div class="gpc-acts">
@@ -65,6 +65,10 @@ const { purgeState, purgeDeleted, purgeMsg } = useGapDesk()
 const busy = computed<boolean>(() => purgeState.value === 'running')
 const hasResult = computed<boolean>(
   () => purgeState.value === 'done' || purgeState.value === 'empty' || purgeState.value === 'error'
+)
+/** 只有成功完成（含 0 条）才有「实际删除」数字；失败态不显示任何条数，避免复用上次结果 */
+const hasCount = computed<boolean>(
+  () => purgeState.value === 'done' || purgeState.value === 'empty'
 )
 const primaryLabel = computed<string>(() => {
   if (purgeState.value === 'running') return '正在清理…'

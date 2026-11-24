@@ -302,6 +302,7 @@ export interface PurgeResult {
  */
 export async function purgeAndRefresh(): Promise<PurgeResult> {
   if (!canPurge.value) {
+    purgeDeleted.value = 0
     return { ok: false, deleted: 0, state: 'error', error: EMPTY_PURGE_DENIED }
   }
   const now = Date.now()
@@ -315,6 +316,8 @@ export async function purgeAndRefresh(): Promise<PurgeResult> {
 
   const res = await purgeExpired()
   if (res.error) {
+    // 失败必须清掉上一次成功的条数：UI 与返回值都只能报本次真实结果（本次为 0）
+    purgeDeleted.value = 0
     purgeError.value = res.error
     purgeState.value = 'error'
     return { ok: false, deleted: 0, state: 'error', error: res.error }

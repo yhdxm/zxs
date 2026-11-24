@@ -285,6 +285,7 @@ function onExit(): void {
 
 function openPurge(): void {
   purgeError.value = null
+  purgeDeleted.value = 0
   purgeState.value = 'confirm'
   purgeOpen.value = true
 }
@@ -308,6 +309,7 @@ const {
   dateBands,
   filters,
   purgeState,
+  purgeDeleted,
   purgeError,
   purgeAndRefresh
 } = useGapDesk()

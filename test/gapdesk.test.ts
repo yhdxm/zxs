@@ -1088,6 +1088,41 @@ describe('管理员清理 · RPC / 清镜像 / 强制重拉（BugFix 交付回�
     expect(parsePurgeResult({ data: 0, error: null })).toEqual({ deleted: 0, error: null })
     expect(parsePurgeResult({ error: { message: 'forbidden' } })).toEqual({ deleted: 0, error: 'forbidden' })
   })
+
+  it('成功后下一次失败：不残留上一次的删除条数（串联回归）', async () => {
+    await signInAs('admin')
+    svcStub.purgeExpired.mockResolvedValueOnce({ data: 7, error: null })
+
+    const first = await purgeAndRefresh()
+    expect(first.state).toBe('done')
+    expect(store.purgeDeleted.value).toBe(7)
+
+    // ① 重新打开浮层这一层：openPurge 必须先把上次条数清零
+    const page = await mountGapDeskView({ dev: 'pc', view: 'latest' })
+    await page.find('.gd-purge-btn').trigger('click')
+    expect(store.purgeDeleted.value).toBe(0)
+    expect(store.purgeState.value).toBe('confirm')
+    page.unmount()
+
+    // 重新塞回旧值，单独验 ② RPC 失败分支自己也会清零（缺任一层都会红）
+    store.purgeDeleted.value = 7
+    // 推进 60s 节流窗口，模拟用户隔一段时间再次清理
+    store.purgeLastAt.value -= 61_000
+    svcStub.purgeExpired.mockResolvedValueOnce({ data: 0, error: 'forbidden' })
+    const second = await purgeAndRefresh()
+
+    expect(second).toEqual({ ok: false, deleted: 0, state: 'error', error: 'forbidden' })
+    expect(store.purgeDeleted.value).toBe(0)
+    expect(store.purgeMsg.value).not.toContain('实际删除')
+
+    // 浮层 DOM 同样不能出现「实际删除 7 条」——三层清零缺一层都会红
+    const wrapper = mount(GapPurgeConfirm, { props: { modelValue: true }, attachTo: document.body })
+    await nextTick()
+    const wrap = document.body.querySelector('.gpc-wrap') as HTMLElement
+    expect(wrap.textContent).not.toContain('实际删除')
+    expect(wrap.textContent).toContain('forbidden')
+    wrapper.unmount()
+  })
 })
 
 describe('GapPurgeConfirm · Teleport 令牌与六态交互', () => {
