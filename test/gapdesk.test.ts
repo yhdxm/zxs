@@ -1159,3 +1159,70 @@ describe('GapPurgeConfirm · Teleport 令牌与六态交互', () => {
     wrapper.unmount()
   })
 })
+
+describe('顶栏对齐 PageHeader 与移动端触控（UI 打磨回归）', () => {
+  /** 取 CSS 中某条 at-rule 的完整块（大括号配平），避免跨块误判 */
+  function atBlock(css: string, head: string): string {
+    const start = css.indexOf(head)
+    expect(start).toBeGreaterThanOrEqual(0)
+    let depth = 0
+    for (let i = start + head.length - 1; i < css.length; i += 1) {
+      if (css[i] === '{') depth += 1
+      else if (css[i] === '}') {
+        depth -= 1
+        if (depth === 0) return css.slice(start, i + 1)
+      }
+    }
+    throw new Error(`未闭合的 CSS 块：${head}`)
+  }
+
+  it('顶栏消费宿主令牌且保留全部真值胶囊', () => {
+    const css = readFileSync(resolve(process.cwd(), 'src/styles/gapdesk/layout.css'), 'utf8')
+    const topbar = css.slice(css.indexOf('.gd-topbar {'), css.indexOf('.gd-topbar::before'))
+    for (const token of ['var(--surface)', 'var(--border)', 'var(--shadow-card)', 'border-radius: 12px']) {
+      expect(topbar).toContain(token)
+    }
+    const inner = css.slice(css.indexOf('.gd-ph-title {'), css.indexOf('.gd-ph-sub {'))
+    expect(inner).toContain('var(--text-strong)')
+    expect(inner).toContain('font-size: 18px')
+
+    const tpl = readFileSync(resolve(process.cwd(), 'src/components/gapdesk/GapTopbar.vue'), 'utf8')
+    for (const token of ['LIVE', '今日 L0', '兑现率', '时差中位', '清理', '手机版']) {
+      expect(tpl).toContain(token)
+    }
+    // 移动壳在真机上独立渲染，PC 顶栏不能在手机壳里出现
+    const host = readFileSync(resolve(process.cwd(), 'src/views/GapDeskView.vue'), 'utf8')
+    expect(host).toContain('v-if="effectiveDev === \'pc\'"')
+  })
+
+  it('搜索框是真控件：写 filters.keyword，"/" 聚焦，不再是 aria-hidden', async () => {
+    store.filters.keyword = ''
+    const wrapper = mount(GapTopbar, { attachTo: document.body })
+    const input = wrapper.find('input[aria-label="搜索差值"]')
+    expect(input.exists()).toBe(true)
+    expect(input.attributes('aria-hidden')).toBeUndefined()
+    // 原来的假控件是一个 aria-hidden 的 div，现在不应再存在
+    expect(wrapper.find('div.gd-searchbox').exists()).toBe(false)
+
+    await input.setValue('银行')
+    await new Promise((r) => setTimeout(r, 340))
+    expect(store.filters.keyword).toBe('银行')
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: '/' }))
+    expect(document.activeElement).toBe(input.element)
+    wrapper.unmount()
+    store.filters.keyword = ''
+  })
+
+  it('移动端导航项与关键控件触控区 ≥44px，PC 紧凑尺寸不变', () => {
+    const css = readFileSync(resolve(process.cwd(), 'src/styles/gapdesk/components.css'), 'utf8')
+    const touch = atBlock(css, '@media (max-width: 768px), (hover: none) and (pointer: coarse)')
+    for (const rule of ['.gd-nav', '.gd-stage .pctl', '.gd-viewbtn', '.gd-purge-btn', '.gd-searchbox input']) {
+      expect(touch).toContain(rule)
+    }
+    expect(touch).toMatch(/\.gd-nav[^{]*\{[^}]*min-height:[ ]*44px/)
+    // 媒体查询之外，PC 仍是 32px 终端风
+    const outside = css.replace(touch, '')
+    expect(outside).toMatch(/\.gd-nav[^{]*\{[^}]*height:[ ]*32px/)
+  })
+})

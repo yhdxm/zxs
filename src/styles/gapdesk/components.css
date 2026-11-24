@@ -98,9 +98,25 @@
   overflow: hidden;
   flex-shrink: 1;
 }
-.gd-searchbox:hover {
+.gd-searchbox:focus-within {
   border-color: var(--gd-brand);
-  color: var(--gd-brand);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--gd-brand) 18%, transparent);
+}
+.gd-searchbox input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--gd-ink);
+  font: inherit;
+}
+.gd-searchbox input::placeholder {
+  color: var(--gd-ink3);
+}
+.gd-searchbox input::-webkit-search-cancel-button {
+  cursor: pointer;
 }
 .gd-kbd {
   font-family: var(--gd-mono);
@@ -809,4 +825,31 @@
   font-size: var(--gd-fs-why);
   line-height: 1.7;
   flex-shrink: 0;
+}
+
+/* ============================================================
+   移动端 / 粗指针：触控目标统一 ≥44px（PC 三栏保持原紧凑尺寸）
+   侧栏 17 项本身 overflow-y:auto，长列表可滚动，不会被撑出屏幕。
+   ============================================================ */
+@media (max-width: 768px), (hover: none) and (pointer: coarse) {
+  .gd-nav {
+    height: auto;
+    min-height: 44px;
+    margin-bottom: 2px;
+  }
+  .gd-gl {
+    margin-top: 14px;
+  }
+  .gd-stage .pctl {
+    min-height: 44px;
+  }
+  .gd-viewbtn,
+  .gd-purge-btn,
+  .gd-avatar-btn {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  .gd-searchbox input {
+    min-height: 44px;
+  }
 }
