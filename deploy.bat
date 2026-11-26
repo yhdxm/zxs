@@ -165,7 +165,7 @@ if not defined GH_TOKEN (
 REM ================= push (retry each route) =================
 echo.
 echo 正在推送到 GitHub...
-set "PUSH_URL=https://%GH_TOKEN%@github.com/%REPO_FULL%.git"
+set "PUSH_URL=https://x-access-token:%GH_TOKEN%@github.com/%REPO_FULL%.git"
 set "PUSH_LOG=%TEMP%\zxs_deploy_push.log"
 set "PUSH_OK=0"
 
@@ -173,6 +173,7 @@ REM 低速容忍：半通网络下避免被误判断流导致整轮失败
 git config http.lowSpeedLimit 0
 git config http.lowSpeedTime 9999
 git config http.maxRequestBuffer 104857600
+
 
 REM 首选：系统 DNS 直连。github.com 实测可达时优先直连，避免静态 IP 过时导致全线路失败
 call :PUSH_DIRECT 3
@@ -252,6 +253,12 @@ if %D_IDX% lss %TRY_N% goto PUSH_DIRECT_LOOP
 exit /b 0
 
 :DIAGNOSE_FAIL
+findstr /C:"could not read Password" /C:"terminal prompts disabled" /C:"Authentication failed" "%PUSH_LOG%" >nul 2>&1
+if !ERRORLEVEL! == 0 (
+  echo 诊断：git 凭据读取失败 —— token 可能被当成用户名二次要密码。
+  echo   本脚本已改用 x-access-token:token 格式；请确认用的是【新生成】的 token（旧的已泄露需撤销）。
+  goto :EOF
+)
 findstr /C:"Could not resolve proxy" "%PUSH_LOG%" >nul 2>&1
 if !ERRORLEVEL! == 0 (
   echo 诊断：代理地址无效 —— 请还原 git 的 http.proxy 设置：git config --global --unset http.proxy
