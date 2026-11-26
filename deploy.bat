@@ -11,7 +11,7 @@ set "PAGES_URL=https://%REPO_OWNER%.github.io/%REPO_NAME%/"
 set "ACTIONS_URL=https://github.com/%REPO_FULL%/actions"
 
 echo.
-echo === 智习 ZXS 一键部署 ===
+echo === ZXS 一键部署 ===
 echo   仓库: %REPO_FULL%
 echo.
 
@@ -20,10 +20,10 @@ if exist "%USERPROFILE%\.workbuddy\vendor\PortableGit\mingw64\bin\git.exe" (
   set "GIT_BIN_DIR=%USERPROFILE%\.workbuddy\vendor\PortableGit\mingw64\bin"
 ) else if exist "%USERPROFILE%\.workbuddy\vendor\PortableGit\cmd\git.exe" (
   set "GIT_BIN_DIR=%USERPROFILE%\.workbuddy\vendor\PortableGit\cmd"
-) else if exist "C:\Program Files\Git\cmd\git.exe" (
-  set "GIT_BIN_DIR=C:\Program Files\Git\cmd"
-) else if exist "C:\Program Files (x86)\Git\cmd\git.exe" (
-  set "GIT_BIN_DIR=C:\Program Files (x86)\Git\cmd"
+) else if exist "C:/Program Files/Git/cmd/git.exe" (
+  set "GIT_BIN_DIR=C:/Program Files\Git\cmd"
+) else if exist "C:/Program Files (x86)/Git/cmd/git.exe" (
+  set "GIT_BIN_DIR=C:/Program Files (x86)\Git\cmd"
 ) else if exist "%LOCALAPPDATA%\Programs\Git\cmd\git.exe" (
   set "GIT_BIN_DIR=%LOCALAPPDATA%\Programs\Git\cmd"
 )
@@ -31,7 +31,7 @@ if exist "%USERPROFILE%\.workbuddy\vendor\PortableGit\mingw64\bin\git.exe" (
 if not defined GIT_BIN_DIR (
   git --version >nul 2>&1
   if !ERRORLEVEL! == 0 goto GIT_READY
-  echo 未找到 git.exe。请先安装 Git for Windows: https://git-scm.com/download/win
+  echo 未找到 git.exe，请先安装 Git for Windows: https://git-scm.com/download/win
   pause
   exit /b 1
 )
@@ -54,24 +54,20 @@ git config user.name "ZXS Deploy"
 git config http.version HTTP/1.1
 git config http.postBuffer 524288000
 git config https.postBuffer 524288000
-git config --local credential.helper ""
+git config --local --unset-all credential.helper >nul 2>&1
 
-REM ================= commit local changes =================
-REM 安全说明：临时/敏感文件已由 .gitignore 排除，下方保留 git add -A 以包含所有部署
-REM 所需的新增源码。请勿改为 pathspec 排除写法（本脚本启用 enabledelayedexpansion，
-REM 其中的 ! 会与 :!xxx 语法冲突导致失效），也不要改为精确列文件（易漏部署文件）。
+REM 提交本地改动
 git add -A
-echo 本次将提交的文件（来自 git add -A）：
 git diff --cached --name-only
 git diff --cached --quiet
 if !ERRORLEVEL! neq 0 (
   git commit -m "deploy: update (%date% %time%)"
 ) else (
-  echo 没有本地改动需要提交。
+  echo 没有改动的文件需要提交
 )
 git branch -M main
 
-REM ================= find a reachable GitHub IP =================
+REM 找可达 GitHub IP
 set "CURL_BIN=curl"
 if exist "%SystemRoot%\System32\curl.exe" set "CURL_BIN=%SystemRoot%\System32\curl.exe"
 
@@ -138,50 +134,48 @@ if defined GOOD_IP (
   set "RESOLVE_ARG=-c http.curloptResolve=github.com:443:!GOOD_IP!"
 ) else (
   echo.
-  echo   [警告] 未找到任何可连接的 IP。将尝试直接连接。
-  echo   如果仍失败，请开启 VPN 或手机热点后重新运行本脚本。
+  echo   [警告] 未找到任何可连接的 IP，将继续直接连接。
+  echo   若最后失败，请开 VPN 或换手机热点后重新运行本脚本。
 )
 
-REM ================= token =================
+REM 凭据输入
 echo.
-echo 请在下方粘贴你的 GitHub token。
-echo   经典 token（classic）：需要 "repo"；仅当改动 .github/workflows 时才加 "workflow"。
-echo   细粒度 token：Contents=写入、Pages=写入；改工作流文件时再加 Actions=读取/写入。
-echo 输入后按回车即可，脚本会立即清屏，token 不会留在屏幕上。
+echo 请输入GitHub凭据后按回车；脚本不会把凭据显示到屏幕上。
+echo   需要仓库写入权限；若会修改 .github/workflows 还需工作流写入权限。
 echo.
-set /p "GH_TOKEN=请输入 GitHub token: "
+set /p "GH_TOKEN=请输入 GitHub 凭据: "
 cls
 echo ============================================
-echo  ZXS deploy: token 已接收，继续推送
+echo  ZXS deploy: 凭据已接收，正在部署
 echo ============================================
 set "GH_TOKEN=%GH_TOKEN: =%"
 
 if not defined GH_TOKEN (
-  echo 未输入 token，已终止。
+  echo 未输入凭据，已终止。
   pause
   exit /b 1
 )
 
-REM ================= push (retry each route) =================
+REM 推送
 echo.
 echo 正在推送到 GitHub...
 set "PUSH_URL=https://x-access-token:%GH_TOKEN%@github.com/%REPO_FULL%.git"
 set "PUSH_LOG=%TEMP%\zxs_deploy_push.log"
 set "PUSH_OK=0"
+set "AUTH_DEAD="
 
-REM 低速容忍：半通网络下避免被误判断流导致整轮失败
 git config http.lowSpeedLimit 0
 git config http.lowSpeedTime 9999
 git config http.maxRequestBuffer 104857600
 
-
-REM 首选：系统 DNS 直连。github.com 实测可达时优先直连，避免静态 IP 过时导致全线路失败
 call :PUSH_DIRECT 3
+if "!AUTH_DEAD!" == "1" goto AUTH_DEAD_END
 if defined GOOD_IP (
   if not "!PUSH_OK!" == "1" call :PUSH_WITH_RETRY "!GOOD_IP!" 3
 )
+if "!AUTH_DEAD!" == "1" goto AUTH_DEAD_END
 if not "!PUSH_OK!" == "1" (
-  echo 直连与首选线路均未成功，正在尝试其他线路...
+  echo 直连与首选线路未成功，正在尝试其他线路...
   for %%r in (
     192.30.255.112
     4.208.26.197
@@ -197,6 +191,7 @@ if not "!PUSH_OK!" == "1" (
     if not "!PUSH_OK!" == "1" (
       if not "%%r" == "!GOOD_IP!" (
         call :PUSH_WITH_RETRY "%%r" 2
+        if "!AUTH_DEAD!" == "1" goto AUTH_DEAD_END
       )
     )
   )
@@ -204,7 +199,6 @@ if not "!PUSH_OK!" == "1" (
 
 if "!PUSH_OK!" == "1" goto PUSH_SUCCESS
 
-REM 二次确认：即使 push 命令返回异常，日志出现下列任一文案也视为成功
 findstr /C:"main -> main" "%PUSH_LOG%" >nul 2>&1
 if !ERRORLEVEL! == 0 goto PUSH_SUCCESS
 findstr /C:"Everything up-to-date" "%PUSH_LOG%" >nul 2>&1
@@ -219,14 +213,24 @@ echo.
 call :DIAGNOSE_FAIL
 goto DEPLOY_END
 
+:AUTH_DEAD_END
+echo.
+echo [失败] 认证未通过，已停止重试（认证问题与线路无关，无需逐个 IP 尝试）。
+echo   详情: %PUSH_LOG%
+echo.
+type "%PUSH_LOG%"
+echo.
+call :DIAGNOSE_FAIL
+goto DEPLOY_END
+
 :PUSH_SUCCESS
 echo.
 echo [成功] 推送完成。
 echo.
-echo ===== 自动配置 GitHub Pages（部署源=GitHub Actions）=====
+echo ===== 自动配置 GitHub Pages（源=GitHub Actions）=====
 call :CONFIGURE_PAGES
 echo.
-echo 部署进度: %ACTIONS_URL%
+echo 构建状态: %ACTIONS_URL%
 echo 线上地址: %PAGES_URL%
 
 :DEPLOY_END
@@ -236,49 +240,56 @@ echo.
 pause
 exit /b 0
 
-REM ================= push retry helper =================
-REM ==== direct push (system DNS, no forced IP) ====
+REM 直连推送（系统 DNS，不强制 IP）
 :PUSH_DIRECT
 set "TRY_N=%~1"
 set /a D_IDX=0
 :PUSH_DIRECT_LOOP
 set /a D_IDX+=1
 echo   系统直连 第 %D_IDX%/%TRY_N% 次尝试...
-git push "%PUSH_URL%" main > "%PUSH_LOG%" 2>&1
+git -c credential.helper= push "%PUSH_URL%" main > "%PUSH_LOG%" 2>&1
 if !ERRORLEVEL! == 0 (
   set "PUSH_OK=1"
   goto :EOF
 )
+call :CHECK_AUTH_DEAD
+if "!AUTH_DEAD!" == "1" exit /b 0
 if %D_IDX% lss %TRY_N% goto PUSH_DIRECT_LOOP
 exit /b 0
 
+:CHECK_AUTH_DEAD
+findstr /C:"Invalid username or token" /C:"Authentication failed" /C:"Password authentication is not supported" /C:"could not read Username" /C:"terminal prompts disabled" "%PUSH_LOG%" >nul 2>&1
+if !ERRORLEVEL! == 0 set "AUTH_DEAD=1"
+exit /b 0
+
 :DIAGNOSE_FAIL
-findstr /C:"could not read Password" /C:"terminal prompts disabled" /C:"Authentication failed" "%PUSH_LOG%" >nul 2>&1
+findstr /C:"could not read Password" /C:"terminal prompts disabled" /C:"Authentication failed" /C:"Invalid username or token" /C:"Password authentication is not supported" "%PUSH_LOG%" >nul 2>&1
 if !ERRORLEVEL! == 0 (
-  echo 诊断：git 凭据读取失败 —— token 可能被当成用户名二次要密码。
-  echo   本脚本已改用 x-access-token:token 格式；请确认用的是【新生成】的 token（旧的已泄露需撤销）。
+  echo 诊断：GitHub 拒绝了本次推送凭据（认证未通过，与网络线路无关）。
+  echo   已强制禁用系统凭据缓存，仅使用本次输入的凭据；请重新运行并再输入一次凭据。
+  echo   若仍不通过，请确认该凭据对仓库有写入权限。
   goto :EOF
 )
 findstr /C:"Could not resolve proxy" "%PUSH_LOG%" >nul 2>&1
 if !ERRORLEVEL! == 0 (
   echo 诊断：代理地址无效 —— 请还原 git 的 http.proxy 设置：git config --global --unset http.proxy
-  echo   本脚本不需要填代理；若装过代理工具，请确认它是全局模式或已关闭。
+  echo   本脚本不再需要代理；如果你开了代理，请确保是全局模式并已关闭。
   goto :EOF
 )
 findstr /C:"10054" /C:"Connection was reset" /C:"Empty reply" /C:"timed out" /C:"Could not resolve host" "%PUSH_LOG%" >nul 2>&1
 if !ERRORLEVEL! == 0 (
-  echo 诊断：连接被网络层重置/中断 —— 这不是 token 问题。
-  echo   curl/浏览器能打开 GitHub 不代表 git 写操作能通；推送常被间歇性阻断。
-  echo   建议：换手机热点重试，或确认 VPN 为「全局模式」（规则模式 git 不走）。
+  echo 诊断：连接被重置/中断 —— 这不是凭据问题。
+  echo   curl/浏览器能打开 GitHub 但 git 写操作不通，通常是运营商链路问题。
+  echo   建议：换手机热点试；确保 VPN 为全局模式（部分模式 git 不走代理）。
   goto :EOF
 )
-findstr /C:"401" /C:"403" /C:"Authentication failed" /C:"Permission denied" /C:"not found" "%PUSH_LOG%" >nul 2>&1
+findstr /C:"401" /C:"403" /C:"Permission denied" /C:"not found" "%PUSH_LOG%" >nul 2>&1
 if !ERRORLEVEL! == 0 (
-  echo 诊断：token 无效或权限不足 —— 这是鉴权问题，不是网络问题。
-  echo   经典 token 请勾选 repo；细粒度 token 请给 Contents=写入。
+  echo 诊断：凭据权限不足 —— 这是鉴权问题，不是网络问题。
+  echo   需要 repo（classic）或 Contents=写入（细粒度）权限。
   goto :EOF
 )
-echo 诊断：原因不明。请把上面的日志发给 AI 分析（发送前删掉 token 那一行）。
+echo 诊断：原因未知，请把上面的日志发给 AI 处理；发送前删掉凭据那一行。
 exit /b 0
 
 :PUSH_WITH_RETRY
@@ -288,32 +299,32 @@ set /a P_IDX=0
 :PUSH_RETRY_LOOP
 set /a P_IDX+=1
 echo   线路 %TRY_IP% 第 %P_IDX%/%TRY_N% 次尝试...
-git -c http.curloptResolve=github.com:443:%TRY_IP% push "%PUSH_URL%" main > "%PUSH_LOG%" 2>&1
-REM git push 返回 0 就是成功：输出可能是 "main -> main"（新提交），也可能是 "Everything up-to-date"（已同步）。
-REM 旧版只认前者，导致本地与远端一致时误报「所有线路推送均失败」。
+git -c credential.helper= -c http.curloptResolve=github.com:443:%TRY_IP% push "%PUSH_URL%" main > "%PUSH_LOG%" 2>&1
 if !ERRORLEVEL! == 0 (
   set "PUSH_OK=1"
   > "%IPFILE%" echo %TRY_IP%
   goto :EOF
 )
+call :CHECK_AUTH_DEAD
+if "!AUTH_DEAD!" == "1" exit /b 0
 if %P_IDX% lss %TRY_N% goto PUSH_RETRY_LOOP
 exit /b 0
 
-REM ================= subroutine =================
+REM 子程序
 :CONFIGURE_PAGES
 set "API_BASE=https://api.github.com/repos/%REPO_FULL%"
-echo   正在调用 GitHub API：将 Pages 部署源设为 GitHub Actions ...
+echo   正在调用 GitHub API，把 Pages 源设置为 GitHub Actions ...
 curl -s -o "%TEMP%\zxs_pages.json" -w "   HTTP %%{http_code}\n" -X PUT ^
   -H "Accept: application/vnd.github+json" ^
   -H "Authorization: Bearer %GH_TOKEN%" ^
   -H "X-GitHub-Api-Version: 2022-11-28" ^
   "%API_BASE%/pages" ^
   -d "{\"build_type\":\"workflow\"}"
-echo   HTTP 200/204 表示 Pages 部署源已成功设为 GitHub Actions。
+echo   HTTP 200/204 表示 Pages 源已成功设置为 GitHub Actions。
 
-echo   本次推送已自动触发 GitHub Pages 部署，无需手动重新运行。
-echo   部署进度：%ACTIONS_URL%
-echo   通常 1-2 分钟后刷新线上地址即可看到新版（首次可能稍慢）。
+echo   接下来请到 GitHub 仓库的 Actions 页面手动触发一次部署。
+echo   查看地址：%ACTIONS_URL%
+echo   通常 1-2 分钟后刷新线上地址即可看到新版本（首次可能更久）。
 exit /b 0
 
 :PROBE
