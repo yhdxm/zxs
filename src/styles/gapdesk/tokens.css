@@ -36,6 +36,14 @@
   --gd-cyan: #00BFD4;
   --gd-warn: #FF9F0A;
 
+  /* 差标签语义色：紫=海外先发 / 橙=时差 / 青=未出圈 / 红=孤证风险 / 绿=多源交叉。
+     三处（PC 卡 / 移动卡 / 详情）共用同一套，保证同一事件色义一致。 */
+  --gd-tag-foreign: #7C3AED;
+  --gd-tag-lag: #EA580C;
+  --gd-tag-mass: #0E9F8A;
+  --gd-tag-risk: #DC2626;
+  --gd-tag-cross: #16A34A;
+
   /* 渐变 */
   --gd-grad: linear-gradient(135deg, #6366F1 0%, #A855F7 55%, #FF3358 100%);
   --gd-grad2: linear-gradient(135deg, #00BFD4 0%, #6366F1 100%);

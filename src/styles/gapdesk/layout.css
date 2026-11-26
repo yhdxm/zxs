@@ -289,6 +289,13 @@ body.gd-fullbleed .main-content {
   display: flex;
   align-items: center;
   gap: 7px;
+  line-height: 1.6;
+}
+/* 展开采集说明时允许换行成多行，不再强制单行居中 */
+.p-note.p-note-more {
+  display: block;
+  max-height: 168px;
+  overflow-y: auto;
 }
 .p-body {
   flex: 1;

@@ -7,10 +7,33 @@
   <div class="pcview">
     <div class="searchbar">
       <span aria-hidden="true">⌕</span>
-      <span>搜索归档：关键词 / 行业 / 信源 / 时间</span>
-      <span class="gd-pill gd-pill-soft gd-mono" :title="EMPTY_EXPORT">{{ EMPTY_EXPORT }}</span>
-      <input class="pctl" type="search" disabled :placeholder="EMPTY_EXPORT" :aria-label="EMPTY_EXPORT" />
+      <label for="gd-archive-q" title="信源与日期维度请见下方按日归档；此处检索仅覆盖当前 48h 池">搜索归档：关键词 / 行业 / 信源 / 时间</label>
+      <input
+        id="gd-archive-q"
+        v-model="keyword"
+        class="pctl"
+        type="search"
+        placeholder="标题 / 摘要 / 译文 / 行业"
+        aria-label="检索当前 48 小时内的事件"
+      />
+      <span class="gd-pill gd-pill-soft gd-mono" :title="`${EMPTY_ARCHIVE} · ${EMPTY_EXPORT}`">仅 48h · 超期已清理</span>
+      <span v-if="keyword" class="gd-mono">{{ searchHits.length }} 条命中</span>
     </div>
+
+    <template v-if="keyword.trim()">
+      <div class="gh"><i class="bar" aria-hidden="true" /><span class="t">检索结果 · 当前 48h</span><span class="b">{{ searchHits.length }}</span></div>
+      <GapEmptyState v-if="!searchHits.length" type="empty" desc="当前 48h 池内没有匹配的事件；超出保留期的条目已不可查" />
+      <GapEventCard
+        v-for="item in searchHits"
+        :key="item.id"
+        :event="item"
+        :favorite="favorites.includes(item.id)"
+        :later="laterIds.includes(item.id)"
+        @open="openDetail"
+        @later="toggleLater"
+        @like="toggleFavoriteEvent"
+      />
+    </template>
 
     <div class="archive-grid">
       <section class="panel">
@@ -65,12 +88,22 @@
 import { computed, inject, ref } from 'vue'
 import GapEmptyState from '../../../components/gapdesk/GapEmptyState.vue'
 import GapEventCard from '../../../components/gapdesk/GapEventCard.vue'
-import { EMPTY_ARCHIVE, EMPTY_EXPORT, EMPTY_HISTORY } from '../../../config/gapdeskConfig'
+import { EMPTY_ARCHIVE, EMPTY_EXPORT, EMPTY_HISTORY, GAP_IND_MAP } from '../../../config/gapdeskConfig'
 import { GAP_OPEN_DETAIL_KEY, useGapDesk } from '../../../composables/useGapDesk'
 import type { GapEventRow } from '../../../types/gapdesk'
 
-const { events, favorites, laterIds, toggleLater, toggleFavoriteEvent } = useGapDesk()
+const {
+  events,
+  favorites,
+  laterIds,
+  toggleLater,
+  toggleFavoriteEvent,
+  titleOf,
+  summaryOf,
+  ensureI18n
+} = useGapDesk()
 const openDetail = inject(GAP_OPEN_DETAIL_KEY, (_id: number) => {})
+const keyword = ref('')
 
 const WEEK = ['一', '二', '三', '四', '五', '六', '日'] as const
 const now = new Date()
@@ -129,6 +162,18 @@ const activeDays = computed(() => {
 const selectedKey = computed(() => keyOf(selectedDay.value))
 const isBefore = computed(() => cells.value.find((cell) => cell.key === selectedKey.value)?.before ?? true)
 const dayEvents = computed(() => (byDay.value.get(selectedKey.value) ?? []).slice().sort((a, b) => b.gap - a.gap))
+
+/** 48h 池内真检索：标题/译文/摘要/行业名，不查已清理的历史 */
+const searchHits = computed<GapEventRow[]>(() => {
+  const kw = keyword.value.trim().toLowerCase()
+  if (!kw) return []
+  const hits = events.value.filter((e) => {
+    const hay = `${e.title} ${titleOf(e)} ${e.summary ?? ''} ${summaryOf(e)} ${GAP_IND_MAP[e.ind]?.label ?? ''}`.toLowerCase()
+    return hay.includes(kw)
+  })
+  ensureI18n(hits.slice(0, 20))
+  return hits.sort((a, b) => b.gap - a.gap).slice(0, 60)
+})
 </script>
 
 <style scoped>

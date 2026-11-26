@@ -17,12 +17,18 @@
       <span class="p-t">{{ title }}</span>
       <span class="gd-spacer" />
 
-      <!-- 状态胶囊自带，真机看不到 PC 顶栏；与 PC 顶栏共用同一份数据年龄与分档 -->
-      <span class="p-pillbtn" :title="dataFreshnessTitle">
+      <!-- 状态胶囊自带，真机看不到 PC 顶栏；点击展开采集说明 -->
+      <button
+        type="button"
+        class="p-pillbtn"
+        :title="dataFreshnessTitle"
+        :aria-expanded="ageOpen"
+        @click="ageOpen = !ageOpen"
+      >
         <span class="gd-pill gd-mono p-pill-sm p-age-pill" :class="'gd-age-' + dataFreshnessTone">
           {{ dataAgeText }}
         </span>
-      </span>
+      </button>
       <span class="p-pillbtn" title="今日 L0 必看条数">
         <span class="gd-pill gd-pill-acc gd-mono p-pill-sm">{{ l0Count === null ? '—' : l0Count }} 条 L0</span>
       </span>
@@ -46,8 +52,10 @@
       </button>
     </div>
 
-    <!-- 不再按 isLive 二元切换：数据来自采集，只是可能滞后；提示对新鲜数据同样成立 -->
-    <div class="p-note">{{ EMPTY_DEMO }}</div>
+    <!-- 不再按 isLive 二元切换：数据来自采集，只是可能滞后；点击状态胶囊展开完整说明 -->
+    <div class="p-note" :class="{ 'p-note-more': ageOpen }">
+      {{ ageOpen ? `${dataFreshnessTitle}。${GAP_COLLECT_NOTE}` : EMPTY_DEMO }}
+    </div>
 
     <!-- 日期条槽：默认渲染真实日期胶囊（当前日渐变紫），各屏也可用 datebar 槽覆盖 -->
     <slot name="datebar">
@@ -81,9 +89,9 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import GapDateStrip from './GapDateStrip.vue'
-import { EMPTY_DEMO } from '../../config/gapdeskConfig'
+import { EMPTY_DEMO, GAP_COLLECT_NOTE } from '../../config/gapdeskConfig'
 import { useGapDesk } from '../../composables/useGapDesk'
 
 const {
@@ -94,6 +102,8 @@ const {
   dataFreshnessTone,
   dataFreshnessTitle
 } = useGapDesk()
+/** 数据年龄说明展开态：只在本组件内，与 PC 顶栏各自独立 */
+const ageOpen = ref(false)
 /** 高亮只从 store 的筛选派生，不允许有第二份本地状态（否则筛了日期再切视图会漂移） */
 const activeBand = computed<string>(() => filters.dateBand)
 function onPick(key: string): void {
@@ -157,5 +167,19 @@ const emit = defineEmits<{
   padding: 0 5px;
   font-size: 9px;
   white-space: nowrap;
+}
+/* 问号走伪元素，胶囊文本与 PC 顶栏、store 逐字一致 */
+.p-age-pill::after {
+  content: '?';
+  display: inline-block;
+  width: 11px;
+  height: 11px;
+  margin-left: 3px;
+  line-height: 10px;
+  text-align: center;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  font-size: 8px;
+  vertical-align: middle;
 }
 </style>

@@ -32,7 +32,7 @@
           <component :is="activeComp" v-bind="activeProps" />
         </main>
 
-        <GapRightCol @navigate="onNavigate" />
+        <GapRightCol :event="activeEvent" @navigate="onNavigate" />
       </div>
     </template>
 

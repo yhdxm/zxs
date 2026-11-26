@@ -40,12 +40,17 @@
           <label>格式 <select class="pctl"><option>Markdown</option></select></label>
         </div>
         <div class="config-actions">
+          <button type="button" class="pctl" @click="copyReport">复制研判文本</button>
+          <button type="button" class="pctl" @click="downloadReport">下载 .txt 简报</button>
+          <span class="gd-mono">{{ exportNote }}</span>
+        </div>
+        <div class="config-actions planned">
           <button type="button" class="pctl" disabled :title="EMPTY_EXPORT">生成 PDF</button>
           <button type="button" class="pctl" disabled :title="EMPTY_EXPORT">检索导出</button>
           <span class="gd-mono">{{ EMPTY_EXPORT }}</span>
         </div>
       </section>
-      <GapEmptyState type="empty" :desc="EMPTY_EXPORT" :phase2="EMPTY_ARCHIVE" />
+      <p class="panel-note">PDF 排版与历史归档导出未接入：当前只提供真实简报文本复制 / 下载，不生成假报告。</p>
     </template>
 
     <!-- 团队席位 -->
@@ -85,16 +90,15 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import GapEmptyState from '../../../components/gapdesk/GapEmptyState.vue'
 import {
-  EMPTY_ARCHIVE,
+  EMPTY_EXPORT,
   EMPTY_LLM,
   EMPTY_GENERIC,
   EMPTY_MEMBERS,
   EMPTY_PUSH,
   EMPTY_WAIT,
-  EMPTY_EXPORT,
   GAP_PLAN,
   gapPlanLabel
 } from '../../../config/gapdeskConfig'
@@ -107,6 +111,37 @@ const props = defineProps<{ kind: 'alert' | 'report' | 'seats' | 'pricing' }>()
 const { dailyBriefText, ruleRows, ruleLoaded } = useGapDesk()
 
 const seatRows = ref<GapSeatRow[]>([])
+const exportNote = ref('导出的是规则归纳文本，非 PDF；不含未接入的历史数据')
+const reportBody = computed(() =>
+  [
+    '# 差值台 · 今日研判',
+    `生成时间：${new Date().toLocaleString('zh-CN')}`,
+    '',
+    dailyBriefText.value || '当前无事件，无法生成研判。',
+    '',
+    '说明：本简报由真实事件按固定规则归纳，非大模型生成；仅覆盖当前 48 小时事件池。'
+  ].join('\n')
+)
+
+async function copyReport(): Promise<void> {
+  try {
+    await navigator.clipboard.writeText(reportBody.value)
+    exportNote.value = '已复制研判文本到剪贴板'
+  } catch {
+    exportNote.value = '浏览器拒绝了剪贴板权限，请改用下载 .txt'
+  }
+}
+
+function downloadReport(): void {
+  const blob = new Blob([reportBody.value], { type: 'text/plain;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `gapdesk-brief-${new Date().toISOString().slice(0, 10)}.txt`
+  a.click()
+  URL.revokeObjectURL(url)
+  exportNote.value = '已下载当日研判文本'
+}
 
 onMounted(async () => {
   if (props.kind === 'seats') seatRows.value = (await loadSeats()).data
@@ -133,6 +168,11 @@ onMounted(async () => {
 }
 .config-actions {
   margin-top: 12px;
+}
+/* 规划中按钮保留但弱化，不与已接线的复制/下载抢视线 */
+.config-actions.planned {
+  margin-top: 6px;
+  opacity: .72;
 }
 .plans {
   display: grid;

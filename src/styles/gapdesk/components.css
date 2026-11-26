@@ -859,6 +859,100 @@
 }
 
 /* ============================================================
+   差标签语义色：PC 卡 / 移动卡 / 详情抽屉三处共用。
+   只给 color + 淡背景，不改布局；任何标签都能安全落 neutral。
+   ============================================================ */
+.gd-stage .gd-gaptag,
+.gd-portal .gd-gaptag {
+  display: inline-flex;
+  align-items: center;
+  font-size: var(--gd-fs-pill);
+  border-radius: 4px;
+  padding: 2px 7px;
+  line-height: 1.5;
+  background: var(--gd-sub);
+  color: var(--gd-ink2);
+  white-space: nowrap;
+}
+.gd-stage .gd-gaptag.tone-foreign,
+.gd-portal .gd-gaptag.tone-foreign {
+  color: var(--gd-tag-foreign);
+  background: color-mix(in srgb, var(--gd-tag-foreign) 9%, var(--gd-card));
+}
+.gd-stage .gd-gaptag.tone-lag,
+.gd-portal .gd-gaptag.tone-lag {
+  color: var(--gd-tag-lag);
+  background: color-mix(in srgb, var(--gd-tag-lag) 10%, var(--gd-card));
+}
+.gd-stage .gd-gaptag.tone-mass,
+.gd-portal .gd-gaptag.tone-mass {
+  color: var(--gd-tag-mass);
+  background: color-mix(in srgb, var(--gd-tag-mass) 10%, var(--gd-card));
+}
+.gd-stage .gd-gaptag.tone-risk,
+.gd-portal .gd-gaptag.tone-risk {
+  color: var(--gd-tag-risk);
+  background: color-mix(in srgb, var(--gd-tag-risk) 10%, var(--gd-card));
+}
+.gd-stage .gd-gaptag.tone-cross,
+.gd-portal .gd-gaptag.tone-cross {
+  color: var(--gd-tag-cross);
+  background: color-mix(in srgb, var(--gd-tag-cross) 10%, var(--gd-card));
+}
+/* 语义色点：标签前加一枚同色圆点，扫视时不必读字即可分辨差的类型 */
+.gd-stage .gd-gaptag::before,
+.gd-portal .gd-gaptag::before {
+  content: '';
+  width: 4px;
+  height: 4px;
+  border-radius: 999px;
+  background: currentColor;
+  margin-right: 4px;
+  flex-shrink: 0;
+}
+/* 卡片被指向时差标签提亮、证据圆点微放大：纯视觉反馈，不增删任何文字 */
+.gd-stage .gd-gcard:hover .gd-gaptag,
+.gd-portal .gd-gcard:hover .gd-gaptag {
+  filter: saturate(1.2);
+}
+.gd-stage .gd-source-dots i,
+.gd-portal .gd-source-dots i {
+  transition: transform .15s var(--gd-ease);
+}
+.gd-stage .src-cred:hover .gd-source-dots i,
+.gd-portal .src-cred:hover .gd-source-dots i {
+  transform: scale(1.35);
+}
+
+/* ============================================================
+   可信度圆点条：1 源=1 点灰（孤证）/ 2 源=2 点 / ≥3 源=3 点绿。
+   列表层即可看出证据强弱，不靠点开详情。
+   ============================================================ */
+.gd-stage .gd-source-dots,
+.gd-portal .gd-source-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  vertical-align: middle;
+}
+.gd-stage .gd-source-dots i,
+.gd-portal .gd-source-dots i {
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: var(--gd-line2);
+  display: inline-block;
+}
+.gd-stage .gd-source-dots.multi i,
+.gd-portal .gd-source-dots.multi i {
+  background: var(--gd-tag-cross);
+}
+.gd-stage .gd-source-dots.lone i,
+.gd-portal .gd-source-dots.lone i {
+  background: var(--gd-tag-risk);
+}
+
+/* ============================================================
    移动端 / 粗指针：触控目标统一 ≥44px（PC 三栏保持原紧凑尺寸）
    侧栏 17 项本身 overflow-y:auto，长列表可滚动，不会被撑出屏幕。
    ============================================================ */

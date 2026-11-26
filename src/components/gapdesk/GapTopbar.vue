@@ -17,13 +17,16 @@
         </div>
       </div>
 
-      <!-- 数据是真的，只是可能旧：按 generated_at 的数据年龄如实展示 -->
+      <!-- 数据是真的，只是可能旧：按 generated_at 的数据年龄如实展示；点击展开采集说明 -->
       <div class="gd-ph-status">
-        <span
-          class="gd-pill gd-mono gd-age-pill"
+        <button
+          type="button"
+          class="gd-pill gd-mono gd-age-pill gd-age-btn"
           :class="'gd-age-' + dataFreshnessTone"
           :title="dataFreshnessTitle"
-        >{{ dataAgeText }}</span>
+          :aria-expanded="ageOpen"
+          @click="ageOpen = !ageOpen"
+        >{{ dataAgeText }}</button>
         <span class="gd-pill gd-pill-fnl gd-mono" title="按池内分位分层：L0 前 10% / L1 10–40% / L2 其余">
           今日 L0 {{ tierCounts.L0 }} · L1 {{ tierCounts.L1 }} · L2 {{ tierCounts.L2 }}
         </span>
@@ -60,12 +63,18 @@
         <button class="gd-avatar-btn" type="button" title="返回工作台" aria-label="返回工作台" @click="emit('exit')" />
       </div>
     </div>
+    <div v-if="ageOpen" class="gd-age-note" role="note">
+      <span class="gd-age-note-t">数据年龄说明</span>
+      <span class="gd-age-note-x">{{ dataFreshnessTitle }}</span>
+      <span class="gd-age-note-b">{{ GAP_COLLECT_NOTE }}</span>
+      <button type="button" class="gd-age-note-close gd-mono" aria-label="收起" @click="ageOpen = false">×</button>
+    </div>
   </header>
 </template>
 
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { EMPTY_ECHO } from '../../config/gapdeskConfig'
+import { EMPTY_ECHO, GAP_COLLECT_NOTE } from '../../config/gapdeskConfig'
 import { useGapDesk } from '../../composables/useGapDesk'
 
 const props = withDefaults(
@@ -92,6 +101,8 @@ const {
 /** 顶栏搜索与筛选栏共用同一个 filters.keyword，300ms 防抖避免每敲一字重算整池 */
 const keywordInput = ref<string>(filters.keyword)
 const searchInput = ref<HTMLInputElement | null>(null)
+/** 数据年龄说明面板开关：只在本组件内，不影响 store */
+const ageOpen = ref(false)
 let kwTimer: ReturnType<typeof setTimeout> | null = null
 
 watch(keywordInput, (value) => {
@@ -149,5 +160,61 @@ const emit = defineEmits<{
   color: var(--gd-ink2, #5d6b82);
   font-weight: 700;
   border: 1px solid var(--gd-line2, #dbe3ef);
+}
+/* 数据年龄徽标是可点按钮，保留胶囊外观，补焦点与问号提示 */
+.gd-age-btn {
+  cursor: pointer;
+  min-height: 26px;
+  font-family: inherit;
+}
+/* 问号用伪元素画，不进 DOM 文本，保持胶囊文案与 store 逐字一致 */
+.gd-age-btn::after {
+  content: '?';
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 13px;
+  height: 13px;
+  margin-left: 4px;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  font-size: 9px;
+  vertical-align: middle;
+  opacity: .8;
+}
+.gd-age-note {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  padding: 10px 18px 12px;
+  border-top: 1px solid var(--gd-line, #e6ebf4);
+  background: var(--gd-sub, #fafcff);
+  font-size: var(--gd-fs-panels, 10.5px);
+  line-height: 1.6;
+}
+.gd-age-note-t {
+  font-weight: 700;
+  color: var(--gd-ink, #0c1030);
+}
+.gd-age-note-x {
+  color: var(--gd-ink2, #54608a);
+}
+.gd-age-note-b {
+  flex: 1 0 100%;
+  color: var(--gd-ink2, #54608a);
+}
+.gd-age-note-close {
+  position: absolute;
+  top: 6px;
+  right: 12px;
+  width: 26px;
+  height: 26px;
+  border: 0;
+  background: transparent;
+  color: var(--gd-ink3, #93a1c4);
+  font-size: 16px;
+  cursor: pointer;
 }
 </style>

@@ -57,7 +57,7 @@ import { computed } from 'vue'
 import GapEmptyState from '../../../components/gapdesk/GapEmptyState.vue'
 import GapHeroCards from '../../../components/gapdesk/GapHeroCards.vue'
 import GapRing from '../../../components/gapdesk/GapRing.vue'
-import { EMPTY_ECHO, EMPTY_ECHO_RULE } from '../../../config/gapdeskConfig'
+import { EMPTY_ECHO, EMPTY_ECHO_RULE, GAP_LAG_NOTE } from '../../../config/gapdeskConfig'
 import { useGapDesk } from '../../../composables/useGapDesk'
 
 const { ranked, lagMedianHours, stats } = useGapDesk()
@@ -71,7 +71,7 @@ const heroItems = computed(() => [
   {
     label: '时差中位（小时）',
     n: lagMedianHours.value === null ? '—' : lagMedianHours.value,
-    d: '源间实测',
+    d: '源间实测 · ' + GAP_LAG_NOTE,
     grad: false
   },
   { label: '待验证队列', n: '积累中', d: EMPTY_ECHO, grad: false }

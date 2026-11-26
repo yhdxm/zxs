@@ -10,6 +10,7 @@
       <div><b class="gd-mono">—</b><span>兑现率 · {{ EMPTY_ECHO }}</span></div>
       <div><b class="gd-mono">{{ sampleN }}</b><span>有效样本 N（L0+L1）</span></div>
       <div><b class="gd-mono">{{ lagMedianHours === null ? '—' : lagMedianHours }}</b><span>时差中位（小时）</span></div>
+      <div class="lag-note"><span>源间实测 · {{ GAP_LAG_NOTE }}</span></div>
       <div><b class="gd-mono">积累中</b><span>待验证队列</span></div>
     </div>
 
@@ -37,7 +38,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { EMPTY_ECHO, EMPTY_ECHO_RULE } from '../../../config/gapdeskConfig'
+import { EMPTY_ECHO, EMPTY_ECHO_RULE, GAP_LAG_NOTE } from '../../../config/gapdeskConfig'
 import { useGapDesk } from '../../../composables/useGapDesk'
 
 const { ranked, lagMedianHours, stats } = useGapDesk()
@@ -67,6 +68,14 @@ const sampleN = computed(() => ranked.value.filter((row) => row.tier === 'L0' ||
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
+}
+.stats > .lag-note {
+  grid-column: 1 / -1;
+  padding: 6px 11px;
+}
+.stats > .lag-note span {
+  font-size: var(--gd-fs-pill);
+  color: var(--gd-ink3);
 }
 .stats > div {
   min-width: 0;

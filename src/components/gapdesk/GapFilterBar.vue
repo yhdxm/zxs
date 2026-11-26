@@ -57,12 +57,35 @@
         >{{ opt.label }}</button>
       </div>
 
+      <div class="gfb-group">
+        <span class="gfb-lb">来源</span>
+        <button
+          type="button"
+          class="gfb-chip gd-mono"
+          :class="{ on: filters.onlyForeign }"
+          :aria-pressed="filters.onlyForeign"
+          @click="filters.onlyForeign = !filters.onlyForeign"
+        >只看海外</button>
+      </div>
+
+      <label class="gfb-group gfb-auto">
+        <span class="gfb-lb">自动翻译</span>
+        <button
+          type="button"
+          class="gfb-switch gd-mono"
+          :class="{ on: autoTranslate }"
+          :aria-pressed="autoTranslate"
+          :title="budgetTip"
+          @click="toggleAutoTranslate()"
+        ><i />{{ autoTranslate ? '开' : '关' }}</button>
+      </label>
+
       <input
         v-model="keywordInput"
         class="gfb-kw gd-mono"
         type="search"
-        placeholder="标题 / 摘要关键词"
-        aria-label="标题或摘要关键词"
+        placeholder="标题 / 摘要 / 译文关键词"
+        aria-label="标题、摘要或译文关键词"
       />
 
       <span class="gfb-count gd-mono">{{ pool.length }} 条</span>
@@ -71,12 +94,32 @@
 </template>
 
 <script setup lang="ts">
-import { onBeforeUnmount, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { GAP_DIM6, GAP_IND } from '../../config/gapdeskConfig'
 import { useGapDesk } from '../../composables/useGapDesk'
 import type { GapDim6Key, GapInd } from '../../types/gapdesk'
 
-const { filters, pool, setWindow, setSort, setDim6, setKeyword, resetFilters } = useGapDesk()
+const {
+  filters,
+  pool,
+  setWindow,
+  setSort,
+  setDim6,
+  setKeyword,
+  resetFilters,
+  autoTranslate,
+  toggleAutoTranslate,
+  i18nBudgetLeft,
+  i18nDailyChars,
+  i18nBudgetOut
+} = useGapDesk()
+
+/** 额度是真实估算值；用完就说用完，不静默失败，也不诱导开启 */
+const budgetTip = computed(() =>
+  i18nBudgetOut.value
+    ? '今日免费翻译额度已用完，译文停止更新，原文照常展示；明日自动恢复'
+    : `免费通道 · 今日剩余约 ${i18nBudgetLeft.value} / ${i18nDailyChars} 字符，仅翻译外文标题与摘要截断`
+)
 
 const SORTS: ReadonlyArray<{ key: 'latest' | 'gap' | 'heat'; label: string }> = [
   { key: 'latest', label: '最新' },
@@ -216,6 +259,32 @@ defineExpose({ reset })
   color: var(--gd-ink3);
   white-space: nowrap;
 }
+.gfb-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 30px;
+  padding: 0 9px;
+  border: 1px solid var(--gd-line);
+  border-radius: 999px;
+  background: var(--gd-card);
+  color: var(--gd-ink2);
+  font-size: var(--gd-fs-pill);
+  cursor: pointer;
+}
+.gfb-switch i {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--gd-ink3);
+}
+.gfb-switch.on {
+  border-color: color-mix(in srgb, var(--gd-brand) 45%, transparent);
+  color: var(--gd-brand);
+}
+.gfb-switch.on i {
+  background: var(--gd-brand);
+}
 .gfb-select {
   height: 30px;
   padding: 0 8px;
@@ -249,7 +318,8 @@ defineExpose({ reset })
 }
 @media (max-width: 768px) {
   .gfb-chip,
-  .gfb-clear {
+  .gfb-clear,
+  .gfb-switch {
     min-height: 44px;
   }
   .gfb-kw,

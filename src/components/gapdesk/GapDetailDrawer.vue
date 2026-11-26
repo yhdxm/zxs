@@ -22,8 +22,18 @@
           <button type="button" class="gdd-x gd-mono" title="关闭" @click="close">×</button>
 
           <div class="gdd-h2row">
-            <h2 class="gdd-title">{{ event.title }}</h2>
+            <GapI18nLine
+              :original="event.title"
+              :display="displayTitle"
+              :state="i18nState"
+              :has-translation="hasTranslation"
+              tag="h2"
+              large
+            />
             <span class="gdd-score gd-mono">{{ event.gap }}</span>
+          </div>
+          <div class="gdd-gaptags" v-if="gapTags.length">
+            <span v-for="tag in gapTags" :key="tag" class="gd-gaptag gd-mono" :class="`tone-${gapTagTone(tag)}`">{{ tag }}</span>
           </div>
           <p class="gdd-sub gd-mono">
             GAP · 池内第 {{ event.rank }} 位 · 原始 {{ event.gap_raw }}/90 · {{ event.src_count }} 路源
@@ -61,8 +71,14 @@
             <p v-else-if="evidenceError" class="gdd-p">证据链读取失败：{{ evidenceError }}</p>
             <p v-else-if="!evidenceRows.length" class="gdd-p">库中没有该事件的证据行（可能刚入库，下一轮补齐）</p>
             <ul v-else class="gdd-srcs">
-              <li v-for="s in evidenceRows" :key="`${s.event_id}-${s.id}`" class="gdd-src">
+              <li
+                v-for="s in evidenceRows"
+                :key="`${s.event_id}-${s.id}`"
+                class="gdd-src"
+                :class="{ first: s.id === firstSourceId }"
+              >
                 <div class="gdd-src-top">
+                  <span v-if="s.id === firstSourceId" class="gdd-first gd-mono">首报</span>
                   <span class="gdd-src-name">{{ s.source_name || '未知来源' }}</span>
                   <span class="gd-pill gd-pill-soft gd-mono">{{ layerLabelOf(s.layer) }}</span>
                   <span class="gdd-src-time gd-mono">{{ stampText(s.publish_ts) }}</span>
@@ -96,8 +112,9 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import GapDualTrack from './GapDualTrack.vue'
 import GapScoreBlock from './GapScoreBlock.vue'
+import GapI18nLine from './GapI18nLine.vue'
 import { EMPTY_ECHO, GAP_IND_MAP, GAP_LAYER_LABEL } from '../../config/gapdeskConfig'
-import { fmtAgo, fmtClock } from '../../utils/gapdeskFormat'
+import { fmtAgo, fmtClock, gapGapTagsOf, gapTagTone } from '../../utils/gapdeskFormat'
 import { loadEventDetail } from '../../services/gapdeskService'
 import { useGapDesk } from '../../composables/useGapDesk'
 import type { GapEventSourceRow, GapLayer, RankedEvent } from '../../types/gapdesk'
@@ -112,7 +129,22 @@ const emit = defineEmits<{
   navigate: [id: number]
 }>()
 
-const { ranked, platforms, evidences, toggleLater, isLater, toggleFavoriteEvent, markEventRead } = useGapDesk()
+const { ranked, platforms, evidences, toggleLater, isLater, toggleFavoriteEvent, markEventRead, titleOf, i18nStateOf, ensureI18n } = useGapDesk()
+
+const displayTitle = computed(() => (props.event ? titleOf(props.event) : ''))
+const i18nState = computed(() => (props.event ? i18nStateOf(props.event) : 'native'))
+const hasTranslation = computed(() => i18nState.value === 'done')
+const gapTags = computed(() => (props.event ? gapGapTagsOf(props.event) : []))
+
+/** 证据链首报：按 publish_ts 最小的一行，行内高亮，不依赖后端再补字段 */
+const firstSourceId = computed<number | null>(() => {
+  let best: GapEventSourceRow | null = null
+  for (const row of evidenceRows.value) {
+    const ts = row.publish_ts ?? Number.MAX_SAFE_INTEGER
+    if (!best || ts < (best.publish_ts ?? Number.MAX_SAFE_INTEGER)) best = row
+  }
+  return best?.id ?? null
+})
 
 const detail = ref<GapEventSourceRow[]>([])
 const evidenceLoading = ref(false)
@@ -177,7 +209,10 @@ async function fetchDetail(id: number): Promise<void> {
 watch(
   () => [props.modelValue, props.event?.id] as const,
   ([open, id]) => {
-    if (open && typeof id === 'number') void fetchDetail(id)
+    if (open && typeof id === 'number') {
+      void fetchDetail(id)
+      if (props.event) ensureI18n([props.event])
+    }
   }
 )
 
@@ -372,6 +407,24 @@ defineExpose({ onLater, onLike, onRead, isCurrentLater })
   border-radius: var(--gd-r-gcard);
   background: var(--gd-sub);
 }
+.gdd-src.first {
+  border-color: color-mix(in srgb, var(--gd-brand) 45%, var(--gd-line));
+  background: color-mix(in srgb, var(--gd-brand) 6%, var(--gd-sub));
+}
+.gdd-first {
+  font-size: var(--gd-fs-pill);
+  color: var(--gd-brand);
+  background: color-mix(in srgb, var(--gd-brand) 10%, var(--gd-card));
+  border-radius: 4px;
+  padding: 1px 5px;
+  flex-shrink: 0;
+}
+.gdd-gaptags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 8px;
+}
 .gdd-src-top {
   display: flex;
   align-items: center;
@@ -424,5 +477,44 @@ defineExpose({ onLater, onLike, onRead, isCurrentLater })
 .gdd-btn:disabled {
   opacity: .45;
   cursor: default;
+}
+
+/* 窄屏：详情抽屉全屏化，证据链改纵向时间轴（左边一条线串起各源，首报节点高亮） */
+@media (max-width: 768px), (hover: none) and (pointer: coarse) {
+  .gdd-wrap {
+    align-items: stretch;
+  }
+  .gdd {
+    width: 100vw;
+    max-width: 100vw;
+    height: 100dvh;
+    border-radius: 0;
+  }
+  .gdd-h { padding: 12px 16px calc(12px + env(safe-area-inset-top)); }
+  .gdd-body { padding: 14px 16px; gap: 16px; }
+  .gdd-srcs {
+    border-left: 2px solid var(--gd-line2);
+    padding-left: 12px;
+    margin-left: 4px;
+  }
+  .gdd-src {
+    position: relative;
+    border-radius: var(--gd-r-nav);
+  }
+  .gdd-src::before {
+    content: '';
+    position: absolute;
+    left: -16px;
+    top: 16px;
+    width: 8px;
+    height: 8px;
+    border-radius: 999px;
+    background: var(--gd-line2);
+  }
+  .gdd-src.first::before {
+    background: var(--gd-brand);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--gd-brand) 18%, transparent);
+  }
+  .gdd-foot { padding-left: 16px; padding-right: 16px; }
 }
 </style>

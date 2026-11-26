@@ -53,6 +53,26 @@ import {
   SR_TIER_OF
 } from '../config/gapdeskConfig'
 import { fmtAgo, fmtClock } from '../utils/gapdeskFormat'
+import {
+  I18N_DAILY_CHARS,
+  i18nBudgetLeft,
+  i18nCostOf,
+  i18nDayKey,
+  i18nFresh,
+  i18nKeyOf,
+  isForeignLike,
+  needI18n,
+  readAutoTranslate,
+  readI18nDaily,
+  readI18nMap,
+  translateEvent,
+  writeAutoTranslate,
+  writeI18nDaily,
+  writeI18nMap,
+  type I18nDaily,
+  type I18nEntry,
+  type I18nMap
+} from '../services/gapdeskI18n'
 import type {
   GapDim,
   GapDim6Key,
@@ -102,6 +122,8 @@ export interface GapFilters {
   dateBand: string
   /** 只看我订阅的行业 */
   onlySub: boolean
+  /** 只看海外事件（默认 false：国内事件照常全量展示） */
+  onlyForeign: boolean
 }
 
 /* ============================================================
@@ -177,8 +199,119 @@ const filters = reactive<GapFilters>({
   keyword: '',
   dim6: '',
   dateBand: '',
-  onlySub: false
+  onlySub: false,
+  onlyForeign: false
 })
+
+/* ============================================================
+   一·补、自动翻译（免费通道；只进展示层，不参与打分/排序）
+   ============================================================ */
+
+/** 默认开，用户开关写入 localStorage；关闭后译文不显示但缓存保留 */
+const autoTranslate = ref<boolean>(readAutoTranslate())
+const i18nMap = ref<I18nMap>(readI18nMap())
+const i18nDaily = ref<I18nDaily | null>(readI18nDaily())
+/** 每项用 Record<string,true> 便于模板直接读，避免 Set 的响应式代理陷阱 */
+const i18nBusy = ref<Record<string, boolean>>({})
+const i18nFailed = ref<Record<string, boolean>>({})
+const i18nBudgetOut = ref(false)
+const I18N_CONCURRENCY = 2
+let i18nActive = 0
+const i18nPending: GapEventRow[] = []
+
+/** 取一条事件的有效译文；关闭开关 / 过期 / 外文判定失败一律返回 null */
+function i18nEntryOf(event: GapEventRow): I18nEntry | null {
+  if (!autoTranslate.value || !isForeignLike(event)) return null
+  const hit = i18nMap.value[i18nKeyOf(event)]
+  return hit && i18nFresh(hit) ? hit : null
+}
+
+/** 展示标题：有译文用译文，否则原文（原文永远不丢） */
+function titleOf(event: GapEventRow): string {
+  return i18nEntryOf(event)?.title || event.title
+}
+
+/** 展示摘要：译文缺失时回落原文；证据链原文始终不翻 */
+function summaryOf(event: GapEventRow): string {
+  const hit = i18nEntryOf(event)
+  return hit ? (hit.summary || (event.summary ?? '')) : (event.summary ?? '')
+}
+
+/** 卡片角标状态：native=国内原文 / off=用户关了 / done=机翻 / loading / failed / quota */
+function i18nStateOf(event: GapEventRow): 'native' | 'off' | 'done' | 'loading' | 'failed' | 'quota' {
+  if (!isForeignLike(event)) return 'native'
+  if (!autoTranslate.value) return 'off'
+  if (i18nBudgetOut.value && !i18nFresh(i18nMap.value[i18nKeyOf(event)])) return 'quota'
+  if (i18nFresh(i18nMap.value[i18nKeyOf(event)])) return 'done'
+  if (i18nBusy.value[i18nKeyOf(event)]) return 'loading'
+  if (i18nFailed.value[i18nKeyOf(event)]) return 'failed'
+  return 'loading'
+}
+
+/** 翻译队列限流：最多 2 并发；额度不足如实停，不排队空转 */
+function pumpI18n(): void {
+  while (i18nActive < I18N_CONCURRENCY && i18nPending.length) {
+    const event = i18nPending.shift()
+    if (!event) return
+    const key = i18nKeyOf(event)
+    if (i18nFresh(i18nMap.value[key]) || i18nFailed.value[key] || i18nBusy.value[key]) continue
+    const cost = i18nCostOf(event)
+    if (i18nBudgetLeft(i18nDaily.value) < cost) {
+      i18nBudgetOut.value = true
+      break
+    }
+    i18nActive += 1
+    i18nBusy.value = { ...i18nBusy.value, [key]: true }
+    void translateEvent(event)
+      .then((res) => {
+        if (!res) {
+          i18nFailed.value = { ...i18nFailed.value, [key]: true }
+          return
+        }
+        const next = { ...i18nMap.value, [key]: { ...res, ts: Date.now() } }
+        i18nMap.value = next
+        writeI18nMap(next)
+        const today = i18nDayKey()
+        const prev = i18nDaily.value
+        const daily: I18nDaily =
+          prev?.date === today
+            ? { date: today, chars: prev.chars + cost }
+            : { date: today, chars: cost }
+        i18nDaily.value = daily
+        writeI18nDaily(daily)
+      })
+      .finally(() => {
+        const busy = { ...i18nBusy.value }
+        delete busy[key]
+        i18nBusy.value = busy
+        i18nActive -= 1
+        pumpI18n()
+      })
+  }
+}
+
+/** 批量入队：同一 key 只排一次；调用方传「当前可见」的条目，避免整池 800 条全翻 */
+function ensureI18n(events: readonly GapEventRow[]): void {
+  if (!autoTranslate.value) return
+  for (const event of events) {
+    if (!needI18n(event, i18nMap.value)) continue
+    const key = i18nKeyOf(event)
+    if (!key || i18nBusy.value[key] || i18nFailed.value[key]) continue
+    if (i18nPending.some((x) => i18nKeyOf(x) === key)) continue
+    i18nPending.push(event)
+  }
+  pumpI18n()
+}
+
+/** 用户开关：关闭只停展示与新入队，已翻译文保留；开启后立刻补当前首屏 */
+function toggleAutoTranslate(on?: boolean): void {
+  autoTranslate.value = on === undefined ? !autoTranslate.value : on
+  writeAutoTranslate(autoTranslate.value)
+  if (autoTranslate.value) {
+    i18nBudgetOut.value = false
+    ensureI18n(topList.value)
+  }
+}
 
 /** 本机稍后读：不新增表，只存 event_id，跨视图共享 */
 const LATER_KEY = 'gapdesk_later_ids'
@@ -209,6 +342,8 @@ function applyFeed(data: GapFeedData): void {
   // 旧镜像没有 evidences 字段，回放时按空数组处理
   evidences.value = Array.isArray(data.evidences) ? data.evidences : []
   meta.value = data.meta ?? null
+  // 只给首屏可见的外文条目排队翻译，避免整池 800 条一起打免费额度
+  ensureI18n(ranked.value.slice(0, FEED_BATCH))
 }
 
 /** 拉用户态数据（收藏/订阅）。未登录时静默跳过，不产生错误提示 */
@@ -402,10 +537,12 @@ const pool = computed<GapEventRow[]>(() => {
     if (filters.dim6 && GAP_DIM6_OF[e.dim] !== filters.dim6) return false
     // 只订阅：未登录或没订阅任何行业时不做限制（否则界面会莫名全空）
     if (filters.onlySub && subs.size > 0 && !subs.has(e.ind)) return false
+    if (filters.onlyForeign && !isForeignLike(e)) return false
     // ts_published=0 表示源站无时间（榜单类），不能用时间窗判它过期
     if (e.ts_published > 0 && e.ts_published < cutoff) return false
     if (kw) {
-      const hay = `${e.title} ${e.summary ?? ''}`.toLowerCase()
+      // 译文也进搜索：用户看到的是中文标题，就该能用中文搜到海外事件
+      const hay = `${e.title} ${titleOf(e)} ${e.summary ?? ''} ${summaryOf(e)}`.toLowerCase()
       if (!hay.includes(kw)) return false
     }
     return true
@@ -568,9 +705,10 @@ const topList = computed<RankedEvent[]>(() => ranked.value.slice(0, feedCount.va
 /** 全池是否还有未展开的条目 */
 const hasMoreTop = computed<boolean>(() => ranked.value.length > feedCount.value)
 
-/** 加载更多：再展开一批 */
+/** 加载更多：再展开一批，新出现的外文条目随之入翻译队列 */
 function loadMoreTop(): void {
   feedCount.value += FEED_BATCH
+  ensureI18n(ranked.value.slice(0, feedCount.value))
 }
 
 const tierCounts = computed<Record<GapTier, number>>(() => {
@@ -959,6 +1097,7 @@ function resetFilters(): void {
   filters.dim6 = ''
   filters.dateBand = ''
   filters.onlySub = false
+  filters.onlyForeign = false
   // 重置筛选等于回到首屏：展开批次一并收回，避免用户重置后仍面对一长串列表
   feedCount.value = FEED_BATCH
 }
@@ -1044,6 +1183,14 @@ export function useGapDesk() {
     purgeDeleted,
     purgeLastAt,
     purgeError,
+    // 自动翻译
+    autoTranslate,
+    i18nMap,
+    i18nBusy,
+    i18nFailed,
+    i18nBudgetOut,
+    i18nBudgetLeft: computed(() => i18nBudgetLeft(i18nDaily.value)),
+    i18nDailyChars: I18N_DAILY_CHARS,
     // derived
     purgeMsg,
     pool,
@@ -1091,6 +1238,12 @@ export function useGapDesk() {
     toggleLater,
     isLater,
     isFavorite,
-    gapDiv
+    gapDiv,
+    // 自动翻译动作
+    titleOf,
+    summaryOf,
+    i18nStateOf,
+    ensureI18n,
+    toggleAutoTranslate
   }
 }

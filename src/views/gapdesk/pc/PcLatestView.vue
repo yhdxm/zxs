@@ -44,22 +44,22 @@
       <div class="hcard"><span class="n">{{ tierCounts.L1 }}</span><span class="l">L1 · 值得看</span><span class="d">池内 10–40%</span></div>
       <div class="hcard"><span class="n">{{ tierCounts.L2 }}</span><span class="l">L2 · 存档</span><span class="d">不推送、不计入今日差值</span></div>
       <div class="hcard"><span class="n">—</span><span class="l">兑现率</span><span class="d">{{ EMPTY_ECHO }}</span></div>
-      <div class="hcard"><span class="n gr2">{{ lagMedianHours === null ? '—' : lagMedianHours }}</span><span class="l">时差中位（小时）</span><span class="d">取中位，避免长尾带偏</span></div>
+      <div class="hcard"><span class="n gr2">{{ lagMedianHours === null ? '—' : lagMedianHours }}</span><span class="l">时差中位（小时）</span><span class="d">取中位，避免长尾带偏 · {{ GAP_LAG_NOTE }}</span></div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, inject } from 'vue'
+import { computed, inject, watch } from 'vue'
 import GapEmptyState from '../../../components/gapdesk/GapEmptyState.vue'
 import GapEventCard from '../../../components/gapdesk/GapEventCard.vue'
-import { EMPTY_ECHO, EMPTY_WINDOW } from '../../../config/gapdeskConfig'
+import { EMPTY_ECHO, EMPTY_WINDOW, GAP_LAG_NOTE } from '../../../config/gapdeskConfig'
 import { bandKeyOf } from '../../../utils/gapdeskFormat'
 import { GAP_OPEN_DETAIL_KEY, useGapDesk } from '../../../composables/useGapDesk'
 import type { GapEventRow, RankedEvent } from '../../../types/gapdesk'
 
 // ranked 是有意保留的：选了具体日期时要在该日期池内重新展开，不能只靠 topList
-const { ranked, topList, loadMoreTop, tierCounts, lagMedianHours, filters, favorites, laterIds, toggleLater, toggleFavoriteEvent, firstSourceOf } = useGapDesk()
+const { ranked, topList, loadMoreTop, tierCounts, lagMedianHours, filters, favorites, laterIds, toggleLater, toggleFavoriteEvent, firstSourceOf, ensureI18n } = useGapDesk()
 const openDetail = inject(GAP_OPEN_DETAIL_KEY, (_id: number) => {})
 
 /** 卡片要的是 {name,url}；没有来源名就返回 null，卡片不占位也不编造 */
@@ -97,6 +97,9 @@ const displayList = computed<RankedEvent[]>(() => {
   if (!filters.dateBand) return topList.value
   return ranked.value.filter((event) => bandKeyOf(event) === filters.dateBand).slice(0, topList.value.length)
 })
+
+/** 日期带切换后新露出的事件也要入翻译队列（与移动端 watch 同口径） */
+watch(displayList, (list) => ensureI18n(list), { immediate: true })
 
 /** 当前筛选下的池内总条数（不受展开批次限制），用于「已显示 X / 共 Y」 */
 const totalShown = computed<number>(() =>

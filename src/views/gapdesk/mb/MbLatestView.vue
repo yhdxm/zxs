@@ -14,7 +14,17 @@
         <span class="gd-mono score">{{ item.gap }}</span>
         <span class="m gd-mono">#{{ item.rank }}</span>
       </div>
-      <div class="ttl">{{ item.title }}</div>
+      <!-- 移动四行：差标签 → 译文标题 → GAP/时差/来源 → 原文；正文压一行，详情里看全 -->
+      <div v-if="gapGapTagsOf(item).length" class="mb-gaptags">
+        <span v-for="tag in gapGapTagsOf(item)" :key="tag" class="gd-gaptag gd-mono" :class="`tone-${gapTagTone(tag)}`">{{ tag }}</span>
+      </div>
+      <GapI18nLine
+        :original="item.title"
+        :display="titleOf(item)"
+        :state="i18nStateOf(item)"
+        :has-translation="i18nStateOf(item) === 'done'"
+        compact
+      />
       <p v-if="item.reason" class="why">{{ item.reason }}</p>
       <GapDualTrack compact :ins-heat="item.ins_heat ?? 0" :pub-heat="item.pub_heat ?? 0" :gap="item.gap" />
       <div class="ft">
@@ -47,7 +57,16 @@
           <span class="m">{{ indLabel(item.ind) }}</span>
           <span class="gd-mono score">{{ item.gap }}</span>
         </div>
-        <div class="ttl">{{ item.title }}</div>
+        <GapI18nLine
+          :original="item.title"
+          :display="titleOf(item)"
+          :state="i18nStateOf(item)"
+          :has-translation="i18nStateOf(item) === 'done'"
+          compact
+        />
+        <div v-if="gapGapTagsOf(item).length" class="mb-gaptags">
+          <span v-for="tag in gapGapTagsOf(item)" :key="tag" class="mb-gaptag gd-mono">{{ tag }}</span>
+        </div>
         <div class="ft">
           <span>{{ item.tier }}</span>
           <span>{{ fmtAgo(item.ts_published || item.ts_first_seen) }}</span>
@@ -91,15 +110,16 @@
 </template>
 
 <script setup lang="ts">
-import { computed, inject } from 'vue'
+import { computed, inject, watch } from 'vue'
 import GapDualTrack from '../../../components/gapdesk/GapDualTrack.vue'
 import GapEmptyState from '../../../components/gapdesk/GapEmptyState.vue'
+import GapI18nLine from '../../../components/gapdesk/GapI18nLine.vue'
 import { EMPTY_WINDOW, GAP_IND_MAP } from '../../../config/gapdeskConfig'
 import { GAP_OPEN_DETAIL_KEY, useGapDesk } from '../../../composables/useGapDesk'
-import { bandKeyOf, fmtAgo } from '../../../utils/gapdeskFormat'
+import { bandKeyOf, fmtAgo, gapGapTagsOf, gapTagTone } from '../../../utils/gapdeskFormat'
 import type { GapInd, RankedEvent } from '../../../types/gapdesk'
 
-const { ranked, topList, loadMoreTop, filters, favorites, laterIds, toggleLater, toggleFavoriteEvent, firstSourceOf } = useGapDesk()
+const { ranked, topList, loadMoreTop, filters, favorites, laterIds, toggleLater, toggleFavoriteEvent, firstSourceOf, titleOf, i18nStateOf, ensureI18n } = useGapDesk()
 const openDetail = inject(GAP_OPEN_DETAIL_KEY, (_id: number) => {})
 const emit = defineEmits<{ navigate: [key: string] }>()
 
@@ -130,6 +150,9 @@ const hasMoreShown = computed<boolean>(() => totalShown.value > displayList.valu
 
 const l0 = computed(() => displayList.value.filter((item) => item.tier === 'L0'))
 const rest = computed(() => displayList.value.filter((item) => item.tier !== 'L0'))
+
+/** 切换日期带 / 加载更多后新出现的条目也要自动翻译，和 PC 的 GapEventCard 同口径 */
+watch(displayList, (list) => ensureI18n(list), { immediate: true })
 
 /**
  * 列表收尾语：live / unknown 不是日期，说「该日期」不成立。
@@ -247,6 +270,18 @@ const indLabel = (ind: GapInd): string => GAP_IND_MAP[ind]?.label ?? '未分类'
   font-size: var(--gd-fs-pill);
   color: var(--gd-ink3);
   padding: 4px 0;
+}
+.mb-gaptags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+/* L0 卡正文压一行：差在首屏优先，完整结论进详情 */
+.p-card .why {
+  line-height: 1.5;
+  margin: 0;
+  font-size: var(--gd-fs-why);
+  color: var(--gd-ink2);
 }
 /* 来源与原文：真实数据才渲染；原文链接给足 44px 触控高度 */
 .ft {

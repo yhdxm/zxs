@@ -20,7 +20,18 @@
         <span class="tm gd-mono">{{ timeText }}</span>
       </div>
 
-      <h3 class="ttl">{{ event.title }}</h3>
+      <GapI18nLine
+        :original="event.title"
+        :display="displayTitle"
+        :state="i18nState"
+        :has-translation="hasTranslation"
+        compact
+      />
+
+      <!-- 差在哪：结构化标签前置 + 语义色，不用点开详情才看懂 -->
+      <div v-if="gapTags.length" class="gc-gaptags" aria-label="差在哪">
+        <span v-for="tag in gapTags" :key="tag" class="gc-gaptag gd-gaptag gd-mono" :class="`tone-${gapTagTone(tag)}`">{{ tag }}</span>
+      </div>
 
       <div class="gc-dims" aria-label="四维分解">
         <span v-for="seg in dims" :key="seg.label" class="gc-dim">
@@ -42,7 +53,12 @@
       <div class="cardfoot">
         <span class="gscore gd-mono" :class="tier ? tier.toLowerCase() : ''">{{ event.gap }}</span>
         <span class="glab gd-mono">GAP</span>
-        <span class="dims gd-mono">{{ event.src_count }} 路源 · {{ layerLabel }}</span>
+        <span class="src-cred" :title="credTitle">
+          <i class="gd-source-dots" :class="credClass" aria-hidden="true">
+            <i v-for="n in credDots" :key="n" />
+          </i>
+          <span class="dims gd-mono">{{ event.src_count }} 路源 · {{ layerLabel }}</span>
+        </span>
         <span v-if="source?.name" class="src gd-mono" :title="`首触来源：${source.name}`">{{ source.name }}</span>
         <a
           v-if="source?.url"
@@ -82,8 +98,10 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import GapDualTrack from './GapDualTrack.vue'
+import GapI18nLine from './GapI18nLine.vue'
 import { EMPTY_ARCHIVE, GAP_IND_MAP, GAP_LAYER_LABEL } from '../../config/gapdeskConfig'
-import { fmtAgo, safeJson } from '../../utils/gapdeskFormat'
+import { fmtAgo, gapGapTagsOf, gapTagTone, safeJson } from '../../utils/gapdeskFormat'
+import { useGapDesk } from '../../composables/useGapDesk'
 import type { GapEventRow, GapInd, GapTier, RankedEvent } from '../../types/gapdesk'
 
 const props = withDefaults(
@@ -113,6 +131,16 @@ function onLike(): void {
   emit('like', props.event.id)
   emit('favorite', props.event.id)
 }
+
+const { titleOf, i18nStateOf, ensureI18n } = useGapDesk()
+
+/** 卡片挂载时把当前事件补进翻译队列：归档/单源等非首屏视图也能自动翻译 */
+ensureI18n([props.event])
+
+const displayTitle = computed(() => titleOf(props.event))
+const i18nState = computed(() => i18nStateOf(props.event))
+const hasTranslation = computed(() => i18nState.value === 'done')
+const gapTags = computed(() => gapGapTagsOf(props.event))
 
 const tier = computed<GapTier | null>(() => ('tier' in props.event ? props.event.tier : null))
 const rank = computed<number | null>(() => ('rank' in props.event ? props.event.rank : null))
@@ -147,6 +175,15 @@ const dims = computed(() => {
 /** 孤证系数：仅 1 路源时显式降级显示，不用百分比伪装置信度 */
 const confClass = computed(() => (props.event.src_count <= 1 ? 'c1' : props.event.src_count >= 3 ? 'c3' : 'c2'))
 const confText = computed(() => (props.event.src_count <= 1 ? '孤证' : `${props.event.src_count} 源`))
+
+/** 可信度圆点：1 源红点、2 源灰点、≥3 源绿点；圆点数最多 3，不按真实源数铺开 */
+const credDots = computed(() => Math.min(3, Math.max(1, props.event.src_count || 1)))
+const credClass = computed(() => (props.event.src_count <= 1 ? 'lone' : props.event.src_count >= 3 ? 'multi' : ''))
+const credTitle = computed(() =>
+  props.event.src_count <= 1
+    ? '孤证：仅 1 路信源，待交叉验证'
+    : `${props.event.src_count} 路信源交叉验证`
+)
 </script>
 
 <style scoped>
@@ -233,14 +270,10 @@ const confText = computed(() => (props.event.src_count <= 1 ? '孤证' : `${prop
   font-size: var(--gd-fs-pill);
   color: var(--gd-ink3);
 }
-.ttl {
-  margin: 0;
-  font-size: var(--gd-fs-ttl);
-  font-weight: 600;
-  line-height: 1.4;
-  letter-spacing: -.1px;
-  color: var(--gd-ink);
-  overflow-wrap: anywhere;
+.gc-gaptags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
 }
 .gc-dims {
   display: flex;
@@ -297,6 +330,12 @@ const confText = computed(() => (props.event.src_count <= 1 ? '孤证' : `${prop
 .glab, .dims {
   font-size: var(--gd-fs-pill);
   color: var(--gd-ink3);
+}
+.src-cred {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
 }
 .src {
   font-size: var(--gd-fs-pill);

@@ -10,6 +10,7 @@
       <div><b class="gd-mono">{{ tierCounts.L0 }}</b><span>L0 · 必看</span></div>
       <div><b class="gd-mono">{{ tierCounts.L1 }}</b><span>L1 · 关注</span></div>
       <div><b class="gd-mono">{{ lagMedianHours === null ? '—' : lagMedianHours }}</b><span>时差中位（小时）</span></div>
+      <div class="lag-note"><span>取中位，避免长尾带偏 · {{ GAP_LAG_NOTE }}</span></div>
       <div><b class="gd-mono">—</b><span>兑现率 · {{ EMPTY_ECHO }}</span></div>
     </div>
 
@@ -49,7 +50,7 @@
 <script setup lang="ts">
 import { computed, inject } from 'vue'
 import GapEmptyState from '../../../components/gapdesk/GapEmptyState.vue'
-import { EMPTY_ECHO, EMPTY_GENERIC, EMPTY_LLM, GAP_IND, GAP_IND_MAP } from '../../../config/gapdeskConfig'
+import { EMPTY_ECHO, EMPTY_GENERIC, EMPTY_LLM, GAP_IND, GAP_IND_MAP, GAP_LAG_NOTE } from '../../../config/gapdeskConfig'
 import { GAP_OPEN_DETAIL_KEY, useGapDesk } from '../../../composables/useGapDesk'
 import type { GapInd } from '../../../types/gapdesk'
 
@@ -94,6 +95,14 @@ const indLabel = (ind: GapInd): string => GAP_IND_MAP[ind]?.label ?? '未分类'
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
+}
+.stats > .lag-note {
+  grid-column: 1 / -1;
+  padding: 6px 11px;
+}
+.stats > .lag-note span {
+  font-size: var(--gd-fs-pill);
+  color: var(--gd-ink3);
 }
 .stats > div {
   min-width: 0;

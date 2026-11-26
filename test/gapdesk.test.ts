@@ -28,11 +28,24 @@ import {
   fmtClock,
   fmtMoney,
   fmtNum,
+  gapGapTagsOf,
+  gapTagTone,
   gapTone,
   heatLabel,
+  i18nBadgeTextOf,
   pct,
   safeJson
 } from '../src/utils/gapdeskFormat'
+import {
+  I18N_DAILY_CHARS,
+  i18nBudgetLeft,
+  i18nCostOf,
+  i18nDayKey,
+  i18nFresh,
+  isForeignLike,
+  needI18n,
+  parseI18nResponse
+} from '../src/services/gapdeskI18n'
 import {
   DIGEST,
   bigrams,
@@ -49,7 +62,9 @@ import {
   EMPTY_PURGE_ERROR,
   EMPTY_PURGE_RUNNING,
   EMPTY_WINDOW,
+  GAP_COLLECT_NOTE,
   GAP_FEED_CACHE_KEY,
+  GAP_LAG_NOTE,
   GAP_REFRESH_MS,
   GAP_TTL_HOURS
 } from '../src/config/gapdeskConfig'
@@ -1729,5 +1744,225 @@ describe('空态与采集文案 · 不再承诺固定频率、不再暗示数据
 
   it('GAP_REFRESH_MS 仍是前端刷新节奏（30s），没有为徽标另开一套间隔常量', () => {
     expect(GAP_REFRESH_MS).toBe(30_000)
+  })
+})
+
+describe('自动翻译 · 免费通道只进展示层，不碰打分口径', () => {
+  const base = {
+    event_key: 'abc',
+    title: 'OpenAI releases new reasoning model for agents',
+    summary: 'The model improves long-horizon planning.',
+    is_foreign: true
+  }
+
+  it('外文判定听库的 is_foreign；国内事件即使是英文标题也不翻', () => {
+    expect(isForeignLike(base)).toBe(true)
+    expect(isForeignLike({ ...base, is_foreign: false })).toBe(false)
+    expect(isForeignLike({ ...base, is_foreign: null, title: '国内政策发布：算力补贴落地' })).toBe(false)
+    expect(isForeignLike({ ...base, is_foreign: null })).toBe(true)
+  })
+
+  it('缓存 48h 有效，过期后重翻；空译文不算有效', () => {
+    const now = 1_800_000_000_000
+    expect(i18nFresh({ title: '已翻译', summary: '', ts: now - 1000 }, now)).toBe(true)
+    expect(i18nFresh({ title: '', summary: '', ts: now - 1000 }, now)).toBe(false)
+    expect(i18nFresh({ title: '过期', summary: '', ts: now - 49 * 3600_000 }, now)).toBe(false)
+    expect(needI18n(base, { abc: { title: '已翻译', summary: '', ts: now - 1000 } }, now)).toBe(false)
+    expect(needI18n(base, {}, now)).toBe(true)
+  })
+
+  it('解析免费接口：只认 200 且非空译文，额度用完立即失败', () => {
+    expect(parseI18nResponse('{"responseStatus":200,"responseData":{"translatedText":" 已翻译 "}}')).toBe('已翻译')
+    expect(parseI18nResponse('{"responseStatus":200,"quotaFinished":true,"responseData":{"translatedText":"x"}}')).toBeNull()
+    expect(parseI18nResponse('{"responseStatus":403,"responseData":{"translatedText":"x"}}')).toBeNull()
+    expect(parseI18nResponse('not json')).toBeNull()
+  })
+
+  it('日额度跨天自动恢复，用完就是 0，不偷偷继续翻译', () => {
+    const now = i18nDayKey() === '2026-01-01' ? Date.parse('2026-01-02T10:00:00') : Date.parse('2026-01-01T10:00:00')
+    expect(i18nBudgetLeft(null, now)).toBe(I18N_DAILY_CHARS)
+    expect(i18nBudgetLeft({ date: i18nDayKey(now), chars: I18N_DAILY_CHARS }, now)).toBe(0)
+    expect(i18nBudgetLeft({ date: '1999-01-01', chars: I18N_DAILY_CHARS }, now)).toBe(I18N_DAILY_CHARS)
+  })
+
+  it('字符额度按截断后的标题+摘要计算，长文不会一次吃光预算', () => {
+    const long = { title: 'a'.repeat(500), summary: 'b'.repeat(1000) }
+    expect(i18nCostOf(long)).toBe(180 + 120)
+  })
+
+  it('差标签只用真实字段：孤证 / 未出圈 / 海外先发，不编数字', () => {
+    const tags = gapGapTagsOf({
+      ...base,
+      src_count: 1,
+      mass_heat: 0,
+      lag_h: 6.46,
+      ts_first_seen: 100,
+      ts_published: 90
+    } as unknown as GapEventRow)
+    expect(tags).toContain('海外先发')
+    expect(tags).toContain('大众未出圈')
+    expect(tags).toContain('孤证')
+    expect(tags).toContain('源间时差 6.5h')
+    expect(tags.length).toBeLessThanOrEqual(4)
+  })
+
+  it('角标文案如实区分国内原文与四种异常态', () => {
+    expect(i18nBadgeTextOf('native')).toContain('国内原文')
+    expect(i18nBadgeTextOf('failed')).toContain('不可用')
+    expect(i18nBadgeTextOf('quota')).toContain('额度')
+    expect(i18nBadgeTextOf('done')).toBe('机器翻译')
+  })
+
+  it('时差口径全局唯一真源，所有指标卡引用它', () => {
+    expect(GAP_LAG_NOTE).toContain('含检测延迟')
+    for (const path of [
+      'src/views/gapdesk/pc/PcLatestView.vue',
+      'src/views/gapdesk/pc/PcBriefView.vue',
+      'src/views/gapdesk/pc/PcEchoView.vue',
+      'src/views/gapdesk/mb/MbBriefView.vue',
+      'src/views/gapdesk/mb/MbEchoView.vue'
+    ]) {
+      expect(readSource(path)).toContain('GAP_LAG_NOTE')
+    }
+  })
+
+  it('翻译不参与打分/排序：pool 的排序字段仍是 gap 与 ts_first_seen', () => {
+    const src = readSource('src/composables/useGapDesk.ts')
+    expect(src).toMatch(/b\.gap - a\.gap \|\| \(b\.ts_first_seen \|\| 0\) - \(a\.ts_first_seen \|\| 0\)/)
+    expect(src).toContain('ensureI18n(ranked.value.slice(0, FEED_BATCH))')
+    // 国内事件默认不被过滤掉：onlyForeign 初值为 false
+    expect(src).toContain('onlyForeign: false')
+  })
+})
+
+describe('差值 UI 全面优化 · 语义色 / 可信度 / 侧栏 / 导航分组', () => {
+  it('差标签语义色：五类色义唯一，未知标签落 neutral，不误染色', () => {
+    expect(gapTagTone('海外先发')).toBe('foreign')
+    expect(gapTagTone('源间时差 6.5h')).toBe('lag')
+    expect(gapTagTone('大众未出圈')).toBe('mass')
+    expect(gapTagTone('孤证')).toBe('risk')
+    expect(gapTagTone('5 源交叉')).toBe('cross')
+    expect(gapTagTone('早于源站发布时刻')).toBe('neutral')
+  })
+
+  it('语义色令牌齐全，且三处视图都用 gapTagTone 上色，色义同源', () => {
+    const tokens = readSource('src/styles/gapdesk/tokens.css')
+    for (const name of ['foreign', 'lag', 'mass', 'risk', 'cross']) {
+      expect(tokens).toContain(`--gd-tag-${name}:`)
+    }
+    for (const path of [
+      'src/components/gapdesk/GapEventCard.vue',
+      'src/components/gapdesk/GapDetailDrawer.vue',
+      'src/views/gapdesk/mb/MbLatestView.vue',
+      'src/components/gapdesk/GapRightCol.vue'
+    ]) {
+      expect(readSource(path)).toContain('gapTagTone')
+    }
+  })
+
+  it('可信度圆点数最多 3，孤证用红点、多源用绿点', () => {
+    const css = readSource('src/styles/gapdesk/components.css')
+    expect(css).toContain('.gd-source-dots.multi i')
+    expect(css).toContain('.gd-source-dots.lone i')
+    const card = readSource('src/components/gapdesk/GapEventCard.vue')
+    expect(card).toContain('Math.min(3, Math.max(1, props.event.src_count || 1))')
+  })
+
+  it('数据年龄可点开采集说明，PC 顶栏与移动壳共用同一文案真源', () => {
+    expect(GAP_COLLECT_NOTE).toContain('GitHub Actions')
+    expect(GAP_COLLECT_NOTE).toContain('延迟或跳过')
+    const topbar = readSource('src/components/gapdesk/GapTopbar.vue')
+    const shell = readSource('src/components/gapdesk/GapMobileShell.vue')
+    expect(topbar).toContain('GAP_COLLECT_NOTE')
+    expect(topbar).toContain('@click="ageOpen = !ageOpen"')
+    expect(shell).toContain('GAP_COLLECT_NOTE')
+    expect(shell).toContain('@click="ageOpen = !ageOpen"')
+  })
+
+  it('PC 首屏证据侧栏常驻，宿主把 activeEvent 传进右栏', () => {
+    const view = readSource('src/views/GapDeskView.vue')
+    expect(view).toContain('<GapRightCol :event="activeEvent"')
+    const right = readSource('src/components/gapdesk/GapRightCol.vue')
+    expect(right).toContain('选中差 · 证据链')
+    expect(right).toContain('firstSourceId')
+    expect(right).toContain('loadEventDetail')
+  })
+
+  it('侧栏三组语义齐全，17 项一个不少、编号无重复', () => {
+    const src = readSource('src/components/gapdesk/GapSidebar.vue')
+    expect(src).toContain('看差 · 发现差值')
+    expect(src).toContain('研判 · 验证差值')
+    expect(src).toContain('管理 · 订阅与导出')
+    const nums = [...src.matchAll(/num: '(\d\d)'/g)].map((m) => m[1])
+    expect(nums).toHaveLength(17)
+    expect(new Set(nums).size).toBe(17)
+  })
+
+  it('移动端详情全屏并让出安全区，证据链走时间轴', () => {
+    const drawer = readSource('src/components/gapdesk/GapDetailDrawer.vue')
+    expect(drawer).toContain('height: 100dvh')
+    expect(drawer).toContain('env(safe-area-inset-top)')
+    expect(drawer).toContain('.gdd-srcs')
+  })
+})
+
+describe('只增不减 · 原有差值内容一个不少', () => {
+  it('侧栏原四组名与 00-16 编号完全保留，新语义只作徽标叠加', () => {
+    const src = readSource('src/components/gapdesk/GapSidebar.vue')
+    for (const name of ['看信息', '进阶·可关键', '收费', '研判·扩展']) {
+      expect(src).toContain(`title: '${name}'`)
+    }
+    expect(src).toContain('class="gd-gfocus"')
+    const nums = [...src.matchAll(/num: '(\d\d)'/g)].map((m) => m[1])
+    expect(nums).toEqual(Array.from({ length: 17 }, (_, i) => String(i).padStart(2, '0')))
+  })
+
+  it('导出页原按钮保留，新增复制/下载不覆盖它们', () => {
+    const src = readSource('src/views/gapdesk/pc/PcBizViews.vue')
+    for (const label of ['生成 PDF', '检索导出', '复制研判文本', '下载 .txt 简报']) {
+      expect(src).toContain(label)
+    }
+  })
+
+  it('归档页保留原搜索标签文案，同时保留真检索', () => {
+    const src = readSource('src/views/gapdesk/pc/PcArchiveView.vue')
+    expect(src).toContain('搜索归档：关键词 / 行业 / 信源 / 时间')
+    expect(src).toContain('v-model="keyword"')
+    expect(src).toContain('searchHits')
+  })
+
+  it('时差说明保留各视图原句，再叠加含检测延迟口径', () => {
+    const paths = [
+      'src/views/gapdesk/pc/PcLatestView.vue',
+      'src/views/gapdesk/pc/PcBriefView.vue',
+      'src/views/gapdesk/pc/PcEchoView.vue',
+      'src/views/gapdesk/mb/MbBriefView.vue',
+      'src/views/gapdesk/mb/MbEchoView.vue'
+    ]
+    for (const path of paths) {
+      const src = readSource(path)
+      expect(src).toMatch(/避免长尾带偏|源间实测/)
+      expect(src).toContain('GAP_LAG_NOTE')
+    }
+  })
+
+  it('移动端理由完整展示，不因四行卡做视觉截断', () => {
+    const src = readSource('src/views/gapdesk/mb/MbLatestView.vue')
+    expect(src).toContain('class="why"')
+    expect(src).not.toContain('-webkit-line-clamp')
+  })
+
+  it('AI 提示 chip 保留提示文案且可点击填入', () => {
+    const src = readSource('src/views/gapdesk/pc/PcAIView.vue')
+    expect(src).toContain(':title="EMPTY_AI_INPUT"')
+    expect(src).toContain('chip-btn')
+    expect(src).toContain('@click="query = q"')
+  })
+
+  it('视觉增强只追加样式，不通过隐藏/截断减少信息', () => {
+    const css = readSource('src/styles/gapdesk/components.css')
+    expect(css).toContain('.gd-gaptag::before')
+    expect(css).toContain('filter: saturate(1.2)')
+    expect(css).toContain('transform: scale(1.35)')
   })
 })

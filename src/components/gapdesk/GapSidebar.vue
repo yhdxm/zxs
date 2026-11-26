@@ -6,7 +6,10 @@
 <template>
   <aside class="gd-sidebar">
     <template v-for="group in NAV_GROUPS" :key="group.title">
-      <div class="gd-gl">{{ group.title }}</div>
+      <div class="gd-gl">
+        <span>{{ group.title }}</span>
+        <span class="gd-gfocus">{{ group.focus }}</span>
+      </div>
       <button
         v-for="item in group.items"
         :key="item.key"
@@ -49,17 +52,21 @@ interface NavItem {
   hot?: boolean
 }
 interface NavGroup {
+  /** 原分组名，一个不改 */
   title: string
+  /** 本轮新增的语义徽标：看差 / 研判 / 管理，以增量方式叠加在原组名旁 */
+  focus: string
   items: readonly NavItem[]
 }
 
 /**
- * 截图字面顺序：看信息 → 进阶·可关键 → 收费 → 研判·扩展。
- * 编号写死在项上，新增/调整一项不会让后面所有编号静默错位。
+ * 原四组 17 项、编号 00-16 与原型字面完全一致 —— 组名不删、入口不删、编号不改。
+ * focus 是新增的语义层，只叠加不替换：既保留原来的分组，又能一眼看出「看差→研判→管理」。
  */
 const RAW_GROUPS: readonly NavGroup[] = [
   {
     title: '看信息',
+    focus: '看差 · 发现差值',
     items: [
       { key: 'profile', label: '按行业', num: '00' },
       { key: 'latest', label: '最新信息', num: '01', hot: true },
@@ -71,6 +78,7 @@ const RAW_GROUPS: readonly NavGroup[] = [
   },
   {
     title: '进阶·可关键',
+    focus: '管理 · 订阅与导出',
     items: [
       { key: 'alert', label: '订阅提醒', num: '06' },
       { key: 'report', label: '导出报告', num: '07' },
@@ -79,10 +87,12 @@ const RAW_GROUPS: readonly NavGroup[] = [
   },
   {
     title: '收费',
+    focus: '管理 · 订阅与导出',
     items: [{ key: 'pricing', label: '价格', num: '09' }]
   },
   {
     title: '研判·扩展',
+    focus: '研判 · 验证差值',
     items: [
       { key: 'brief', label: '今日简报', num: '10' },
       { key: 'source-risk', label: '信源分级', num: '11' },
@@ -100,3 +110,23 @@ const NAV_GROUPS: readonly NavGroup[] = RAW_GROUPS
 withDefaults(defineProps<{ active?: string }>(), { active: '' })
 const emit = defineEmits<{ navigate: [key: string] }>()
 </script>
+
+<style scoped>
+/* 原组名照旧，新语义作为小徽标叠在右侧：信息只增不减 */
+.gd-gl {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px;
+}
+.gd-gfocus {
+  font-size: 9px;
+  font-weight: 500;
+  color: var(--gd-ink3);
+  opacity: .72;
+  white-space: nowrap;
+}
+@media (max-width: 768px) {
+  .gd-gfocus { display: none; }
+}
+</style>

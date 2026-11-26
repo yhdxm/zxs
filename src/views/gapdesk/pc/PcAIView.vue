@@ -31,9 +31,16 @@
       </div>
 
       <div class="row1 chips suggest">
-        <span v-for="q in SUGGESTS" :key="q" class="gd-pill gd-pill-soft" :title="EMPTY_AI_INPUT">{{ q }}</span>
+        <button v-for="q in SUGGESTS" :key="q" type="button" class="gd-pill gd-pill-soft chip-btn" :title="EMPTY_AI_INPUT" @click="query = q">{{ q }}</button>
       </div>
-      <input class="pctl ai-input" type="text" disabled :placeholder="EMPTY_AI_INPUT" :title="EMPTY_AI_INPUT" />
+      <input v-model="query" class="pctl ai-input" type="search" :placeholder="EMPTY_AI_INPUT" :aria-label="EMPTY_AI_INPUT" />
+      <div v-if="query.trim()" class="ai-hits">
+        <p class="panel-note">检索到 {{ aiHits.length }} 条真实事件（按差值分排序），点一条打开详情：</p>
+        <button v-for="item in aiHits" :key="item.id" type="button" class="quote gd-mono" @click="openDetail(item.id)">
+          #{{ item.rank }} · GAP {{ item.gap }} · {{ titleOf(item) }}
+        </button>
+        <GapEmptyState v-if="!aiHits.length" type="empty" desc="当前 48h 池内没有匹配的事件；不编造研判依据" />
+      </div>
       <p class="panel-note">{{ EMPTY_AI_INPUT }} · {{ EMPTY_LLM }}</p>
     </section>
 
@@ -75,7 +82,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, inject } from 'vue'
+import { computed, inject, ref } from 'vue'
+import GapEmptyState from '../../../components/gapdesk/GapEmptyState.vue'
 import {
   EMPTY_AI_INPUT,
   EMPTY_AI_PUSH,
@@ -86,8 +94,18 @@ import {
 } from '../../../config/gapdeskConfig'
 import { GAP_OPEN_DETAIL_KEY, useGapDesk } from '../../../composables/useGapDesk'
 
-const { ranked, tierCounts, lagMedianHours, health, dailyBriefText } = useGapDesk()
+const { ranked, tierCounts, lagMedianHours, health, dailyBriefText, titleOf } = useGapDesk()
 const openDetail = inject(GAP_OPEN_DETAIL_KEY, (_id: number) => {})
+const query = ref('')
+
+/** 检索真实事件作为研判依据，不是 LLM 对话；命中仅来自当前 48h 池 */
+const aiHits = computed(() => {
+  const kw = query.value.trim().toLowerCase()
+  if (!kw) return []
+  return ranked.value
+    .filter((item) => `${item.title} ${titleOf(item)} ${item.reason ?? ''}`.toLowerCase().includes(kw))
+    .slice(0, 8)
+})
 
 const SUGGESTS = ['孤证为什么降权？', '时差中位怎么取？', 'L0 是怎么分的？'] as const
 
@@ -130,10 +148,22 @@ const weightRows = computed(() => [
 .suggest {
   padding-top: 2px;
 }
+.chip-btn {
+  cursor: pointer;
+  border: 0;
+}
+.chip-btn:hover {
+  color: var(--gd-brand);
+}
 .ai-input {
   width: 100%;
   min-height: 34px;
-  cursor: not-allowed;
+}
+.ai-hits {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 8px;
 }
 .quote {
   display: block;

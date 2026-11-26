@@ -80,7 +80,7 @@ import GapBarChart from '../../../components/gapdesk/GapBarChart.vue'
 import GapEmptyState from '../../../components/gapdesk/GapEmptyState.vue'
 import GapEventCard from '../../../components/gapdesk/GapEventCard.vue'
 import GapHeroCards from '../../../components/gapdesk/GapHeroCards.vue'
-import { EMPTY_ECHO, EMPTY_GENERIC, EMPTY_LLM, EMPTY_SUPPLY, GAP_IND, GAP_IND_MAP } from '../../../config/gapdeskConfig'
+import { EMPTY_ECHO, EMPTY_GENERIC, EMPTY_LLM, EMPTY_SUPPLY, GAP_IND, GAP_IND_MAP, GAP_LAG_NOTE } from '../../../config/gapdeskConfig'
 import { GAP_OPEN_DETAIL_KEY, useGapDesk } from '../../../composables/useGapDesk'
 import type { GapInd } from '../../../types/gapdesk'
 
@@ -105,7 +105,7 @@ const heroItems = computed(() => [
   {
     label: '时差中位（小时）',
     n: lagMedianHours.value === null ? '—' : lagMedianHours.value,
-    d: '取中位，避免长尾带偏',
+    d: '取中位，避免长尾带偏 · ' + GAP_LAG_NOTE,
     grad: false
   }
 ])

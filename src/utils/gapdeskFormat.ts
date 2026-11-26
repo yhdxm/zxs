@@ -6,7 +6,7 @@
  * - 时间入参统一为 epoch 毫秒（与库表 bigint 字段 ts_* 一致），0 表示「源站无时间」；
  * - 所有函数对 NaN / 负数 / 空值做兜底，绝不返回 undefined 让模板炸掉。
  */
-import type { GapTone } from '../types/gapdesk'
+import type { GapEventRow, GapTone } from '../types/gapdesk'
 
 /** 1 分钟 / 1 小时 / 1 天的毫秒数，避免魔法数字散落 */
 const MS_MIN = 60 * 1000
@@ -164,6 +164,56 @@ export function eventKeyOf(title: string): string {
     hash = Math.imul(hash, 16777619)
   }
   return (hash >>> 0).toString(16)
+}
+
+/**
+ * 「差在哪」结构化标签：从事件真实字段派生，不重算分数、不编造。
+ * 卡片 / 详情 / 移动端共用，保证同一事件在三处说法一致。
+ */
+export function gapGapTagsOf(event: GapEventRow): string[] {
+  const tags: string[] = []
+  if (event.is_foreign === true) tags.push('海外先发')
+  // 时差优先露出：这是差值台最硬的信号，不能被次要标签挤掉
+  if (event.lag_h != null && event.lag_h > 0) {
+    tags.push(`源间时差 ${Math.round(event.lag_h * 10) / 10}h`)
+  }
+  if ((event.mass_heat ?? 0) === 0) tags.push('大众未出圈')
+  else tags.push('大众已出圈')
+  if (event.src_count <= 1) tags.push('孤证')
+  else if (event.src_count >= 3) tags.push(`${event.src_count} 源交叉`)
+  if (event.ts_first_seen > 0 && event.ts_published > 0 && event.ts_first_seen > event.ts_published) {
+    tags.push('早于源站发布时刻')
+  }
+  return tags.slice(0, 4)
+}
+
+/** 差标签语义色类别：与 tokens.css 的 --gd-tag-* 一一对应 */
+export type GapTagTone = 'foreign' | 'lag' | 'mass' | 'risk' | 'cross' | 'neutral'
+
+/**
+ * 标签 → 语义色：紫=海外先发 / 橙=时差 / 青=未出圈 / 红=孤证 / 绿=多源交叉。
+ * 按标签文字判定，不改 gapGapTagsOf 的返回结构；未知标签落 neutral，
+ * 保证加新标签时不会渲染出错色。三处视图共用，色义一致。
+ */
+export function gapTagTone(tag: string): GapTagTone {
+  if (tag.includes('海外')) return 'foreign'
+  if (tag.includes('时差')) return 'lag'
+  if (tag.includes('未出圈')) return 'mass'
+  if (tag.includes('孤证')) return 'risk'
+  if (tag.includes('交叉')) return 'cross'
+  return 'neutral'
+}
+
+/** 自动翻译角标文案：状态来自 store，不在这里判空值 */
+export function i18nBadgeTextOf(state: 'native' | 'off' | 'done' | 'loading' | 'failed' | 'quota'): string {
+  switch (state) {
+    case 'native': return '国内原文'
+    case 'off': return '自动翻译已关'
+    case 'done': return '机器翻译'
+    case 'loading': return '翻译中…'
+    case 'failed': return '译文不可用'
+    case 'quota': return '今日免费额度已用完'
+  }
 }
 
 /**
