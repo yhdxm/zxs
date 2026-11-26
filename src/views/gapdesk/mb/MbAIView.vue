@@ -1,6 +1,6 @@
 <!--
   移动 m-ai · AI 研判（只读二级页）
-  规则式统计归纳，不是大模型；输入框只说明口径，不会产生回答。
+  规则式统计归纳，不是大模型；输入框在当前 48h 池内真检索事件作为研判依据，与 PC 同口径。
 -->
 <template>
   <div class="mbview">
@@ -34,8 +34,22 @@
     </section>
 
     <section class="p-card">
-      <div class="ttl">追问</div>
-      <input class="ask" type="text" disabled :placeholder="EMPTY_AI_INPUT" :title="EMPTY_AI_INPUT" />
+      <div class="ttl">检索研判依据</div>
+      <input v-model="query" class="ask" type="search" :placeholder="EMPTY_AI_INPUT" :aria-label="EMPTY_AI_INPUT" />
+      <div v-if="query.trim()" class="hits">
+        <p class="why">当前 48h 池内命中 {{ aiHits.length }} 条（按差值排序），点一条打开详情：</p>
+        <button
+          v-for="item in aiHits"
+          :key="item.id"
+          type="button"
+          class="p-item quote"
+          @click="openDetail(item.id)"
+        >
+          <span class="t">#{{ item.rank }} · GAP {{ item.gap }} · {{ titleOf(item) }}</span>
+          <span class="m gd-mono">{{ indLabel(item.ind) }}</span>
+        </button>
+        <GapEmptyState v-if="!aiHits.length" type="empty" desc="当前 48h 池内没有匹配的事件；不编造研判依据" />
+      </div>
       <p class="why">{{ EMPTY_AI_INPUT }}</p>
       <p class="why">{{ EMPTY_AI_PUSH }}</p>
     </section>
@@ -43,15 +57,25 @@
 </template>
 
 <script setup lang="ts">
-import { computed, inject } from 'vue'
+import { computed, inject, ref } from 'vue'
 import GapEmptyState from '../../../components/gapdesk/GapEmptyState.vue'
 import { EMPTY_AI_INPUT, EMPTY_AI_PUSH, EMPTY_AI_WEIGHT, EMPTY_GENERIC, EMPTY_LLM, GAP_IND_MAP, GAP_WEIGHTS } from '../../../config/gapdeskConfig'
 import { GAP_OPEN_DETAIL_KEY, useGapDesk } from '../../../composables/useGapDesk'
 import type { GapInd } from '../../../types/gapdesk'
 
-const { ranked, dailyBriefText } = useGapDesk()
+const { ranked, dailyBriefText, titleOf } = useGapDesk()
 const openDetail = inject(GAP_OPEN_DETAIL_KEY, (_id: number) => {})
 const emit = defineEmits<{ navigate: [key: string] }>()
+
+/** 与 PC PcAIView 同口径：只查当前 48h 池，不查历史、不编造 */
+const query = ref('')
+const aiHits = computed(() => {
+  const kw = query.value.trim().toLowerCase()
+  if (!kw) return []
+  return ranked.value
+    .filter((item) => `${item.title} ${titleOf(item)} ${item.reason ?? ''}`.toLowerCase().includes(kw))
+    .slice(0, 8)
+})
 
 const top3 = computed(() => ranked.value.slice(0, 3))
 const weightRows = computed(() => [
@@ -107,7 +131,13 @@ const indLabel = (ind: GapInd): string => GAP_IND_MAP[ind]?.label ?? '未分类'
   color: var(--gd-ink2);
   font-family: var(--gd-sans);
   font-size: var(--gd-fs-panels);
-  cursor: not-allowed;
+  cursor: text;
+}
+.hits {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 8px 0;
 }
 .quote {
   width: 100%;

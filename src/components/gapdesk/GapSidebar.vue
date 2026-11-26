@@ -120,7 +120,7 @@ const emit = defineEmits<{ navigate: [key: string] }>()
   gap: 6px;
 }
 .gd-gfocus {
-  font-size: 9px;
+  font-size: 11.5px;
   font-weight: 500;
   color: var(--gd-ink3);
   opacity: .72;

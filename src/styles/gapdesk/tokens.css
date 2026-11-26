@@ -54,23 +54,24 @@
   --gd-sh-md: 0 8px 28px rgba(12, 16, 48, .09);
   --gd-sh-lg: 0 18px 56px rgba(12, 16, 48, .16);
 
-  /* 字族 */
-  --gd-sans: 'Inter', 'PingFang SC', 'Noto Sans SC', 'Microsoft YaHei', system-ui, sans-serif;
+  /* 字族：与其他模块（base.css / DashboardView）同链 —— Inter 打头，中文落系统黑体 */
+  --gd-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
   --gd-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 
-  /* 字号层级：原型是紧凑终端 UI，整体比 Element Plus 默认小一档 */
-  --gd-fs-kick: 10px;
-  --gd-fs-nav: 11.5px;
-  --gd-fs-ttl: 14px;
-  --gd-fs-why: 12px;
-  --gd-fs-hcard: 26px;
-  --gd-fs-gscore: 17px;
-  --gd-fs-pill: 10px;
-  --gd-fs-panelh: 12.5px;
-  --gd-fs-panels: 10.5px;
-  --gd-fs-phead: 17.5px;
-  --gd-fs-pcard: 15px;
-  --gd-fs-tab: 10px;
+  /* 字号层级：对齐其他模块正文 13–14 / 辅助 11–12 / 标题 14–18 的基准，
+     只比全局 body 15px 略收一档，不再用原来的 10px 极缩小字。 */
+  --gd-fs-kick: 11.5px;
+  --gd-fs-nav: 13px;
+  --gd-fs-ttl: 15.5px;
+  --gd-fs-why: 13.5px;
+  --gd-fs-hcard: 28px;
+  --gd-fs-gscore: 19px;
+  --gd-fs-pill: 11.5px;
+  --gd-fs-panelh: 14px;
+  --gd-fs-panels: 12.5px;
+  --gd-fs-phead: 19px;
+  --gd-fs-pcard: 16.5px;
+  --gd-fs-tab: 11.5px;
 
   /* 圆角 */
   --gd-r-nav: 8px;

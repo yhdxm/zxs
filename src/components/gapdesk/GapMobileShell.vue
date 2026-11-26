@@ -165,7 +165,7 @@ const emit = defineEmits<{
 /* 手机头寸更紧：只缩字号与内边距，文案与 PC 完全一致 */
 .p-age-pill {
   padding: 0 5px;
-  font-size: 9px;
+  font-size: 11.5px;
   white-space: nowrap;
 }
 /* 问号走伪元素，胶囊文本与 PC 顶栏、store 逐字一致 */

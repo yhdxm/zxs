@@ -144,12 +144,12 @@ function dotClass(s: GapSourceRow): string {
   color: var(--gd-gap);
 }
 .gsh-sum-main span {
-  font-size: 10px;
+  font-size: 12px;
   color: var(--gd-ink3);
 }
 .gsh-sum-msg {
   margin: 0;
-  font-size: 10px;
+  font-size: 12px;
   line-height: 1.5;
   color: var(--gd-ink3);
 }
@@ -176,7 +176,7 @@ function dotClass(s: GapSourceRow): string {
   text-align: left;
 }
 .gsh-caret {
-  font-size: 10px;
+  font-size: 12px;
   color: var(--gd-ink3);
   transition: transform 0.15s ease;
 }
@@ -189,13 +189,13 @@ function dotClass(s: GapSourceRow): string {
   color: var(--gd-ink);
 }
 .gsh-group-n {
-  font-size: 10px;
+  font-size: 12px;
   color: var(--gd-ink3);
   font-variant-numeric: tabular-nums;
 }
 .gsh-group-bad {
   margin-left: auto;
-  font-size: 10px;
+  font-size: 12px;
   color: var(--gd-gap);
   font-variant-numeric: tabular-nums;
 }
@@ -245,13 +245,13 @@ function dotClass(s: GapSourceRow): string {
 .gsh-ok-at {
   flex: none;
   font-variant-numeric: tabular-nums;
-  font-size: 10px;
+  font-size: 12px;
   color: var(--gd-ink3);
 }
 .gsh-msg {
   flex-basis: 100%;
   margin: 0 0 0 11px;
-  font-size: 10px;
+  font-size: 12px;
   line-height: 1.4;
   color: var(--gd-gap);
   word-break: break-all;
@@ -265,7 +265,7 @@ function dotClass(s: GapSourceRow): string {
   border-top: 1px solid var(--gd-line);
 }
 .gsh-funnel-lb {
-  font-size: 10px;
+  font-size: 12px;
   color: var(--gd-ink3);
 }
 .gsh-funnel-v {
@@ -276,7 +276,7 @@ function dotClass(s: GapSourceRow): string {
 }
 .gsh-funnel-cam {
   flex-basis: 100%;
-  font-size: 9px;
+  font-size: 11.5px;
   color: var(--gd-line2);
 }
 

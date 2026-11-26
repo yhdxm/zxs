@@ -193,12 +193,12 @@ function pick(ind: string, dim: string): void {
 }
 .gmg-n {
   display: block;
-  font-size: 10px;
+  font-size: 12px;
   font-variant-numeric: tabular-nums;
   color: var(--gd-ink3);
 }
 .gmg-todo {
-  font-size: 10px;
+  font-size: 12px;
   letter-spacing: 0.06em;
   color: var(--gd-line2);
 }

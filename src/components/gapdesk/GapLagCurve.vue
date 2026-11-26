@@ -167,12 +167,12 @@ function fmtTick(t: number): string {
 }
 .glc-grid text {
   fill: var(--gd-line2);
-  font-size: 9px;
+  font-size: 11.5px;
   font-variant-numeric: tabular-nums;
 }
 .glc-xt {
   fill: var(--gd-ink3);
-  font-size: 9px;
+  font-size: 11.5px;
   font-variant-numeric: tabular-nums;
 }
 .glc-area {

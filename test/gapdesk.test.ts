@@ -1966,3 +1966,36 @@ describe('只增不减 · 原有差值内容一个不少', () => {
     expect(css).toContain('transform: scale(1.35)')
   })
 })
+
+describe('字体与其他模块对齐 + 双端 AI 检索一致', () => {
+  it('GAPDESK 字族与其他模块同链，字号抬到正文 13-14 / 辅助 11-12 基准', () => {
+    const tokens = readSource('src/styles/gapdesk/tokens.css')
+    expect(tokens).toContain("--gd-sans: 'Inter', system-ui, -apple-system")
+    expect(tokens).toContain('--gd-fs-nav: 13px')
+    expect(tokens).toContain('--gd-fs-why: 13.5px')
+    expect(tokens).toContain('--gd-fs-pill: 11.5px')
+    // 不允许再出现极小的 9/10px 正文（8px 只留给胶囊装饰伪元素）
+    const css = readSource('src/styles/gapdesk/components.css')
+    expect(css).not.toMatch(/font-size:\s*(9|10(\.5)?)px/)
+  })
+
+  it('移动 AI 页检索与 PC 同口径：真查 48h 池，不做禁用假输入', () => {
+    const mb = readSource('src/views/gapdesk/mb/MbAIView.vue')
+    const pc = readSource('src/views/gapdesk/pc/PcAIView.vue')
+    expect(mb).toContain('v-model="query"')
+    expect(mb).not.toContain('class="ask" type="text" disabled')
+    expect(mb).toContain('titleOf(item)')
+    // 两端同一过滤式：标题 + 译文 + reason，按 GAP 排序由 ranked 保证
+    for (const src of [mb, pc]) {
+      expect(src).toContain("titleOf(item)")
+      expect(src).toContain("item.reason ?? ''")
+      expect(src).toContain('.slice(0, 8)')
+    }
+  })
+
+  it('顶栏搜索文案如实：48h 池内没有归档，不写「搜索归档」', () => {
+    const topbar = readSource('src/components/gapdesk/GapTopbar.vue')
+    expect(topbar).toContain('placeholder="搜索标题 / 摘要 / 行业"')
+    expect(topbar).not.toContain('placeholder="搜索归档')
+  })
+})

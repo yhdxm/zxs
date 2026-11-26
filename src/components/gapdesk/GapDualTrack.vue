@@ -146,13 +146,13 @@ const divColor = computed(() => {
   font-weight: 600;
 }
 .gdt-cap {
-  font-size: 10px;
+  font-size: 12px;
   color: var(--gd-ink3);
   letter-spacing: 0.08em;
 }
 .gdt-gap {
   margin-top: 2px;
-  font-size: 10px;
+  font-size: 12px;
   color: var(--gd-ink3);
   font-variant-numeric: tabular-nums;
 }

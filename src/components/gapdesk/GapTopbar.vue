@@ -43,7 +43,7 @@
             ref="searchInput"
             v-model="keywordInput"
             type="search"
-            placeholder="搜索归档 / 行业 / 信源"
+            placeholder="搜索标题 / 摘要 / 行业"
             aria-label="搜索差值"
           />
           <span class="gd-kbd" aria-hidden="true">/</span>
@@ -178,7 +178,7 @@ const emit = defineEmits<{
   margin-left: 4px;
   border: 1px solid currentColor;
   border-radius: 999px;
-  font-size: 9px;
+  font-size: 11.5px;
   vertical-align: middle;
   opacity: .8;
 }
