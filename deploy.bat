@@ -174,11 +174,13 @@ git config http.lowSpeedLimit 0
 git config http.lowSpeedTime 9999
 git config http.maxRequestBuffer 104857600
 
+REM 首选：系统 DNS 直连。github.com 实测可达时优先直连，避免静态 IP 过时导致全线路失败
+call :PUSH_DIRECT 3
 if defined GOOD_IP (
-  call :PUSH_WITH_RETRY "!GOOD_IP!" 3
+  if not "!PUSH_OK!" == "1" call :PUSH_WITH_RETRY "!GOOD_IP!" 3
 )
 if not "!PUSH_OK!" == "1" (
-  echo 首选线路未成功，正在尝试其他线路...
+  echo 直连与首选线路均未成功，正在尝试其他线路...
   for %%r in (
     192.30.255.112
     4.208.26.197
@@ -213,9 +215,9 @@ echo   %PUSH_LOG%
 echo.
 type "%PUSH_LOG%"
 echo.
-echo 常见原因：
-echo   1. 当前网络完全屏蔽了 GitHub —— 请开启手机热点或 VPN 后重试。
-echo   2. token 缺少 "repo" 权限，或不属于当前账号。
+echo 常见原因（按可能性排序）：
+echo   1. token 无效、缺少 "repo" 权限，或不属于当前账号 —— 请重新生成 classic token 后重试。
+echo   2. 直连与静态线路都不可达 —— 先确认浏览器能否打开 github.com；能打开则多为 token 问题，打不开再开热点/VPN。
 goto DEPLOY_END
 
 :PUSH_SUCCESS
@@ -236,6 +238,21 @@ pause
 exit /b 0
 
 REM ================= push retry helper =================
+REM ==== direct push (system DNS, no forced IP) ====
+:PUSH_DIRECT
+set "TRY_N=%~1"
+set /a D_IDX=0
+:PUSH_DIRECT_LOOP
+set /a D_IDX+=1
+echo   系统直连 第 %D_IDX%/%TRY_N% 次尝试...
+git push "%PUSH_URL%" main > "%PUSH_LOG%" 2>&1
+if !ERRORLEVEL! == 0 (
+  set "PUSH_OK=1"
+  goto :EOF
+)
+if %D_IDX% lss %TRY_N% goto PUSH_DIRECT_LOOP
+exit /b 0
+
 :PUSH_WITH_RETRY
 set "TRY_IP=%~1"
 set "TRY_N=%~2"
