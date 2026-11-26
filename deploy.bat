@@ -1,6 +1,5 @@
 @echo off
 setlocal enabledelayedexpansion
-chcp 65001 >nul 2>&1
 cd /d "%~dp0"
 set "GIT_TERMINAL_PROMPT=0"
 
@@ -12,8 +11,8 @@ set "PAGES_URL=https://%REPO_OWNER%.github.io/%REPO_NAME%/"
 set "ACTIONS_URL=https://github.com/%REPO_FULL%/actions"
 
 echo.
-echo === æ™ºä¹  ZXS ä¸€é”®éƒ¨ç½² ===
-echo   ä»“åº“: %REPO_FULL%
+echo === ÖÇÏ° ZXS Ò»¼ü²¿Êğ ===
+echo   ²Ö¿â: %REPO_FULL%
 echo.
 
 set "GIT_BIN_DIR="
@@ -32,7 +31,7 @@ if exist "%USERPROFILE%\.workbuddy\vendor\PortableGit\mingw64\bin\git.exe" (
 if not defined GIT_BIN_DIR (
   git --version >nul 2>&1
   if !ERRORLEVEL! == 0 goto GIT_READY
-  echo æœªæ‰¾åˆ° git.exeã€‚è¯·å…ˆå®‰è£… Git for Windows: https://git-scm.com/download/win
+  echo Î´ÕÒµ½ git.exe¡£ÇëÏÈ°²×° Git for Windows: https://git-scm.com/download/win
   pause
   exit /b 1
 )
@@ -40,7 +39,7 @@ set "PATH=%GIT_BIN_DIR%;%PATH%"
 
 :GIT_READY
 if not exist ".git" (
-  echo æ­£åœ¨åˆå§‹åŒ– git ä»“åº“...
+  echo ÕıÔÚ³õÊ¼»¯ git ²Ö¿â...
   git init
   git remote add origin %REPO_URL%
 )
@@ -58,15 +57,17 @@ git config https.postBuffer 524288000
 git config --local credential.helper ""
 
 REM ================= commit local changes =================
-REM å®‰å…¨è¯´æ˜ï¼šä¸´æ—¶/æ•æ„Ÿæ–‡ä»¶å·²ç”± .gitignore æ’é™¤ï¼Œä¸‹æ–¹ä¿ç•™ git add -A ä»¥åŒ…å«æ‰€æœ‰éƒ¨ç½²
-REM æ‰€éœ€çš„æ–°å¢æºç ã€‚è¯·å‹¿æ”¹ä¸º pathspec æ’é™¤å†™æ³•ï¼ˆæœ¬è„šæœ¬å¯ç”¨ enabledelayedexpansionï¼Œ
-REM å…¶ä¸­çš„ ! ä¼šä¸ :!xxx è¯­æ³•å†²çªå¯¼è‡´å¤±æ•ˆï¼‰ï¼Œä¹Ÿä¸è¦æ”¹ä¸ºç²¾ç¡®åˆ—æ–‡ä»¶ï¼ˆæ˜“æ¼éƒ¨ç½²æ–‡ä»¶ï¼‰ã€‚
+REM °²È«ËµÃ÷£ºÁÙÊ±/Ãô¸ĞÎÄ¼şÒÑÓÉ .gitignore ÅÅ³ı£¬ÏÂ·½±£Áô git add -A ÒÔ°üº¬ËùÓĞ²¿Êğ
+REM ËùĞèµÄĞÂÔöÔ´Âë¡£ÇëÎğ¸ÄÎª pathspec ÅÅ³ıĞ´·¨£¨±¾½Å±¾ÆôÓÃ enabledelayedexpansion£¬
+REM ÆäÖĞµÄ ! »áÓë :!xxx Óï·¨³åÍ»µ¼ÖÂÊ§Ğ§£©£¬Ò²²»Òª¸ÄÎª¾«È·ÁĞÎÄ¼ş£¨Ò×Â©²¿ÊğÎÄ¼ş£©¡£
 git add -A
+echo ±¾´Î½«Ìá½»µÄÎÄ¼ş£¨À´×Ô git add -A£©£º
+git diff --cached --name-only
 git diff --cached --quiet
 if !ERRORLEVEL! neq 0 (
   git commit -m "deploy: update (%date% %time%)"
 ) else (
-  echo æ²¡æœ‰æœ¬åœ°æ”¹åŠ¨éœ€è¦æäº¤ã€‚
+  echo Ã»ÓĞ±¾µØ¸Ä¶¯ĞèÒªÌá½»¡£
 )
 git branch -M main
 
@@ -77,7 +78,7 @@ if exist "%SystemRoot%\System32\curl.exe" set "CURL_BIN=%SystemRoot%\System32\cu
 set "IPFILE=.git\gh_last_ip.txt"
 set "GOOD_IP="
 
-echo æ­£åœ¨å¯»æ‰¾å¯è¿æ¥çš„ GitHub çº¿è·¯...
+echo ÕıÔÚÑ°ÕÒ¿ÉÁ¬½ÓµÄ GitHub ÏßÂ·...
 
 if exist "%IPFILE%" (
   set /p LAST_IP=<"%IPFILE%"
@@ -85,7 +86,7 @@ if exist "%IPFILE%" (
     call :PROBE "!LAST_IP!"
     if !ERRORLEVEL! == 0 (
       set "GOOD_IP=!LAST_IP!"
-      echo   [æˆåŠŸ] ä½¿ç”¨ç¼“å­˜çº¿è·¯ !LAST_IP!
+      echo   [³É¹¦] Ê¹ÓÃ»º´æÏßÂ· !LAST_IP!
     )
   )
 )
@@ -123,10 +124,10 @@ if not defined GOOD_IP (
       call :PROBE "%%i"
       if !ERRORLEVEL! == 0 (
         set "GOOD_IP=%%i"
-        echo   [æˆåŠŸ] æ‰¾åˆ°å¯ç”¨çº¿è·¯ %%i
+        echo   [³É¹¦] ÕÒµ½¿ÉÓÃÏßÂ· %%i
         > "%IPFILE%" echo %%i
       ) else (
-        echo   [--] %%i æ— æ³•è¿æ¥
+        echo   [--] %%i ÎŞ·¨Á¬½Ó
       )
     )
   )
@@ -137,34 +138,38 @@ if defined GOOD_IP (
   set "RESOLVE_ARG=-c http.curloptResolve=github.com:443:!GOOD_IP!"
 ) else (
   echo.
-  echo   [è­¦å‘Š] æœªæ‰¾åˆ°ä»»ä½•å¯è¿æ¥çš„ IPã€‚å°†å°è¯•ç›´æ¥è¿æ¥ã€‚
-  echo   å¦‚æœä»å¤±è´¥ï¼Œè¯·å¼€å¯ VPN æˆ–æ‰‹æœºçƒ­ç‚¹åé‡æ–°è¿è¡Œæœ¬è„šæœ¬ã€‚
+  echo   [¾¯¸æ] Î´ÕÒµ½ÈÎºÎ¿ÉÁ¬½ÓµÄ IP¡£½«³¢ÊÔÖ±½ÓÁ¬½Ó¡£
+  echo   Èç¹ûÈÔÊ§°Ü£¬Çë¿ªÆô VPN »òÊÖ»úÈÈµãºóÖØĞÂÔËĞĞ±¾½Å±¾¡£
 )
 
 REM ================= token =================
 echo.
-echo è¯·åœ¨ä¸‹æ–¹ç²˜è´´ä½ çš„ GitHub tokenã€‚
-echo   ç»å…¸ tokenï¼ˆclassicï¼‰ï¼šéœ€è¦ "repo" + "workflow" ä¸¤ä¸ªæƒé™èŒƒå›´ã€‚
-echo   ç»†ç²’åº¦ tokenï¼šä»“åº“æƒé™éœ€ Actions=è¯»å–/å†™å…¥ã€Pages=å†™å…¥ã€Contents=å†™å…¥ã€‚
-echo æ³¨æ„ï¼štoken ä¼šä»¥æ˜æ–‡æ˜¾ç¤ºï¼Œè¯·å‹¿æˆªå›¾è¿™ä¸€è¡Œã€‚
+echo ÇëÔÚÏÂ·½Õ³ÌùÄãµÄ GitHub token¡£
+echo   ¾­µä token£¨classic£©£ºĞèÒª "repo" + "workflow" Á½¸öÈ¨ÏŞ·¶Î§¡£
+echo   Ï¸Á£¶È token£º²Ö¿âÈ¨ÏŞĞè Actions=¶ÁÈ¡/Ğ´Èë¡¢Pages=Ğ´Èë¡¢Contents=Ğ´Èë¡£
+echo ÊäÈëºó°´»Ø³µ¼´¿É£¬½Å±¾»áÁ¢¼´ÇåÆÁ£¬token ²»»áÁôÔÚÆÁÄ»ÉÏ¡£
 echo.
-set /p "GH_TOKEN=è¯·è¾“å…¥ GitHub token: "
+set /p "GH_TOKEN=ÇëÊäÈë GitHub token: "
+cls
+echo ============================================
+echo  ZXS deploy: token ÒÑ½ÓÊÕ£¬¼ÌĞøÍÆËÍ
+echo ============================================
 set "GH_TOKEN=%GH_TOKEN: =%"
 
 if not defined GH_TOKEN (
-  echo æœªè¾“å…¥ tokenï¼Œå·²ç»ˆæ­¢ã€‚
+  echo Î´ÊäÈë token£¬ÒÑÖÕÖ¹¡£
   pause
   exit /b 1
 )
 
 REM ================= push (retry each route) =================
 echo.
-echo æ­£åœ¨æ¨é€åˆ° GitHub...
+echo ÕıÔÚÍÆËÍµ½ GitHub...
 set "PUSH_URL=https://%GH_TOKEN%@github.com/%REPO_FULL%.git"
 set "PUSH_LOG=%TEMP%\zxs_deploy_push.log"
 set "PUSH_OK=0"
 
-REM ä½é€Ÿå®¹å¿ï¼šåŠé€šç½‘ç»œä¸‹é¿å…è¢«è¯¯åˆ¤æ–­æµå¯¼è‡´æ•´è½®å¤±è´¥
+REM µÍËÙÈİÈÌ£º°ëÍ¨ÍøÂçÏÂ±ÜÃâ±»ÎóÅĞ¶ÏÁ÷µ¼ÖÂÕûÂÖÊ§°Ü
 git config http.lowSpeedLimit 0
 git config http.lowSpeedTime 9999
 git config http.maxRequestBuffer 104857600
@@ -173,7 +178,7 @@ if defined GOOD_IP (
   call :PUSH_WITH_RETRY "!GOOD_IP!" 3
 )
 if not "!PUSH_OK!" == "1" (
-  echo é¦–é€‰çº¿è·¯æœªæˆåŠŸï¼Œæ­£åœ¨å°è¯•å…¶ä»–çº¿è·¯...
+  echo Ê×Ñ¡ÏßÂ·Î´³É¹¦£¬ÕıÔÚ³¢ÊÔÆäËûÏßÂ·...
   for %%r in (
     192.30.255.112
     4.208.26.197
@@ -196,30 +201,32 @@ if not "!PUSH_OK!" == "1" (
 
 if "!PUSH_OK!" == "1" goto PUSH_SUCCESS
 
-REM äºŒæ¬¡ç¡®è®¤ï¼šå³ä½¿ push å‘½ä»¤è¿”å›å¼‚å¸¸ï¼Œåªè¦æ—¥å¿—ä¸­å‡ºç° "main -> main" ä¹Ÿè§†ä¸ºæˆåŠŸ
+REM ¶ş´ÎÈ·ÈÏ£º¼´Ê¹ push ÃüÁî·µ»ØÒì³££¬ÈÕÖ¾³öÏÖÏÂÁĞÈÎÒ»ÎÄ°¸Ò²ÊÓÎª³É¹¦
 findstr /C:"main -> main" "%PUSH_LOG%" >nul 2>&1
+if !ERRORLEVEL! == 0 goto PUSH_SUCCESS
+findstr /C:"Everything up-to-date" "%PUSH_LOG%" >nul 2>&1
 if !ERRORLEVEL! == 0 goto PUSH_SUCCESS
 
 echo.
-echo [å¤±è´¥] æ‰€æœ‰çº¿è·¯æ¨é€å‡å¤±è´¥ã€‚è¯¦æƒ…ï¼š
+echo [Ê§°Ü] ËùÓĞÏßÂ·ÍÆËÍ¾ùÊ§°Ü¡£ÏêÇé£º
 echo   %PUSH_LOG%
 echo.
 type "%PUSH_LOG%"
 echo.
-echo å¸¸è§åŸå› ï¼š
-echo   1. å½“å‰ç½‘ç»œå®Œå…¨å±è”½äº† GitHub â€”â€” è¯·å¼€å¯æ‰‹æœºçƒ­ç‚¹æˆ– VPN åé‡è¯•ã€‚
-echo   2. token ç¼ºå°‘ "repo" æƒé™ï¼Œæˆ–ä¸å±äºå½“å‰è´¦å·ã€‚
+echo ³£¼ûÔ­Òò£º
+echo   1. µ±Ç°ÍøÂçÍêÈ«ÆÁ±ÎÁË GitHub ¡ª¡ª Çë¿ªÆôÊÖ»úÈÈµã»ò VPN ºóÖØÊÔ¡£
+echo   2. token È±ÉÙ "repo" È¨ÏŞ£¬»ò²»ÊôÓÚµ±Ç°ÕËºÅ¡£
 goto DEPLOY_END
 
 :PUSH_SUCCESS
 echo.
-echo [æˆåŠŸ] æ¨é€å®Œæˆã€‚
+echo [³É¹¦] ÍÆËÍÍê³É¡£
 echo.
-echo ===== è‡ªåŠ¨é…ç½® GitHub Pagesï¼ˆéƒ¨ç½²æº=GitHub Actionsï¼‰=====
+echo ===== ×Ô¶¯ÅäÖÃ GitHub Pages£¨²¿ÊğÔ´=GitHub Actions£©=====
 call :CONFIGURE_PAGES
 echo.
-echo éƒ¨ç½²è¿›åº¦: %ACTIONS_URL%
-echo çº¿ä¸Šåœ°å€: %PAGES_URL%
+echo ²¿Êğ½ø¶È: %ACTIONS_URL%
+echo ÏßÉÏµØÖ·: %PAGES_URL%
 
 :DEPLOY_END
 set "PUSH_URL="
@@ -235,15 +242,14 @@ set "TRY_N=%~2"
 set /a P_IDX=0
 :PUSH_RETRY_LOOP
 set /a P_IDX+=1
-echo   çº¿è·¯ %TRY_IP% ç¬¬ %P_IDX%/%TRY_N% æ¬¡å°è¯•...
-git -c http.curloptResolve=github.com:443:%TRY_IP% push -f "%PUSH_URL%" main > "%PUSH_LOG%" 2>&1
+echo   ÏßÂ· %TRY_IP% µÚ %P_IDX%/%TRY_N% ´Î³¢ÊÔ...
+git -c http.curloptResolve=github.com:443:%TRY_IP% push "%PUSH_URL%" main > "%PUSH_LOG%" 2>&1
+REM git push ·µ»Ø 0 ¾ÍÊÇ³É¹¦£ºÊä³ö¿ÉÄÜÊÇ "main -> main"£¨ĞÂÌá½»£©£¬Ò²¿ÉÄÜÊÇ "Everything up-to-date"£¨ÒÑÍ¬²½£©¡£
+REM ¾É°æÖ»ÈÏÇ°Õß£¬µ¼ÖÂ±¾µØÓëÔ¶¶ËÒ»ÖÂÊ±Îó±¨¡¸ËùÓĞÏßÂ·ÍÆËÍ¾ùÊ§°Ü¡¹¡£
 if !ERRORLEVEL! == 0 (
-  findstr /C:"main -> main" "%PUSH_LOG%" >nul 2>&1
-  if !ERRORLEVEL! == 0 (
-    set "PUSH_OK=1"
-    > "%IPFILE%" echo %TRY_IP%
-    goto :EOF
-  )
+  set "PUSH_OK=1"
+  > "%IPFILE%" echo %TRY_IP%
+  goto :EOF
 )
 if %P_IDX% lss %TRY_N% goto PUSH_RETRY_LOOP
 exit /b 0
@@ -251,29 +257,29 @@ exit /b 0
 REM ================= subroutine =================
 :CONFIGURE_PAGES
 set "API_BASE=https://api.github.com/repos/%REPO_FULL%"
-echo   æ­£åœ¨è°ƒç”¨ GitHub APIï¼šå°† Pages éƒ¨ç½²æºè®¾ä¸º GitHub Actions ...
+echo   ÕıÔÚµ÷ÓÃ GitHub API£º½« Pages ²¿ÊğÔ´ÉèÎª GitHub Actions ...
 curl -s -o "%TEMP%\zxs_pages.json" -w "   HTTP %%{http_code}\n" -X PUT ^
   -H "Accept: application/vnd.github+json" ^
   -H "Authorization: Bearer %GH_TOKEN%" ^
   -H "X-GitHub-Api-Version: 2022-11-28" ^
   "%API_BASE%/pages" ^
   -d "{\"build_type\":\"workflow\"}"
-echo   HTTP 200/204 è¡¨ç¤º Pages éƒ¨ç½²æºå·²æˆåŠŸè®¾ä¸º GitHub Actionsã€‚
+echo   HTTP 200/204 ±íÊ¾ Pages ²¿ÊğÔ´ÒÑ³É¹¦ÉèÎª GitHub Actions¡£
 
-echo   ä¸Šæ–¹çš„æ¨é€å·²ç»è§¦å‘äº†ä¸€æ¬¡è‡ªåŠ¨éƒ¨ç½²ï¼Œæ— éœ€æ‰‹åŠ¨é‡æ–°è¿è¡Œã€‚
-echo   æ­£åœ¨å°è¯•é‡æ–°è¿è¡Œæœ€æ–°ä¸€æ¬¡ä»»åŠ¡ä»¥ç«‹å³éƒ¨ç½²ï¼ˆå¯é€‰ï¼‰...
+echo   ÉÏ·½µÄÍÆËÍÒÑ¾­´¥·¢ÁËÒ»´Î×Ô¶¯²¿Êğ£¬ÎŞĞèÊÖ¶¯ÖØĞÂÔËĞĞ¡£
+echo   ÕıÔÚ³¢ÊÔÖØĞÂÔËĞĞ×îĞÂÒ»´ÎÈÎÎñÒÔÁ¢¼´²¿Êğ£¨¿ÉÑ¡£©...
 for /f "delims=" %%i in ('powershell -NoProfile -Command "try{(Invoke-RestMethod -Uri '%API_BASE%/actions/workflows/deploy.yml/runs?per_page=1' -Headers @{Authorization='Bearer %GH_TOKEN%'}).workflow_runs[0].id}catch{''}"') do set "RUN_ID=%%i"
 if defined RUN_ID (
   curl -s -o "%TEMP%\zxs_rerun.json" -w "   re-run HTTP %%{http_code}\n" -X POST -H "Accept: application/vnd.github+json" -H "Authorization: Bearer %GH_TOKEN%" -H "X-GitHub-Api-Version: 2022-11-28" "%API_BASE%/actions/runs/!RUN_ID!/rerun"
-  powershell -NoProfile -Command "try{$r=Get-Content '%TEMP%\zxs_rerun.json' -Raw -ErrorAction SilentlyContinue; if($r -and $r.Trim().Length -gt 0){$j=ConvertFrom-Json $r -ErrorAction SilentlyContinue; if($j.message){Write-Host ('   API æç¤º: ' + $j.message)}}}catch{}"
-  echo   å¦‚æœé‡æ–°è¿è¡Œè¿”å› 403ï¼š
-  echo     - ç»å…¸ token éœ€é¢å¤–åŒ…å« "workflow" æƒé™ï¼ˆé™¤ "repo" å¤–ï¼‰ã€‚
-  echo     - ç»†ç²’åº¦ token éœ€å…·å¤‡ Actions=è¯»å–/å†™å…¥ æƒé™ã€‚
-  echo     - ä»“åº“è®¾ç½® ^> Actions ^> Generalï¼šWorkflow æƒé™éœ€è®¾ä¸º"è¯»å–å’Œå†™å…¥æƒé™"ã€‚
-  echo   å¦åˆ™æœ€æ–°æ¨é€å·²è‡ªåŠ¨å¼€å§‹éƒ¨ç½²ï¼Œè¯·ç­‰å¾… 1-2 åˆ†é’Ÿå³å¯ã€‚
+  powershell -NoProfile -Command "try{$r=Get-Content '%TEMP%\zxs_rerun.json' -Raw -ErrorAction SilentlyContinue; if($r -and $r.Trim().Length -gt 0){$j=ConvertFrom-Json $r -ErrorAction SilentlyContinue; if($j.message){Write-Host ('   API ÌáÊ¾: ' + $j.message)}}}catch{}"
+  echo   Èç¹ûÖØĞÂÔËĞĞ·µ»Ø 403£º
+  echo     - ¾­µä token Ğè¶îÍâ°üº¬ "workflow" È¨ÏŞ£¨³ı "repo" Íâ£©¡£
+  echo     - Ï¸Á£¶È token Ğè¾ß±¸ Actions=¶ÁÈ¡/Ğ´Èë È¨ÏŞ¡£
+  echo     - ²Ö¿âÉèÖÃ ^> Actions ^> General£ºWorkflow È¨ÏŞĞèÉèÎª"¶ÁÈ¡ºÍĞ´ÈëÈ¨ÏŞ"¡£
+  echo   ·ñÔò×îĞÂÍÆËÍÒÑ×Ô¶¯¿ªÊ¼²¿Êğ£¬ÇëµÈ´ı 1-2 ·ÖÖÓ¼´¿É¡£
 ) else (
-  echo   æ— æ³•è‡ªåŠ¨è·å–æœ€æ–°ä»»åŠ¡ IDã€‚è‹¥ 1 åˆ†é’Ÿå†…æœªå‡ºç°æ–°ä»»åŠ¡ï¼Œ
-  echo   è¯·æ‰“å¼€ %ACTIONS_URL%ï¼Œåœ¨æœ€æ–°ä¸€æ¬¡å¤±è´¥/è·³è¿‡çš„ä»»åŠ¡ä¸Šç‚¹å‡»"Re-run jobs"ã€‚
+  echo   ÎŞ·¨×Ô¶¯»ñÈ¡×îĞÂÈÎÎñ ID¡£Èô 1 ·ÖÖÓÄÚÎ´³öÏÖĞÂÈÎÎñ£¬
+  echo   Çë´ò¿ª %ACTIONS_URL%£¬ÔÚ×îĞÂÒ»´ÎÊ§°Ü/Ìø¹ıµÄÈÎÎñÉÏµã»÷"Re-run jobs"¡£
 )
 exit /b 0
 
