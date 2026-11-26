@@ -142,27 +142,9 @@ if defined GOOD_IP (
   echo   如果仍失败，请开启 VPN 或手机热点后重新运行本脚本。
 )
 
-REM ================= optional proxy (for VPN / accelerator users) =================
-set "PROXY_ARG="
-echo.
-echo 【第 1 步 / 共 2 步】代理地址（绝大多数人直接回车跳过）
-echo   开了 VPN / 加速器才填，形如 http://127.0.0.1:7890；没开就【直接回车】。
-echo   注意：这里【不要】填 GitHub token，token 在下一步单独输入。
-set /p "USER_PROXY=代理地址（没开代理直接回车）: "
-set "USER_PROXY=%USER_PROXY: =%"
-REM 识别误填的 token：ghp_/github_pat_/gho_/ghu_/ghs_/ghr_ 开头一律当没填
-if defined USER_PROXY (
-  echo %USER_PROXY% | findstr /I /B /C:"ghp_" /C:"github_pat_" /C:"gho_" /C:"ghu_" /C:"ghs_" /C:"ghr_" >nul 2>&1
-  if !ERRORLEVEL! == 0 (
-    echo [提醒] 刚才填的是 GitHub token，不是代理地址 —— 已忽略，下一步会单独问 token。
-    set "USER_PROXY="
-  )
-)
-if defined USER_PROXY set "PROXY_ARG=-c http.proxy=%USER_PROXY% -c https.proxy=%USER_PROXY%"
-
 REM ================= token =================
 echo.
-echo 【第 2 步 / 共 2 步】请在下方粘贴你的 GitHub token。
+echo 请在下方粘贴你的 GitHub token。
 echo   经典 token（classic）：需要 "repo"；仅当改动 .github/workflows 时才加 "workflow"。
 echo   细粒度 token：Contents=写入、Pages=写入；改工作流文件时再加 Actions=读取/写入。
 echo 输入后按回车即可，脚本会立即清屏，token 不会留在屏幕上。
@@ -261,7 +243,7 @@ set /a D_IDX=0
 :PUSH_DIRECT_LOOP
 set /a D_IDX+=1
 echo   系统直连 第 %D_IDX%/%TRY_N% 次尝试...
-git %PROXY_ARG% push "%PUSH_URL%" main > "%PUSH_LOG%" 2>&1
+git push "%PUSH_URL%" main > "%PUSH_LOG%" 2>&1
 if !ERRORLEVEL! == 0 (
   set "PUSH_OK=1"
   goto :EOF
@@ -272,15 +254,15 @@ exit /b 0
 :DIAGNOSE_FAIL
 findstr /C:"Could not resolve proxy" "%PUSH_LOG%" >nul 2>&1
 if !ERRORLEVEL! == 0 (
-  echo 诊断：代理地址填错了 —— 很可能把 GitHub token 填进了「代理地址」那一栏。
-  echo   代理地址应形如 http://127.0.0.1:7890；没开代理就直接回车跳过，token 在下一步填。
+  echo 诊断：代理地址无效 —— 请还原 git 的 http.proxy 设置：git config --global --unset http.proxy
+  echo   本脚本不需要填代理；若装过代理工具，请确认它是全局模式或已关闭。
   goto :EOF
 )
 findstr /C:"10054" /C:"Connection was reset" /C:"Empty reply" /C:"timed out" /C:"Could not resolve host" "%PUSH_LOG%" >nul 2>&1
 if !ERRORLEVEL! == 0 (
   echo 诊断：连接被网络层重置/中断 —— 这不是 token 问题。
   echo   curl/浏览器能打开 GitHub 不代表 git 写操作能通；推送常被间歇性阻断。
-  echo   建议：① 换手机热点重试；② 开了 VPN/加速器就在脚本开头填代理地址；③ 确认 VPN 为全局模式。
+  echo   建议：换手机热点重试，或确认 VPN 为「全局模式」（规则模式 git 不走）。
   goto :EOF
 )
 findstr /C:"401" /C:"403" /C:"Authentication failed" /C:"Permission denied" /C:"not found" "%PUSH_LOG%" >nul 2>&1
@@ -299,7 +281,7 @@ set /a P_IDX=0
 :PUSH_RETRY_LOOP
 set /a P_IDX+=1
 echo   线路 %TRY_IP% 第 %P_IDX%/%TRY_N% 次尝试...
-git %PROXY_ARG% -c http.curloptResolve=github.com:443:%TRY_IP% push "%PUSH_URL%" main > "%PUSH_LOG%" 2>&1
+git -c http.curloptResolve=github.com:443:%TRY_IP% push "%PUSH_URL%" main > "%PUSH_LOG%" 2>&1
 REM git push 返回 0 就是成功：输出可能是 "main -> main"（新提交），也可能是 "Everything up-to-date"（已同步）。
 REM 旧版只认前者，导致本地与远端一致时误报「所有线路推送均失败」。
 if !ERRORLEVEL! == 0 (
