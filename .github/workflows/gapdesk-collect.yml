@@ -1,5 +1,5 @@
 # =============================================================
-# 差值台 GAPDESK · 采集任务（每 30 分钟一轮）
+# 差值台 GAPDESK · 采集任务（每小时两轮，错开整点高峰）
 # =============================================================
 # 前置（仓库 Settings → Secrets and variables → Actions 里配置）：
 #   SUPABASE_SERVICE_ROLE_KEY  必填，旧版 service_role JWT 或新版 sb_secret_ 开头的 secret key
@@ -16,9 +16,10 @@ name: GAPDESK Collect
 
 on:
   schedule:
-    # 每 30 分钟：与 src/config/gapdeskConfig.ts 的 GAP_REFRESH_MS（30s 前端补偿刷新）配合，
+    # 每小时两轮（第 7、37 分）：避开 GitHub 点名的整点/半点高负载分钟，仍满足最短 5 分钟间隔。
+    # 与 src/config/gapdeskConfig.ts 的 GAP_REFRESH_MS（30s 前端补偿刷新）配合：
     # 前端靠 Realtime 拿增量，这里负责把新事件写进库。
-    - cron: '*/30 * * * *'
+    - cron: '7,37 * * * *'
   workflow_dispatch:
 
 concurrency:

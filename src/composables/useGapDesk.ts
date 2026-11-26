@@ -10,7 +10,7 @@
 //   2) 失败不抛错：network 挂了就退到 localStorage 镜像，并置 stale=true 让界面显式说明
 //      「数据可能不是最新」—— 静默展示旧数据是这类工具最致命的体验问题；
 //   3) useGapDeskRealtime() 内部调用 useCloudSync()，**必须在组件 setup 内调用**。
-import { computed, reactive, ref, type InjectionKey, type Ref, type ComputedRef } from 'vue'
+import { computed, onBeforeUnmount, reactive, ref, type InjectionKey, type Ref, type ComputedRef } from 'vue'
 import { useCloudSync } from './useCloudSync'
 import { cacheGetStale, cacheSet } from '../services/cloudSyncService'
 import { getSavedUser, type AppUser } from '../services/appDataService'
@@ -40,6 +40,7 @@ import {
   EMPTY_PURGE_RUNNING,
   GAP_CACHE_TTL,
   GAP_FEED_CACHE_KEY,
+  GAP_REFRESH_MS,
   type PurgeState,
   GAP_DIM,
   GAP_DIM6,
@@ -51,6 +52,7 @@ import {
   SR_TIERS,
   SR_TIER_OF
 } from '../config/gapdeskConfig'
+import { fmtAgo, fmtClock } from '../utils/gapdeskFormat'
 import type {
   GapDim,
   GapDim6Key,
@@ -120,6 +122,33 @@ const staleAgeMs = ref(0)
 /** 最近一次成功拉取时刻（毫秒） */
 const lastLoadedAt = ref(0)
 
+/**
+ * 共享时钟（毫秒）：数据年龄的唯一时间源。
+ * 不按组件各建定时器 —— 只在 useGapDeskRealtime() 的既有刷新生命周期里启停一次，
+ * 并在每次 feed 落地（含缓存回放）时立刻对齐到当前时刻。
+ */
+const nowMs = ref(Date.now())
+let clockTimer: ReturnType<typeof setInterval> | null = null
+let clockUsers = 0
+
+/** 启动共享时钟：与 GAP_REFRESH_MS 同一节奏，多视图挂载只维持一个定时器 */
+function startClock(): void {
+  clockUsers += 1
+  nowMs.value = Date.now()
+  if (clockTimer !== null) return
+  clockTimer = setInterval(() => {
+    nowMs.value = Date.now()
+  }, GAP_REFRESH_MS)
+}
+
+/** 停止共享时钟：最后一个使用者卸载时才清理 */
+function stopClock(): void {
+  clockUsers = Math.max(0, clockUsers - 1)
+  if (clockUsers > 0 || clockTimer === null) return
+  clearInterval(clockTimer)
+  clockTimer = null
+}
+
 /** 我的收藏 event_id 列表（卡片收藏态、收藏视图共用） */
 const favorites = ref<number[]>([])
 /** 我的订阅行业 */
@@ -172,6 +201,8 @@ let inflight: Promise<void> | null = null
 
 /** 把一份 feed 写进 state（缓存回放与网络结果共用同一条路径） */
 function applyFeed(data: GapFeedData): void {
+  // 数据刚落地：马上对齐时钟，避免年龄显示等到下一个 30s tick 才更新
+  nowMs.value = Date.now()
   events.value = Array.isArray(data.events) ? data.events : []
   platforms.value = Array.isArray(data.platforms) ? data.platforms : []
   sources.value = Array.isArray(data.sources) ? data.sources : []
@@ -337,6 +368,9 @@ export async function purgeAndRefresh(): Promise<PurgeResult> {
  */
 let syncBound = false
 export function useGapDeskRealtime(): void {
+  // 时钟与刷新订阅共用同一条生命周期：组件卸载时由这里统一收尾，页面挂着不动也会走字
+  startClock()
+  onBeforeUnmount(stopClock)
   if (syncBound) return
   syncBound = true
   useCloudSync({
@@ -685,6 +719,51 @@ const demoReasons = computed<string[]>(() => {
   return reasons
 })
 
+/* ---------- 数据新鲜度：真数据 + 真实年龄，不再用 LIVE/DEMO 二分 ---------- */
+
+/** 新鲜度分档：<1h 绿 / 1-12h 黄 / >12h 灰 / 时间未知 */
+export type DataFreshnessTone = 'fresh' | 'aging' | 'old' | 'unknown'
+
+/** 采集时刻（毫秒）：缺失或不可解析一律 null，绝不拿 0 当 1970 展示 */
+const generatedTs = computed<number | null>(() => {
+  const iso = meta.value?.generated_at
+  if (typeof iso !== 'string' || !iso.trim()) return null
+  const ts = Date.parse(iso)
+  return Number.isFinite(ts) && ts > 0 ? ts : null
+})
+
+/** 数据年龄（小时，向下取整）：未来时间按 0 处理，不出现负年龄 */
+const dataAgeHours = computed<number | null>(() => {
+  const ts = generatedTs.value
+  if (ts === null) return null
+  return Math.max(0, Math.floor((nowMs.value - ts) / 3600_000))
+})
+
+/** 分档只用于顶栏配色，不改变任何打分/时差数字 */
+const dataFreshnessTone = computed<DataFreshnessTone>(() => {
+  const hours = dataAgeHours.value
+  if (hours === null) return 'unknown'
+  if (hours < 1) return 'fresh'
+  if (hours < 12) return 'aging'
+  return 'old'
+})
+
+/** 顶栏徽标文案：真实年龄；时间不可用时只给破折号，不编造 0 或负数 */
+const dataAgeText = computed<string>(() => {
+  const ts = generatedTs.value
+  return ts === null ? '—' : `数据更新于 ${fmtAgo(ts, nowMs.value)}`
+})
+
+/** hover 说明：保留镜像/错误等真实降级信息，但不再把「数据旧」说成数据假 */
+const dataFreshnessTitle = computed<string>(() => {
+  const ts = generatedTs.value
+  if (ts === null) return '采集时间缺失或无法解析；现有数据仍来自采集，只是无法确认更新时间'
+  const base = `采集时间 ${fmtClock(ts)}；数据来自采集，可能滞后`
+  // 「采集时间超过 40 分钟」已是常态，不再作为降级理由塞进提示
+  const notes = demoReasons.value.filter((reason) => !reason.startsWith('采集时间'))
+  return notes.length ? `${base}；${notes.join('；')}` : base
+})
+
 /** 今日研判：规则归纳（非 LLM），每一句都能回溯到真实事件统计 */
 const dailyBriefText = computed<string>(() => {
   const list = ranked.value
@@ -952,6 +1031,7 @@ export function useGapDesk() {
     stale,
     staleAgeMs,
     lastLoadedAt,
+    nowMs,
     favorites,
     mySubs,
     ruleRows,
@@ -985,6 +1065,10 @@ export function useGapDesk() {
     lagMedianHours,
     isLive,
     demoReasons,
+    dataAgeHours,
+    dataFreshnessTone,
+    dataAgeText,
+    dataFreshnessTitle,
     dailyBriefText,
     funnel,
     loneCount,

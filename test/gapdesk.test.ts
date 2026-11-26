@@ -43,11 +43,14 @@ import {
 import { scoreEvents } from '../scripts/gapdesk/score.mjs'
 import { FEED_BATCH, gapDiv, loadGapFeed, purgeAndRefresh, useGapDesk } from '../src/composables/useGapDesk'
 import {
+  EMPTY_DEMO,
+  EMPTY_LOADING,
   EMPTY_PURGE_EMPTY,
   EMPTY_PURGE_ERROR,
   EMPTY_PURGE_RUNNING,
   EMPTY_WINDOW,
   GAP_FEED_CACHE_KEY,
+  GAP_REFRESH_MS,
   GAP_TTL_HOURS
 } from '../src/config/gapdeskConfig'
 import { parsePurgeResult } from '../src/services/gapdeskService'
@@ -1197,7 +1200,7 @@ describe('顶栏对齐 PageHeader 与移动端触控（UI 打磨回归）', () =
     expect(inner).toContain('font-size: 18px')
 
     const tpl = readFileSync(resolve(process.cwd(), 'src/components/gapdesk/GapTopbar.vue'), 'utf8')
-    for (const token of ['LIVE', '今日 L0', '兑现率', '时差中位', '清理', '手机版']) {
+    for (const token of ['gd-age-pill', '今日 L0', '兑现率', '时差中位', '清理', '手机版']) {
       expect(tpl).toContain(token)
     }
     // 移动壳在真机上独立渲染，PC 顶栏不能在手机壳里出现
@@ -1580,5 +1583,100 @@ describe('移动端日期胶囊 · 与 PC 同口径接通 dateBand', () => {
       pc.unmount()
       mb.unmount()
     }
+  })
+})
+
+/* ============================================================
+   七、P0 收尾：cron 错峰 + 数据新鲜度诚实化
+   ============================================================ */
+describe('顶栏数据新鲜度 · 真实但旧的数据不再被标成 DEMO', () => {
+  /** 固定采集时刻与当前时刻，避免测试跑在整点附近影响分档 */
+  function seedMeta(generatedAt: string | null): void {
+    store.meta.value = generatedAt === null
+      ? null
+      : ({ generated_at: generatedAt } as NonNullable<typeof store.meta.value>)
+    store.nowMs.value = NOW
+    store.error.value = null
+    store.stale.value = false
+  }
+
+  it('8 小时前 → 展示数据年龄（黄档），不出现 DEMO / 不是实时源数据', () => {
+    seedMeta(new Date(NOW - 8 * HOUR).toISOString())
+    const wrapper = mount(GapTopbar)
+    const badge = wrapper.find('.gd-age-pill')
+
+    expect(badge.exists()).toBe(true)
+    expect(badge.text()).toContain('数据更新于 8小时前')
+    expect(badge.classes()).toContain('gd-age-aging')
+    expect(badge.text()).not.toContain('DEMO')
+    expect(wrapper.text()).not.toContain('不是实时源数据')
+    expect(badge.attributes('title')).not.toContain('未连上网关')
+    wrapper.unmount()
+  })
+
+  it('generated_at 缺失或异常 → 显示 —，不出现 NaN / 负年龄', () => {
+    for (const bad of [null, '', 'not-a-date']) {
+      seedMeta(bad)
+      const wrapper = mount(GapTopbar)
+      const badge = wrapper.find('.gd-age-pill')
+
+      expect(badge.text()).toBe('—')
+      expect(badge.classes()).toContain('gd-age-unknown')
+      expect(badge.text()).not.toMatch(/NaN|-\d/)
+      wrapper.unmount()
+    }
+  })
+
+  it('采集时间超前 → 按「刚刚」展示，不出现负年龄', () => {
+    seedMeta(new Date(NOW + HOUR).toISOString())
+    const wrapper = mount(GapTopbar)
+    const badge = wrapper.find('.gd-age-pill')
+
+    expect(badge.text()).toContain('数据更新于 刚刚')
+    expect(badge.text()).not.toMatch(/-\d/)
+    expect(badge.classes()).toContain('gd-age-fresh')
+    wrapper.unmount()
+  })
+
+  it('时钟走字后徽标跟着变，且时钟沿用 GAP_REFRESH_MS 这一条生命周期', async () => {
+    seedMeta(new Date(NOW - 8 * HOUR).toISOString())
+    const wrapper = mount(GapTopbar)
+    expect(wrapper.find('.gd-age-pill').text()).toContain('数据更新于 8小时前')
+
+    // 共享时钟推进一小时：页面挂着不动也要刷新显示，不靠重新拉数据
+    store.nowMs.value = NOW + HOUR
+    await nextTick()
+    expect(wrapper.find('.gd-age-pill').text()).toContain('数据更新于 9小时前')
+    wrapper.unmount()
+
+    const src = readSource('src/composables/useGapDesk.ts')
+    expect(src).toContain('GAP_REFRESH_MS')
+    expect(src).toMatch(/setInterval\(\(\) => \{[\s\S]*?nowMs\.value = Date\.now\(\)/)
+    expect(src).toContain('onBeforeUnmount(stopClock)')
+  })
+})
+
+describe('空态与采集文案 · 不再承诺固定频率、不再暗示数据虚假', () => {
+  it('EMPTY_LOADING / EMPTY_DEMO 去掉「每 30 分钟」与「不是实时源数据」', () => {
+    expect(EMPTY_LOADING).not.toContain('每 30 分钟')
+    expect(EMPTY_LOADING).toContain('正在加载')
+    expect(EMPTY_DEMO).not.toContain('不是实时源数据')
+    expect(EMPTY_DEMO).not.toContain('未连上网关')
+    expect(EMPTY_DEMO).toContain('采集')
+    expect(EMPTY_DEMO).toContain('滞后')
+  })
+
+  it('采集 workflow 用 7,37 错峰，注释不再声称每 30 分钟', () => {
+    const yml = readSource('.github/workflows/gapdesk-collect.yml')
+    expect(yml).toContain("- cron: '7,37 * * * *'")
+    expect(yml).not.toContain("'*/30 * * * *'")
+    expect(yml).not.toContain('每 30 分钟')
+    // 错峰后仍保留原有的并发与超时保护
+    expect(yml).toContain('cancel-in-progress: false')
+    expect(yml).toContain('timeout-minutes: 5')
+  })
+
+  it('GAP_REFRESH_MS 仍是前端刷新节奏（30s），没有为徽标另开一套间隔常量', () => {
+    expect(GAP_REFRESH_MS).toBe(30_000)
   })
 })

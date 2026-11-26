@@ -2,7 +2,7 @@
   差值台 GAPDESK · PC 顶栏
   ---------------------------------------------------------------
   视觉语言对齐宿主 PageHeader：白卡片 / 圆角 / 描边 / 阴影 / 40px 渐变图标 /
-  标题+副标题 / 右侧 actions。功能信息（LIVE、L0/L1/L2、兑现率、时差、
+  标题+副标题 / 右侧 actions。功能信息（数据年龄、L0/L1/L2、兑现率、时差、
   视图标题、清理、切端、退出）一条不少；指标位全部来自 store。
   搜索框是真控件：直接写 filters.keyword，"/" 可聚焦。
 -->
@@ -17,13 +17,13 @@
         </div>
       </div>
 
-      <!-- 三条降级条件同时不满足才敢标 LIVE -->
+      <!-- 数据是真的，只是可能旧：按 generated_at 的数据年龄如实展示 -->
       <div class="gd-ph-status">
         <span
-          class="gd-pill gd-mono"
-          :class="liveNow ? 'gd-pill-live' : 'gd-pill-demo'"
-          :title="liveNow ? '40 分钟内有采集、非镜像、无错误' : demoTitle"
-        >{{ liveNow ? 'LIVE' : 'DEMO' }}</span>
+          class="gd-pill gd-mono gd-age-pill"
+          :class="'gd-age-' + dataFreshnessTone"
+          :title="dataFreshnessTitle"
+        >{{ dataAgeText }}</span>
         <span class="gd-pill gd-pill-fnl gd-mono" title="按池内分位分层：L0 前 10% / L1 10–40% / L2 其余">
           今日 L0 {{ tierCounts.L0 }} · L1 {{ tierCounts.L1 }} · L2 {{ tierCounts.L2 }}
         </span>
@@ -64,7 +64,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { EMPTY_ECHO } from '../../config/gapdeskConfig'
 import { useGapDesk } from '../../composables/useGapDesk'
 
@@ -72,16 +72,22 @@ const props = withDefaults(
   defineProps<{
     /** 当前视图名，由宿主按 ?view= 传入 */
     title?: string
-    /** 外部强制实时态（默认走 store 的 isLive 判定） */
+    /** @deprecated 宿主仍在传 isLive；顶栏已改用数据年龄，保留 prop 只是不破坏调用方 */
     live?: boolean
   }>(),
   { title: '最新信息', live: false }
 )
 
-const { tierCounts, lagMedianHours, isLive, demoReasons, canPurge, filters, setKeyword } = useGapDesk()
-
-const liveNow = computed<boolean>(() => props.live || isLive.value)
-const demoTitle = computed<string>(() => demoReasons.value.join('；') || '未连上网关')
+const {
+  tierCounts,
+  lagMedianHours,
+  dataAgeText,
+  dataFreshnessTone,
+  dataFreshnessTitle,
+  canPurge,
+  filters,
+  setKeyword
+} = useGapDesk()
 
 /** 顶栏搜索与筛选栏共用同一个 filters.keyword，300ms 防抖避免每敲一字重算整池 */
 const keywordInput = ref<string>(filters.keyword)
@@ -123,3 +129,25 @@ const emit = defineEmits<{
   purge: []
 }>()
 </script>
+
+<style scoped>
+/* 数据新鲜度三档：绿=新、黄=旧但可用、灰=时间未知；只表达年龄，不暗示真假 */
+.gd-age-fresh {
+  background: #E6F9F2;
+  color: var(--gd-ok, #159c72);
+  font-weight: 700;
+}
+.gd-age-aging {
+  background: #FFF4DE;
+  color: #946200;
+  font-weight: 700;
+  border: 1px solid #F3D9A4;
+}
+.gd-age-old,
+.gd-age-unknown {
+  background: #F0F4FB;
+  color: var(--gd-ink2, #5d6b82);
+  font-weight: 700;
+  border: 1px solid var(--gd-line2, #dbe3ef);
+}
+</style>

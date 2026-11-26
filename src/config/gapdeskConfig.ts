@@ -335,10 +335,11 @@ export const EMPTY_LLM = '本段由真实事件按固定规则归纳，非大模
 export const EMPTY_PUSH = '规则已存，真实推送待二期'
 export const EMPTY_HISTORY = '历史序列需快照积累，不补假趋势'
 export const EMPTY_WAIT = '待采'
-export const EMPTY_DEMO = 'DEMO · 演示数据　未连上网关，以下内容不是实时源数据'
+/** 数据来自真实采集，只是可能滞后；判断新旧请看顶栏的采集时间 */
+export const EMPTY_DEMO = '数据来自采集，可能滞后；请以采集时间为准'
 
 /** 空态组件的四态标题/说明也走这里，组件内零文案硬编码 */
-export const EMPTY_LOADING = '采集任务每 30 分钟跑一轮，稍等片刻'
+export const EMPTY_LOADING = '正在加载采集数据，请稍候'
 export const EMPTY_ERROR = '数据暂时取不到，已保留上一次成功加载的结果'
 export const EMPTY_STALE = '当前展示的是本地镜像，分数与热度可能已过期'
 export const EMPTY_GENERIC = '当前时间窗内没有可展示的差值'
