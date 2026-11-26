@@ -150,6 +150,12 @@ echo  ZXS deploy: 凭据已接收，正在部署
 echo ============================================
 set "GH_TOKEN=%GH_TOKEN: =%"
 
+if not defined GH_TOKEN (
+  echo 未输入凭据，已终止。
+  pause
+  exit /b 1
+)
+
 REM 凭据自检：在推送前识别明显输错的内容，避免走完整套线路才报错
 set "PREFIX_BAD=1"
 if /i "%GH_TOKEN:~0,4%"=="ghp_" set "PREFIX_BAD=0"
@@ -170,8 +176,9 @@ if "!PREFIX_BAD!"=="1" (
   exit /b 1
 )
 
-if not defined GH_TOKEN (
-  echo 未输入凭据，已终止。
+REM 推送前预检：直接问 GitHub 这个凭据认不认，1 秒出结果
+call :PRECHECK_TOKEN
+if "!PRECHECK_BAD!"=="1" (
   pause
   exit /b 1
 )
@@ -259,6 +266,29 @@ set "GH_TOKEN="
 echo.
 pause
 exit /b 0
+
+REM 凭据预检子程序（独立子程序，避开主流程括号解析）
+:PRECHECK_TOKEN
+set "PRECHECK_BAD=0"
+set "CHECK_CODE="
+set "CHECK_FILE=%TEMP%\zxs_check_code.txt"
+"%CURL_BIN%" -s -o nul -w "%%{http_code}" --connect-timeout 8 --max-time 20 -H "Authorization: Bearer %GH_TOKEN%" https://api.github.com/user > "%CHECK_FILE%" 2>nul
+set /p CHECK_CODE=<"%CHECK_FILE%" >nul 2>&1
+del "%CHECK_FILE%" >nul 2>&1
+if "!CHECK_CODE!"=="200" (
+  echo   [预检] 凭据有效，继续推送。
+  goto :EOF
+)
+if "!CHECK_CODE!"=="401" (
+  echo.
+  echo [失败] GitHub 不认这个凭据（预检返回 401），不是脚本也不是网络问题。
+  echo   请换一个有效的仓库访问凭据再运行。
+  echo.
+  set "PRECHECK_BAD=1"
+  goto :EOF
+)
+echo   [预检] 无法连通 GitHub API（!CHECK_CODE!），跳过预检直接推送。
+goto :EOF
 
 REM 直连推送（系统 DNS，不强制 IP）
 :PUSH_DIRECT
