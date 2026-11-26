@@ -41,7 +41,6 @@
       v-else
       :title="currentMeta.label"
       :tab="mobileTab"
-      :live="isLive"
       :l0-count="tierCounts.L0"
       @tab="onMobileTab"
       @switch-dev="onSwitchDev('pc')"

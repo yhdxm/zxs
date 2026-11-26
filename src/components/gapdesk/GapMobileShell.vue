@@ -117,13 +117,11 @@ const TABS: readonly MobileTab[] = [
 withDefaults(
   defineProps<{
     title?: string
-    /** @deprecated 宿主仍在传 isLive；手机壳已改用共享数据年龄，保留 prop 只是不破坏调用方 */
-    live?: boolean
     /** null = 未知，显示「—」，不写死条数 */
     l0Count?: number | null
     tab?: string
   }>(),
-  { title: '最新信息', live: false, l0Count: null, tab: 'm-latest' }
+  { title: '最新信息', l0Count: null, tab: 'm-latest' }
 )
 
 const emit = defineEmits<{

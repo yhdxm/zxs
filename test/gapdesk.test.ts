@@ -1614,24 +1614,32 @@ describe('顶栏数据新鲜度 · 真实但旧的数据不再被标成 DEMO', (
     wrapper.unmount()
   })
 
-  it('手机壳与 PC 顶栏共用同一份 dataAgeText：8 小时前两端文案一致，且不再按 live 二元切换', () => {
+  it('手机壳与 PC 顶栏共用同一份 dataAgeText：8 小时前文案与 store 完全一致，且不含 DEMO', () => {
     seedMeta(new Date(NOW - 8 * HOUR).toISOString())
+    const expected = store.dataAgeText.value
     const pc = mount(GapTopbar)
-    const mb = mount(GapMobileShell, { props: { live: false } })
-    const pcText = pc.find('.gd-age-pill').text()
+    const mb = mount(GapMobileShell)
 
-    expect(mb.find('.p-age-pill').text()).toBe(pcText)
-    expect(mb.find('.p-age-pill').text()).toContain('数据更新于 8小时前')
+    expect(expected).toContain('数据更新于 8小时前')
+    expect(pc.find('.gd-age-pill').text()).toBe(expected)
+    // 直接咬 store 派生值；下面的源码断言保证退回 v-if="!live" 写法时必然变红
+    expect(mb.find('.p-age-pill').exists()).toBe(true)
+    expect(mb.find('.p-age-pill').text()).toBe(expected)
     expect(mb.find('.p-age-pill').classes()).toContain('gd-age-aging')
+    expect(mb.find('.p-note').exists()).toBe(true)
     expect(mb.text()).not.toContain('DEMO')
     expect(mb.text()).not.toContain('不是实时源数据')
 
-    // live=true 也必须同样展示年龄与诚实提示，证明旧阈值判定已不再分流
-    const mbLive = mount(GapMobileShell, { props: { live: true } })
-    expect(mbLive.find('.p-note').exists()).toBe(true)
-    expect(mbLive.find('.p-note').text()).toBe(EMPTY_DEMO)
-    expect(mbLive.find('.p-age-pill').text()).toBe(pcText)
-    mbLive.unmount()
+    // 死 prop 必须清干净：组件源码与调用方都不允许再出现 live 入参
+    const shell = readSource('src/components/gapdesk/GapMobileShell.vue')
+    const host = readSource('src/views/GapDeskView.vue')
+    expect(shell).not.toContain('v-if="!live"')
+    expect(shell).not.toContain('live?: boolean')
+    // 只查手机壳标签内部：PC 顶栏的 :live 是另一条兼容 prop，不在此轮清理范围
+    const shellStart = host.indexOf('<GapMobileShell')
+    const shellEnd = host.indexOf('</GapMobileShell>', shellStart)
+    const mbBlock = host.slice(shellStart, shellEnd)
+    expect(mbBlock).not.toContain(':live=')
     pc.unmount()
     mb.unmount()
   })
