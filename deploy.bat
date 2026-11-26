@@ -145,15 +145,24 @@ if defined GOOD_IP (
 REM ================= optional proxy (for VPN / accelerator users) =================
 set "PROXY_ARG="
 echo.
-echo 若你开了 VPN / 加速器，请填代理地址让 git 走代理，例如 http://127.0.0.1:7890
-echo 没有使用代理就直接回车跳过（将用系统网络直连）。
-set /p "USER_PROXY=代理地址（回车=跳过）: "
+echo 【第 1 步 / 共 2 步】代理地址（绝大多数人直接回车跳过）
+echo   开了 VPN / 加速器才填，形如 http://127.0.0.1:7890；没开就【直接回车】。
+echo   注意：这里【不要】填 GitHub token，token 在下一步单独输入。
+set /p "USER_PROXY=代理地址（没开代理直接回车）: "
 set "USER_PROXY=%USER_PROXY: =%"
+REM 识别误填的 token：ghp_/github_pat_/gho_/ghu_/ghs_/ghr_ 开头一律当没填
+if defined USER_PROXY (
+  echo %USER_PROXY% | findstr /I /B /C:"ghp_" /C:"github_pat_" /C:"gho_" /C:"ghu_" /C:"ghs_" /C:"ghr_" >nul 2>&1
+  if !ERRORLEVEL! == 0 (
+    echo [提醒] 刚才填的是 GitHub token，不是代理地址 —— 已忽略，下一步会单独问 token。
+    set "USER_PROXY="
+  )
+)
 if defined USER_PROXY set "PROXY_ARG=-c http.proxy=%USER_PROXY% -c https.proxy=%USER_PROXY%"
 
 REM ================= token =================
 echo.
-echo 请在下方粘贴你的 GitHub token。
+echo 【第 2 步 / 共 2 步】请在下方粘贴你的 GitHub token。
 echo   经典 token（classic）：需要 "repo"；仅当改动 .github/workflows 时才加 "workflow"。
 echo   细粒度 token：Contents=写入、Pages=写入；改工作流文件时再加 Actions=读取/写入。
 echo 输入后按回车即可，脚本会立即清屏，token 不会留在屏幕上。
@@ -261,6 +270,12 @@ if %D_IDX% lss %TRY_N% goto PUSH_DIRECT_LOOP
 exit /b 0
 
 :DIAGNOSE_FAIL
+findstr /C:"Could not resolve proxy" "%PUSH_LOG%" >nul 2>&1
+if !ERRORLEVEL! == 0 (
+  echo 诊断：代理地址填错了 —— 很可能把 GitHub token 填进了「代理地址」那一栏。
+  echo   代理地址应形如 http://127.0.0.1:7890；没开代理就直接回车跳过，token 在下一步填。
+  goto :EOF
+)
 findstr /C:"10054" /C:"Connection was reset" /C:"Empty reply" /C:"timed out" /C:"Could not resolve host" "%PUSH_LOG%" >nul 2>&1
 if !ERRORLEVEL! == 0 (
   echo 诊断：连接被网络层重置/中断 —— 这不是 token 问题。
