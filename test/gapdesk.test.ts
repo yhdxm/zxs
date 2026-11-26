@@ -1614,6 +1614,28 @@ describe('顶栏数据新鲜度 · 真实但旧的数据不再被标成 DEMO', (
     wrapper.unmount()
   })
 
+  it('手机壳与 PC 顶栏共用同一份 dataAgeText：8 小时前两端文案一致，且不再按 live 二元切换', () => {
+    seedMeta(new Date(NOW - 8 * HOUR).toISOString())
+    const pc = mount(GapTopbar)
+    const mb = mount(GapMobileShell, { props: { live: false } })
+    const pcText = pc.find('.gd-age-pill').text()
+
+    expect(mb.find('.p-age-pill').text()).toBe(pcText)
+    expect(mb.find('.p-age-pill').text()).toContain('数据更新于 8小时前')
+    expect(mb.find('.p-age-pill').classes()).toContain('gd-age-aging')
+    expect(mb.text()).not.toContain('DEMO')
+    expect(mb.text()).not.toContain('不是实时源数据')
+
+    // live=true 也必须同样展示年龄与诚实提示，证明旧阈值判定已不再分流
+    const mbLive = mount(GapMobileShell, { props: { live: true } })
+    expect(mbLive.find('.p-note').exists()).toBe(true)
+    expect(mbLive.find('.p-note').text()).toBe(EMPTY_DEMO)
+    expect(mbLive.find('.p-age-pill').text()).toBe(pcText)
+    mbLive.unmount()
+    pc.unmount()
+    mb.unmount()
+  })
+
   it('generated_at 缺失或异常 → 显示 —，不出现 NaN / 负年龄', () => {
     for (const bad of [null, '', 'not-a-date']) {
       seedMeta(bad)
@@ -1674,8 +1696,9 @@ describe('空态与采集文案 · 不再承诺固定频率、不再暗示数据
     // 错峰后仍保留原有的并发与超时保护
     expect(yml).toContain('cancel-in-progress: false')
     expect(yml).toContain('timeout-minutes: 5')
-    // 轻量槽位观测：几天后可用 API 按 run_id / slot 统计存活率
-    expect(yml).toContain('slot=${TS:11:5} observed_at=$TS run_id=$GITHUB_RUN_ID')
+    // 槽位存活率改由 GitHub API 按 created_at 反推，workflow 里不留观测代码
+    expect(yml).not.toContain('observed_at=')
+    expect(yml).not.toContain('run_id=')
   })
 
   it('4 处采集侧注释同步改口，残留的 30min 只剩真实冷却逻辑', () => {

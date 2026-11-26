@@ -85,8 +85,4 @@ jobs:
             echo '```'
             if [ -f "$LOG" ]; then tail -n 40 "$LOG"; else echo '(没有日志输出)'; fi
             echo '```'
-            echo ''
-            # 槽位存活观测：只记本次运行的 UTC 分钟与 run_id，便于几天后用 API 统计 cron 是否真的按 7/37 分触发
-            TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-            echo "slot=${TS:11:5} observed_at=$TS run_id=$GITHUB_RUN_ID schedule=${{ github.event.schedule }}"
           } >> "$GITHUB_STEP_SUMMARY"
