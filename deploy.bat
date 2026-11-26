@@ -142,6 +142,15 @@ if defined GOOD_IP (
   echo   如果仍失败，请开启 VPN 或手机热点后重新运行本脚本。
 )
 
+REM ================= optional proxy (for VPN / accelerator users) =================
+set "PROXY_ARG="
+echo.
+echo 若你开了 VPN / 加速器，请填代理地址让 git 走代理，例如 http://127.0.0.1:7890
+echo 没有使用代理就直接回车跳过（将用系统网络直连）。
+set /p "USER_PROXY=代理地址（回车=跳过）: "
+set "USER_PROXY=%USER_PROXY: =%"
+if defined USER_PROXY set "PROXY_ARG=-c http.proxy=%USER_PROXY% -c https.proxy=%USER_PROXY%"
+
 REM ================= token =================
 echo.
 echo 请在下方粘贴你的 GitHub token。
@@ -215,9 +224,7 @@ echo   %PUSH_LOG%
 echo.
 type "%PUSH_LOG%"
 echo.
-echo 常见原因（按可能性排序）：
-echo   1. token 无效、缺少 "repo" 权限，或不属于当前账号 —— 请重新生成 classic token 后重试。
-echo   2. 直连与静态线路都不可达 —— 先确认浏览器能否打开 github.com；能打开则多为 token 问题，打不开再开热点/VPN。
+call :DIAGNOSE_FAIL
 goto DEPLOY_END
 
 :PUSH_SUCCESS
@@ -245,12 +252,29 @@ set /a D_IDX=0
 :PUSH_DIRECT_LOOP
 set /a D_IDX+=1
 echo   系统直连 第 %D_IDX%/%TRY_N% 次尝试...
-git push "%PUSH_URL%" main > "%PUSH_LOG%" 2>&1
+git %PROXY_ARG% push "%PUSH_URL%" main > "%PUSH_LOG%" 2>&1
 if !ERRORLEVEL! == 0 (
   set "PUSH_OK=1"
   goto :EOF
 )
 if %D_IDX% lss %TRY_N% goto PUSH_DIRECT_LOOP
+exit /b 0
+
+:DIAGNOSE_FAIL
+findstr /C:"10054" /C:"Connection was reset" /C:"Empty reply" /C:"timed out" /C:"Could not resolve host" "%PUSH_LOG%" >nul 2>&1
+if !ERRORLEVEL! == 0 (
+  echo 诊断：连接被网络层重置/中断 —— 这不是 token 问题。
+  echo   curl/浏览器能打开 GitHub 不代表 git 写操作能通；推送常被间歇性阻断。
+  echo   建议：① 换手机热点重试；② 开了 VPN/加速器就在脚本开头填代理地址；③ 确认 VPN 为全局模式。
+  goto :EOF
+)
+findstr /C:"401" /C:"403" /C:"Authentication failed" /C:"Permission denied" /C:"not found" "%PUSH_LOG%" >nul 2>&1
+if !ERRORLEVEL! == 0 (
+  echo 诊断：token 无效或权限不足 —— 这是鉴权问题，不是网络问题。
+  echo   经典 token 请勾选 repo；细粒度 token 请给 Contents=写入。
+  goto :EOF
+)
+echo 诊断：原因不明。请把上面的日志发给 AI 分析（发送前删掉 token 那一行）。
 exit /b 0
 
 :PUSH_WITH_RETRY
@@ -260,7 +284,7 @@ set /a P_IDX=0
 :PUSH_RETRY_LOOP
 set /a P_IDX+=1
 echo   线路 %TRY_IP% 第 %P_IDX%/%TRY_N% 次尝试...
-git -c http.curloptResolve=github.com:443:%TRY_IP% push "%PUSH_URL%" main > "%PUSH_LOG%" 2>&1
+git %PROXY_ARG% -c http.curloptResolve=github.com:443:%TRY_IP% push "%PUSH_URL%" main > "%PUSH_LOG%" 2>&1
 REM git push 返回 0 就是成功：输出可能是 "main -> main"（新提交），也可能是 "Everything up-to-date"（已同步）。
 REM 旧版只认前者，导致本地与远端一致时误报「所有线路推送均失败」。
 if !ERRORLEVEL! == 0 (
