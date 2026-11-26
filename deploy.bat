@@ -145,8 +145,8 @@ if defined GOOD_IP (
 REM ================= token =================
 echo.
 echo 请在下方粘贴你的 GitHub token。
-echo   经典 token（classic）：需要 "repo" + "workflow" 两个权限范围。
-echo   细粒度 token：仓库权限需 Actions=读取/写入、Pages=写入、Contents=写入。
+echo   经典 token（classic）：需要 "repo"；仅当改动 .github/workflows 时才加 "workflow"。
+echo   细粒度 token：Contents=写入、Pages=写入；改工作流文件时再加 Actions=读取/写入。
 echo 输入后按回车即可，脚本会立即清屏，token 不会留在屏幕上。
 echo.
 set /p "GH_TOKEN=请输入 GitHub token: "
@@ -266,21 +266,9 @@ curl -s -o "%TEMP%\zxs_pages.json" -w "   HTTP %%{http_code}\n" -X PUT ^
   -d "{\"build_type\":\"workflow\"}"
 echo   HTTP 200/204 表示 Pages 部署源已成功设为 GitHub Actions。
 
-echo   上方的推送已经触发了一次自动部署，无需手动重新运行。
-echo   正在尝试重新运行最新一次任务以立即部署（可选）...
-for /f "delims=" %%i in ('powershell -NoProfile -Command "try{(Invoke-RestMethod -Uri '%API_BASE%/actions/workflows/deploy.yml/runs?per_page=1' -Headers @{Authorization='Bearer %GH_TOKEN%'}).workflow_runs[0].id}catch{''}"') do set "RUN_ID=%%i"
-if defined RUN_ID (
-  curl -s -o "%TEMP%\zxs_rerun.json" -w "   re-run HTTP %%{http_code}\n" -X POST -H "Accept: application/vnd.github+json" -H "Authorization: Bearer %GH_TOKEN%" -H "X-GitHub-Api-Version: 2022-11-28" "%API_BASE%/actions/runs/!RUN_ID!/rerun"
-  powershell -NoProfile -Command "try{$r=Get-Content '%TEMP%\zxs_rerun.json' -Raw -ErrorAction SilentlyContinue; if($r -and $r.Trim().Length -gt 0){$j=ConvertFrom-Json $r -ErrorAction SilentlyContinue; if($j.message){Write-Host ('   API 提示: ' + $j.message)}}}catch{}"
-  echo   如果重新运行返回 403：
-  echo     - 经典 token 需额外包含 "workflow" 权限（除 "repo" 外）。
-  echo     - 细粒度 token 需具备 Actions=读取/写入 权限。
-  echo     - 仓库设置 ^> Actions ^> General：Workflow 权限需设为"读取和写入权限"。
-  echo   否则最新推送已自动开始部署，请等待 1-2 分钟即可。
-) else (
-  echo   无法自动获取最新任务 ID。若 1 分钟内未出现新任务，
-  echo   请打开 %ACTIONS_URL%，在最新一次失败/跳过的任务上点击"Re-run jobs"。
-)
+echo   本次推送已自动触发 GitHub Pages 部署，无需手动重新运行。
+echo   部署进度：%ACTIONS_URL%
+echo   通常 1-2 分钟后刷新线上地址即可看到新版（首次可能稍慢）。
 exit /b 0
 
 :PROBE
