@@ -1674,6 +1674,26 @@ describe('空态与采集文案 · 不再承诺固定频率、不再暗示数据
     // 错峰后仍保留原有的并发与超时保护
     expect(yml).toContain('cancel-in-progress: false')
     expect(yml).toContain('timeout-minutes: 5')
+    // 轻量槽位观测：几天后可用 API 按 run_id / slot 统计存活率
+    expect(yml).toContain('slot=${TS:11:5} observed_at=$TS run_id=$GITHUB_RUN_ID')
+  })
+
+  it('4 处采集侧注释同步改口，残留的 30min 只剩真实冷却逻辑', () => {
+    const collect = readSource('scripts/gapdesk/collect.mjs')
+    const service = readSource('src/services/gapdeskService.ts')
+    const score = readSource('scripts/gapdesk/score.mjs')
+    const fetch = readSource('scripts/gapdesk/fetch.mjs')
+
+    expect(collect).toContain('每小时两轮，错开整点高峰')
+    expect(collect).not.toContain('每 30 分钟')
+    expect(service).toContain('每小时两轮，错开整点高峰')
+    expect(service).not.toContain('每 30 分钟')
+    expect(score).toContain('误差 ≤ 两轮采集间隔')
+    expect(score).not.toContain('轮询间隔 30min')
+    expect(fetch).toContain('采集每小时两轮')
+    expect(fetch).not.toContain('Actions 每 30 分钟一轮')
+    // 429 冷却 30min 是真实逻辑，不是过期口径，保持不动
+    expect(fetch).toContain('30 * 60 * 1000')
   })
 
   it('GAP_REFRESH_MS 仍是前端刷新节奏（30s），没有为徽标另开一套间隔常量', () => {

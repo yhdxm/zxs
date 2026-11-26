@@ -15,7 +15,7 @@ export const DEFAULT_TIMEOUT_MS = 12000
 
 /**
  * 按 URL 记录冷却到期时间：429 → 30 分钟，5xx → 5 分钟，其余错误 → 1 分钟。
- * 冷却期内不重试（Actions 每 30 分钟一轮，重试只会继续挨打），直接沿用上一轮数据。
+ * 冷却期内不重试（采集每小时两轮，重试只会继续挨打），直接沿用上一轮数据。
  */
 export const COOLDOWN = new Map()
 

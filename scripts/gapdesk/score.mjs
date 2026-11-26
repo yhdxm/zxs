@@ -206,7 +206,7 @@ export function buildPlat({ pubH, insH, massHit, massOn, isForeign, fs, pubTs, c
     return {
       platform: n,
       heat: hit ? pubH : null,
-      // 命中时「首触」= 我们本轮在榜上观测到它的时刻（误差 ≤ 轮询间隔 30min）
+      // 命中时「首触」= 我们本轮在榜上观测到它的时刻（误差 ≤ 两轮采集间隔）
       firstTouchTs: hit ? fs : 0,
       real: hit,
     }

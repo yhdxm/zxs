@@ -7,7 +7,7 @@
 //   4) 所有公共表查询都显式带 `expire_at > now` —— RLS 之外再走 expire_at 索引，
 //      避免把已过期但尚未被清理函数删掉的行拉回前端。
 //
-// 数据来源：scripts/gapdesk/collect.mjs（GitHub Actions 每 30 分钟写一轮）。
+// 数据来源：scripts/gapdesk/collect.mjs（GitHub Actions 每小时两轮，错开整点高峰）。
 import { supabase } from '../lib/supabaseClient'
 import { cacheClear } from './cloudSyncService'
 import { getSavedUser, type AppUser } from './appDataService'
