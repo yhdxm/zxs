@@ -150,6 +150,26 @@ echo  ZXS deploy: 凭据已接收，正在部署
 echo ============================================
 set "GH_TOKEN=%GH_TOKEN: =%"
 
+REM 凭据自检：在推送前识别明显输错的内容，避免走完整套线路才报错
+set "PREFIX_BAD=1"
+if /i "%GH_TOKEN:~0,4%"=="ghp_" set "PREFIX_BAD=0"
+if /i "%GH_TOKEN:~0,11%"=="github_pat_" set "PREFIX_BAD=0"
+if /i "%GH_TOKEN:~0,4%"=="gho_" set "PREFIX_BAD=0"
+if /i "%GH_TOKEN:~0,4%"=="ghu_" set "PREFIX_BAD=0"
+if /i "%GH_TOKEN:~0,4%"=="ghs_" set "PREFIX_BAD=0"
+if /i "%GH_TOKEN:~0,4%"=="ghr_" set "PREFIX_BAD=0"
+if "!PREFIX_BAD!"=="1" (
+  echo.
+  echo [自检] 输入的内容不像 GitHub 仓库凭据。
+  echo   本机识别到的开头: %GH_TOKEN:~0,8%
+  echo   正确格式应以 ghp_ 或 github_pat_ 开头；其他平台的密钥 GitHub 不认。
+  echo.
+  echo 已中止，请重新运行并输入 GitHub 仓库访问凭据。
+  echo.
+  pause
+  exit /b 1
+)
+
 if not defined GH_TOKEN (
   echo 未输入凭据，已终止。
   pause
