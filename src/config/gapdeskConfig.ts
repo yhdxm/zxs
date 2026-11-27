@@ -459,3 +459,26 @@ export const EMPTY_PURGE_EMPTY = '没有需要清理的过期数据，已刷新�
 export const EMPTY_PURGE_ERROR = '清理失败，本地缓存与已展示数据均未改动，可稍后重试'
 /** 无权限：按钮不渲染，这是兜底提示 */
 export const EMPTY_PURGE_DENIED = '仅管理员可执行清理'
+
+/* ============================================================
+   十三、第四档增量文案（可信度 / 翻译重试 / 稍后读清单 / AI 引用）
+   ============================================================ */
+
+/** 「能不能信」：与 GapEventCard 卡脚口径一致，≤1 路源算孤证、≥2 路算交叉验证（gapGapTagsOf 的交叉标签要求 ≥3，两者刻意不同） */
+export const GAP_CRED_LONE = '孤证'
+export const GAP_CRED_CROSS = '交叉验证'
+export const GAP_CRED_FIRST = '首触源'
+
+/** 翻译失败后的手动重试：只重入队，不动译文缓存与打分 */
+export const I18N_RETRY_TEXT = '重试'
+export const I18N_RETRY_TIP = '重新尝试翻译这条；源站原文始终保留'
+
+/** 稍后读清单的展开/收起按钮 */
+export const GAP_LATER_EXPAND = '展开清单'
+export const GAP_LATER_COLLAPSE = '收起清单'
+/** 有个别稍后读条目已过期/未加载时的如实说明，不编造标题 */
+export const GAP_LATER_MISSING = '队列中有条目已过期或未加载（入库保留 48 小时）'
+
+/** AI 研判末尾「依据：#x #y」的前端标签文案 */
+export const GAP_BRIEF_REF_LABEL = '依据'
+export const GAP_BRIEF_REF_MISS = '该序号不在当前 48h 池内，无法回溯'

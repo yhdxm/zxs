@@ -39,7 +39,7 @@ export function useGapBriefAi() {
       config = await loadAiConfig(userId.value || undefined)
       configReady.value = briefConfigReady(config)
       // 命中 48h 缓存：直接展示，不重复消耗额度
-      const hit = peekBriefCache(config, ranked.value)
+      const hit = peekBriefCache(config, ranked.value, userId.value)
       if (hit) {
         text.value = hit.text
         modelLabel.value = hit.model
@@ -82,7 +82,7 @@ export function useGapBriefAi() {
     status.value = 'loading'
     error.value = ''
     try {
-      const result = await generateGapBrief(config, ranked.value, titleOf, force)
+      const result = await generateGapBrief(config, ranked.value, titleOf, force, userId.value)
       text.value = result.text
       modelLabel.value = result.model
       cached.value = result.cached

@@ -37,7 +37,22 @@
         <button type="button" class="pctl" @click="applyFreeModel()">保存模型</button>
       </div>
       <p v-if="error" class="panel-note brief-error">{{ error }}；下方规则版研判不受影响。</p>
-      <p v-if="text" class="panel-note brief-text">{{ text }}</p>
+      <!-- 模型按提示词输出的末尾「依据：#x」解析为可点引用；格式不符时原样纯文本展示 -->
+      <template v-if="text">
+        <p v-if="briefCitations" class="panel-note brief-text">{{ briefCitations.body }}</p>
+        <p v-else class="panel-note brief-text">{{ text }}</p>
+        <div v-if="briefCitations" class="brief-refs">
+          <span class="brief-refs-label gd-mono">{{ GAP_BRIEF_REF_LABEL }}</span>
+          <button
+            v-for="n in briefCitations.refs"
+            :key="n"
+            type="button"
+            class="brief-ref gd-mono"
+            :title="refTitle(n)"
+            @click="openRef(n)"
+          >#{{ n }}</button>
+        </div>
+      </template>
     </section>
 
     <section class="panel chat">
@@ -123,11 +138,15 @@ import {
   EMPTY_AI_WEIGHT,
   EMPTY_GENERIC,
   EMPTY_LLM,
+  GAP_BRIEF_REF_LABEL,
+  GAP_BRIEF_REF_MISS,
   GAP_FRESH_NOTE,
   GAP_WEIGHTS
 } from '../../../config/gapdeskConfig'
 import { GAP_OPEN_DETAIL_KEY, useGapDesk } from '../../../composables/useGapDesk'
 import { useGapBriefAi } from '../../../composables/useGapBriefAi'
+import { parseBriefCitations } from '../../../utils/gapdeskFormat'
+import type { RankedEvent } from '../../../types/gapdesk'
 
 const { ranked, tierCounts, lagMedianHours, health, dailyBriefText, titleOf } = useGapDesk()
 const {
@@ -136,6 +155,22 @@ const {
 } = useGapBriefAi()
 const openDetail = inject(GAP_OPEN_DETAIL_KEY, (_id: number) => {})
 const query = ref('')
+
+/** 末尾「依据：#x」→ 可点引用；无该格式时整段原文照旧显示 */
+const briefCitations = computed(() => parseBriefCitations(text.value))
+function refEventOf(n: number): RankedEvent | null {
+  return ranked.value.find((event) => event.rank === n) ?? null
+}
+function openRef(n: number): void {
+  const event = refEventOf(n)
+  if (event) openDetail(event.id)
+}
+function refTitle(n: number): string {
+  const event = refEventOf(n)
+  return event
+    ? `#${n} · GAP ${event.gap} · ${titleOf(event)}；点击查看该事件详情`
+    : `#${n} ${GAP_BRIEF_REF_MISS}`
+}
 
 /** 检索真实事件作为研判依据，不是 LLM 对话；命中仅来自当前 48h 池 */
 const aiHits = computed(() => {
@@ -223,6 +258,31 @@ const weightRows = computed(() => [
   padding: 10px 12px;
   border-radius: var(--gd-r-nav);
   background: var(--gd-sub);
+}
+/* 研判依据标签：紧跟正文，点一下回到池内对应序号事件 */
+.brief-refs {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+.brief-refs-label {
+  font-size: var(--gd-fs-pill);
+  color: var(--gd-ink3);
+}
+.brief-ref {
+  min-height: 30px;
+  padding: 2px 8px;
+  border: 1px solid color-mix(in srgb, var(--gd-brand) 35%, var(--gd-line));
+  border-radius: var(--gd-r-nav);
+  background: color-mix(in srgb, var(--gd-brand) 6%, var(--gd-card));
+  color: var(--gd-brand);
+  font-size: var(--gd-fs-pill);
+  cursor: pointer;
+}
+.brief-ref:hover {
+  border-color: var(--gd-brand);
 }
 .msg {
   padding: 9px 11px;

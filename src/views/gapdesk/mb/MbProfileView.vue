@@ -65,17 +65,16 @@ function toggleTop5(ind: GapInd): void {
 }
 
 /**
- * 与 PC 行业档案卡同一口径：byIndustry[ind] 按 gap 降序前 5，
- * 名次从全局 ranked 反查（byIndustry 行本身不带 rank）。
+ * 与 PC 行业档案卡同一口径：全局 ranked（含时效衰减、名次连续）按行业过滤前 5。
+ * 直接取 ranked 的 rank，展示顺序与名次天然一致。
  */
 function top5Of(ind: GapInd): Top5Row[] {
-  const rankMap = new Map(ranked.value.map((row) => [row.id, row.rank]))
-  return [...(byIndustry.value[ind] ?? [])]
-    .sort((a, b) => b.gap - a.gap)
+  return ranked.value
+    .filter((row) => row.ind === ind)
     .slice(0, 5)
-    .map((row, index) => ({
+    .map((row) => ({
       id: row.id,
-      rank: rankMap.get(row.id) ?? index + 1,
+      rank: row.rank,
       gap: row.gap,
       title: row.title
     }))

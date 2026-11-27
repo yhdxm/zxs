@@ -27,7 +27,22 @@
         <button type="button" class="brief-save" @click="applyFreeModel()">保存模型</button>
       </div>
       <p v-if="error" class="why brief-error">{{ error }}；下方规则版研判不受影响。</p>
-      <p v-if="text" class="why brief-text">{{ text }}</p>
+      <!-- 与 PC 同口径：末尾「依据：#x」可点回溯；格式不符时原样展示 -->
+      <template v-if="text">
+        <p v-if="briefCitations" class="why brief-text">{{ briefCitations.body }}</p>
+        <p v-else class="why brief-text">{{ text }}</p>
+        <div v-if="briefCitations" class="brief-refs">
+          <span class="m gd-mono">{{ GAP_BRIEF_REF_LABEL }}</span>
+          <button
+            v-for="n in briefCitations.refs"
+            :key="n"
+            type="button"
+            class="brief-ref gd-mono"
+            :title="refTitle(n)"
+            @click="openRef(n)"
+          >#{{ n }}</button>
+        </div>
+      </template>
     </section>
 
     <section class="p-card">
@@ -84,10 +99,22 @@
 <script setup lang="ts">
 import { computed, inject, ref } from 'vue'
 import GapEmptyState from '../../../components/gapdesk/GapEmptyState.vue'
-import { EMPTY_AI_INPUT, EMPTY_AI_PUSH, EMPTY_AI_WEIGHT, EMPTY_GENERIC, EMPTY_LLM, GAP_FRESH_NOTE, GAP_IND_MAP, GAP_WEIGHTS } from '../../../config/gapdeskConfig'
+import {
+  EMPTY_AI_INPUT,
+  EMPTY_AI_PUSH,
+  EMPTY_AI_WEIGHT,
+  EMPTY_GENERIC,
+  EMPTY_LLM,
+  GAP_BRIEF_REF_LABEL,
+  GAP_BRIEF_REF_MISS,
+  GAP_FRESH_NOTE,
+  GAP_IND_MAP,
+  GAP_WEIGHTS
+} from '../../../config/gapdeskConfig'
 import { GAP_OPEN_DETAIL_KEY, useGapDesk } from '../../../composables/useGapDesk'
 import { useGapBriefAi } from '../../../composables/useGapBriefAi'
-import type { GapInd } from '../../../types/gapdesk'
+import { parseBriefCitations } from '../../../utils/gapdeskFormat'
+import type { GapInd, RankedEvent } from '../../../types/gapdesk'
 
 const { ranked, dailyBriefText, titleOf } = useGapDesk()
 const {
@@ -96,6 +123,22 @@ const {
 } = useGapBriefAi()
 const openDetail = inject(GAP_OPEN_DETAIL_KEY, (_id: number) => {})
 const emit = defineEmits<{ navigate: [key: string] }>()
+
+/** 与 PC PcAIView 同口径：只认末尾引用行，其余情况整段原文展示 */
+const briefCitations = computed(() => parseBriefCitations(text.value))
+function refEventOf(n: number): RankedEvent | null {
+  return ranked.value.find((event) => event.rank === n) ?? null
+}
+function openRef(n: number): void {
+  const event = refEventOf(n)
+  if (event) openDetail(event.id)
+}
+function refTitle(n: number): string {
+  const event = refEventOf(n)
+  return event
+    ? `#${n} · GAP ${event.gap} · ${titleOf(event)}；点击查看该事件详情`
+    : `#${n} ${GAP_BRIEF_REF_MISS}`
+}
 
 /** 与 PC PcAIView 同口径：只查当前 48h 池，不查历史、不编造 */
 const query = ref('')
@@ -179,6 +222,27 @@ const indLabel = (ind: GapInd): string => GAP_IND_MAP[ind]?.label ?? '未分类'
 }
 .brief-error { color: #c0392b; }
 .brief-text { white-space: pre-line; line-height: 1.7; }
+/* 研判引用标签：移动端 44px 触控高度，窄屏自动折行 */
+.brief-refs {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+.brief-ref {
+  min-height: 44px;
+  padding: 0 10px;
+  border: 1px solid color-mix(in srgb, var(--gd-brand) 35%, var(--gd-line));
+  border-radius: var(--gd-r-nav);
+  background: color-mix(in srgb, var(--gd-brand) 6%, var(--gd-card));
+  color: var(--gd-brand);
+  font-size: var(--gd-fs-pill);
+  cursor: pointer;
+}
+.brief-ref:hover {
+  border-color: var(--gd-brand);
+}
 .pre {
   white-space: pre-line;
 }

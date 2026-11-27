@@ -23,11 +23,13 @@ import {
   listRules,
   listSubscriptions,
   markRead,
+  probeLaterTable,
   purgeExpired,
   resolveUserId,
   toggleFavorite as toggleFavoriteRemote,
   toggleLaterRemote,
   toggleSubscribe as toggleSubscribeRemote,
+  type LaterWriteResult,
   type GapFeedData,
   type GapFeedMeta
 } from '../services/gapdeskService'
@@ -56,7 +58,7 @@ import {
   SR_TIERS,
   SR_TIER_OF
 } from '../config/gapdeskConfig'
-import { fmtAgo, fmtClock } from '../utils/gapdeskFormat'
+import { bandKeyOf, fmtAgo, fmtClock } from '../utils/gapdeskFormat'
 import {
   I18N_DAILY_CHARS,
   i18nBudgetLeft,
@@ -221,7 +223,28 @@ const i18nDaily = ref<I18nDaily | null>(readI18nDaily())
 /** 每项用 Record<string,true> 便于模板直接读，避免 Set 的响应式代理陷阱 */
 const i18nBusy = ref<Record<string, boolean>>({})
 const i18nFailed = ref<Record<string, boolean>>({})
-const i18nBudgetOut = ref(false)
+const i18nBudgetOutRaw = ref(false)
+/** 记录标志置位当天，跨天自动复位（日额度按日键恢复，文案说「明日自动恢复」就必须真恢复） */
+let i18nBudgetOutDay = ''
+/**
+ * 保持原读写接口（.value = true|false），但用普通 getter 而非 computed：
+ * 日期不是响应式源，computed 会缓存导致跨天后读不到复位；getter 每次现算，跨天真正自动恢复。
+ * 类型上兼容 Ref<boolean>（只读消费 + 可写）。
+ */
+const i18nBudgetOut = {
+  get value(): boolean {
+    const today = i18nDayKey()
+    if (i18nBudgetOutDay && i18nBudgetOutDay !== today) {
+      i18nBudgetOutRaw.value = false
+      i18nBudgetOutDay = ''
+    }
+    return i18nBudgetOutRaw.value
+  },
+  set value(v: boolean) {
+    i18nBudgetOutRaw.value = v
+    i18nBudgetOutDay = v ? i18nDayKey() : ''
+  }
+} as { value: boolean }
 const I18N_CONCURRENCY = 2
 let i18nActive = 0
 const i18nPending: GapEventRow[] = []
@@ -310,6 +333,20 @@ function ensureI18n(events: readonly GapEventRow[]): void {
   pumpI18n()
 }
 
+/**
+ * 翻译失败手动重试：只清掉本会话的失败标记并把该事件重新入队。
+ * 译文缓存、日额度、打分/排序一概不动；国内事件仍由 needI18n 拦下，不会被翻译。
+ */
+export function clearI18nFailed(key: string): void {
+  if (!key || !i18nFailed.value[key]) return
+  const next = { ...i18nFailed.value }
+  delete next[key]
+  i18nFailed.value = next
+  // 失败条目可能已滚出当前筛选，但仍在完整 feed 里；从全池找，保证重试按钮真能生效
+  const event = events.value.find((row) => i18nKeyOf(row) === key)
+  if (event) ensureI18n([event])
+}
+
 /** 用户开关：关闭只停展示与新入队，已翻译文保留；开启后立刻补当前首屏 */
 function toggleAutoTranslate(on?: boolean): void {
   autoTranslate.value = on === undefined ? !autoTranslate.value : on
@@ -322,6 +359,8 @@ function toggleAutoTranslate(on?: boolean): void {
 
 /** 稍后读：localStorage 是离线镜像，登录后以 gap_later 表为准跨设备同步 */
 const LATER_KEY = 'gapdesk_later_ids'
+/** gap_later 表不可用（未执行增量 SQL / 无权限）时降级为纯本地队列，UI 如实提示一次 */
+const laterLocalOnly = ref(false)
 function readLaterIds(): number[] {
   try {
     const raw = globalThis.localStorage?.getItem(LATER_KEY)
@@ -392,10 +431,14 @@ async function loadUserState(): Promise<void> {
   mySubs.value = sub.data.map((s) => s.ind)
   // 登录后以云端为准跨端对齐；表未建/读失败时保留本机镜像，不静默清空
   if (!later.error) {
+    laterLocalOnly.value = false
     laterIds.value = later.data.map((l) => l.event_id)
     try {
       globalThis.localStorage?.setItem(LATER_KEY, JSON.stringify(laterIds.value))
     } catch { /* ignore */ }
+  } else {
+    // 区分「缺表/无权限」与「临时网络失败」：前者降级本地并提示，后者也先保留本机镜像不动
+    void probeLaterTable().then((ok) => { laterLocalOnly.value = !ok })
   }
   if (rules.error) {
     ruleRows.value = []
@@ -545,8 +588,11 @@ export function gapDiv(e: GapEventRow): number {
   return (e.ins_heat ?? 0) - (e.pub_heat ?? 0)
 }
 
-/** 过滤 + 排序后的池（矩阵/时差/暗流都从它派生，保证全站口径一致） */
-const pool = computed<GapEventRow[]>(() => {
+/**
+ * 基础池：关键词/行业/六维/订阅/海外/时间窗过滤 + 排序。
+ * 刻意不含 dateBand —— 日期胶囊选项（dateBands）从它派生，否则选一个日期会让胶囊自缩水到只剩一项。
+ */
+const basePool = computed<GapEventRow[]>(() => {
   const kw = filters.keyword.trim().toLowerCase()
   const cutoff = Date.now() - filters.windowH * 3600 * 1000
   const subs = new Set<GapInd>(mySubs.value)
@@ -572,6 +618,18 @@ const pool = computed<GapEventRow[]>(() => {
     if (filters.sort === 'latest') return (b.ts_first_seen || 0) - (a.ts_first_seen || 0)
     return b.gap - a.gap
   })
+})
+
+/**
+ * 全局池：基础池再按 dateBand 收窄。
+ * ranked / 矩阵 / 信源 / Echo / AI / 行业 TOP5 / 今日最大差全部从它派生 —— 日期胶囊一选，全站同口径。
+ * 胶囊选项本身读 basePool，不受此收窄影响。
+ */
+const pool = computed<GapEventRow[]>(() => {
+  const band = filters.dateBand
+  if (!band) return basePool.value
+  const now = nowMs.value
+  return basePool.value.filter((e) => bandKeyOf(e, now) === band)
 })
 
 /** 概览数字 */
@@ -806,6 +864,20 @@ const ranked = computed<RankedEvent[]>(() => {
   })
 })
 
+/**
+ * 稍后读清单：按 laterIds 的加入顺序映射回完整 feed 中的事件对象。
+ * 读完整 feed 而非 ranked，筛选/日期带切换时队列不会凭空消失；已过期的 id 直接跳过，不造占位。
+ */
+const laterList = computed<GapEventRow[]>(() => {
+  const byId = new Map(events.value.map((row) => [row.id, row]))
+  const out: GapEventRow[] = []
+  for (const id of laterIds.value) {
+    const hit = byId.get(id)
+    if (hit) out.push(hit)
+  }
+  return out
+})
+
 /** 首屏批次：一次铺 20 条，点「加载更多」再追加 20，直到全池 */
 export const FEED_BATCH = 20
 
@@ -903,7 +975,8 @@ const dateBands = computed<GapDateBand[]>(() => {
     if (hit) hit.count += 1
     else buckets.set(band.key, { ...band })
   }
-  for (const e of pool.value) {
+  // 读 basePool 而非 pool：胶囊是筛选器本身，读筛选后池会导致选中一项后其余选项消失
+  for (const e of basePool.value) {
     if (!(e.ts_published > 0)) {
       put({ key: 'unknown', label: '时间未知', count: 1, kind: 'unknown', ts: null })
       continue
@@ -1284,15 +1357,19 @@ function toggleLater(eventId: number): void {
     /* 隐私模式下写不进去，内存态照常生效 */
   }
   if (userId.value) {
-    void toggleLaterRemote(eventId, on).then((ok) => {
-      if (!ok) {
-        // 云端写失败：回滚到操作前状态，避免双端口径不一致
+    void toggleLaterRemote(eventId, on).then((result: LaterWriteResult) => {
+      if (result === 'schema-missing') {
+        // 缺表/无权限：本地操作有效，保留刚才的写入，标记降级并如实提示（不回滚、不静默失败）
+        laterLocalOnly.value = true
+        console.warn('[gapdesk] gap_later 不可用，稍后读已降级为仅本机；执行 scripts/gapdesk_later.sql 后可跨端同步')
+      } else if (result === 'offline') {
+        // 真正的网络失败：回滚到操作前状态，避免双端口径不一致
         const rollback = on ? laterIds.value.filter((id) => id !== eventId) : [...laterIds.value, eventId]
         laterIds.value = rollback
         try {
           globalThis.localStorage?.setItem(LATER_KEY, JSON.stringify(rollback))
         } catch { /* ignore */ }
-        console.warn('[gapdesk] 稍后读写库失败，已回滚')
+        console.warn('[gapdesk] 稍后读网络失败，已回滚')
       }
     })
   }
@@ -1362,6 +1439,8 @@ export function useGapDesk() {
     userId,
     evidences,
     laterIds,
+    laterList,
+    laterLocalOnly,
     canPurge,
     purgeState,
     purgeDeleted,
@@ -1430,6 +1509,7 @@ export function useGapDesk() {
     summaryOf,
     i18nStateOf,
     ensureI18n,
+    clearI18nFailed,
     toggleAutoTranslate
   }
 }

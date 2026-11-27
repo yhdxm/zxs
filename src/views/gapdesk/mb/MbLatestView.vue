@@ -3,6 +3,8 @@
   与 PC-01 同一份 store 口径：L0 优先、日期胶囊来自 dateBands，卡片为移动 p-card。
 -->
 <template>
+  <!-- 移动首屏横幅与 PC 同一组件同一 store 口径；compact 版不遮挡情报流 -->
+  <GapTopGapBanner compact />
   <div class="mbview">
     <div class="p-sec">
       <div class="h">L0 · 今日必看 <b class="gd-mono">{{ l0.length }}</b></div>
@@ -13,6 +15,9 @@
         <span class="m">{{ indLabel(item.ind) }}</span>
         <span class="gd-mono score">{{ item.gap }}</span>
         <span class="m gd-mono">#{{ item.rank }}</span>
+        <!-- 能不能信前置：源数判定 + 首触源，都来自现有 store，不参与打分 -->
+        <span class="cred gd-mono" :class="credOf(item).tone" :title="credOf(item).tip">{{ credOf(item).label }}</span>
+        <span v-if="credOf(item).firstSource" class="cred-src gd-mono" :title="credOf(item).tip">{{ firstLabel }} {{ credOf(item).firstSource }}</span>
       </div>
       <!-- 移动四行：差标签 → 译文标题 → GAP/时差/来源 → 原文；正文压一行，详情里看全 -->
       <div v-if="gapGapTagsOf(item).length" class="mb-gaptags">
@@ -23,6 +28,7 @@
         :display="titleOf(item)"
         :state="i18nStateOf(item)"
         :has-translation="i18nStateOf(item) === 'done'"
+        :retry-key="item.event_key"
         compact
       />
       <p v-if="item.reason" class="why">{{ item.reason }}</p>
@@ -56,16 +62,19 @@
           <i class="dot" :style="{ background: indColor(item.ind) }" aria-hidden="true" />
           <span class="m">{{ indLabel(item.ind) }}</span>
           <span class="gd-mono score">{{ item.gap }}</span>
+          <span class="cred gd-mono" :class="credOf(item).tone" :title="credOf(item).tip">{{ credOf(item).label }}</span>
+          <span v-if="credOf(item).firstSource" class="cred-src gd-mono" :title="credOf(item).tip">{{ firstLabel }} {{ credOf(item).firstSource }}</span>
         </div>
         <GapI18nLine
           :original="item.title"
           :display="titleOf(item)"
           :state="i18nStateOf(item)"
           :has-translation="i18nStateOf(item) === 'done'"
+          :retry-key="item.event_key"
           compact
         />
         <div v-if="gapGapTagsOf(item).length" class="mb-gaptags">
-          <span v-for="tag in gapGapTagsOf(item)" :key="tag" class="mb-gaptag gd-mono">{{ tag }}</span>
+          <span v-for="tag in gapGapTagsOf(item)" :key="tag" class="mb-gaptag gd-mono" :class="`tone-${gapTagTone(tag)}`">{{ tag }}</span>
         </div>
         <div class="ft">
           <span>{{ item.tier }}</span>
@@ -114,9 +123,17 @@ import { computed, inject, watch } from 'vue'
 import GapDualTrack from '../../../components/gapdesk/GapDualTrack.vue'
 import GapEmptyState from '../../../components/gapdesk/GapEmptyState.vue'
 import GapI18nLine from '../../../components/gapdesk/GapI18nLine.vue'
-import { EMPTY_WINDOW, GAP_IND_MAP } from '../../../config/gapdeskConfig'
+import GapTopGapBanner from '../../../components/gapdesk/GapTopGapBanner.vue'
+import { EMPTY_WINDOW, GAP_CRED_FIRST, GAP_IND_MAP } from '../../../config/gapdeskConfig'
 import { GAP_OPEN_DETAIL_KEY, useGapDesk } from '../../../composables/useGapDesk'
-import { bandKeyOf, fmtAgo, gapGapTagsOf, gapTagTone } from '../../../utils/gapdeskFormat'
+import {
+  bandKeyOf,
+  fmtAgo,
+  gapCredibilityOf,
+  gapGapTagsOf,
+  gapTagTone,
+  type GapCredibility
+} from '../../../utils/gapdeskFormat'
 import type { GapInd, RankedEvent } from '../../../types/gapdesk'
 
 const { ranked, topList, loadMoreTop, filters, favorites, laterIds, toggleLater, toggleFavoriteEvent, firstSourceOf, titleOf, i18nStateOf, ensureI18n } = useGapDesk()
@@ -179,6 +196,12 @@ function sourceOf(id: number): { name: string; url: string | null } | null {
   return sourceMap.value.get(id) ?? null
 }
 
+/** 卡片头「能不能信」：与横幅共用 gapCredibilityOf，PC/移动同口径 */
+const firstLabel = GAP_CRED_FIRST
+function credOf(item: RankedEvent): GapCredibility {
+  return gapCredibilityOf(item, firstSourceOf.value(item.id))
+}
+
 const indColor = (ind: GapInd): string => GAP_IND_MAP[ind]?.color ?? 'var(--gd-ink3)'
 const indLabel = (ind: GapInd): string => GAP_IND_MAP[ind]?.label ?? '未分类'
 </script>
@@ -196,8 +219,25 @@ const indLabel = (ind: GapInd): string => GAP_IND_MAP[ind]?.label ?? '未分类'
 .mhead {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 7px;
   min-width: 0;
+}
+/* 可信度前置：窄屏允许折行，首触源过长时省略不撑破卡片 */
+.cred {
+  font-size: var(--gd-fs-pill);
+  color: var(--gd-ink2);
+  white-space: nowrap;
+}
+.cred.lone { color: var(--gd-warn); }
+.cred-src {
+  min-width: 0;
+  max-width: 46%;
+  font-size: var(--gd-fs-pill);
+  color: var(--gd-ink3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .dot {
   width: 7px;

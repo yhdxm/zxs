@@ -20,6 +20,8 @@ import { createMemoryHistory, createRouter } from 'vue-router'
 import GapEmptyState from '../src/components/gapdesk/GapEmptyState.vue'
 import GapDetailDrawer from '../src/components/gapdesk/GapDetailDrawer.vue'
 import GapDeskView from '../src/views/GapDeskView.vue'
+import { peekBriefCache, clearBriefCache } from '../src/services/gapdeskBriefService'
+import type { AiConfig } from '../src/services/aiService'
 
 import {
   clamp,
@@ -28,6 +30,7 @@ import {
   fmtClock,
   fmtMoney,
   fmtNum,
+  gapCredibilityOf,
   gapGapTagsOf,
   gapTagTone,
   gapTone,
@@ -38,6 +41,7 @@ import {
   i18nQuotaTextOf,
   i18nQuotaToneOf,
   pct,
+  parseBriefCitations,
   safeJson
 } from '../src/utils/gapdeskFormat'
 import {
@@ -58,7 +62,7 @@ import {
   sameEvent
 } from '../scripts/gapdesk/cluster.mjs'
 import { scoreEvents } from '../scripts/gapdesk/score.mjs'
-import { FEED_BATCH, GAP_OPEN_DETAIL_KEY, gapDiv, loadGapFeed, purgeAndRefresh, useGapDesk } from '../src/composables/useGapDesk'
+import { clearI18nFailed, FEED_BATCH, GAP_OPEN_DETAIL_KEY, gapDiv, loadGapFeed, purgeAndRefresh, useGapDesk } from '../src/composables/useGapDesk'
 import {
   EMPTY_DEMO,
   EMPTY_LOADING,
@@ -2393,5 +2397,210 @@ describe('第三档 · 翻译额度指示与降级提示（PC + 移动同源）'
         expect(src).toContain('i18nBudgetOut.value')
       }
     }
+  })
+})
+
+/* ============================================================
+   排查修复回归：6 个真实 Bug 的行为/契约护栏（2026-11-27）
+   ============================================================ */
+describe('排查修复 · A1 日期筛选全局生效且胶囊不自缩水', () => {
+  it('dateBand 收窄 ranked/矩阵/信源派生，但 dateBands 仍保留全部可选日期', () => {
+    const now = Date.now()
+    store.events.value = [
+      makeEvent({ id: 1, ts_published: now - 3 * 3600_000, gap: 90, ind: 'ai' }),
+      makeEvent({ id: 2, ts_published: now - 26 * 3600_000, gap: 70, ind: 'ai' }),
+      makeEvent({ id: 3, ts_published: now - 20 * 3600_000, gap: 60, ind: 'finance' })
+    ]
+    store.filters.dateBand = ''
+    const allBands = store.dateBands.value.map((b) => b.key)
+    const allCount = store.ranked.value.length
+    expect(allCount).toBe(3)
+    expect(allBands.length).toBeGreaterThan(1) // 胶囊选项完整
+
+    const yesterday = i18nDayKey(now - 26 * 3600_000)
+    store.filters.dateBand = yesterday
+    expect(store.ranked.value.every((e) => store.dateBands.value.some((b) => b.key === yesterday) || e.id === 2)).toBe(true)
+    expect(store.ranked.value.some((e) => e.id === 2)).toBe(true)
+    expect(store.ranked.value.some((e) => e.id === 1)).toBe(false) // 3 小时前被排除
+    // 关键：选中一个日期后，胶囊选项不塌缩成只剩它自己
+    expect(store.dateBands.value.length).toBe(allBands.length)
+    // 行业统计也随筛选收窄（AI 行业只剩昨天的 1 条）
+    expect(store.byIndustry.value.ai.length).toBe(1)
+  })
+})
+
+describe('排查修复 · A3 AI 研判缓存按账号隔离', () => {
+  const cfg: AiConfig = {
+    provider: 'zhipu' as AiConfig['provider'],
+    baseUrl: 'https://example.test',
+    model: 'glm-4-flash',
+    apiKey: 'sk-test-1234567890',
+    systemPrompt: ''
+  }
+  const events = [{ id: 1, rank: 1, gap: 90, tier: 'L0', ind: 'ai', title: 'x' }] as any
+
+  it('同一事件同一配置：换账号后不再命中上一账号的缓存', () => {
+    clearBriefCache('user-A')
+    clearBriefCache('user-B')
+    // 给 A 写一个命中指纹的缓存
+    const fp = `${cfg.provider}|${cfg.model}|${String(cfg.apiKey.length) + cfg.apiKey.slice(-4)}|1|1`
+    localStorage.setItem(`gapdesk_ai_brief_v1:user-A`, JSON.stringify({ fp, at: Date.now(), text: 'A 的研判', model: cfg.model }))
+    expect(peekBriefCache(cfg, events, 'user-A')?.text).toBe('A 的研判')
+    expect(peekBriefCache(cfg, events, 'user-B')).toBeNull() // B 看不到 A 的研判
+    clearBriefCache('user-A')
+  })
+
+  it('同一账号换 Key 后旧缓存不复用', () => {
+    clearBriefCache('user-C')
+    const fp = `${cfg.provider}|${cfg.model}|${String(cfg.apiKey.length) + cfg.apiKey.slice(-4)}|1|1`
+    localStorage.setItem(`gapdesk_ai_brief_v1:user-C`, JSON.stringify({ fp, at: Date.now(), text: '旧 Key 研判', model: cfg.model }))
+    expect(peekBriefCache(cfg, events, 'user-C')?.text).toBe('旧 Key 研判')
+    expect(peekBriefCache({ ...cfg, apiKey: 'sk-other-000000' }, events, 'user-C')).toBeNull()
+    clearBriefCache('user-C')
+  })
+})
+
+describe('排查修复 · A4 翻译额度跨天自动复位', () => {
+  it('置位后当天保持用尽，跨天后自动读回可用', () => {
+    // 先清再置，确保 day 记录为「今天」（避免前面用例残留的 day 干扰）
+    store.i18nBudgetOut.value = false
+    store.i18nBudgetOut.value = true
+    expect(store.i18nBudgetOut.value).toBe(true)
+    // 模拟跨天：推进系统时间 25 小时后，惰性 getter 应自动复位
+    const tomorrow = Date.now() + 25 * 3600_000
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date(tomorrow))
+    expect(store.i18nBudgetOut.value).toBe(false)
+    vi.useRealTimers()
+  })
+})
+
+describe('排查修复 · A5/A6 双端口径一致', () => {
+  it('移动端 L1/L2 差标签与 L0 同款语义色 class', () => {
+    const src = readSource('src/views/gapdesk/mb/MbLatestView.vue')
+    const occurrences = src.split('tone-${gapTagTone(tag)}').length - 1
+    expect(occurrences).toBeGreaterThanOrEqual(2) // L0 + L1/L2 两处都有
+  })
+
+  it('行业 TOP5 直接取 ranked，名次与展示顺序连续一致', () => {
+    for (const rel of ['src/views/gapdesk/pc/PcProfileView.vue', 'src/views/gapdesk/mb/MbProfileView.vue']) {
+      const src = readSource(rel)
+      expect(src).toContain('ranked.value')
+      expect(src).toContain('.filter((row) => row.ind ===')
+      expect(src).toContain('rank: row.rank')
+      expect(src).not.toContain('rankMap.get')
+    }
+  })
+
+  it('稍后读缺表降级：写库区分 schema-missing，文案如实提示', () => {
+    const svc = readSource('src/services/gapdeskService.ts')
+    expect(svc).toContain("export type LaterWriteResult = 'ok' | 'schema-missing' | 'offline'")
+    expect(svc).toContain("return isLaterSchemaError(error.message) ? 'schema-missing' : 'offline'")
+    const s = readSource('src/composables/useGapDesk.ts')
+    expect(s).toContain('laterLocalOnly.value = true')
+    expect(s).toContain('result === \'schema-missing\'')
+    expect(readSource('src/components/gapdesk/GapRightCol.vue')).toContain('laterLocalOnly.value')
+    expect(readSource('src/components/gapdesk/GapEventCard.vue')).not.toContain('加入稍后读（仅本机）')
+  })
+})
+
+/* ============================================================
+   第四档 · 纯逻辑入口常驻测试（QA 临时用例固化）
+   ============================================================ */
+describe('QA 独立验证 · O07 parseBriefCitations 健壮性', () => {
+  it('标准末尾引用行：正文与序号分离，序号去重且保持出现顺序', () => {
+    const r = parseBriefCitations('研判正文第一行\n第二行\n依据：#3 #1 #3、#2')
+    expect(r).toEqual({ body: '研判正文第一行\n第二行', refs: [3, 1, 2] })
+  })
+
+  it('全角/半角冒号与逗号、制表符均可解析', () => {
+    expect(parseBriefCitations('正文\n依据: #1,#2，#3')?.refs).toEqual([1, 2, 3])
+    expect(parseBriefCitations('正文\n 依据：\t#7  #8  ')?.refs).toEqual([7, 8])
+  })
+
+  it('无结尾换行、尾部多余空白均能解析，正文保留原文', () => {
+    // 正文按原文保留（含行首空白），只 trimEnd 掉引用行前的尾部空白
+    expect(parseBriefCitations('  正文  \n依据：#2   ')?.body).toBe('  正文')
+    expect(parseBriefCitations('正文\n依据：#2')?.body).toBe('正文')
+  })
+
+  it('格式不符一律降级返回 null（原样纯文本展示）', () => {
+    expect(parseBriefCitations('正文 依据：#1')).toBeNull()          // 引用不在行首
+    expect(parseBriefCitations('依据：#1')).toBeNull()                // 没有正文
+    expect(parseBriefCitations('正文\n依据：#1 还有别的话')).toBeNull() // 行尾有杂字
+    expect(parseBriefCitations('正文\n依据 #1')).toBeNull()          // 缺冒号
+    expect(parseBriefCitations('正文\n依据：')).toBeNull()
+    expect(parseBriefCitations('')).toBeNull()
+    expect(parseBriefCitations(null as unknown as string)).toBeNull()
+  })
+
+  it('非法序号被过滤；全部非法则整体降级，不产生空标签排', () => {
+    expect(parseBriefCitations('正文\n依据：#0 #2')?.refs).toEqual([2])
+    expect(parseBriefCitations('正文\n依据：#0')).toBeNull()
+    expect(parseBriefCitations('正文\n依据：#abc')).toBeNull()
+    expect(parseBriefCitations('正文\n依据：#99999999999999999999')).toBeNull()
+  })
+
+  it('多段正文中间出现「依据：#x」不应被当作引用行', () => {
+    expect(parseBriefCitations('正文\n依据：#1\n后续结论')).toBeNull()
+  })
+})
+
+describe('QA 独立验证 · O02 gapCredibilityOf 口径与首触源', () => {
+  it('1 路及以下为孤证，>=2 为交叉验证（与 GapEventCard 既有用户可见口径一致）', () => {
+    expect(gapCredibilityOf({ src_count: 1 })).toMatchObject({ tone: 'lone', firstSource: null })
+    expect(gapCredibilityOf({ src_count: 0 })).toMatchObject({ tone: 'lone' })
+    expect(gapCredibilityOf({ src_count: 2 }).tone).toBe('cross')
+    expect(gapCredibilityOf({ src_count: 3 }).label).toBe('3 路源 · 交叉验证')
+  })
+
+  it('非法/小数 src_count 有兜底，不产生 NaN 文案', () => {
+    expect(gapCredibilityOf({ src_count: Number.NaN }).label).toBe('0 路源 · 孤证')
+    expect(gapCredibilityOf({ src_count: 2.6 }).label).toBe('3 路源 · 交叉验证')
+    expect(gapCredibilityOf({ src_count: -5 }).label).toBe('0 路源 · 孤证')
+  })
+
+  it('首触源为空/纯空白时不编造名称，有值时进 tip 与 firstSource', () => {
+    expect(gapCredibilityOf({ src_count: 2 }, { source_name: '   ' }).firstSource).toBeNull()
+    const r = gapCredibilityOf({ src_count: 2 }, { source_name: ' 路透 ' })
+    expect(r.firstSource).toBe('路透')
+    expect(r.tip).toContain('首触源：路透')
+  })
+
+  it('只读，不修改入参（不碰打分/源数）', () => {
+    const ev = { src_count: 2 }
+    gapCredibilityOf(ev, { source_name: 'X' })
+    expect(ev).toEqual({ src_count: 2 })
+  })
+})
+
+describe('第四档 · clearI18nFailed 翻译失败重试（纯 store 状态）', () => {
+  it('只清指定 key 的失败标记；未标记时是 no-op；国内事件不会因此进入翻译队列', () => {
+    const ev = makeEvent({ id: 901, is_foreign: false })
+    store.events.value = [ev]
+    const key = ev.event_key
+    store.i18nFailed.value = { ...store.i18nFailed.value, [key]: true }
+    expect(store.i18nStateOf(ev)).toBe('native')
+
+    clearI18nFailed(key)
+
+    expect(store.i18nFailed.value[key]).toBeUndefined()
+    expect(store.i18nStateOf(ev)).toBe('native') // 国内原文始终不翻译
+    const after = { ...store.i18nFailed.value }
+    clearI18nFailed('unknown-key')
+    expect(store.i18nFailed.value).toEqual(after)
+  })
+})
+
+describe('第四档 · laterList 稍后读清单顺序映射', () => {
+  afterEach(() => { store.laterIds.value = [] })
+
+  it('按 laterIds 加入顺序映射完整 feed，缺失 id 跳过且不造占位', () => {
+    const a = makeEvent({ id: 911 })
+    const b = makeEvent({ id: 912 })
+    store.events.value = [a, b]
+    store.laterIds.value = [912, 999, 911]
+    expect(store.laterList.value.map((e) => e.id)).toEqual([912, 911])
+    expect(store.laterList.value[0]?.title).toBe('t-912')
   })
 })

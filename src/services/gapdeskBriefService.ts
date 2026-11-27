@@ -9,9 +9,14 @@ import { callAi, type AiConfig } from './aiService'
 import { CALLABLE_MODELS, toAiConfig, type CallableModel } from './modelCatalog'
 import type { RankedEvent } from '../types/gapdesk'
 
-const CACHE_KEY = 'gapdesk_ai_brief_v1'
+const CACHE_KEY_PREFIX = 'gapdesk_ai_brief_v1'
 const CACHE_TTL = 48 * 3600_000
 const MAX_SEEDS = 12
+
+/** 缓存按账号命名空间：换账号不会看到上一位的研判文本与模型归因 */
+function cacheKeyOf(uid: string): string {
+  return `${CACHE_KEY_PREFIX}:${uid || 'anon'}`
+}
 
 export interface BriefSeed {
   rank: number
@@ -73,18 +78,21 @@ function poolSignature(events: RankedEvent[]): string {
 }
 
 function fingerprint(config: AiConfig, events: RankedEvent[]): string {
-  return `${config.provider}|${config.model}|${poolSignature(events)}`
+  // Key 只取摘要不落明文；同账号换 Key 后指纹变化，不会复用旧结论
+  const keyHash = config.apiKey ? String(config.apiKey.length) + config.apiKey.slice(-4) : ''
+  return `${config.provider}|${config.model}|${keyHash}|${poolSignature(events)}`
 }
 
-function readCache(): BriefCache | null {
+function readCache(uid: string): BriefCache | null {
   if (typeof localStorage === 'undefined') return null
+  const key = cacheKeyOf(uid)
   try {
-    const raw = localStorage.getItem(CACHE_KEY)
+    const raw = localStorage.getItem(key)
     if (!raw) return null
     const parsed = JSON.parse(raw) as BriefCache
     if (!parsed || typeof parsed.text !== 'string' || !parsed.fp || !parsed.at) return null
     if (Date.now() - parsed.at > CACHE_TTL) {
-      localStorage.removeItem(CACHE_KEY)
+      localStorage.removeItem(key)
       return null
     }
     return parsed
@@ -93,27 +101,27 @@ function readCache(): BriefCache | null {
   }
 }
 
-function writeCache(entry: BriefCache): void {
+function writeCache(entry: BriefCache, uid: string): void {
   if (typeof localStorage === 'undefined') return
   try {
-    localStorage.setItem(CACHE_KEY, JSON.stringify(entry))
+    localStorage.setItem(cacheKeyOf(uid), JSON.stringify(entry))
   } catch {
     /* 隐私模式 / 配额满：缓存失败不影响本次生成 */
   }
 }
 
-export function clearBriefCache(): void {
+export function clearBriefCache(uid = ''): void {
   if (typeof localStorage === 'undefined') return
   try {
-    localStorage.removeItem(CACHE_KEY)
+    localStorage.removeItem(cacheKeyOf(uid))
   } catch {
     /* ignore */
   }
 }
 
 /** 读当前缓存状态，供 UI 显示「本次为 48h 缓存」而不用重复调用模型 */
-export function peekBriefCache(config: AiConfig, events: RankedEvent[]): BriefResult | null {
-  const cache = readCache()
+export function peekBriefCache(config: AiConfig, events: RankedEvent[], uid = ''): BriefResult | null {
+  const cache = readCache(uid)
   if (!cache || cache.fp !== fingerprint(config, events)) return null
   return { text: cache.text, model: cache.model, cached: true, at: cache.at }
 }
@@ -163,14 +171,15 @@ export async function generateGapBrief(
   config: AiConfig,
   events: RankedEvent[],
   titleOf: (e: RankedEvent) => string,
-  force = false
+  force = false,
+  uid = ''
 ): Promise<BriefResult> {
   if (!briefConfigReady(config)) throw new Error('未配置可用模型')
   if (!events.length) throw new Error('当前 48h 池没有可研判的真实事件')
 
   const fp = fingerprint(config, events)
   if (!force) {
-    const cache = readCache()
+    const cache = readCache(uid)
     if (cache && cache.fp === fp) {
       return { text: cache.text, model: cache.model, cached: true, at: cache.at }
     }
@@ -179,6 +188,6 @@ export async function generateGapBrief(
   const text = tidy(await callAi(config, buildBriefPrompt(events, titleOf)))
   if (!text) throw new Error('模型返回内容为空')
   const at = Date.now()
-  writeCache({ fp, at, text, model: config.model })
+  writeCache({ fp, at, text, model: config.model }, uid)
   return { text, model: config.model, cached: false, at }
 }

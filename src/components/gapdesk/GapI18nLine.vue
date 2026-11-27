@@ -19,12 +19,21 @@
         @click="showOriginal = !showOriginal"
       >{{ showOriginal ? '返回译文' : '查看原文' }}</button>
       <span v-if="state === 'failed'" class="gi18n-tip gd-mono">已保留源站原文</span>
+      <button
+        v-if="state === 'failed' && retryKey"
+        type="button"
+        class="gi18n-retry gd-mono"
+        :title="I18N_RETRY_TIP"
+        @click="retry"
+      >{{ I18N_RETRY_TEXT }}</button>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import { I18N_RETRY_TEXT, I18N_RETRY_TIP } from '../../config/gapdeskConfig'
+import { clearI18nFailed } from '../../composables/useGapDesk'
 import { i18nBadgeTextOf } from '../../utils/gapdeskFormat'
 
 type I18nState = 'native' | 'off' | 'done' | 'loading' | 'failed' | 'quota'
@@ -41,8 +50,10 @@ const props = withDefaults(
     compact?: boolean
     large?: boolean
     tag?: string
+    /** 事件指纹（event_key）：失败态据此重试翻译；不传则保持原展示，不影响旧调用方 */
+    retryKey?: string
   }>(),
-  { hasTranslation: false, compact: false, large: false, tag: 'h3' }
+  { hasTranslation: false, compact: false, large: false, tag: 'h3', retryKey: '' }
 )
 
 /** 事件切换时复位到译文视图，避免上一条的「看原文」状态串到下一条 */
@@ -53,6 +64,11 @@ watch(
 )
 const shownTitle = computed(() => (showOriginal.value ? props.original : props.display))
 const text = computed(() => i18nBadgeTextOf(props.state))
+
+/** 手动重试：store 只清失败标记并重新入队，译文缓存与打分都不动 */
+function retry(): void {
+  if (props.retryKey) clearI18nFailed(props.retryKey)
+}
 </script>
 
 <style scoped>
@@ -109,7 +125,22 @@ const text = computed(() => i18nBadgeTextOf(props.state))
   font-size: var(--gd-fs-pill);
   color: var(--gd-ink3);
 }
+/* 失败重试：与「查看原文」同为弱化文字按钮，不抢主内容视觉 */
+.gi18n-retry {
+  min-height: 30px;
+  padding: 1px 6px;
+  border: 1px solid var(--gd-line);
+  border-radius: 5px;
+  background: transparent;
+  color: var(--gd-brand);
+  font-size: var(--gd-fs-pill);
+  cursor: pointer;
+}
+.gi18n-retry:hover {
+  border-color: var(--gd-brand);
+}
 @media (max-width: 768px) {
   .gi18n-toggle { min-height: 44px; }
+  .gi18n-retry { min-height: 44px; }
 }
 </style>

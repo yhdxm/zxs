@@ -27,6 +27,7 @@
               :display="displayTitle"
               :state="i18nState"
               :has-translation="hasTranslation"
+              :retry-key="event.event_key"
               tag="h2"
               large
             />
@@ -99,6 +100,13 @@
         <footer class="gdd-foot">
           <button type="button" class="gdd-btn gd-mono" @click="emit('navigate', prevId)" :disabled="prevId === event.id">← 上一条</button>
           <button type="button" class="gdd-btn gd-mono" @click="emit('navigate', nextId)" :disabled="nextId === event.id">下一条 →</button>
+          <!-- 抽屉内直接完成动作：复用已暴露给宿主的同名方法，不重写 store 逻辑 -->
+          <button type="button" class="gdd-btn gd-mono" :class="{ on: isCurrentLater() }" @click="onLater">
+            {{ isCurrentLater() ? '移出稍后读' : '加入稍后读' }}
+          </button>
+          <button type="button" class="gdd-btn gd-mono" :class="{ on: isCurrentLike() }" @click="onLike">
+            {{ isCurrentLike() ? '取消喜欢' : '喜欢' }}
+          </button>
           <span class="gd-spacer" />
           <a v-if="event.url" class="gdd-origin gd-mono" :href="event.url" target="_blank" rel="noopener">原始出处 ↗</a>
         </footer>
@@ -129,7 +137,7 @@ const emit = defineEmits<{
   navigate: [id: number]
 }>()
 
-const { ranked, platforms, evidences, toggleLater, isLater, toggleFavoriteEvent, markEventRead, titleOf, i18nStateOf, ensureI18n } = useGapDesk()
+const { ranked, platforms, evidences, toggleLater, isLater, toggleFavoriteEvent, markEventRead, isFavorite, titleOf, i18nStateOf, ensureI18n } = useGapDesk()
 
 const displayTitle = computed(() => (props.event ? titleOf(props.event) : ''))
 const i18nState = computed(() => (props.event ? i18nStateOf(props.event) : 'native'))
@@ -249,6 +257,9 @@ function onRead(): void {
 }
 function isCurrentLater(): boolean {
   return props.event ? isLater(props.event.id) : false
+}
+function isCurrentLike(): boolean {
+  return props.event ? isFavorite(props.event.id) : false
 }
 defineExpose({ onLater, onLike, onRead, isCurrentLater })
 </script>
@@ -459,6 +470,7 @@ defineExpose({ onLater, onLike, onRead, isCurrentLater })
   flex-shrink: 0;
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
   padding: 10px 18px calc(10px + env(safe-area-inset-bottom));
   border-top: 1px solid var(--gd-line);
@@ -477,6 +489,12 @@ defineExpose({ onLater, onLike, onRead, isCurrentLater })
 .gdd-btn:disabled {
   opacity: .45;
   cursor: default;
+}
+/* 已在队列/已喜欢：只加状态色，不改变按钮位置或原有操作 */
+.gdd-btn.on {
+  background: var(--gd-grad);
+  border-color: transparent;
+  color: var(--gd-card);
 }
 
 /* 窄屏：详情抽屉全屏化，证据链改纵向时间轴（左边一条线串起各源，首报节点高亮） */

@@ -51,6 +51,23 @@
         <span class="gd-tag gd-mono">{{ panel.tag }}</span>
       </div>
       <p class="gd-panel-body">{{ panel.body }}</p>
+      <!-- 稍后读从「只有计数」扩展为可点开的清单；计数文案与写库逻辑原样保留 -->
+      <template v-if="panel.tag === 'LATER' && laterList.length">
+        <button
+          type="button"
+          class="gd-panel-link gd-mono gd-later-toggle"
+          @click="laterOpen = !laterOpen"
+        >{{ laterOpen ? GAP_LATER_COLLAPSE : GAP_LATER_EXPAND }}</button>
+        <ul v-if="laterOpen" class="gd-later-list">
+          <li v-for="ev in laterList" :key="ev.id">
+            <button type="button" class="gd-later-row" @click="openLater(ev.id)">
+              <span class="gd-later-title">{{ titleOf(ev) }}</span>
+              <span v-if="rankById.has(ev.id)" class="gd-later-rank gd-mono">#{{ rankById.get(ev.id) }}</span>
+            </button>
+          </li>
+        </ul>
+        <p v-if="laterOpen && missingLaterCount" class="gd-panel-body gd-later-missing">{{ GAP_LATER_MISSING }}</p>
+      </template>
       <button
         v-if="panel.linkText"
         type="button"
@@ -64,9 +81,16 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
-import { EMPTY_ECHO, EMPTY_LLM, EMPTY_WAIT } from '../../config/gapdeskConfig'
-import { useGapDesk } from '../../composables/useGapDesk'
+import { computed, inject, ref, watch } from 'vue'
+import {
+  EMPTY_ECHO,
+  EMPTY_LLM,
+  EMPTY_WAIT,
+  GAP_LATER_COLLAPSE,
+  GAP_LATER_EXPAND,
+  GAP_LATER_MISSING
+} from '../../config/gapdeskConfig'
+import { GAP_OPEN_DETAIL_KEY, useGapDesk } from '../../composables/useGapDesk'
 import { fmtClock, gapGapTagsOf, gapTagTone } from '../../utils/gapdeskFormat'
 import { loadEventDetail } from '../../services/gapdeskService'
 import type { GapEventSourceRow, RankedEvent } from '../../types/gapdesk'
@@ -83,7 +107,16 @@ interface RightPanel {
 const props = defineProps<{ event?: RankedEvent | null }>()
 const emit = defineEmits<{ navigate: [key: string] }>()
 
-const { health, tierCounts, dailyBriefText, laterIds, evidences, titleOf, ensureI18n, sourceHealthStats, echoChains } = useGapDesk()
+const { health, tierCounts, dailyBriefText, laterIds, laterList, laterLocalOnly, ranked, evidences, titleOf, ensureI18n, sourceHealthStats, echoChains } = useGapDesk()
+
+/** 清单只读打开详情，不另建抽屉：沿用宿主 provide 的同一注入点 */
+const openDetail = inject(GAP_OPEN_DETAIL_KEY, (_id: number) => {})
+const laterOpen = ref(false)
+const rankById = computed(() => new Map(ranked.value.map((row) => [row.id, row.rank])))
+const missingLaterCount = computed(() => Math.max(0, laterIds.value.length - laterList.value.length))
+function openLater(id: number): void {
+  openDetail(id)
+}
 
 /** 选中事件的传播链：与 Echo 页同源，仅取当前事件那条 */
 const selectedChain = computed(() =>
@@ -166,7 +199,11 @@ const PANELS = computed<RightPanel[]>(() => [
   {
     title: '稍后读队列',
     tag: 'LATER',
-    body: laterIds.value.length ? `稍后读 ${laterIds.value.length} 条（登录后跨端同步）` : '— 队列为空，进入详情可加入稍后读。'
+    body: laterLocalOnly.value
+      ? `稍后读 ${laterIds.value.length} 条（仅本机）：gap_later 表不可用，执行 scripts/gapdesk_later.sql 后可跨端同步。`
+      : laterIds.value.length
+        ? `稍后读 ${laterIds.value.length} 条（登录后跨端同步）`
+        : '— 队列为空，进入详情可加入稍后读。'
   },
   {
     title: '今日概览',
@@ -192,6 +229,56 @@ function go(key: string | undefined): void {
 }
 .gd-panel-link:hover {
   color: color-mix(in srgb, var(--gd-brand) 72%, var(--gd-brand2));
+}
+/* 稍后读清单：轻量、可滚动，点条目直接开对应详情 */
+.gd-later-toggle {
+  margin-bottom: 2px;
+}
+.gd-later-list {
+  list-style: none;
+  margin: 2px 0 6px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 190px;
+  overflow-y: auto;
+}
+.gd-later-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  min-width: 0;
+  min-height: 30px;
+  padding: 4px 6px;
+  border: 1px solid var(--gd-line);
+  border-radius: var(--gd-r-nav);
+  background: var(--gd-sub);
+  color: var(--gd-ink2);
+  font-family: var(--gd-sans);
+  font-size: var(--gd-fs-pill);
+  text-align: left;
+  cursor: pointer;
+}
+.gd-later-row:hover {
+  border-color: var(--gd-brand);
+  color: var(--gd-brand);
+}
+.gd-later-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.gd-later-rank {
+  flex: none;
+  color: var(--gd-brand);
+}
+.gd-later-missing {
+  font-size: var(--gd-fs-pill);
+  color: var(--gd-ink3);
 }
 /* 常驻证据侧栏 */
 .gd-evpanel {

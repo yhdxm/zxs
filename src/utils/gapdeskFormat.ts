@@ -6,6 +6,7 @@
  * - 时间入参统一为 epoch 毫秒（与库表 bigint 字段 ts_* 一致），0 表示「源站无时间」；
  * - 所有函数对 NaN / 负数 / 空值做兜底，绝不返回 undefined 让模板炸掉。
  */
+import { GAP_CRED_CROSS, GAP_CRED_FIRST, GAP_CRED_LONE } from '../config/gapdeskConfig'
 import type { GapEventRow, GapTone } from '../types/gapdesk'
 
 /** 1 分钟 / 1 小时 / 1 天的毫秒数，避免魔法数字散落 */
@@ -267,4 +268,62 @@ export function bandKeyOf(event: { ts_published: number }, nowMs: number = Date.
     d.getDate() === today.getDate()
   if (sameDay) return 'today'
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+/**
+ * 「能不能信」展示口径（横幅与移动卡片共用，PC/移动同一句话）。
+ * 只用事件自带的 src_count 与证据链首触源；不打分、不猜来源。
+ */
+export interface GapCredibility {
+  /** 短标签：如「3 路源 · 交叉验证」 */
+  label: string
+  /** 语义色类别：孤证走警示色，交叉验证走正常色 */
+  tone: 'lone' | 'cross'
+  /** 首触源名称；证据链缺失时为 null，界面不编造 */
+  firstSource: string | null
+  /** hover 提示：带上首触源，避免窄屏挤不下又看不见 */
+  tip: string
+}
+
+export function gapCredibilityOf(
+  event: Pick<GapEventRow, 'src_count'>,
+  firstSource?: { source_name: string | null } | null
+): GapCredibility {
+  const count = Number.isFinite(event.src_count) ? Math.max(0, Math.round(event.src_count)) : 0
+  const lone = count <= 1
+  const name = (firstSource?.source_name ?? '').trim() || null
+  const headline = `${count} 路源 · ${lone ? GAP_CRED_LONE : GAP_CRED_CROSS}`
+  return {
+    label: headline,
+    tone: lone ? 'lone' : 'cross',
+    firstSource: name,
+    tip: name ? `${headline}；${GAP_CRED_FIRST}：${name}` : headline
+  }
+}
+
+/** AI 研判末尾引用行解析结果：body 保持原文，refs 为引用序号 */
+export interface GapBriefCitations {
+  /** 去掉末尾引用行后的研判正文（原文，不改写） */
+  body: string
+  /** 去重后的引用序号，按出现顺序 */
+  refs: number[]
+}
+
+/**
+ * 解析模型研判末尾的「依据：#x #y」。只认末尾独立一行；
+ * 格式不符 / 没正文 / 没序号一律返回 null，调用方原样纯文本展示。
+ */
+export function parseBriefCitations(text: string): GapBriefCitations | null {
+  if (typeof text !== 'string' || !text.trim()) return null
+  const trimmed = text.trimEnd()
+  const match = trimmed.match(/(?:^|\n)[ \t]*依据\s*[：:][ \t]*((?:#[0-9]+[ \t、,，]*)+)$/)
+  if (!match || match.index == null || !match[1]) return null
+  const refs = [...match[1].matchAll(/#([0-9]+)/g)]
+    .map((hit) => Number(hit[1]))
+    .filter((n) => Number.isSafeInteger(n) && n > 0)
+  if (!refs.length) return null
+  const body = trimmed.slice(0, match.index).trimEnd()
+  // 只有引用行没有正文时降级：原样展示整段，不让研判变成一排空标签
+  if (!body) return null
+  return { body, refs: [...new Set(refs)] }
 }

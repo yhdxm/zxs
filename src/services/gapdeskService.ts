@@ -426,12 +426,30 @@ export async function listLater(userId: string): Promise<GapResult<GapLaterRow[]
   }
 }
 
+/** 稍后读云端写入结果：ok=已同步；schema-missing=缺表/无权限（降级本地，不回滚）；offline=网络失败（回滚） */
+export type LaterWriteResult = 'ok' | 'schema-missing' | 'offline'
+
+/** 判断一条 PostgREST 错误是否属于「缺表/缺列/无权限」——这类错误重试无意义，应降级为纯本地队列 */
+function isLaterSchemaError(message: string): boolean {
+  const m = message.toLowerCase()
+  return (
+    m.includes('does not exist') ||
+    m.includes('relation') ||
+    m.includes('schema cache') ||
+    m.includes('permission denied') ||
+    m.includes('42501') ||
+    m.includes('42p01') ||
+    m.includes('42703') ||
+    m.includes('pgrst205')
+  )
+}
+
 /** 切换稍后读：on=true 幂等插入，on=false 精确删除；未登录跳过（保留本地镜像） */
-export async function toggleLaterRemote(eventId: number, on: boolean): Promise<boolean> {
+export async function toggleLaterRemote(eventId: number, on: boolean): Promise<LaterWriteResult> {
   const userId = await resolveUserId()
   if (!userId) {
     console.warn('[gapdesk] 未登录，稍后读仅存本机')
-    return false
+    return 'offline'
   }
   try {
     if (on) {
@@ -440,9 +458,9 @@ export async function toggleLaterRemote(eventId: number, on: boolean): Promise<b
         .upsert({ user_id: userId, event_id: eventId }, { onConflict: 'user_id,event_id', ignoreDuplicates: true })
       if (error) {
         console.warn('[gapdesk] 稍后读写入失败', error.message)
-        return false
+        return isLaterSchemaError(error.message) ? 'schema-missing' : 'offline'
       }
-      return true
+      return 'ok'
     }
     const { error } = await supabase
       .from('gap_later')
@@ -451,11 +469,25 @@ export async function toggleLaterRemote(eventId: number, on: boolean): Promise<b
       .eq('event_id', eventId)
     if (error) {
       console.warn('[gapdesk] 稍后读移除失败', error.message)
-      return false
+      return isLaterSchemaError(error.message) ? 'schema-missing' : 'offline'
     }
-    return true
+    return 'ok'
   } catch (e) {
     console.warn('[gapdesk] 稍后读写入异常', errMsg(e))
+    return 'offline'
+  }
+}
+
+/** 探测 gap_later 是否可用（缺表时供 UI 如实提示一次） */
+export async function probeLaterTable(): Promise<boolean> {
+  const userId = await resolveUserId()
+  if (!userId) return false
+  try {
+    const { error } = await supabase.from('gap_later').select('event_id').eq('user_id', userId).limit(1)
+    if (!error) return true
+    console.warn('[gapdesk] gap_later 不可用', error.message)
+    return false
+  } catch {
     return false
   }
 }

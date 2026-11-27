@@ -25,7 +25,7 @@
         <main class="gd-main">
           <GapDateStrip
             :bands="dateBands"
-            :active="filters.dateBand || 'today'"
+            :active="filters.dateBand"
             @pick="filters.dateBand = filters.dateBand === $event ? '' : $event"
           />
           <GapFilterBar />
@@ -50,6 +50,9 @@
       @purge="openPurge"
     >
       <div class="gd-vcol">
+        <!-- 移动首屏同样要能一眼回答「差是什么/差多大」。m-latest 由 MbLatestView 自己挂横幅，
+             这里跳过以免同一屏出现两条；其余移动屏由宿主统一补上 compact 横幅。 -->
+        <GapTopGapBanner v-if="current !== 'm-latest'" compact />
         <component :is="activeComp" v-bind="activeProps" @navigate="onNavigate" />
       </div>
     </GapMobileShell>

@@ -25,6 +25,7 @@
         :display="displayTitle"
         :state="i18nState"
         :has-translation="hasTranslation"
+        :retry-key="event.event_key"
         compact
       />
 
@@ -74,7 +75,7 @@
             type="button"
             class="act gd-mono"
             :class="{ on: later }"
-            :title="later ? '移出稍后读' : '加入稍后读（仅本机）'"
+            :title="later ? '移出稍后读' : '加入稍后读'"
             @click="emit('later', event.id)"
           >稍后读</button>
           <button type="button" class="act gd-mono" :title="EMPTY_ARCHIVE" @click="emit('archive', event.id)">归档</button>

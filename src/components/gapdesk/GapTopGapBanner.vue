@@ -20,26 +20,38 @@
     <span class="tg-score gd-mono">GAP {{ top.gap }}</span>
     <span class="tg-title">{{ displayTitle }}</span>
     <span class="tg-tier gd-mono" :class="`t-${top.tier}`">{{ top.tier }}</span>
+    <!-- 能不能信：只报真实源数与首触源，不改打分 -->
+    <span class="tg-cred gd-mono" :class="cred.tone" :title="cred.tip">{{ cred.label }}</span>
+    <span v-if="cred.firstSource" class="tg-first gd-mono" :title="cred.tip">{{ firstLabel }}：{{ cred.firstSource }}</span>
     <span class="tg-go gd-mono">看详情 →</span>
   </button>
 </template>
 
 <script setup lang="ts">
 import { computed, inject } from 'vue'
+import { GAP_CRED_FIRST } from '../../config/gapdeskConfig'
 import { GAP_OPEN_DETAIL_KEY, useGapDesk } from '../../composables/useGapDesk'
+import { gapCredibilityOf, type GapCredibility } from '../../utils/gapdeskFormat'
 
 withDefaults(defineProps<{ compact?: boolean }>(), { compact: false })
 
-const { ranked, titleOf } = useGapDesk()
+const { ranked, titleOf, firstSourceOf } = useGapDesk()
 /** 宿主 GapDeskView provide；单独挂载时退化为无操作，不能抛错 */
 const openDetail = inject(GAP_OPEN_DETAIL_KEY, (_id: number) => {})
 
 /** 排行第一条就是今日最大差，不在组件内重排、不另算一套口径 */
 const top = computed(() => ranked.value[0] ?? null)
 const displayTitle = computed<string>(() => (top.value ? titleOf(top.value) : ''))
+/** 首触源取现有 store 的 firstSourceOf，不自建证据链查询 */
+const cred = computed<GapCredibility>(() =>
+  top.value
+    ? gapCredibilityOf(top.value, firstSourceOf.value(top.value.id))
+    : { label: '', tone: 'cross', firstSource: null, tip: '' }
+)
+const firstLabel = GAP_CRED_FIRST
 const bannerTip = computed<string>(() =>
   top.value
-    ? `今日最大差 #${top.value.rank} · GAP ${top.value.gap} · ${top.value.tier} · ${displayTitle.value}；点击查看该差值详情`
+    ? `今日最大差 #${top.value.rank} · GAP ${top.value.gap} · ${top.value.tier} · ${displayTitle.value}；${cred.value.tip}；点击查看该差值详情`
     : ''
 )
 
@@ -121,6 +133,24 @@ function open(): void {
 .tg-tier.t-L1 {
   background: color-mix(in srgb, var(--gd-warn) 16%, transparent);
   color: var(--gd-warn);
+}
+/* 可信度：孤证走警示色，交叉验证走正常弱化色；首触源只展示真实证据行 */
+.tg-cred {
+  flex: none;
+  font-size: var(--gd-fs-pill);
+  color: var(--gd-ink2);
+  white-space: nowrap;
+}
+.tg-cred.lone { color: var(--gd-warn); }
+.tg-first {
+  flex: none;
+  min-width: 0;
+  max-width: 42%;
+  font-size: var(--gd-fs-pill);
+  color: var(--gd-ink3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .tg-go {
   flex: none;

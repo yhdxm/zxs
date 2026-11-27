@@ -52,10 +52,10 @@
       <GapEmptyState type="empty" title="行业解码库" :desc="EMPTY_HISTORY" :phase2="EMPTY_EXPORT" />
     </div>
 
-    <!-- 行业档案卡下钻：与移动端「看该行业 TOP5」同源，都读 byIndustry[selected] -->
+    <!-- 行业档案卡下钻：与移动端「看该行业 TOP5」同源，都按全局 ranked 过滤前 5 -->
     <section class="panel t5panel">
       <h4>{{ selectedLabel }} · TOP5 差事件</h4>
-      <p class="sub">按 GAP 分降序取前 5，排名沿用全局 ranked；无事件的行业不补 0、不造占位</p>
+      <p class="sub">按 GAP 分降序取前 5，排名沿用全局 ranked；无事件的行业不补 0、不造占位（名次按全局 ranked 顺序连续展示，含时效衰减口径）</p>
       <button
         v-for="row in top5"
         :key="row.id"
@@ -96,17 +96,16 @@ interface Top5Row {
 }
 
 /**
- * TOP5 唯一口径：byIndustry[selected] 按 gap 降序前 5；
- * byIndustry 的行是 GapEventRow（不带 rank），真实名次从全局 ranked 反查。
+ * TOP5 唯一口径：全局 ranked（含时效衰减、名次连续）按行业过滤前 5。
+ * 直接从 ranked 取，rank 与展示顺序天然一致，不再用 byIndustry 二次排序回填名次。
  */
 const top5 = computed<Top5Row[]>(() => {
-  const rankMap = new Map(ranked.value.map((row) => [row.id, row.rank]))
-  return [...(byIndustry.value[selected.value] ?? [])]
-    .sort((a, b) => b.gap - a.gap)
+  return ranked.value
+    .filter((row) => row.ind === selected.value)
     .slice(0, 5)
-    .map((row, index) => ({
+    .map((row) => ({
       id: row.id,
-      rank: rankMap.get(row.id) ?? index + 1,
+      rank: row.rank,
       gap: row.gap,
       title: row.title
     }))
