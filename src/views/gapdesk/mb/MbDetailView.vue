@@ -68,8 +68,9 @@ const route = useRoute()
 const event = computed(() => {
   const raw = Array.isArray(route.query.id) ? route.query.id[0] : route.query.id
   const id = Number(raw)
-  if (Number.isFinite(id) && id > 0) return ranked.value.find((row) => row.id === id) ?? null
-  return ranked.value[0] ?? null
+  // 无效 / 过期 id 走既有 GapEmptyState，不静默展示另一条事件的详情（那会误导判断）
+  if (!Number.isFinite(id) || id <= 0) return null
+  return ranked.value.find((row) => row.id === id) ?? null
 })
 
 const evidenceRows = computed(() => {

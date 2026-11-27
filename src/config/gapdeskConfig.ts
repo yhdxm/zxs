@@ -221,10 +221,37 @@ export const GAP_REFRESH_MS = 30000
 export const GAP_CACHE_TTL = 5 * 60 * 1000
 
 /**
+ * 时间窗单一真源：筛选栏按钮与 store 的 GAP_WINDOW_OPTIONS 都从这里派生。
+ * 筛选栏原有 48/3/12/24/72 五项一个不少；6h 继续保留在导出 API 里（visible=false，
+ * 不在筛选栏新增按钮，避免改变既有 UI）。
+ */
+export interface GapTimeWindowOption {
+  /** 小时数 */
+  h: number
+  /** 按钮文案 */
+  label: string
+  /** 是否在筛选栏渲染；false = 仅供导出 API 兼容 */
+  visible: boolean
+  /** 有值时作为按钮 title，如实说明数据窗口限制 */
+  tip?: string
+}
+export const GAP_TIME_WINDOWS: readonly GapTimeWindowOption[] = [
+  { h: 48, label: '全天', visible: true },
+  { h: 3, label: '3h', visible: true },
+  { h: 6, label: '6h', visible: false },
+  { h: 12, label: '12h', visible: true },
+  { h: 24, label: '24h', visible: true },
+  { h: 72, label: '近3天', visible: true, tip: '近3天（受 48h 数据窗口限制，超出保留期的条目不在池内）' }
+]
+
+/**
  * 差值分展示阈值：低于此值的「差值」不值得打扰用户。
  * 为什么是 85 而不是 75：展示分是**池内分位**映射（54-97），
  * 实测 333 条里 191 条 ≥75 —— 75 恰好落在中位数附近，等于「全都推」。
  * 85 对应池内约前 25%，才是「真的有人还不知道」的量级。
+ * ⚠️ 当前口径：85 只用于强度统计（stats.strong）与采集侧 meta.shown；
+ *    展示池（basePool）刻意不做 gap>=85 过滤，所以空态文案见 EMPTY_WINDOW，
+ *    不能把「没有达到展示阈值」当成列表被过滤的原因。
  */
 export const GAP_GAP_MIN = 85
 
@@ -345,7 +372,7 @@ export const EMPTY_STALE = '当前展示的是本地镜像，分数与热度可�
 export const EMPTY_GENERIC = '当前时间窗内没有可展示的差值'
 
 /** 事件池为空：只说明当前筛选下无可展示事件；不替采集链路背书（前端无法验证采集是否正常） */
-export const EMPTY_WINDOW = '当前时间窗与筛选条件下没有达到展示阈值的事件；不补条目凑数'
+export const EMPTY_WINDOW = '当前时间窗与筛选条件下没有匹配的事件；评分阈值 85 仅用于强度统计，不影响展示与筛选；不补条目凑数'
 
 /** 单条详情取不到：列表仍在，只是这条已过期或未加载 */
 export const EMPTY_MISSING = '这条差值未加载或已过期（入库保留 48 小时），请回列表重试'
@@ -478,6 +505,8 @@ export const GAP_LATER_EXPAND = '展开清单'
 export const GAP_LATER_COLLAPSE = '收起清单'
 /** 有个别稍后读条目已过期/未加载时的如实说明，不编造标题 */
 export const GAP_LATER_MISSING = '队列中有条目已过期或未加载（入库保留 48 小时）'
+/** 移动端稍后读清单空态：与 PC 右栏「队列为空」同口径 */
+export const GAP_LATER_EMPTY = '稍后读队列为空，进入详情可加入'
 
 /** AI 研判末尾「依据：#x #y」的前端标签文案 */
 export const GAP_BRIEF_REF_LABEL = '依据'

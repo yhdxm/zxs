@@ -3,8 +3,7 @@
   与 PC-01 同一份 store 口径：L0 优先、日期胶囊来自 dateBands，卡片为移动 p-card。
 -->
 <template>
-  <!-- 移动首屏横幅与 PC 同一组件同一 store 口径；compact 版不遮挡情报流 -->
-  <GapTopGapBanner compact />
+  <!-- 横幅由移动壳统一挂载一次（含首屏）；本视图不再自挂，避免同屏两条 -->
   <div class="mbview">
     <div class="p-sec">
       <div class="h">L0 · 今日必看 <b class="gd-mono">{{ l0.length }}</b></div>
@@ -123,7 +122,6 @@ import { computed, inject, watch } from 'vue'
 import GapDualTrack from '../../../components/gapdesk/GapDualTrack.vue'
 import GapEmptyState from '../../../components/gapdesk/GapEmptyState.vue'
 import GapI18nLine from '../../../components/gapdesk/GapI18nLine.vue'
-import GapTopGapBanner from '../../../components/gapdesk/GapTopGapBanner.vue'
 import { EMPTY_WINDOW, GAP_CRED_FIRST, GAP_IND_MAP } from '../../../config/gapdeskConfig'
 import { GAP_OPEN_DETAIL_KEY, useGapDesk } from '../../../composables/useGapDesk'
 import {
@@ -140,8 +138,10 @@ const { ranked, topList, loadMoreTop, filters, favorites, laterIds, toggleLater,
 const openDetail = inject(GAP_OPEN_DETAIL_KEY, (_id: number) => {})
 const emit = defineEmits<{ navigate: [key: string] }>()
 
-/** 5 个新模块走二级页，底 tab 仍是原来 5 个 */
+/** 5 个新模块走二级页，底 tab 仍是原来 5 个；筛选与稍后读也是二级页，纯新增入口 */
 const ENTRIES = [
+  { key: 'm-filter', label: '筛选', desc: '维度/排序/翻译' },
+  { key: 'm-later', label: '稍后读', desc: '我的清单' },
   { key: 'm-brief', label: '简报', desc: '每日研判' },
   { key: 'm-echo', label: '命中率', desc: '回打口径' },
   { key: 'm-source-risk', label: '信源', desc: '分级体检' },

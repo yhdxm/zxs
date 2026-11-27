@@ -65,7 +65,11 @@
           v-for="item in current.events"
           :key="item.id"
           :event="item"
+          :favorite="favorites.includes(item.id)"
+          :later="laterIds.includes(item.id)"
           @open="openDetail"
+          @later="toggleLater"
+          @like="toggleFavoriteEvent"
         />
       </div>
     </div>
@@ -81,7 +85,7 @@ import { EMPTY_WAIT, GAP_LAYER_MAP, GAP_LAYER_ORDER } from '../../../config/gapd
 import { GAP_OPEN_DETAIL_KEY, useGapDesk } from '../../../composables/useGapDesk'
 import type { GapLayer } from '../../../types/gapdesk'
 
-const { bySource, sources } = useGapDesk()
+const { bySource, sources, favorites, laterIds, toggleLater, toggleFavoriteEvent } = useGapDesk()
 const openDetail = inject(GAP_OPEN_DETAIL_KEY, (_id: number) => {})
 
 const groups = computed(() => bySource.value)

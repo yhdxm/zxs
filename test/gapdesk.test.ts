@@ -69,6 +69,7 @@ import {
   EMPTY_PURGE_EMPTY,
   EMPTY_PURGE_ERROR,
   EMPTY_PURGE_RUNNING,
+  EMPTY_MISSING,
   EMPTY_WINDOW,
   GAP_COLLECT_NOTE,
   GAP_FEED_CACHE_KEY,
@@ -2602,5 +2603,74 @@ describe('第四档 · laterList 稍后读清单顺序映射', () => {
     store.laterIds.value = [912, 999, 911]
     expect(store.laterList.value.map((e) => e.id)).toEqual([912, 911])
     expect(store.laterList.value[0]?.title).toBe('t-912')
+  })
+})
+
+/* ============================================================
+   审查修复 P0/P1 行为回归（横幅去重 / 移动入口 / 无效 id / 文案口径）
+   ============================================================ */
+describe('GAPDESK 审查修复 · P0/P1 行为回归', () => {
+  afterEach(() => { store.laterIds.value = [] })
+
+  it('横幅去重：PC / 移动首屏 / 移动二级屏每屏都恰好一条', async () => {
+    store.events.value = [makeEvent({ id: 941, gap: 97, title: '横幅去重头条' })]
+    for (const query of [
+      { dev: 'pc', view: 'latest' },
+      { dev: 'mb', view: 'm-latest' },
+      { dev: 'mb', view: 'm-profile' }
+    ]) {
+      const wrapper = await mountGapDeskView(query)
+      expect(wrapper.findAll('.gd-topgap')).toHaveLength(1)
+      wrapper.unmount()
+    }
+  })
+
+  it('移动端有筛选与稍后读入口，稍后读清单条目能打开详情', async () => {
+    store.events.value = [makeEvent({ id: 942, gap: 91, title: '稍后读头条' })]
+    store.laterIds.value = [942]
+
+    const latest = await mountGapDeskView({ dev: 'mb', view: 'm-latest' })
+    const labels = latest.findAll('.entry b').map((node) => node.text())
+    expect(labels).toContain('筛选')
+    expect(labels).toContain('稍后读')
+    latest.unmount()
+
+    const later = await mountGapDeskView({ dev: 'mb', view: 'm-later' })
+    expect(later.text()).toContain('稍后读头条')
+    await later.findAll('.p-card')[0]?.trigger('click')
+    expect(later.findComponent(GapDetailDrawer).props('modelValue')).toBe(true)
+    later.unmount()
+  })
+
+  it('移动详情无效 id 走空态，不回落展示另一条事件', async () => {
+    store.events.value = [makeEvent({ id: 943, title: '不该被展示的头条' })]
+    const wrapper = await mountGapDeskView({ dev: 'mb', view: 'm-detail', id: '999999' })
+    // 只看详情子视图：顶栏横幅展示全池第一名是既有行为，不属于详情回落
+    const detailText = wrapper.find('.mbview').text()
+    expect(detailText).toContain(EMPTY_MISSING)
+    expect(detailText).not.toContain('不该被展示的头条')
+    wrapper.unmount()
+  })
+
+  it('时间窗单一真源：筛选栏读 GAP_TIME_WINDOWS，store 从同一常量派生', () => {
+    const filterSrc = readSource('src/components/gapdesk/GapFilterBar.vue')
+    const storeSrc = readSource('src/composables/useGapDesk.ts')
+    expect(filterSrc).toContain('GAP_TIME_WINDOWS.filter')
+    expect(storeSrc).toContain('GAP_TIME_WINDOWS.map')
+    // 原有 3h / 72h 一个不少，6h 只留在导出 API，不新增 UI 按钮
+    const configSrc = readSource('src/config/gapdeskConfig.ts')
+    for (const h of ['h: 48', 'h: 3', 'h: 12', 'h: 24', 'h: 72', 'h: 6']) {
+      expect(configSrc).toContain(h)
+    }
+    expect(configSrc).toContain('受 48h 数据窗口限制')
+  })
+
+  it('归档点击有二期反馈；信源页补齐稍后读/喜欢事件；空态文案如实', () => {
+    expect(readSource('src/components/gapdesk/GapEventCard.vue')).toContain('ElMessage.info(EMPTY_ARCHIVE)')
+    const sourceSrc = readSource('src/views/gapdesk/pc/PcSourceView.vue')
+    expect(sourceSrc).toContain('@later="toggleLater"')
+    expect(sourceSrc).toContain('@like="toggleFavoriteEvent"')
+    expect(EMPTY_WINDOW).toContain('85')
+    expect(EMPTY_WINDOW).not.toContain('没有达到展示阈值')
   })
 })

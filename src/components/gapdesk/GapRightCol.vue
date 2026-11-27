@@ -164,6 +164,8 @@ watch(
     if (evidences.value.some((row) => row.event_id === id)) { detail.value = []; return }
     evidenceLoading.value = true
     void loadEventDetail(id).then((res) => {
+      // 与 GapDetailDrawer 同口径：快速切卡时，晚返回的那次请求不能覆盖当前事件的证据链
+      if (props.event?.id !== id) return
       detail.value = res.data
       evidenceLoading.value = false
     })

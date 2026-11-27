@@ -50,9 +50,7 @@
       @purge="openPurge"
     >
       <div class="gd-vcol">
-        <!-- 移动首屏同样要能一眼回答「差是什么/差多大」。m-latest 由 MbLatestView 自己挂横幅，
-             这里跳过以免同一屏出现两条；其余移动屏由宿主统一补上 compact 横幅。 -->
-        <GapTopGapBanner v-if="current !== 'm-latest'" compact />
+        <!-- 今日最大差由移动壳 GapMobileShell 统一挂一次，覆盖全部移动屏；宿主不再重复渲染，避免同一屏两条 -->
         <component :is="activeComp" v-bind="activeProps" @navigate="onNavigate" />
       </div>
     </GapMobileShell>
@@ -98,6 +96,7 @@ import MbSourceView from './gapdesk/mb/MbSourceView.vue'
 import MbPricingView from './gapdesk/mb/MbPricingView.vue'
 import MbDetailView from './gapdesk/mb/MbDetailView.vue'
 import MbFilterView from './gapdesk/mb/MbFilterView.vue'
+import MbLaterView from './gapdesk/mb/MbLaterView.vue'
 import MbBriefView from './gapdesk/mb/MbBriefView.vue'
 import MbEchoView from './gapdesk/mb/MbEchoView.vue'
 import MbSourceRiskView from './gapdesk/mb/MbSourceRiskView.vue'
@@ -158,6 +157,7 @@ const MOBILE_VIEWS: readonly GapViewMeta[] = [
 const MOBILE_SECONDARY: readonly GapViewMeta[] = [
   { key: 'm-detail', label: '详情', desc: '手机端详情（二级）', scope: 'mb', secondary: true, component: MbDetailView },
   { key: 'm-filter', label: '筛选', desc: '手机端筛选（二级）', scope: 'mb', secondary: true, component: MbFilterView },
+  { key: 'm-later', label: '稍后读', desc: '手机端稍后读清单（二级）', scope: 'mb', secondary: true, component: MbLaterView },
   { key: 'm-brief', label: '今日简报', desc: '手机端简报（二级）', scope: 'mb', secondary: true, component: MbBriefView },
   { key: 'm-echo', label: '命中率', desc: '手机端回打口径（二级）', scope: 'mb', secondary: true, component: MbEchoView },
   { key: 'm-source-risk', label: '信源分级', desc: '手机端信源分级（二级）', scope: 'mb', secondary: true, component: MbSourceRiskView },
@@ -243,6 +243,8 @@ const MOBILE_TAB_OF: Readonly<Record<string, string>> = {
   pricing: 'm-pricing',
   detail: 'm-detail',
   // 新二级页 → 所属主 tab，返回后底栏高不错位
+  'm-filter': 'm-latest',
+  'm-later': 'm-latest',
   'm-brief': 'm-latest',
   'm-echo': 'm-latest',
   'm-source-risk': 'm-latest',

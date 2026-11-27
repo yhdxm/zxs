@@ -205,8 +205,10 @@ export async function runPipeline(opts = {}) {
     raw = r.raw
   }
 
-  /* 中央新鲜度闸门：按发布时间丢弃陈年条目（防停更僵尸源） */
-  const gated = freshnessGate(items, 168)
+  /* 中央新鲜度闸门：按发布时间丢弃陈年条目（防停更僵尸源）。
+     必须与 TTL_HOURS / 前端 48h 承诺同口径：48~168h 的条目写库时 expire_at 已是过去，
+     白写库还会虚增 funnel.shown。停更源的观测走下面独立的 gated_by_source，不放宽主闸门。 */
+  const gated = freshnessGate(items, TTL_HOURS)
   const fresh = gated.items
 
   /* 分池：大众榜只做探针，不进情报池 */

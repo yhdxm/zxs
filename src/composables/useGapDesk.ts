@@ -55,6 +55,7 @@ import {
   GAP_IND,
   GAP_IND_MAP,
   GAP_TTL_HOURS,
+  GAP_TIME_WINDOWS,
   SR_TIERS,
   SR_TIER_OF
 } from '../config/gapdeskConfig'
@@ -109,8 +110,11 @@ const CACHE_KEY = GAP_FEED_CACHE_KEY
 /** 清理按钮 throttle：60s 内重复点击不重复打 RPC */
 const PURGE_THROTTLE_MS = 60_000
 
-/** 可选时间窗（小时）：产品只承诺近 48 小时，更窄的窗口是用户自己的取舍 */
-export const GAP_WINDOW_OPTIONS = [6, 12, 24, 48] as const
+/**
+ * 可选时间窗（小时）：产品只承诺近 48 小时，更窄的窗口是用户自己的取舍。
+ * 与筛选栏共用 GAP_TIME_WINDOWS 单一真源；原有 6/12/24/48 一个不少，另含筛选栏已有的 3/72。
+ */
+export const GAP_WINDOW_OPTIONS: readonly number[] = GAP_TIME_WINDOWS.map((opt) => opt.h)
 
 /**
  * 宿主向各视图提供的「打开详情」注入点。
@@ -372,6 +376,41 @@ function readLaterIds(): number[] {
 }
 const laterIds = ref<number[]>(readLaterIds())
 
+/**
+ * 登录后稍后读合并（纯函数）：云端行带 created_at，以 event_id 去重，
+ * 本机未同步的 id 追加在云端之后。任一侧都不丢弃，只做合并与去重。
+ * 云端 created_at 无法解析时保留原顺序，不擅自重排用户看到的清单。
+ */
+export function mergeLaterIds(
+  localIds: readonly number[],
+  cloudRows: readonly { event_id: number; created_at?: string | null }[]
+): number[] {
+  const seen = new Set<number>()
+  const out: number[] = []
+  const ordered = cloudRows
+    .map((row, index) => ({
+      row,
+      index,
+      ts: Number.isFinite(Date.parse(row.created_at ?? '')) ? Date.parse(row.created_at ?? '') : NaN
+    }))
+    .sort((a, b) => {
+      if (Number.isFinite(a.ts) && Number.isFinite(b.ts) && a.ts !== b.ts) return b.ts - a.ts
+      return a.index - b.index
+    })
+  for (const { row } of ordered) {
+    const id = row.event_id
+    if (!Number.isFinite(id) || seen.has(id)) continue
+    seen.add(id)
+    out.push(id)
+  }
+  for (const id of localIds) {
+    if (!Number.isFinite(id) || seen.has(id)) continue
+    seen.add(id)
+    out.push(id)
+  }
+  return out
+}
+
 let inflight: Promise<void> | null = null
 
 /* ============================================================
@@ -429,10 +468,13 @@ async function loadUserState(): Promise<void> {
   ])
   favorites.value = fav.data.map((f) => f.event_id)
   mySubs.value = sub.data.map((s) => s.ind)
-  // 登录后以云端为准跨端对齐；表未建/读失败时保留本机镜像，不静默清空
+  // 登录后先按云端 created_at 跨端对齐，再把本机尚未同步的条目按 event_id 合并进来；
+  // 表未建/读失败时保留本机镜像，不静默清空。合并后写回 localStorage，两侧都不丢。
   if (!later.error) {
     laterLocalOnly.value = false
+    const localBeforeLogin = readLaterIds()
     laterIds.value = later.data.map((l) => l.event_id)
+    laterIds.value = mergeLaterIds(localBeforeLogin, later.data)
     try {
       globalThis.localStorage?.setItem(LATER_KEY, JSON.stringify(laterIds.value))
     } catch { /* ignore */ }
@@ -492,9 +534,10 @@ export async function loadGapFeed(force = false): Promise<void> {
         stale.value = false
         staleAgeMs.value = 0
         lastLoadedAt.value = Date.now()
-        // 部分失败也把错误带出去（界面可提示「信源面板暂不可用」），但数据照常展示
+        // 部分失败也把错误带出去（界面可提示「信源面板暂不可用」），但数据照常展示；
+        // 只有全部子请求成功才覆盖镜像，避免一次局部失败把完整镜像换成残缺镜像（stale/错误提示照旧）
         error.value = errText(res.error)
-        cacheSet(CACHE_KEY, res.data)
+        if (res.error === null) cacheSet(CACHE_KEY, res.data)
       }
 
       await loadUserState()
@@ -561,13 +604,23 @@ export async function purgeAndRefresh(): Promise<PurgeResult> {
 
 /**
  * 注册跨端同步（切回前台 / 聚焦 / 联网 / Realtime 四重触发，由 useCloudSync 统一处理）。
- * ⚠️ 只能在组件 setup 内调用一次；重复调用会被内部标记拦住。
+ * ⚠️ 只能在组件 setup 内调用；同一时刻多个使用者只注册一份订阅，最后一个人卸载时复位，
+ * 这样离开差值台再回来可以重新注册，不会永久丢掉四重同步触发。
  */
 let syncBound = false
+/** 同时挂载的 useGapDeskRealtime 使用者数：与时钟一样做引用计数，避免多实例重复注册 */
+let syncUsers = 0
 export function useGapDeskRealtime(): void {
   // 时钟与刷新订阅共用同一条生命周期：组件卸载时由这里统一收尾，页面挂着不动也会走字
   startClock()
   onBeforeUnmount(stopClock)
+  syncUsers += 1
+  // 卸载时复位同步标志：离开差值台再回来仍能重新注册四重同步；
+  // 归零才复位，仍有其它实例挂载时不让后续订阅重复注册。
+  onBeforeUnmount(() => {
+    syncUsers = Math.max(0, syncUsers - 1)
+    if (syncUsers === 0) syncBound = false
+  })
   if (syncBound) return
   syncBound = true
   useCloudSync({

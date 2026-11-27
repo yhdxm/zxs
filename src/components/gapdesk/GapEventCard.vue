@@ -78,7 +78,7 @@
             :title="later ? '移出稍后读' : '加入稍后读'"
             @click="emit('later', event.id)"
           >稍后读</button>
-          <button type="button" class="act gd-mono" :title="EMPTY_ARCHIVE" @click="emit('archive', event.id)">归档</button>
+          <button type="button" class="act gd-mono" :title="EMPTY_ARCHIVE" @click="onArchive">归档</button>
           <button
             type="button"
             class="act gd-mono"
@@ -98,6 +98,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import { ElMessage } from 'element-plus'
 import GapDualTrack from './GapDualTrack.vue'
 import GapI18nLine from './GapI18nLine.vue'
 import { EMPTY_ARCHIVE, GAP_IND_MAP, GAP_LAYER_LABEL } from '../../config/gapdeskConfig'
@@ -131,6 +132,15 @@ const emit = defineEmits<{
 function onLike(): void {
   emit('like', props.event.id)
   emit('favorite', props.event.id)
+}
+
+/**
+ * 归档仍是二期：先把原有 archive 事件照常发出去，再给点击者一条明确反馈，
+ * 不再让按钮看起来失灵。不接任何付费/后端归档服务。
+ */
+function onArchive(): void {
+  emit('archive', props.event.id)
+  ElMessage.info(EMPTY_ARCHIVE)
 }
 
 const { titleOf, i18nStateOf, ensureI18n } = useGapDesk()

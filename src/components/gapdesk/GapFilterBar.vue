@@ -53,6 +53,7 @@
           type="button"
           class="gfb-chip gd-mono"
           :class="{ on: filters.windowH === opt.h }"
+          :title="opt.tip"
           @click="setWindow(opt.h)"
         >{{ opt.label }}</button>
       </div>
@@ -102,7 +103,7 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
-import { GAP_DIM6, GAP_IND } from '../../config/gapdeskConfig'
+import { GAP_DIM6, GAP_IND, GAP_TIME_WINDOWS } from '../../config/gapdeskConfig'
 import { useGapDesk } from '../../composables/useGapDesk'
 import { i18nQuotaTextOf, i18nQuotaTipOf, i18nQuotaToneOf } from '../../utils/gapdeskFormat'
 import type { GapDim6Key, GapInd } from '../../types/gapdesk'
@@ -146,14 +147,12 @@ const SORTS: ReadonlyArray<{ key: 'latest' | 'gap' | 'heat'; label: string }> = 
   { key: 'heat', label: '热度差' }
 ]
 
-/** 全天 = 库里 48h 保留窗口；近 3 天只用于检索，超出保留期的条目本就不在池里 */
-const WINDOWS: ReadonlyArray<{ h: number; label: string }> = [
-  { h: 48, label: '全天' },
-  { h: 3, label: '3h' },
-  { h: 12, label: '12h' },
-  { h: 24, label: '24h' },
-  { h: 72, label: '近3天' }
-]
+/**
+ * 时间窗与 store 的 GAP_WINDOW_OPTIONS 同源：config 的 GAP_TIME_WINDOWS。
+ * 全天 = 库里 48h 保留窗口；近 3 天只用于检索，超出保留期的条目本就不在池里
+ * （该选项的 title 由常量给出如实说明，选项本身一个不少）。
+ */
+const WINDOWS = GAP_TIME_WINDOWS.filter((opt) => opt.visible)
 
 /** 关键词防抖：本地受控，300ms 后才写 store，避免每敲一字重算整池 */
 const keywordInput = ref(filters.keyword)
