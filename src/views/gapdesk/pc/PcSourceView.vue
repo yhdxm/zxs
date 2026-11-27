@@ -11,6 +11,8 @@
       <span class="r">今日未说话 {{ silentCount }} 路</span>
     </div>
 
+    <GapSourceStats :limit="12" />
+
     <GapEmptyState v-if="!groups.length" type="empty" :desc="EMPTY_WAIT" />
 
     <div v-else class="source-layout">
@@ -74,6 +76,7 @@
 import { computed, inject, ref, watch } from 'vue'
 import GapEmptyState from '../../../components/gapdesk/GapEmptyState.vue'
 import GapEventCard from '../../../components/gapdesk/GapEventCard.vue'
+import GapSourceStats from '../../../components/gapdesk/GapSourceStats.vue'
 import { EMPTY_WAIT, GAP_LAYER_MAP, GAP_LAYER_ORDER } from '../../../config/gapdeskConfig'
 import { GAP_OPEN_DETAIL_KEY, useGapDesk } from '../../../composables/useGapDesk'
 import type { GapLayer } from '../../../types/gapdesk'

@@ -6,6 +6,30 @@
   <div class="mbview">
     <button type="button" class="back gd-mono" @click="emit('navigate', 'm-latest')">← 返回</button>
 
+    <section class="p-card brief-card">
+      <div class="ttl">AI 模型研判 · 点击即生成</div>
+      <p class="why">把当前 48h 池的真实差值交给模型归纳，只引用给定事件、不编造；下方规则版研判始终保留。</p>
+      <button type="button" class="brief-run" :disabled="!canGenerate" @click="generate()">
+        {{ status === 'loading' ? '研判生成中…' : (text ? '重新生成研判' : '生成研判') }}
+      </button>
+      <p v-if="status === 'done'" class="m gd-mono">{{ cached ? '48h 缓存' : modelLabel }}</p>
+      <div v-if="!configReady" class="brief-setup">
+        <select v-model="modelPick" class="brief-select" aria-label="选择免费模型">
+          <option v-for="m in freeModels" :key="m.id" :value="m.id">{{ m.label }}</option>
+        </select>
+        <input
+          v-model="keyInput"
+          class="brief-key"
+          type="password"
+          autocomplete="off"
+          placeholder="免费 API Key（仅填一次）"
+        />
+        <button type="button" class="brief-save" @click="applyFreeModel()">保存模型</button>
+      </div>
+      <p v-if="error" class="why brief-error">{{ error }}；下方规则版研判不受影响。</p>
+      <p v-if="text" class="why brief-text">{{ text }}</p>
+    </section>
+
     <section class="p-card">
       <div class="ttl">今日研判</div>
       <p class="why pre">{{ dailyBriefText || EMPTY_GENERIC }}</p>
@@ -31,6 +55,7 @@
         <span>{{ w.label }}</span><b class="gd-mono">×{{ w.value }}</b>
       </div>
       <p class="why">{{ EMPTY_AI_WEIGHT }}</p>
+      <p class="why">{{ GAP_FRESH_NOTE }}</p>
     </section>
 
     <section class="p-card">
@@ -59,11 +84,16 @@
 <script setup lang="ts">
 import { computed, inject, ref } from 'vue'
 import GapEmptyState from '../../../components/gapdesk/GapEmptyState.vue'
-import { EMPTY_AI_INPUT, EMPTY_AI_PUSH, EMPTY_AI_WEIGHT, EMPTY_GENERIC, EMPTY_LLM, GAP_IND_MAP, GAP_WEIGHTS } from '../../../config/gapdeskConfig'
+import { EMPTY_AI_INPUT, EMPTY_AI_PUSH, EMPTY_AI_WEIGHT, EMPTY_GENERIC, EMPTY_LLM, GAP_FRESH_NOTE, GAP_IND_MAP, GAP_WEIGHTS } from '../../../config/gapdeskConfig'
 import { GAP_OPEN_DETAIL_KEY, useGapDesk } from '../../../composables/useGapDesk'
+import { useGapBriefAi } from '../../../composables/useGapBriefAi'
 import type { GapInd } from '../../../types/gapdesk'
 
 const { ranked, dailyBriefText, titleOf } = useGapDesk()
+const {
+  status, text, modelLabel, cached, error, keyInput, modelPick,
+  configReady, canGenerate, freeModels, applyFreeModel, generate
+} = useGapBriefAi()
 const openDetail = inject(GAP_OPEN_DETAIL_KEY, (_id: number) => {})
 const emit = defineEmits<{ navigate: [key: string] }>()
 
@@ -105,6 +135,50 @@ const indLabel = (ind: GapInd): string => GAP_IND_MAP[ind]?.label ?? '未分类'
   font-size: var(--gd-fs-panels);
   cursor: pointer;
 }
+.brief-card {
+  border-color: color-mix(in srgb, var(--gd-brand) 35%, var(--gd-line));
+}
+.brief-run {
+  width: 100%;
+  min-height: 44px;
+  margin: 8px 0;
+  border: 1px solid var(--gd-brand);
+  border-radius: var(--gd-r-nav);
+  background: color-mix(in srgb, var(--gd-brand) 8%, var(--gd-card));
+  color: var(--gd-brand);
+  font-size: var(--gd-fs-panels);
+  font-weight: 600;
+  cursor: pointer;
+}
+.brief-run:disabled { opacity: 0.5; cursor: not-allowed; }
+.brief-setup {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.brief-select,
+.brief-key {
+  width: 100%;
+  min-height: 44px;
+  padding: 0 10px;
+  border: 1px solid var(--gd-line);
+  border-radius: var(--gd-r-nav);
+  background: var(--gd-sub);
+  color: var(--gd-ink2);
+  font-family: var(--gd-sans);
+  font-size: var(--gd-fs-panels);
+}
+.brief-save {
+  min-height: 44px;
+  border: 1px solid var(--gd-line);
+  border-radius: var(--gd-r-nav);
+  background: var(--gd-sub);
+  color: var(--gd-ink2);
+  font-size: var(--gd-fs-panels);
+  cursor: pointer;
+}
+.brief-error { color: #c0392b; }
+.brief-text { white-space: pre-line; line-height: 1.7; }
 .pre {
   white-space: pre-line;
 }

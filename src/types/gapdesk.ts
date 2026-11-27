@@ -161,6 +161,13 @@ export interface GapFavoriteRow {
   created_at: string
 }
 
+/** `public.gap_later` · 稍后读（跨设备同步） */
+export interface GapLaterRow {
+  user_id: string
+  event_id: number
+  created_at: string
+}
+
 /** `public.gap_reads` · 已读 */
 export interface GapReadRow {
   user_id: string
@@ -268,6 +275,57 @@ export interface SourceGroup {
   layer: GapLayer | null
   events: GapEventRow[]
   silent: boolean
+}
+
+/**
+ * 逐源实测统计（48h 池真值，不落新表、不写死数字）：
+ * 首报次数=该源作为事件最早 publish_ts 证据行的次数；
+ * 交叉次数=参与事件里 src_count≥2 的次数；
+ * 孤证次数=参与事件里 src_count=1 的次数；
+ * 平均时延=该源相对同事件首报源的滞后小时中位数（仅算有双时间戳的事件）。
+ */
+export interface SourceHealthStat {
+  source: string
+  layer: GapLayer | null
+  /** 参与的事件总数 */
+  events: number
+  /** 首报次数 */
+  firstCount: number
+  /** 被交叉验证次数（多源事件） */
+  crossCount: number
+  /** 孤证次数（单源事件） */
+  loneCount: number
+  /** 相对首报的滞后小时中位数；无双时间戳样本时为 null */
+  lagH: number | null
+  /** 首报占比 0-100，整数 */
+  firstPct: number
+}
+
+/** 事件传播链（同一事件内按 publish_ts 排序的跨源首触序列） */
+export interface EchoChainHop {
+  source: string
+  /** 相对首报的小时差，首报为 0 */
+  lagH: number
+  /** 绝对发布时间 */
+  ts: number
+  layer: GapLayer | null
+}
+
+export interface EchoChain {
+  eventId: number
+  title: string
+  gap: number
+  tier: GapTier
+  /** 首报源 */
+  firstSource: string
+  /** 首报绝对时间 */
+  firstTs: number
+  /** 跟发跨度（小时）= 最后 hops − 首报 */
+  spanH: number
+  /** 有效带时间戳的源数 */
+  hopCount: number
+  /** 完整序列（首报在前） */
+  hops: EchoChainHop[]
 }
 
 /** 采集脚本注入结果（一期只读表结构，二期采集侧写入后回传） */

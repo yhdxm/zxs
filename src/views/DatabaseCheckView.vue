@@ -252,6 +252,7 @@ const TABLE_DESC: Record<string, string> = {
   gap_event_platform: '差值·平台首触与热度：微博/知乎/抖音/决策圈等平台的首触时刻与热度，只增不改',
   gap_sources: '差值·信源健康：25 路源的连续成功/失败次数、延迟、条数与失败原因',
   gap_favorites: '差值·收藏表：用户收藏的差值事件，按 user_id 隔离',
+  gap_later: '差值·稍后读表：用户稍后读队列，登录后跨 PC/移动端同步（localStorage 为离线镜像）',
   gap_reads: '差值·已读表：用户已读的差值事件（重复标记不刷新 read_at）',
   gap_subscriptions: '差值·行业订阅表：用户订阅的 8 个行业键，用于「仅订阅」筛选',
   gap_rules: '差值·预警规则表：用户级规则 DSL（行业/维度/阈值/源数/时间窗/通道）',
@@ -287,7 +288,7 @@ const TABLE_GROUP: Record<string, string> = {
   degree_words: 'degree', degree_questions: 'degree', degree_phrases: 'degree',
   degree_exam_records: 'degree',
   gap_events: 'gapdesk', gap_event_sources: 'gapdesk', gap_event_platform: 'gapdesk',
-  gap_sources: 'gapdesk', gap_favorites: 'gapdesk', gap_reads: 'gapdesk',
+  gap_sources: 'gapdesk', gap_favorites: 'gapdesk', gap_later: 'gapdesk', gap_reads: 'gapdesk',
   gap_subscriptions: 'gapdesk', gap_rules: 'gapdesk', gap_seats: 'gapdesk',
   study_module_settings: 'learn', user_json_blobs: 'biz'
 }

@@ -17,6 +17,7 @@ import type {
   GapEventRow,
   GapEventSourceRow,
   GapFavoriteRow,
+  GapLaterRow,
   GapPlatformRow,
   GapReadRow,
   GapRuleDsl,
@@ -401,6 +402,61 @@ export async function listSubscriptions(userId: string): Promise<GapResult<GapSu
   } catch (e) {
     console.warn('[gapdesk] 订阅列表读取异常', errMsg(e))
     return { data: [], error: errMsg(e) }
+  }
+}
+
+/** 稍后读列表（跨设备同步）：未登录返回空，由本地镜像兜底 */
+export async function listLater(userId: string): Promise<GapResult<GapLaterRow[]>> {
+  if (!userId) return { data: [], error: null }
+  try {
+    const { data, error } = await supabase
+      .from('gap_later')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(1000)
+    if (error) {
+      console.warn('[gapdesk] 稍后读列表读取失败', error.message)
+      return { data: [], error: error.message }
+    }
+    return { data: (data ?? []) as GapLaterRow[], error: null }
+  } catch (e) {
+    console.warn('[gapdesk] 稍后读列表读取异常', errMsg(e))
+    return { data: [], error: errMsg(e) }
+  }
+}
+
+/** 切换稍后读：on=true 幂等插入，on=false 精确删除；未登录跳过（保留本地镜像） */
+export async function toggleLaterRemote(eventId: number, on: boolean): Promise<boolean> {
+  const userId = await resolveUserId()
+  if (!userId) {
+    console.warn('[gapdesk] 未登录，稍后读仅存本机')
+    return false
+  }
+  try {
+    if (on) {
+      const { error } = await supabase
+        .from('gap_later')
+        .upsert({ user_id: userId, event_id: eventId }, { onConflict: 'user_id,event_id', ignoreDuplicates: true })
+      if (error) {
+        console.warn('[gapdesk] 稍后读写入失败', error.message)
+        return false
+      }
+      return true
+    }
+    const { error } = await supabase
+      .from('gap_later')
+      .delete()
+      .eq('user_id', userId)
+      .eq('event_id', eventId)
+    if (error) {
+      console.warn('[gapdesk] 稍后读移除失败', error.message)
+      return false
+    }
+    return true
+  } catch (e) {
+    console.warn('[gapdesk] 稍后读写入异常', errMsg(e))
+    return false
   }
 }
 

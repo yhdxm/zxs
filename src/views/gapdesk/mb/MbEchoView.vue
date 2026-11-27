@@ -14,6 +14,8 @@
       <div><b class="gd-mono">积累中</b><span>待验证队列</span></div>
     </div>
 
+    <GapEchoChains mobile :limit="5" />
+
     <section class="p-card">
       <div class="ttl">回打收敛曲线</div>
       <p class="why">{{ EMPTY_ECHO }}，不画收敛趋势。</p>
@@ -38,6 +40,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import GapEchoChains from '../../../components/gapdesk/GapEchoChains.vue'
 import { EMPTY_ECHO, EMPTY_ECHO_RULE, GAP_LAG_NOTE } from '../../../config/gapdeskConfig'
 import { useGapDesk } from '../../../composables/useGapDesk'
 

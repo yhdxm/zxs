@@ -52,19 +52,65 @@
       <GapEmptyState type="empty" title="行业解码库" :desc="EMPTY_HISTORY" :phase2="EMPTY_EXPORT" />
     </div>
 
+    <!-- 行业档案卡下钻：与移动端「看该行业 TOP5」同源，都读 byIndustry[selected] -->
+    <section class="panel t5panel">
+      <h4>{{ selectedLabel }} · TOP5 差事件</h4>
+      <p class="sub">按 GAP 分降序取前 5，排名沿用全局 ranked；无事件的行业不补 0、不造占位</p>
+      <button
+        v-for="row in top5"
+        :key="row.id"
+        type="button"
+        class="t5row"
+        :title="`查看 #${row.rank} · GAP ${row.gap} · ${row.title} 的详情`"
+        @click="openDetail(row.id)"
+      >
+        <span class="t5rank gd-mono">#{{ row.rank }}</span>
+        <span class="t5gap gd-mono">GAP {{ row.gap }}</span>
+        <span class="t5title">{{ row.title }}</span>
+        <span class="t5go gd-mono">看详情 →</span>
+      </button>
+      <GapEmptyState v-if="!top5.length" type="empty" title="TOP5 差事件" :desc="EMPTY_WAIT" />
+    </section>
+
     <GapEmptyState type="empty" title="中国国标行业分类全览" :desc="EMPTY_HISTORY" :phase2="EMPTY_ARCHIVE" />
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, inject, ref } from 'vue'
 import GapEmptyState from '../../../components/gapdesk/GapEmptyState.vue'
 import { EMPTY_ARCHIVE, EMPTY_EXPORT, EMPTY_HISTORY, EMPTY_WAIT, GAP_DIM6, GAP_IND } from '../../../config/gapdeskConfig'
-import { useGapDesk } from '../../../composables/useGapDesk'
+import { GAP_OPEN_DETAIL_KEY, useGapDesk } from '../../../composables/useGapDesk'
 import type { GapInd } from '../../../types/gapdesk'
 
-const { byIndustry, matrix6, evidences } = useGapDesk()
+const { byIndustry, matrix6, evidences, ranked } = useGapDesk()
+/** 宿主统一持有详情抽屉；单独挂载时退化为无操作 */
+const openDetail = inject(GAP_OPEN_DETAIL_KEY, (_id: number) => {})
 const selected = ref<GapInd>('ai')
+
+interface Top5Row {
+  id: number
+  rank: number
+  gap: number
+  title: string
+}
+
+/**
+ * TOP5 唯一口径：byIndustry[selected] 按 gap 降序前 5；
+ * byIndustry 的行是 GapEventRow（不带 rank），真实名次从全局 ranked 反查。
+ */
+const top5 = computed<Top5Row[]>(() => {
+  const rankMap = new Map(ranked.value.map((row) => [row.id, row.rank]))
+  return [...(byIndustry.value[selected.value] ?? [])]
+    .sort((a, b) => b.gap - a.gap)
+    .slice(0, 5)
+    .map((row, index) => ({
+      id: row.id,
+      rank: rankMap.get(row.id) ?? index + 1,
+      gap: row.gap,
+      title: row.title
+    }))
+})
 
 const GAP_DIM6_LABELS = GAP_DIM6.map((d) => d.label)
 
@@ -203,6 +249,60 @@ const shapePoints = computed(() => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.t5panel {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.t5panel h4 {
+  margin: 0;
+  font-size: var(--gd-fs-panelh);
+  color: var(--gd-ink);
+}
+.t5row {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  min-height: 40px;
+  padding: 7px 10px;
+  border: 1px solid var(--gd-line);
+  border-radius: var(--gd-r-nav);
+  background: var(--gd-sub);
+  text-align: left;
+  cursor: pointer;
+  min-width: 0;
+  transition: all .18s var(--gd-ease);
+}
+.t5row:hover {
+  border-color: var(--gd-brand);
+  background: var(--gd-card);
+  box-shadow: var(--gd-sh-xs);
+}
+.t5rank {
+  flex: none;
+  font-size: var(--gd-fs-pill);
+  color: var(--gd-ink3);
+}
+.t5gap {
+  flex: none;
+  font-size: var(--gd-fs-why);
+  font-weight: 700;
+  color: var(--gd-gap);
+}
+.t5title {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--gd-fs-panels);
+  color: var(--gd-ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.t5go {
+  flex: none;
+  font-size: var(--gd-fs-pill);
+  color: var(--gd-brand);
 }
 .radar {
   display: block;

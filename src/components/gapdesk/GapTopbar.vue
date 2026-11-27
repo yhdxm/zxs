@@ -67,6 +67,10 @@
       <span class="gd-age-note-t">数据年龄说明</span>
       <span class="gd-age-note-x">{{ dataFreshnessTitle }}</span>
       <span class="gd-age-note-b">{{ GAP_COLLECT_NOTE }}</span>
+      <span class="gd-age-manual">
+        <button type="button" class="gd-collect-btn gd-mono" @click="openCollect">手动补采 →</button>
+        <span class="gd-age-note-b">{{ GAP_COLLECT_MANUAL_NOTE }}</span>
+      </span>
       <button type="button" class="gd-age-note-close gd-mono" aria-label="收起" @click="ageOpen = false">×</button>
     </div>
   </header>
@@ -74,7 +78,12 @@
 
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { EMPTY_ECHO, GAP_COLLECT_NOTE } from '../../config/gapdeskConfig'
+import {
+  EMPTY_ECHO,
+  GAP_COLLECT_MANUAL_NOTE,
+  GAP_COLLECT_NOTE,
+  GAP_COLLECT_URL
+} from '../../config/gapdeskConfig'
 import { useGapDesk } from '../../composables/useGapDesk'
 
 const props = withDefaults(
@@ -133,6 +142,11 @@ onBeforeUnmount(() => {
   if (kwTimer) clearTimeout(kwTimer)
   if (typeof window !== 'undefined') window.removeEventListener('keydown', onKey)
 })
+
+/** 手动补采：新标签打开 GitHub Actions，用户在自己已登录会话里点 Run workflow */
+function openCollect(): void {
+  if (typeof window !== 'undefined') window.open(GAP_COLLECT_URL, '_blank', 'noopener,noreferrer')
+}
 
 const emit = defineEmits<{
   'switch-dev': []
@@ -204,6 +218,27 @@ const emit = defineEmits<{
 .gd-age-note-b {
   flex: 1 0 100%;
   color: var(--gd-ink2, #54608a);
+}
+.gd-age-manual {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  flex: 1 0 100%;
+}
+.gd-collect-btn {
+  flex: none;
+  min-height: 32px;
+  padding: 4px 12px;
+  border: 1px solid var(--gd-brand, #3a5cf5);
+  border-radius: var(--gd-r-nav, 8px);
+  background: var(--gd-card, #fff);
+  color: var(--gd-brand, #3a5cf5);
+  font-size: var(--gd-fs-panels, 12px);
+  cursor: pointer;
+}
+.gd-collect-btn:hover {
+  background: color-mix(in srgb, var(--gd-brand, #3a5cf5) 8%, var(--gd-card, #fff));
 }
 .gd-age-note-close {
   position: absolute;

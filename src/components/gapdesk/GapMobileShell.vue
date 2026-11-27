@@ -55,6 +55,17 @@
     <!-- 不再按 isLive 二元切换：数据来自采集，只是可能滞后；点击状态胶囊展开完整说明 -->
     <div class="p-note" :class="{ 'p-note-more': ageOpen }">
       {{ ageOpen ? `${dataFreshnessTitle}。${GAP_COLLECT_NOTE}` : EMPTY_DEMO }}
+      <!-- 翻译额度：与 PC 筛选栏同一份 store 与同一套文案函数，移动端无需进筛选页也能看到降级 -->
+      <span
+        class="p-quota gd-mono"
+        :class="`p-quota-${quotaTone}`"
+        :title="quotaTip"
+        :aria-label="quotaTip"
+      >{{ quotaText }}</span>
+    </div>
+    <div v-if="ageOpen" class="p-collect">
+      <button type="button" class="p-collect-btn gd-mono" @click="openCollect">手动补采 →</button>
+      <span class="p-collect-note">{{ GAP_COLLECT_MANUAL_NOTE }}</span>
     </div>
 
     <!-- 日期条槽：默认渲染真实日期胶囊（当前日渐变紫），各屏也可用 datebar 槽覆盖 -->
@@ -65,6 +76,8 @@
     </slot>
 
     <div class="p-body">
+      <!-- 今日最大差：PC 主区同一组件，compact 版允许标题两行、触控区 ≥44px -->
+      <GapTopGapBanner compact />
       <slot />
     </div>
 
@@ -91,8 +104,15 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import GapDateStrip from './GapDateStrip.vue'
-import { EMPTY_DEMO, GAP_COLLECT_NOTE } from '../../config/gapdeskConfig'
+import GapTopGapBanner from './GapTopGapBanner.vue'
+import {
+  EMPTY_DEMO,
+  GAP_COLLECT_MANUAL_NOTE,
+  GAP_COLLECT_NOTE,
+  GAP_COLLECT_URL
+} from '../../config/gapdeskConfig'
 import { useGapDesk } from '../../composables/useGapDesk'
+import { i18nQuotaTextOf, i18nQuotaTipOf, i18nQuotaToneOf } from '../../utils/gapdeskFormat'
 
 const {
   dateBands,
@@ -100,10 +120,28 @@ const {
   filters,
   dataAgeText,
   dataFreshnessTone,
-  dataFreshnessTitle
+  dataFreshnessTitle,
+  i18nBudgetLeft,
+  i18nDailyChars,
+  i18nBudgetOut
 } = useGapDesk()
+
+/** 额度文案与 PC 筛选栏共用纯函数，不另写一套判断 */
+const quotaTone = computed(() =>
+  i18nQuotaToneOf(i18nBudgetLeft.value, i18nDailyChars, i18nBudgetOut.value)
+)
+const quotaText = computed(() =>
+  i18nQuotaTextOf(i18nBudgetLeft.value, i18nDailyChars, i18nBudgetOut.value)
+)
+const quotaTip = computed(() =>
+  i18nQuotaTipOf(i18nBudgetLeft.value, i18nDailyChars, i18nBudgetOut.value)
+)
 /** 数据年龄说明展开态：只在本组件内，与 PC 顶栏各自独立 */
 const ageOpen = ref(false)
+/** 手动补采：新标签打开 GitHub Actions，用户在自己已登录会话里点 Run workflow */
+function openCollect(): void {
+  if (typeof window !== 'undefined') window.open(GAP_COLLECT_URL, '_blank', 'noopener,noreferrer')
+}
 /** 高亮只从 store 的筛选派生，不允许有第二份本地状态（否则筛了日期再切视图会漂移） */
 const activeBand = computed<string>(() => filters.dateBand)
 function onPick(key: string): void {
@@ -181,5 +219,52 @@ const emit = defineEmits<{
   border-radius: 999px;
   font-size: 8px;
   vertical-align: middle;
+}
+/* 翻译额度徽标：与 PC 筛选栏同色义（品牌 / 警示 / 用尽），不引入新配色 */
+.p-quota {
+  flex: none;
+  margin-left: auto;
+  padding: 2px 7px;
+  border: 1px solid var(--gd-line2);
+  border-radius: 999px;
+  background: var(--gd-card);
+  color: var(--gd-ink2);
+  font-size: var(--gd-fs-pill);
+  white-space: nowrap;
+}
+.p-quota-low {
+  border-color: color-mix(in srgb, var(--gd-warn) 55%, transparent);
+  background: color-mix(in srgb, var(--gd-warn) 12%, transparent);
+  color: var(--gd-warn);
+  font-weight: 700;
+}
+.p-quota-out {
+  border-color: color-mix(in srgb, var(--gd-gap) 55%, transparent);
+  background: color-mix(in srgb, var(--gd-gap) 12%, transparent);
+  color: var(--gd-gap);
+  font-weight: 700;
+}
+/* 手动补采：44px 触控区，拇指可点；说明文字小字不挤占滚动区 */
+.p-collect {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 4px 0 6px;
+}
+.p-collect-btn {
+  align-self: flex-start;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid var(--gd-brand, #3a5cf5);
+  border-radius: var(--gd-r-nav, 8px);
+  background: var(--gd-card, #fff);
+  color: var(--gd-brand, #3a5cf5);
+  font-size: var(--gd-fs-panels, 12px);
+  cursor: pointer;
+}
+.p-collect-note {
+  font-size: var(--gd-fs-pill, 11px);
+  line-height: 1.5;
+  color: var(--gd-ink2, #5d6b82);
 }
 </style>

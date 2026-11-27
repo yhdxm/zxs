@@ -32,6 +32,10 @@
             <span class="gd-ev-time gd-mono">{{ stampText(s.publish_ts) }}</span>
           </li>
         </ul>
+        <div v-if="selectedChain" class="gd-ev-chain">
+          <span class="gd-ev-chain-lb gd-mono">跨源时差</span>
+          <span class="gd-ev-chain-v gd-mono">{{ selectedChain.hopCount }} 源 · 跨度 {{ selectedChain.spanH }}h</span>
+        </div>
         <div class="gd-ev-health">
           源健康 <span :class="health.ok > 0 ? 'gd-ev-ok' : 'gd-ev-bad'">{{ health.total > 0 ? `${health.ok}/${health.total} 正常` : '暂无数据' }}</span>
           <button type="button" class="gd-panel-link gd-mono gd-ev-more" @click="go('source-risk')">信源分级 →</button>
@@ -79,7 +83,21 @@ interface RightPanel {
 const props = defineProps<{ event?: RankedEvent | null }>()
 const emit = defineEmits<{ navigate: [key: string] }>()
 
-const { health, tierCounts, dailyBriefText, laterIds, evidences, titleOf, ensureI18n } = useGapDesk()
+const { health, tierCounts, dailyBriefText, laterIds, evidences, titleOf, ensureI18n, sourceHealthStats, echoChains } = useGapDesk()
+
+/** 选中事件的传播链：与 Echo 页同源，仅取当前事件那条 */
+const selectedChain = computed(() =>
+  props.event ? echoChains.value.find((c) => c.eventId === props.event?.id) ?? null : null
+)
+
+/** 逐源实测摘要：首报 Top1 + 孤证数，全部来自证据链真值；无样本留口径文案 */
+const sourceDigest = computed(() => {
+  const rows = sourceHealthStats.value
+  if (!rows.length) return ''
+  const top = rows[0]!
+  const lone = rows.filter((r) => r.loneCount > 0).length
+  return `首报最多 ${top.source}（${top.firstCount} 次）；${lone} 路有孤证。`
+})
 
 /* ===== 常驻证据侧栏：与详情抽屉同源，按需补拉详情 ===== */
 const detail = ref<GapEventSourceRow[]>([])
@@ -139,14 +157,16 @@ const PANELS = computed<RightPanel[]>(() => [
   {
     title: '信源体温计',
     tag: 'HEALTH',
-    body: health.value.total > 0
-      ? `正常 ${health.value.ok} / ${health.value.total} 路；失败源逐一列在信源分级页，不隐藏。`
-      : `— ${EMPTY_WAIT}：还没有逐源健康数据。`
+    body: sourceDigest.value
+      ? sourceDigest.value
+      : health.value.total > 0
+        ? `正常 ${health.value.ok} / ${health.value.total} 路；失败源逐一列在信源分级页，不隐藏。`
+        : `— ${EMPTY_WAIT}：还没有逐源健康数据。`
   },
   {
     title: '稍后读队列',
     tag: 'LATER',
-    body: laterIds.value.length ? `本机稍后读 ${laterIds.value.length} 条` : '— 队列为空，进入详情可加入稍后读。'
+    body: laterIds.value.length ? `稍后读 ${laterIds.value.length} 条（登录后跨端同步）` : '— 队列为空，进入详情可加入稍后读。'
   },
   {
     title: '今日概览',
@@ -234,6 +254,21 @@ function go(key: string | undefined): void {
   flex-shrink: 0;
   font-size: var(--gd-fs-pill);
   color: var(--gd-ink3);
+}
+.gd-ev-chain {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  font-size: var(--gd-fs-pill);
+  color: var(--gd-ink3);
+  margin-bottom: 6px;
+}
+.gd-ev-chain-lb {
+  color: var(--gd-ink3);
+}
+.gd-ev-chain-v {
+  color: var(--gd-brand);
 }
 .gd-ev-health {
   display: flex;

@@ -7,6 +7,8 @@
   <div class="pcview">
     <GapHeroCards :items="heroItems" />
 
+    <GapEchoChains :limit="8" />
+
     <section class="panel">
       <div class="gh">
         <i class="bar" aria-hidden="true" />
@@ -57,6 +59,7 @@ import { computed } from 'vue'
 import GapEmptyState from '../../../components/gapdesk/GapEmptyState.vue'
 import GapHeroCards from '../../../components/gapdesk/GapHeroCards.vue'
 import GapRing from '../../../components/gapdesk/GapRing.vue'
+import GapEchoChains from '../../../components/gapdesk/GapEchoChains.vue'
 import { EMPTY_ECHO, EMPTY_ECHO_RULE, GAP_LAG_NOTE } from '../../../config/gapdeskConfig'
 import { useGapDesk } from '../../../composables/useGapDesk'
 

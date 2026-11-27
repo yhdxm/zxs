@@ -78,6 +78,13 @@
           :title="budgetTip"
           @click="toggleAutoTranslate()"
         ><i />{{ autoTranslate ? '开' : '关' }}</button>
+        <!-- 额度徽标：正常报真实剩余、低于 20% 警示、用尽如实说明；数值全部来自 store -->
+        <span
+          class="gfb-quota gd-mono"
+          :class="`gfb-quota-${quotaTone}`"
+          :title="quotaTip"
+          :aria-label="quotaTip"
+        >{{ quotaText }}</span>
       </label>
 
       <input
@@ -97,6 +104,7 @@
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { GAP_DIM6, GAP_IND } from '../../config/gapdeskConfig'
 import { useGapDesk } from '../../composables/useGapDesk'
+import { i18nQuotaTextOf, i18nQuotaTipOf, i18nQuotaToneOf } from '../../utils/gapdeskFormat'
 import type { GapDim6Key, GapInd } from '../../types/gapdesk'
 
 const {
@@ -119,6 +127,17 @@ const budgetTip = computed(() =>
   i18nBudgetOut.value
     ? '今日免费翻译额度已用完，译文停止更新，原文照常展示；明日自动恢复'
     : `免费通道 · 今日剩余约 ${i18nBudgetLeft.value} / ${i18nDailyChars} 字符，仅翻译外文标题与摘要截断`
+)
+
+/** 额度徽标三档共用同一套纯函数（移动壳也调它），不在模板里写死任何额度数字 */
+const quotaTone = computed(() =>
+  i18nQuotaToneOf(i18nBudgetLeft.value, i18nDailyChars, i18nBudgetOut.value)
+)
+const quotaText = computed(() =>
+  i18nQuotaTextOf(i18nBudgetLeft.value, i18nDailyChars, i18nBudgetOut.value)
+)
+const quotaTip = computed(() =>
+  i18nQuotaTipOf(i18nBudgetLeft.value, i18nDailyChars, i18nBudgetOut.value)
 )
 
 const SORTS: ReadonlyArray<{ key: 'latest' | 'gap' | 'heat'; label: string }> = [
@@ -284,6 +303,30 @@ defineExpose({ reset })
 }
 .gfb-switch.on i {
   background: var(--gd-brand);
+}
+.gfb-quota {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 1px 7px;
+  border: 1px solid var(--gd-line2);
+  border-radius: 999px;
+  background: var(--gd-sub);
+  color: var(--gd-ink2);
+  font-size: var(--gd-fs-pill);
+  white-space: nowrap;
+}
+.gfb-quota-low {
+  border-color: color-mix(in srgb, var(--gd-warn) 55%, transparent);
+  background: color-mix(in srgb, var(--gd-warn) 12%, transparent);
+  color: var(--gd-warn);
+  font-weight: 700;
+}
+.gfb-quota-out {
+  border-color: color-mix(in srgb, var(--gd-gap) 55%, transparent);
+  background: color-mix(in srgb, var(--gd-gap) 12%, transparent);
+  color: var(--gd-gap);
+  font-weight: 700;
 }
 .gfb-select {
   height: 30px;

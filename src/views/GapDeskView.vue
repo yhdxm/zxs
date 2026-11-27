@@ -29,6 +29,8 @@
             @pick="filters.dateBand = filters.dateBand === $event ? '' : $event"
           />
           <GapFilterBar />
+          <!-- 今日最大差：与移动壳同一组件同一 store 口径，无事件时整条不渲染 -->
+          <GapTopGapBanner />
           <component :is="activeComp" v-bind="activeProps" />
         </main>
 
@@ -71,6 +73,7 @@ import GapDetailDrawer from '../components/gapdesk/GapDetailDrawer.vue'
 import GapPurgeConfirm from '../components/gapdesk/GapPurgeConfirm.vue'
 import GapDateStrip from '../components/gapdesk/GapDateStrip.vue'
 import GapFilterBar from '../components/gapdesk/GapFilterBar.vue'
+import GapTopGapBanner from '../components/gapdesk/GapTopGapBanner.vue'
 import PcLatestView from './gapdesk/pc/PcLatestView.vue'
 import PcProfileView from './gapdesk/pc/PcProfileView.vue'
 import PcTimelineView from './gapdesk/pc/PcTimelineView.vue'

@@ -33,6 +33,10 @@ import {
   gapTone,
   heatLabel,
   i18nBadgeTextOf,
+  I18N_QUOTA_OUT_TEXT,
+  I18N_QUOTA_OUT_TIP,
+  i18nQuotaTextOf,
+  i18nQuotaToneOf,
   pct,
   safeJson
 } from '../src/utils/gapdeskFormat'
@@ -54,7 +58,7 @@ import {
   sameEvent
 } from '../scripts/gapdesk/cluster.mjs'
 import { scoreEvents } from '../scripts/gapdesk/score.mjs'
-import { FEED_BATCH, gapDiv, loadGapFeed, purgeAndRefresh, useGapDesk } from '../src/composables/useGapDesk'
+import { FEED_BATCH, GAP_OPEN_DETAIL_KEY, gapDiv, loadGapFeed, purgeAndRefresh, useGapDesk } from '../src/composables/useGapDesk'
 import {
   EMPTY_DEMO,
   EMPTY_LOADING,
@@ -74,6 +78,9 @@ import GapMobileShell from '../src/components/gapdesk/GapMobileShell.vue'
 import GapPurgeConfirm from '../src/components/gapdesk/GapPurgeConfirm.vue'
 import PcLatestView from '../src/views/gapdesk/pc/PcLatestView.vue'
 import MbLatestView from '../src/views/gapdesk/mb/MbLatestView.vue'
+import PcProfileView from '../src/views/gapdesk/pc/PcProfileView.vue'
+import MbProfileView from '../src/views/gapdesk/mb/MbProfileView.vue'
+import GapFilterBar from '../src/components/gapdesk/GapFilterBar.vue'
 import {
   DEFAULT_ROLE_CONFIG,
   PERMISSION_TREE,
@@ -1997,5 +2004,394 @@ describe('字体与其他模块对齐 + 双端 AI 检索一致', () => {
     const topbar = readSource('src/components/gapdesk/GapTopbar.vue')
     expect(topbar).toContain('placeholder="搜索标题 / 摘要 / 行业"')
     expect(topbar).not.toContain('placeholder="搜索归档')
+  })
+})
+
+/* ============================================================
+   第一档优化：逐源实测统计 / Echo 传播链 / 手动补采入口
+   ============================================================ */
+
+describe('useGapDesk.sourceHealthStats · 逐源实测统计（48h 证据链真值）', () => {
+  function ev(over: Partial<GapEventSourceRow> & { id: number; event_id: number }): GapEventSourceRow {
+    return {
+      source_name: null, layer: null, url: null, publish_ts: null, heat: null,
+      ...over
+    } as GapEventSourceRow
+  }
+
+  it('首报次数按 publish_ts 最小计，交叉/孤证按 src_count 计，滞后取小时中位', () => {
+    store.events.value = [
+      makeEvent({ id: 1, src_count: 3, gap: 90 }),
+      makeEvent({ id: 2, src_count: 1, gap: 70 })
+    ]
+    // 事件1：A 首报(1000)，A 同源重复(+1h，应被忽略)，B 在 +2h
+    // 事件2：B 首报(5000)，单源孤证
+    store.evidences.value = [
+      ev({ id: 1, event_id: 1, source_name: 'A', layer: 'insider', publish_ts: 1000 }),
+      ev({ id: 2, event_id: 1, source_name: 'A', publish_ts: 1000 + HOUR }),
+      ev({ id: 3, event_id: 1, source_name: 'B', layer: 'main', publish_ts: 1000 + 2 * HOUR }),
+      ev({ id: 4, event_id: 2, source_name: 'B', publish_ts: 5000 })
+    ]
+    const rows = store.sourceHealthStats.value
+    const a = rows.find((r) => r.source === 'A')!
+    const b = rows.find((r) => r.source === 'B')!
+
+    expect(a.firstCount).toBe(1)
+    expect(a.crossCount).toBe(1)
+    expect(a.loneCount).toBe(0)
+    expect(a.lagH).toBeNull() // A 是首报源，首报本身不计滞后；同源重复取最早也不计
+
+    expect(b.firstCount).toBe(1) // 事件2 单源首报
+    expect(b.crossCount).toBe(1) // 事件1 是多源
+    expect(b.loneCount).toBe(1)  // 事件2 孤证
+    expect(b.lagH).toBe(2)       // 事件1 相对 A 的 +2h
+  })
+
+  it('无证据链时返回空数组；首报占比按事件数算不按行数', () => {
+    store.evidences.value = []
+    expect(store.sourceHealthStats.value).toEqual([])
+    store.events.value = [makeEvent({ id: 9, src_count: 2 })]
+    store.evidences.value = [
+      ev({ id: 1, event_id: 9, source_name: 'X', publish_ts: 1000 }),
+      ev({ id: 2, event_id: 9, source_name: 'Y', publish_ts: 2000 })
+    ]
+    const x = store.sourceHealthStats.value.find((r) => r.source === 'X')!
+    expect(x.events).toBe(1)
+    expect(x.firstPct).toBe(100)
+  })
+})
+
+describe('useGapDesk.echoChains · 跨源传播链（实测，非回打兑现率）', () => {
+  function ev(over: Partial<GapEventSourceRow> & { id: number; event_id: number }): GapEventSourceRow {
+    return {
+      source_name: null, layer: null, url: null, publish_ts: null, heat: null,
+      ...over
+    } as GapEventSourceRow
+  }
+
+  it('同源重复只留最早；无时间戳行不参与；按跨度降序；首触 lagH=0', () => {
+    store.events.value = [
+      makeEvent({ id: 1, gap: 80 }),
+      makeEvent({ id: 2, gap: 95 }),
+      makeEvent({ id: 3, gap: 70 })
+    ]
+    store.evidences.value = [
+      ev({ id: 1, event_id: 1, source_name: 'A', publish_ts: 1000 }),
+      ev({ id: 2, event_id: 1, source_name: 'A', publish_ts: 3000 }), // 同源重复，应丢弃
+      ev({ id: 3, event_id: 1, source_name: 'B', publish_ts: 1000 + 3 * HOUR }),
+      ev({ id: 4, event_id: 1, source_name: 'C', publish_ts: null }),   // 无时戳，应丢弃
+      ev({ id: 5, event_id: 2, source_name: 'X', publish_ts: 5000 }),
+      ev({ id: 6, event_id: 2, source_name: 'Y', publish_ts: 5000 + HOUR }),
+      ev({ id: 7, event_id: 3, source_name: '单源', publish_ts: 9000 })
+    ]
+    const chains = store.echoChains.value
+    expect(chains.length).toBe(2) // 事件3 单源不成链
+    expect(chains[0]?.eventId).toBe(1) // 跨度 3h > 1h
+    expect(chains[0]?.hopCount).toBe(2)
+    expect(chains[0]?.spanH).toBe(3)
+    expect(chains[0]?.hops[0]?.source).toBe('A')
+    expect(chains[0]?.hops[0]?.lagH).toBe(0)
+    expect(chains[0]?.hops[1]?.lagH).toBe(3)
+  })
+
+  it('证据链为空时不产出任何链，不编造传播路径', () => {
+    store.evidences.value = []
+    expect(store.echoChains.value).toEqual([])
+  })
+})
+
+describe('手动补采入口 · 不把凭据带进前端，只给 GitHub 触发页链接', () => {
+  it('常量指向 Actions workflow 页，说明强调无需在本站输凭据', () => {
+    const config = readSource('src/config/gapdeskConfig.ts')
+    expect(config).toContain('GAP_COLLECT_URL')
+    expect(config).toContain('actions/workflows/gapdesk-collect.yml')
+    expect(config).toContain('不需要在本站输入任何凭据')
+    for (const file of ['src/components/gapdesk/GapTopbar.vue', 'src/components/gapdesk/GapMobileShell.vue']) {
+      const src = readSource(file)
+      expect(src).toContain('window.open(GAP_COLLECT_URL')
+      expect(src).toContain('手动补采')
+    }
+  })
+})
+
+describe('第二档 · 时效衰减排序', () => {
+  it('新事件优先：20h 前的 97 分排在 2h 前的 95 分之后', () => {
+    const now = Date.now()
+    store.nowMs.value = now
+    store.events.value = [
+      makeEvent({ id: 1, gap: 97, ts_published: now - 20 * 3600000, ts_first_seen: now - 20 * 3600000 }),
+      makeEvent({ id: 2, gap: 95, ts_published: now - 2 * 3600000, ts_first_seen: now - 2 * 3600000 })
+    ]
+    const ranked = store.ranked.value
+    expect(ranked[0]?.id).toBe(2)
+    expect(ranked[1]?.id).toBe(1)
+    // gap 展示分不变，只改排序键
+    expect(ranked[1]?.gap).toBe(97)
+  })
+
+  it('同档内仍按 gap 降序；无时间(ts=0)按最旧档不冒充新鲜', () => {
+    const now = Date.now()
+    store.nowMs.value = now
+    store.events.value = [
+      makeEvent({ id: 1, gap: 80, ts_published: now - 1 * 3600000, ts_first_seen: now - 1 * 3600000 }),
+      makeEvent({ id: 2, gap: 90, ts_published: now - 2 * 3600000, ts_first_seen: now - 2 * 3600000 }),
+      makeEvent({ id: 3, gap: 100, ts_published: 0, ts_first_seen: now })
+    ]
+    const ranked = store.ranked.value
+    expect(ranked[0]?.id).toBe(2) // 90 分（2h，不到 3h 档）> 80 分（1h），同档按 gap
+    expect(ranked[2]?.id).toBe(3) // 无时间按最旧档，100 分也排末位
+  })
+
+  it('衰减口径在双端 AI 页如实展示', () => {
+    for (const file of ['src/views/gapdesk/pc/PcAIView.vue', 'src/views/gapdesk/mb/MbAIView.vue']) {
+      expect(readSource(file)).toContain('GAP_FRESH_NOTE')
+    }
+  })
+})
+
+describe('第二档 · AI 模型研判（免费模型 + 点击即生成）', () => {
+  it('研判服务强约束不编造、只喂 48h 真事件，且 48h 缓存', () => {
+    const src = readSource('src/services/gapdeskBriefService.ts')
+    expect(src).toContain('只能使用上面给出的事件')
+    expect(src).toContain('不得引入素材之外的任何事件')
+    expect(src).toContain('CACHE_TTL')
+    expect(src).toContain('peekBriefCache')
+    expect(src).toContain('callAi(config')
+  })
+
+  it('免费模型只列当前有效的免费档，已过期的百炼额度不列入', () => {
+    const src = readSource('src/services/gapdeskBriefService.ts')
+    expect(src).toContain('zhipu:glm-4-flash')
+    expect(src).toContain('siliconflow:deepseek-v3')
+    expect(src).toContain('openrouter:deepseek-v3-free')
+    expect(src).toContain('已过期')
+  })
+
+  it('双端都有「生成研判」按钮与一键选模型，规则版研判保留', () => {
+    for (const file of ['src/views/gapdesk/pc/PcAIView.vue', 'src/views/gapdesk/mb/MbAIView.vue']) {
+      const src = readSource(file)
+      expect(src).toContain('useGapBriefAi')
+      expect(src).toContain('生成研判')
+      expect(src).toContain('freeModels')
+      expect(src).toContain('dailyBriefText') // 只增不减：规则版仍在
+    }
+  })
+
+  it('调用失败降级：不伪造模型输出，错误态保留规则版', () => {
+    const src = readSource('src/composables/useGapBriefAi.ts')
+    expect(src).toContain('降级')
+    expect(src).toContain("status.value = 'error'")
+    expect(src).toContain('briefConfigReady')
+  })
+})
+
+describe('第二档 · 稍后读跨端同步', () => {
+  it('SQL 建表含 RLS 仅本人、user_id 取 auth.uid()', () => {
+    const sql = readSource('scripts/gapdesk_later.sql')
+    expect(sql).toContain('create table if not exists public.gap_later')
+    expect(sql).toContain('enable row level security')
+    expect(sql).toContain('auth.uid()::text = user_id')
+  })
+
+  it('数据库检测清单已登记 gap_later', () => {
+    const src = readSource('src/views/DatabaseCheckView.vue')
+    expect(src).toContain("gap_later: '差值·稍后读表")
+    expect(src).toContain("gap_later: 'gapdesk'")
+  })
+
+  it('store 登录后从云端对齐、未登录保留本机；实时同步表含 gap_later', () => {
+    const src = readSource('src/composables/useGapDesk.ts')
+    expect(src).toContain('listLater(uid)')
+    expect(src).toContain('laterIds.value = later.data.map')
+    expect(src).toContain("tables: ['gap_events', 'gap_favorites', 'gap_subscriptions', 'gap_reads', 'gap_later']")
+    expect(src).toContain('toggleLaterRemote(eventId, on)')
+    // 只增不减：读失败不清空本机
+    expect(src).toContain('表未建/读失败时保留本机镜像，不静默清空')
+  })
+})
+
+/* ============================================================
+   第三档 · 首屏最大差 / 行业下钻 / 翻译额度
+   ============================================================ */
+describe('第三档 · 首屏「今日最大差」横幅（PC + 移动同源）', () => {
+  it('PC 取 ranked 第一条：rank / GAP / 标题 / 分层 / 看详情齐全；无事件整条不渲染', async () => {
+    store.events.value = [
+      makeEvent({ id: 1, gap: 99, title: '今日头条差值' }),
+      makeEvent({ id: 2, gap: 60, title: '次要差值' })
+    ]
+    const pc = await mountGapDeskView({ dev: 'pc', view: 'latest' })
+    const banner = pc.find('.gd-topgap')
+    expect(banner.exists()).toBe(true)
+    const text = banner.text()
+    expect(text).toContain('今日最大差')
+    expect(text).toContain('#1')
+    expect(text).toContain('GAP 99')
+    expect(text).toContain('今日头条差值')
+    expect(text).toContain('L0')
+    expect(text).toContain('看详情 →')
+    expect(text).not.toContain('次要差值')
+    pc.unmount()
+
+    resetStore()
+    const empty = await mountGapDeskView({ dev: 'pc', view: 'latest' })
+    expect(empty.find('.gd-topgap').exists()).toBe(false)
+    empty.unmount()
+  })
+
+  it('移动壳主内容区顶部有紧凑版横幅，点击沿用宿主 openDetail', async () => {
+    store.events.value = [makeEvent({ id: 7, gap: 97, title: '移动端头条' })]
+    const mb = await mountGapDeskView({ dev: 'mb', view: 'm-latest' })
+    const banner = mb.find('.gd-topgap-compact')
+    expect(banner.exists()).toBe(true)
+    expect(banner.text()).toContain('#1')
+    expect(banner.text()).toContain('GAP 97')
+    expect(banner.text()).toContain('移动端头条')
+    const body = mb.find('.p-body')
+    expect(body.html().indexOf('gd-topgap')).toBeLessThan(body.html().indexOf('mbview'))
+
+    await banner.trigger('click')
+    expect(mb.findComponent(GapDetailDrawer).props('modelValue')).toBe(true)
+    mb.unmount()
+  })
+
+  it('标题走 titleOf：有译文时横幅显示译文而不是原文', () => {
+    const src = readSource('src/components/gapdesk/GapTopGapBanner.vue')
+    expect(src).toContain('titleOf(top.value)')
+    expect(src).toContain('ranked.value[0]')
+    expect(src).toContain('GAP_OPEN_DETAIL_KEY')
+  })
+})
+
+describe('第三档 · 行业档案卡下钻 TOP5（PC + 移动同源）', () => {
+  function seedIndustries(): void {
+    store.events.value = Array.from({ length: 7 }, (_, i) =>
+      makeEvent({ id: i + 1, gap: 90 - i * 10, ind: 'ai', title: `AI事件${i + 1}` })
+    )
+  }
+
+  it('PC 在 grid2 之后新增 TOP5 面板：读 byIndustry，按 gap 降序前 5，点击打开详情', async () => {
+    seedIndustries()
+    const openDetail = vi.fn()
+    const wrapper = mount(PcProfileView, {
+      global: { provide: { [GAP_OPEN_DETAIL_KEY]: openDetail } }
+    })
+    const rows = wrapper.findAll('.t5row')
+    expect(rows.length).toBe(5)
+    expect(rows.map((r) => r.text()).join('|')).toContain('GAP 90')
+    expect(rows[0].text()).toContain('#1')
+    expect(rows[3].text()).toContain('GAP 60')
+    expect(rows[4].text()).toContain('GAP 50')
+    const all = wrapper.html()
+    expect(all).not.toContain('GAP 40')
+    expect(all.indexOf('grid2')).toBeLessThan(all.indexOf('t5panel'))
+    expect(all).toContain('AI与数字经济 · TOP5 差事件')
+
+    await rows[0].trigger('click')
+    expect(openDetail).toHaveBeenCalledWith(1)
+    wrapper.unmount()
+  })
+
+  it('移动保留 openIndustry 跳转，新增「看该行业 TOP5」展开/收起且同源同序', async () => {
+    seedIndustries()
+    const openDetail = vi.fn()
+    const wrapper = mount(MbProfileView, {
+      global: { provide: { [GAP_OPEN_DETAIL_KEY]: openDetail } }
+    })
+    // 原跳转行为一个不少
+    await wrapper.findAll('.p-item')[0].trigger('click')
+    expect(wrapper.emitted('navigate')).toEqual([['m-latest']])
+
+    const toggle = wrapper.findAll('.ind-toggle')[0]
+    expect(toggle.text()).toContain('看该行业 TOP5')
+    await toggle.trigger('click')
+    expect(toggle.text()).toContain('收起该行业 TOP5')
+    const rows = wrapper.findAll('.ind-row')
+    expect(rows.length).toBe(5)
+    expect(rows[0].text()).toContain('#1')
+    expect(rows[0].text()).toContain('GAP 90')
+    expect(rows[4].text()).toContain('GAP 50')
+    await rows[0].trigger('click')
+    expect(openDetail).toHaveBeenCalledWith(1)
+    await toggle.trigger('click')
+    expect(wrapper.findAll('.ind-row').length).toBe(0)
+    wrapper.unmount()
+  })
+
+  it('两端都读 byIndustry；无事件时显示空态，不造占位', () => {
+    const pcSrc = readSource('src/views/gapdesk/pc/PcProfileView.vue')
+    const mbSrc = readSource('src/views/gapdesk/mb/MbProfileView.vue')
+    for (const src of [pcSrc, mbSrc]) {
+      expect(src).toContain('byIndustry.value[')
+      expect(src).toContain('.sort((a, b) => b.gap - a.gap)')
+      expect(src).toContain('.slice(0, 5)')
+    }
+    const pc = mount(PcProfileView)
+    expect(pc.findAll('.t5row').length).toBe(0)
+    expect(pc.html()).toContain('TOP5 差事件')
+    pc.unmount()
+    const mb = mount(MbProfileView)
+    expect(mb.findAll('.ind-row').length).toBe(0)
+    mb.unmount()
+  })
+})
+
+describe('第三档 · 翻译额度指示与降级提示（PC + 移动同源）', () => {
+  afterEach(() => {
+    store.i18nBudgetOut.value = false
+  })
+
+  it('纯函数档位：正常 / 低于 20% / 用尽，用尽标记优先', () => {
+    expect(i18nQuotaToneOf(4000, 4500, false)).toBe('ok')
+    expect(i18nQuotaToneOf(800, 4500, false)).toBe('low')
+    expect(i18nQuotaToneOf(799, 4500, false)).toBe('low')
+    expect(i18nQuotaToneOf(4000, 4500, true)).toBe('out')
+    expect(i18nQuotaToneOf(0, 4500, false)).toBe('out')
+    expect(i18nQuotaTextOf(4000, 4500, false)).toBe('今日剩余 4000 字')
+    expect(I18N_QUOTA_OUT_TEXT).toBe('额度用尽 · 保留原文')
+    expect(I18N_QUOTA_OUT_TIP).toContain('明日自动恢复')
+    expect(I18N_QUOTA_OUT_TIP).toContain('原文始终保留')
+  })
+
+  it('PC 筛选栏徽标读真实 store 值；用尽时文案与 aria 如实说明', async () => {
+    store.i18nBudgetOut.value = false
+    const wrapper = mount(GapFilterBar)
+    const badge = wrapper.find('.gfb-quota')
+    expect(badge.exists()).toBe(true)
+    expect(badge.text()).toBe(`今日剩余 ${store.i18nBudgetLeft.value} 字`)
+    expect(badge.attributes('title')).toContain(String(store.i18nDailyChars))
+
+    store.i18nBudgetOut.value = true
+    await nextTick()
+    expect(badge.text()).toBe(I18N_QUOTA_OUT_TEXT)
+    expect(badge.attributes('title')).toBe(I18N_QUOTA_OUT_TIP)
+    expect(badge.attributes('aria-label')).toBe(I18N_QUOTA_OUT_TIP)
+    wrapper.unmount()
+  })
+
+  it('移动壳同样有同款额度徽标，且所有额度数值取自 store 不写死', async () => {
+    const shell = mount(GapMobileShell)
+    const badge = shell.find('.p-quota')
+    expect(badge.exists()).toBe(true)
+    expect(badge.text()).toBe(`今日剩余 ${store.i18nBudgetLeft.value} 字`)
+    store.i18nBudgetOut.value = true
+    await nextTick()
+    expect(badge.text()).toBe(I18N_QUOTA_OUT_TEXT)
+    expect(badge.attributes('aria-label')).toBe(I18N_QUOTA_OUT_TIP)
+    shell.unmount()
+
+    // GapFilterBar 被 PC 宿主与移动筛选页共同引用；两端都从 store 读真实值
+    for (const rel of [
+      'src/components/gapdesk/GapFilterBar.vue',
+      'src/components/gapdesk/GapMobileShell.vue',
+      'src/views/gapdesk/mb/MbFilterView.vue'
+    ]) {
+      const src = readSource(rel)
+      if (rel.includes('MbFilterView')) expect(src).toContain('<GapFilterBar />')
+      else {
+        expect(src).toContain('i18nBudgetLeft.value')
+        expect(src).toContain('i18nDailyChars')
+        expect(src).toContain('i18nBudgetOut.value')
+      }
+    }
   })
 })

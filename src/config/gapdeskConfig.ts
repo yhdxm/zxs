@@ -382,6 +382,16 @@ export const GAP_LAG_NOTE = '含检测延迟 · 源间首触跨度取中位'
  */
 export const GAP_COLLECT_NOTE = '采集由 GitHub Actions 免费定时触发（每小时两轮），高负载时会延迟或跳过槽位，因此数据可能滞后数小时；这不影响已入库数据的真实性，也不代表系统故障。绿色=1 小时内、黄色=1 小时内未更新、灰色=采集时间未知。'
 
+/**
+ * 手动补采入口：GitHub Actions 的 workflow_dispatch 已在仓库启用。
+ * 前端不放任何 token（安全）：按钮在浏览器新标签打开该页，用户在自己已登录的 GitHub 会话里点 Run workflow。
+ * 触发后回来刷新页面即可看到新数据；这里只提供入口，不伪造「已触发」状态。
+ */
+export const GAP_COLLECT_URL =
+  'https://github.com/yhdxm/zxs/actions/workflows/gapdesk-collect.yml'
+export const GAP_COLLECT_MANUAL_NOTE =
+  '数据旧了可在打开的页面点 Run workflow 手动补采；回到本页点刷新拉取新数据。此入口不需要在本站输入任何凭据。'
+
 /** AI 模块边界：输入用于检索研判依据，不是对话模型 */
 export const EMPTY_AI_INPUT = '输入关键词检索真实事件作为研判依据（本模块不是对话模型，不会产生自由回答）'
 
@@ -394,6 +404,21 @@ export const EMPTY_AI_WEIGHT = '按反馈在线更新权重尚未实现'
  * rare>1 鼓励孤证早报，action<1 抑制不可执行项。
  */
 export const GAP_WEIGHTS = { time: 0.90, rare: 1.10, impact: 0.85, action: 0.75 } as const
+
+/**
+ * 时效衰减档位（排序口径）：让「今天早上」的真实差值排在几十小时前的高分前面。
+ * 采用离散档而非连续公式：按 3/6/12/24 小时分桶，避免 30 秒时钟 tick 导致列表反复重排。
+ * 源站无时间（ts_published=0）按最旧档处理，不冒充分新；同档内仍按 gap 降序。
+ * gap 展示分不变，只用于排序的 effGap 会随档位打折。
+ */
+export const GAP_FRESH_DECAY = [
+  { maxHours: 3, factor: 1.00, label: '3 小时内' },
+  { maxHours: 6, factor: 0.98, label: '3-6 小时' },
+  { maxHours: 12, factor: 0.94, label: '6-12 小时' },
+  { maxHours: 24, factor: 0.88, label: '12-24 小时' }
+] as const
+export const GAP_FRESH_DECAY_OLD = 0.80
+export const GAP_FRESH_NOTE = '排序已按新鲜度分档衰减（3h 内不打折，24h 以上打 8 折）；gap 展示分与分层口径不变。源站无时间按最旧档。'
 
 /**
  * 信源层级 → 分级档位（唯一真源，composable 与视图共用）。

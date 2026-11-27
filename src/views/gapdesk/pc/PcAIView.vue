@@ -8,6 +8,38 @@
       <span v-for="chip in contextChips" :key="chip" class="gd-pill gd-pill-soft gd-mono">{{ chip }}</span>
     </div>
 
+    <section class="panel model-brief">
+      <div class="gh">
+        <i class="bar" aria-hidden="true" />
+        <span class="t">AI 模型研判 · 点击即生成</span>
+        <span class="r gd-mono">{{ status === 'done' ? (cached ? '48h 缓存' : modelLabel) : '' }}</span>
+      </div>
+      <p class="panel-note">
+        把当前 48h 池的真实差值交给模型归纳，只引用给定事件，不编造；下方规则版研判始终保留。
+      </p>
+      <div class="brief-actions">
+        <button type="button" class="pctl brief-run" :disabled="!canGenerate" @click="generate()">
+          {{ status === 'loading' ? '研判生成中…' : (text ? '重新生成研判' : '生成研判') }}
+        </button>
+        <span v-if="!configReady" class="brief-hint">首次使用：选免费模型 + 填一次 Key</span>
+      </div>
+      <div v-if="!configReady" class="brief-setup">
+        <select v-model="modelPick" class="brief-select" aria-label="选择免费模型">
+          <option v-for="m in freeModels" :key="m.id" :value="m.id">{{ m.label }}</option>
+        </select>
+        <input
+          v-model="keyInput"
+          class="pctl brief-key"
+          type="password"
+          autocomplete="off"
+          placeholder="该平台的免费 API Key（仅填一次，加密留存）"
+        />
+        <button type="button" class="pctl" @click="applyFreeModel()">保存模型</button>
+      </div>
+      <p v-if="error" class="panel-note brief-error">{{ error }}；下方规则版研判不受影响。</p>
+      <p v-if="text" class="panel-note brief-text">{{ text }}</p>
+    </section>
+
     <section class="panel chat">
       <div class="gh">
         <i class="bar" aria-hidden="true" />
@@ -28,6 +60,7 @@
           时间 ×{{ GAP_WEIGHTS.time }} · 孤证 ×{{ GAP_WEIGHTS.rare }} · 影响 ×{{ GAP_WEIGHTS.impact }} · 行动 ×{{ GAP_WEIGHTS.action }}。
           {{ EMPTY_LLM }}。
         </p>
+        <p class="panel-note">{{ GAP_FRESH_NOTE }}</p>
       </div>
 
       <div class="row1 chips suggest">
@@ -90,11 +123,17 @@ import {
   EMPTY_AI_WEIGHT,
   EMPTY_GENERIC,
   EMPTY_LLM,
+  GAP_FRESH_NOTE,
   GAP_WEIGHTS
 } from '../../../config/gapdeskConfig'
 import { GAP_OPEN_DETAIL_KEY, useGapDesk } from '../../../composables/useGapDesk'
+import { useGapBriefAi } from '../../../composables/useGapBriefAi'
 
 const { ranked, tierCounts, lagMedianHours, health, dailyBriefText, titleOf } = useGapDesk()
+const {
+  status, text, modelLabel, cached, error, keyInput, modelPick,
+  configReady, canGenerate, freeModels, applyFreeModel, generate
+} = useGapBriefAi()
 const openDetail = inject(GAP_OPEN_DETAIL_KEY, (_id: number) => {})
 const query = ref('')
 
@@ -128,6 +167,62 @@ const weightRows = computed(() => [
 <style scoped>
 .chips {
   flex-wrap: wrap;
+}
+.model-brief {
+  border-color: color-mix(in srgb, var(--gd-brand) 35%, var(--gd-line));
+}
+.brief-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 8px 0;
+}
+.brief-run {
+  cursor: pointer;
+  color: var(--gd-brand);
+  font-weight: 600;
+}
+.brief-run:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.brief-hint {
+  font-size: var(--gd-fs-pill);
+  color: var(--gd-ink3);
+}
+.brief-setup {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.brief-select,
+.brief-key {
+  min-height: 34px;
+  padding: 0 9px;
+  border: 1px solid var(--gd-line);
+  border-radius: var(--gd-r-nav);
+  background: var(--gd-sub);
+  color: var(--gd-ink2);
+  font-family: var(--gd-sans);
+  font-size: var(--gd-fs-panels);
+}
+.brief-select {
+  max-width: 260px;
+}
+.brief-key {
+  flex: 1 1 240px;
+}
+.brief-error {
+  color: #c0392b;
+}
+.brief-text {
+  white-space: pre-line;
+  line-height: 1.7;
+  padding: 10px 12px;
+  border-radius: var(--gd-r-nav);
+  background: var(--gd-sub);
 }
 .msg {
   padding: 9px 11px;

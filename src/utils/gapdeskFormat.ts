@@ -216,6 +216,41 @@ export function i18nBadgeTextOf(state: 'native' | 'off' | 'done' | 'loading' | '
   }
 }
 
+/** 翻译额度用尽的固定文案：所有端共用，避免一处说「额度用完」一处说「保留原文」 */
+export const I18N_QUOTA_OUT_TEXT = '额度用尽 · 保留原文'
+/** 用尽时的完整说明，作为 title / aria-label，明确「明日恢复 + 原文保留」 */
+export const I18N_QUOTA_OUT_TIP = '免费翻译日额度已用完，明日自动恢复；原文始终保留'
+
+/** 额度徽标三档：正常 / 低于 20% 警示 / 用尽 */
+export type I18nQuotaTone = 'ok' | 'low' | 'out'
+
+/**
+ * 翻译额度档位。每日总字符数从 store 的 i18nDailyChars 传入，不在本函数写死。
+ * 用尽标记（store 的 i18nBudgetOut）优先于剩余字符判断。
+ */
+export function i18nQuotaToneOf(left: number, daily: number, out: boolean): I18nQuotaTone {
+  const rest = Number.isFinite(left) && left > 0 ? left : 0
+  const total = Number.isFinite(daily) && daily > 0 ? daily : 0
+  if (out || rest <= 0) return 'out'
+  if (total > 0 && rest / total < 0.2) return 'low'
+  return 'ok'
+}
+
+/** 额度徽标短文案：正常/警示都报真实剩余字符数，用尽按固定口径说清楚。 */
+export function i18nQuotaTextOf(left: number, daily: number, out: boolean): string {
+  if (i18nQuotaToneOf(left, daily, out) === 'out') return I18N_QUOTA_OUT_TEXT
+  const rest = Number.isFinite(left) && left > 0 ? Math.round(left) : 0
+  return `今日剩余 ${rest} 字`
+}
+
+/** 额度徽标完整说明（title / aria-label），数值同样来自调用方传入的真实 store 值。 */
+export function i18nQuotaTipOf(left: number, daily: number, out: boolean): string {
+  if (i18nQuotaToneOf(left, daily, out) === 'out') return I18N_QUOTA_OUT_TIP
+  const rest = Number.isFinite(left) && left > 0 ? Math.round(left) : 0
+  const total = Number.isFinite(daily) && daily > 0 ? Math.round(daily) : 0
+  return `免费翻译日额度 ${total} 字，今日剩余 ${rest} 字；译文只用于展示，原文始终保留`
+}
+
 /**
  * 事件归日 key：live（1 小时内）/ today（今天更早）/ YYYY-MM-DD / unknown（源站无时间）。
  * PC 最新信息的分段、移动端最新信息的分段、日期胶囊筛选必须共用这一份，

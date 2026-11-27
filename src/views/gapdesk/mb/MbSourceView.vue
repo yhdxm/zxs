@@ -10,6 +10,8 @@
     </section>
     <p v-if="health.total === 0" class="gd-mono">{{ EMPTY_WAIT }}：还没有信源健康数据。</p>
 
+    <GapSourceStats mobile :limit="8" />
+
     <template v-for="section in layerGroups" :key="section.key">
       <div class="p-sec"><div class="h">{{ section.label }} · {{ section.groups.length }} 路</div></div>
       <button v-for="group in section.groups" :key="group.source" type="button" class="p-item" @click="toggle(group.source)">
@@ -30,6 +32,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import GapEmptyState from '../../../components/gapdesk/GapEmptyState.vue'
+import GapSourceStats from '../../../components/gapdesk/GapSourceStats.vue'
 import { EMPTY_WAIT, GAP_LAYER_MAP, GAP_LAYER_ORDER } from '../../../config/gapdeskConfig'
 import { useGapDesk } from '../../../composables/useGapDesk'
 

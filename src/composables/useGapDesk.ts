@@ -19,12 +19,14 @@ import {
   clearFeedCache,
   loadFeed,
   listFavorites,
+  listLater,
   listRules,
   listSubscriptions,
   markRead,
   purgeExpired,
   resolveUserId,
   toggleFavorite as toggleFavoriteRemote,
+  toggleLaterRemote,
   toggleSubscribe as toggleSubscribeRemote,
   type GapFeedData,
   type GapFeedMeta
@@ -39,6 +41,8 @@ import {
   EMPTY_PURGE_ERROR,
   EMPTY_PURGE_RUNNING,
   GAP_CACHE_TTL,
+  GAP_FRESH_DECAY,
+  GAP_FRESH_DECAY_OLD,
   GAP_FEED_CACHE_KEY,
   GAP_REFRESH_MS,
   type PurgeState,
@@ -91,6 +95,9 @@ import type {
   SourceGradeRow,
   SourceStatusKind,
   SourceGroup,
+  SourceHealthStat,
+  EchoChain,
+  EchoChainHop,
   SupplyDayRow
 } from '../types/gapdesk'
 
@@ -313,7 +320,7 @@ function toggleAutoTranslate(on?: boolean): void {
   }
 }
 
-/** 本机稍后读：不新增表，只存 event_id，跨视图共享 */
+/** 稍后读：localStorage 是离线镜像，登录后以 gap_later 表为准跨设备同步 */
 const LATER_KEY = 'gapdesk_later_ids'
 function readLaterIds(): number[] {
   try {
@@ -356,6 +363,7 @@ async function loadUserState(): Promise<void> {
     ruleRows.value = []
     ruleLoaded.value = false
     canPurge.value = false
+    // 未登录：稍后读保留本机镜像，不清空（不能因为读不到云端就丢用户数据）
     return
   }
   // 清理权限按 app_accounts 的 role 判定；读不到用户就当普通用户，按钮不渲染。
@@ -368,16 +376,27 @@ async function loadUserState(): Promise<void> {
   canPurge.value = canManageSystem(user)
 
   // 规则读取与收藏/订阅同轮发起，但单独兜底：规则读失败不能拖累其它用户态。
-  const [fav, sub, rules] = await Promise.all([
+  const [fav, sub, rules, later] = await Promise.all([
     listFavorites(uid),
     listSubscriptions(uid),
     listRules(uid).then(
       (r) => r,
       (e: unknown) => ({ data: [] as GapRuleRow[], error: e instanceof Error ? e.message : String(e) })
+    ),
+    listLater(uid).then(
+      (r) => r,
+      (e: unknown) => ({ data: [] as { event_id: number }[], error: e instanceof Error ? e.message : String(e) })
     )
   ])
   favorites.value = fav.data.map((f) => f.event_id)
   mySubs.value = sub.data.map((s) => s.ind)
+  // 登录后以云端为准跨端对齐；表未建/读失败时保留本机镜像，不静默清空
+  if (!later.error) {
+    laterIds.value = later.data.map((l) => l.event_id)
+    try {
+      globalThis.localStorage?.setItem(LATER_KEY, JSON.stringify(laterIds.value))
+    } catch { /* ignore */ }
+  }
   if (rules.error) {
     ruleRows.value = []
     ruleLoaded.value = false
@@ -509,7 +528,7 @@ export function useGapDeskRealtime(): void {
   if (syncBound) return
   syncBound = true
   useCloudSync({
-    tables: ['gap_events', 'gap_favorites', 'gap_subscriptions', 'gap_reads'],
+    tables: ['gap_events', 'gap_favorites', 'gap_subscriptions', 'gap_reads', 'gap_later'],
     reload: () => loadGapFeed(true),
     // 首次加载由视图自己的 onMounted → load() 负责，避免与 TTL 判断互相抢跑
     immediate: false,
@@ -676,15 +695,109 @@ const health = computed(() => {
   return { ok, total, down }
 })
 
+/**
+ * 逐源实测统计：全部来自 48h 池的证据链真值，不依赖 gap_sources 运行态，也不写死数字。
+ * 事件 → 首报源（publish_ts 最小）→ 该源首报次数；src_count 判交叉/孤证；
+ * 有双时间戳的事件算该源相对首报的滞后，取中位。无样本一律 0 / null，界面须显示「待采」。
+ */
+const sourceHealthStats = computed<SourceHealthStat[]>(() => {
+  const eventMap = new Map(events.value.map((e) => [e.id, e]))
+  const first = firstSourceOf.value
+  const rowsBySource = new Map<string, GapEventSourceRow[]>()
+  for (const row of evidences.value) {
+    const name = (row.source_name || '').trim() || '未知来源'
+    const arr = rowsBySource.get(name)
+    if (arr) arr.push(row)
+    else rowsBySource.set(name, [row])
+  }
+
+  const out: SourceHealthStat[] = []
+  for (const [source, rows] of rowsBySource) {
+    const eventIds = new Set<number>(rows.map((r) => r.event_id))
+    let firstCount = 0
+    let crossCount = 0
+    let loneCount = 0
+    const lags: number[] = []
+    let layer: GapLayer | null = null
+    for (const row of rows) {
+      if (!layer && row.layer) layer = row.layer
+    }
+    // 每个事件里该源只取最早一条带时间戳的行（同源重复不重复计滞后），与 Echo 链同口径
+    const earliestByEvent = new Map<number, GapEventSourceRow>()
+    for (const row of rows) {
+      if (!row.publish_ts || row.publish_ts <= 0) continue
+      const prev = earliestByEvent.get(row.event_id)
+      if (!prev || row.publish_ts < (prev.publish_ts ?? Number.MAX_SAFE_INTEGER)) {
+        earliestByEvent.set(row.event_id, row)
+      }
+    }
+    for (const [eventId, row] of earliestByEvent) {
+      const f = first(eventId)
+      if (f && f.id === row.id) {
+        firstCount += 1 // 该源是事件首报，首报本身没有滞后，不计入 lags
+      } else if (f?.publish_ts && f.publish_ts > 0 && row.publish_ts) {
+        lags.push((row.publish_ts - f.publish_ts) / 3600000)
+      }
+    }
+    for (const id of eventIds) {
+      const ev = eventMap.get(id)
+      if (!ev) continue
+      if (ev.src_count >= 2) crossCount += 1
+      else loneCount += 1
+    }
+    const total = eventIds.size
+    const sorted = [...lags].sort((a, b) => a - b)
+    let lagH: number | null = null
+    if (sorted.length) {
+      const mid = sorted.length >> 1
+      const hit = sorted[mid]
+      if (hit != null) {
+        lagH = sorted.length % 2
+          ? Math.round(hit * 10) / 10
+          : Math.round((((sorted[mid - 1] ?? 0) + hit) / 2) * 10) / 10
+      }
+    }
+    out.push({
+      source,
+      layer,
+      events: total,
+      firstCount,
+      crossCount,
+      loneCount,
+      lagH,
+      firstPct: total > 0 ? Math.round((firstCount / total) * 100) : 0
+    })
+  }
+  return out.sort((a, b) => b.firstCount - a.firstCount || b.events - a.events)
+})
+
 /* ============================================================
    三·补、T02 派生数据（全部只读 computed）
    ============================================================ */
 
+/**
+ * 时效衰减系数：按离散档位（3/6/12/24h）打折，避免连续公式随 30 秒时钟抖动重排。
+ * 源站无时间（ts_published=0）按最旧档处理，不冒充新鲜。
+ */
+function freshFactorOf(ts: number, now: number): number {
+  // 源站无时间：比最旧档再降一档，避免高 gap 的榜单条目压过有时间的新鲜事件
+  if (ts <= 0) return GAP_FRESH_DECAY_OLD * 0.99
+  const ageH = Math.max(0, (now - ts) / 3600000)
+  for (const band of GAP_FRESH_DECAY) {
+    if (ageH < band.maxHours) return band.factor
+  }
+  return GAP_FRESH_DECAY_OLD
+}
+
 /** 排名 + 展示分层：按池内分位而非绝对分数，L0 前 10% / L1 10–40% / L2 其余 */
 const ranked = computed<RankedEvent[]>(() => {
-  const list = [...pool.value].sort(
-    (a, b) => b.gap - a.gap || (b.ts_first_seen || 0) - (a.ts_first_seen || 0)
-  )
+  const now = nowMs.value
+  // 排序键 = gap × 时效档位；gap 展示分不变，只影响先后。同分档内仍按 gap 降序、再按首见时间。
+  const list = [...pool.value].sort((a, b) => {
+    const ea = a.gap * freshFactorOf(a.ts_published, now)
+    const eb = b.gap * freshFactorOf(b.ts_published, now)
+    return eb - ea || b.gap - a.gap || (b.ts_first_seen || 0) - (a.ts_first_seen || 0)
+  })
   const total = list.length
   return list.map((e, i) => {
     const ratio = total > 0 ? i / total : 1
@@ -715,6 +828,63 @@ const tierCounts = computed<Record<GapTier, number>>(() => {
   const out: Record<GapTier, number> = { L0: 0, L1: 0, L2: 0 }
   for (const e of ranked.value) out[e.tier] += 1
   return out
+})
+
+/**
+ * Echo 传播链：同一事件内按 publish_ts 排序的跨源首触序列（真实证据链，非回打兑现率）。
+ * 只收有 ≥2 条带真实时间戳证据、且分属不同源的事件；同源重复行只保留最早那条。
+ * 首触滞后 = 该源 publish_ts − 最早源 publish_ts（小时，一位小数）。
+ * 这是「谁先报、谁跟、隔多久」的直接实测，不涉及任何预测或补齐。
+ */
+const echoChains = computed<EchoChain[]>(() => {
+  const rankedById = new Map(ranked.value.map((r) => [r.id, r]))
+  const byEvent = new Map<number, GapEventSourceRow[]>()
+  for (const row of evidences.value) {
+    const arr = byEvent.get(row.event_id)
+    if (arr) arr.push(row)
+    else byEvent.set(row.event_id, [row])
+  }
+
+  const out: EchoChain[] = []
+  for (const [eventId, rows] of byEvent) {
+    const ev = rankedById.get(eventId)
+    if (!ev) continue
+    // 同源取最早一条，且必须有真实时间戳
+    const earliestBySource = new Map<string, GapEventSourceRow>()
+    for (const row of rows) {
+      if (!row.publish_ts || row.publish_ts <= 0) continue
+      const name = (row.source_name || '').trim() || '未知来源'
+      const prev = earliestBySource.get(name)
+      if (!prev || row.publish_ts < (prev.publish_ts ?? Number.MAX_SAFE_INTEGER)) {
+        earliestBySource.set(name, row)
+      }
+    }
+    if (earliestBySource.size < 2) continue
+
+    const ordered = [...earliestBySource.values()].sort(
+      (a, b) => (a.publish_ts ?? 0) - (b.publish_ts ?? 0)
+    )
+    const firstTs = ordered[0]?.publish_ts ?? 0
+    const hops: EchoChainHop[] = ordered.map((row) => ({
+      source: (row.source_name || '').trim() || '未知来源',
+      ts: row.publish_ts ?? 0,
+      layer: row.layer ?? null,
+      lagH: Math.round((((row.publish_ts ?? 0) - firstTs) / 3600000) * 10) / 10
+    }))
+    const spanH = hops.length > 1 ? (hops[hops.length - 1]?.lagH ?? 0) : 0
+    out.push({
+      eventId,
+      title: ev.title,
+      gap: ev.gap,
+      tier: ev.tier,
+      firstSource: hops[0]?.source ?? '未知来源',
+      firstTs,
+      spanH,
+      hopCount: hops.length,
+      hops
+    })
+  }
+  return out.sort((a, b) => b.spanH - a.spanH || b.gap - a.gap)
 })
 
 /** 本地日键：按用户看到的「今天」归日，不用 UTC 造成跨日错位 */
@@ -1102,15 +1272,29 @@ function resetFilters(): void {
   feedCount.value = FEED_BATCH
 }
 
-/** 稍后读：本机列表，写 localStorage 失败也不影响内存状态 */
+/** 稍后读：乐观更新（立即响应），登录后同步云端；写库失败回滚，localStorage 始终是离线镜像 */
 function toggleLater(eventId: number): void {
   const has = laterIds.value.includes(eventId)
-  const next = has ? laterIds.value.filter((id) => id !== eventId) : [...laterIds.value, eventId]
+  const on = !has
+  const next = on ? [...laterIds.value, eventId] : laterIds.value.filter((id) => id !== eventId)
   laterIds.value = next
   try {
     globalThis.localStorage?.setItem(LATER_KEY, JSON.stringify(next))
   } catch {
     /* 隐私模式下写不进去，内存态照常生效 */
+  }
+  if (userId.value) {
+    void toggleLaterRemote(eventId, on).then((ok) => {
+      if (!ok) {
+        // 云端写失败：回滚到操作前状态，避免双端口径不一致
+        const rollback = on ? laterIds.value.filter((id) => id !== eventId) : [...laterIds.value, eventId]
+        laterIds.value = rollback
+        try {
+          globalThis.localStorage?.setItem(LATER_KEY, JSON.stringify(rollback))
+        } catch { /* ignore */ }
+        console.warn('[gapdesk] 稍后读写库失败，已回滚')
+      }
+    })
   }
 }
 
@@ -1209,6 +1393,8 @@ export function useGapDesk() {
     byIndustry,
     matrix6,
     bySource,
+    sourceHealthStats,
+    echoChains,
     lagMedianHours,
     isLive,
     demoReasons,
